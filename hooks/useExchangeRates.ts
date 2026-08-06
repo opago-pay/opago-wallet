@@ -1,45 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchJson } from '@/lib/http';
 
-const CACHE_EXPIRY = 60 * 1000; // 60 seconds
-let cachedRates = { btcToEur: 60000, solToEur: 140 }; // Fallback estimations
-let cacheTimestamp = 0;
+const CACHE_EXPIRY = 60_000;
+const FALLBACK_RATES = { btcToEur: 0, solToEur: 0 };
+let cachedRates = FALLBACK_RATES;
+let lastFetch = 0;
+
+interface CoinGeckoResponse {
+  bitcoin?: { eur?: number };
+  solana?: { eur?: number };
+}
 
 export function useExchangeRates() {
   const [rates, setRates] = useState(cachedRates);
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    const fetchRates = async () => {
-      if (Date.now() - cacheTimestamp < CACHE_EXPIRY) {
-        if (active) setRates(cachedRates);
+    async function loadRates() {
+      if (Date.now() - lastFetch < CACHE_EXPIRY && cachedRates.btcToEur > 0) {
+        setRates(cachedRates);
         return;
       }
-
       try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur');
-        const data = await res.json();
-        
-        const newRates = { 
-          btcToEur: data.bitcoin?.eur || cachedRates.btcToEur, 
-          solToEur: data.solana?.eur || cachedRates.solToEur 
-        };
-        
-        cachedRates = newRates;
-        cacheTimestamp = Date.now();
-        
-        if (active) setRates(newRates);
-      } catch (e) {
-        console.warn("CoinGecko fetch failed, using memory cache", e);
+        const data = await fetchJson<CoinGeckoResponse>(
+          'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur',
+          {},
+          { purpose: 'Exchange-rate service', timeoutMs: 8_000 },
+        );
+        const btcToEur = Number(data.bitcoin?.eur);
+        const solToEur = Number(data.solana?.eur);
+        if (btcToEur > 0 && solToEur > 0) {
+          cachedRates = { btcToEur, solToEur };
+          lastFetch = Date.now();
+          if (!cancelled) setRates(cachedRates);
+        }
+      } catch {
+        if (!cancelled) setRates(cachedRates);
       }
-    };
+    }
 
-    fetchRates();
-    const interval = setInterval(fetchRates, CACHE_EXPIRY);
-
+    void loadRates();
     return () => {
-      active = false;
-      clearInterval(interval);
+      cancelled = true;
     };
   }, []);
 

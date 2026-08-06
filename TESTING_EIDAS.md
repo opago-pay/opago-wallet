@@ -1,72 +1,83 @@
-# Hackathon Pitch: eIDAS Flow Testanleitung
+# eID / Travel Rule demo test
 
-Da das physische BVA-Berechtigungszertifikat noch auf dem Postweg ist und wir unseren eigenen eID-Server noch nicht final anbinden können, nutzen wir für den Pitch einen **hybriden Test-Flow**. 
+This is an explicit development demo. It is not an eIDAS certification, legal opinion, production VASP service, or authorization to process identity data.
 
-Dieser Flow beweist der Jury zwei Dinge:
-1. Eure kryptografische Backend-Architektur (Opago VASP Signatur) ist produktionsreif und mathematisch sicher.
-2. Der "Seamless UX Flow" per Deep-Link funktioniert reibungslos.
+## 1. Configure the app
 
----
+Use private LAN addresses when testing on a physical device:
 
-## 🛠 Vorbereitung
+~~~text
+EXPO_PUBLIC_EID_BACKEND_URL=http://192.168.1.20:5555
+EXPO_PUBLIC_ALLOW_INSECURE_HTTP=true
+~~~
 
-Du benötigst drei offene Terminals für diese Demo.
+Restart Expo after changing EXPO_PUBLIC_* values. Never enable local HTTP in a production build.
 
-### Terminal 1: Der Merchant / Receiver
-Dieser Server simuliert den Empfänger (z.B. eine Krypto-Börse oder einen Händler), der die FATF Travel Rule Compliance von Opago verlangt. Er generiert die LNURL und validiert später eure Ed25519-Signatur.
+## 2. Start the reference backend
 
-```bash
-node scratch_eidas_server.js
-```
-*(Kopiere dir den ausgegebenen LNURL-String).*
-
-### Terminal 2: Das Opago Krypto-Backend
-Dieser Server simuliert euer VASP-Backend. Er initialisiert die eID-Session und signiert die verifizierten Ausweisdaten kryptografisch (Ed25519) für das Lightning-Netzwerk.
-
-```bash
+~~~powershell
+$env:EID_DEMO_MODE='true'
+$env:EID_DEMO_SECRET='replace-with-a-long-random-secret'
+$env:EID_BIND_HOST='0.0.0.0'
 node opago_eid_backend.js
-```
+~~~
 
-### Terminal 3: Die App & ADB
-Starte den Expo-Server für den Emulator:
-```bash
-npx expo start
-```
-Stelle **unbedingt** sicher, dass die Port-Weiterleitung zur Windows-AusweisApp aktiv ist:
-```bash
-adb reverse tcp:24727 tcp:24727
-```
+The service uses an ephemeral Ed25519 key in demo mode. It creates sessions in PENDING state and does not auto-approve them.
 
----
+## 3. Start the merchant
 
-## 🚀 Der Demo-Flow (Live)
+The merchant must receive a real, unexpired invoice from your own regtest/demo setup. Choose one option:
 
-1. **Zahlung initiieren:**
-   Füge den LNURL-String aus Terminal 1 in das "Destination"-Feld der Opago Wallet App ein und klicke auf "Execute Payload".
-   
-2. **eIDAS Aufforderung:**
-   Der Screen wechselt zum eIDAS-Verifizierungsbildschirm. Klicke auf **"Tap ID Card"**.
-   *Im Hintergrund generiert das Opago Backend (Terminal 2) jetzt die Session und triggert die Desktop-AusweisApp.*
+~~~powershell
+$env:EIDAS_DEMO_INVOICE='YOUR_CURRENT_REGTEST_BOLT11_INVOICE'
+~~~
 
-3. **Ausweis verifizieren:**
-   Schließe den PIN-Vorgang in der AusweisApp auf dem PC erfolgreich ab.
+or:
 
-4. **Der Deep-Link Hack (Magic Moment):**
-   *Hintergrund:* Da wir noch den öffentlichen Test-Server von Governikus nutzen, öffnet dieser nach Abschluss zwingend ein Browserfenster, anstatt in die App zurückzuleiten. 
-   Um euren echten, eigenen Server zu simulieren (der direkt den Deep-Link triggern würde), nutzt du in Terminal 3 folgenden Befehl:
+~~~powershell
+$env:EIDAS_DEMO_INVOICE_URL='https://your-controlled-invoice-provider.example/callback'
+~~~
 
-   ```bash
-   npx uri-scheme open opagowallet://eid-success --android
-   ```
-   *(Falls du auf einem iOS Simulator pitchst: `npx uri-scheme open opagowallet://eid-success --ios`)*
+Then expose the LAN callback and start the server:
 
-5. **Kryptografischer Erfolg:**
-   Sobald du den Befehl ausführst, springt die App an! Sie holt sich die signierten Travel Rule Daten von eurem Backend und sendet sie an den Merchant.
-   
-   **Beweis für die Jury (in Terminal 1 schauen!):**
-   ```text
-   -> ✅ eIDAS Travel Rule Signatur ist GÜLTIG! Krypto-Beweis erfolgreich.
-   -> Echte Invoice von Alby geladen und an App gesendet!
-   ```
-   
-   In der App erscheint der grüne Haken. Der kryptografische Beweis der Identität wurde erfolgreich auf der Blockchain / im Lightning-Netzwerk verifiziert!
+~~~powershell
+$env:EIDAS_DEMO_BIND_HOST='0.0.0.0'
+$env:EIDAS_DEMO_PUBLIC_BASE_URL='http://192.168.1.20:4444'
+$env:EIDAS_BACKEND_URL='http://127.0.0.1:5555'
+node scratch_eidas_server.js
+~~~
+
+The server prints an LNURL and QR code.
+
+## 4. Run the flow
+
+1. Scan the merchant LNURL in the Send screen.
+2. Enter the exact LNURL amount and continue.
+3. Start identity verification. The app creates a PENDING backend session and opens AusweisApp.
+4. Copy the session ID printed by the backend.
+5. Complete only that session with the configured bearer secret:
+
+~~~powershell
+$headers = @{ Authorization = 'Bearer replace-with-a-long-random-secret' }
+Invoke-RestMethod -Method Post -Headers $headers -Uri 'http://127.0.0.1:5555/api/eid/session/SESSION_ID/demo-complete'
+~~~
+
+6. Return to Opago Wallet. If necessary in an emulator, trigger the normal app deep link:
+
+~~~powershell
+npx uri-scheme open opagowallet://eid-success --android
+~~~
+
+The app polls the exact session. Only SUCCESS with signed payer data continues. The merchant reconstructs the canonical payload, verifies the Ed25519 signature and expiry, rejects replay, and then returns the configured invoice. The app independently decodes that invoice, checks network, expiry, and exact amount, and only then requests payment.
+
+## Expected failure cases
+
+- Wrong or absent demo bearer secret: 401.
+- Unknown, expired, or already completed session: 404/409.
+- Missing or modified payer data: merchant returns ERROR.
+- Replayed identity proof: merchant returns ERROR.
+- Missing invoice configuration: merchant returns ERROR; no placeholder invoice is emitted.
+- Mainnet invoice in the default safe build: wallet rejects it.
+- Public HTTP or local HTTP without the explicit development flag: wallet rejects it.
+
+For provider-connected testing, use the authenticated session callback instead of demo-complete and supply verifiedData from the configured eID provider. The bundled backend remains in-memory and is not a production identity system.

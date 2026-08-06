@@ -1,84 +1,167 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  AppState,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
-import { deleteSecureItem, getSecureItem } from '../../lib/storage';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
-import { wipeWalletGlobally } from '@/hooks/useWalletAuth';
 import { usePrivy } from '@privy-io/expo';
+import { useWalletAuth } from '@/hooks/useWalletAuth';
+import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
+import { appConfig } from '@/lib/config';
 
+function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
+  usePreventScreenCapture('opago-recovery-phrase');
+  return <Text style={styles.mnemonicText}>{phrase}</Text>;
+}
 export default function SettingsScreen() {
   const router = useRouter();
   const { logout } = usePrivy();
+  const { wipeWallet } = useWalletAuth();
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
-
-  useEffect(() => {
-    getSecureItem('opago_wallet_mnemonic').then(setMnemonic);
-  }, []);
-
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  useEffect(() => {
+    if (!isRevealed) return;
+    const hide = () => {
+      setMnemonic(null);
+      setIsRevealed(false);
+    };
+    const timer = setTimeout(hide, 30_000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') hide();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [isRevealed]);
 
-  const handleReset = async () => {
+  async function toggleRecoveryPhrase() {
+    if (isRevealed) {
+      setMnemonic(null);
+      setIsRevealed(false);
+      return;
+    }
+    setIsUnlocking(true);
+    try {
+      const phrase = await getSecureItem(MNEMONIC_STORE_KEY);
+      if (!phrase) throw new Error('Recovery phrase is unavailable.');
+      setMnemonic(phrase);
+      setIsRevealed(true);
+    } catch (cause) {
+      Alert.alert(
+        'Could not unlock recovery phrase',
+        cause instanceof Error ? cause.message : 'Device authentication failed.',
+      );
+    } finally {
+      setIsUnlocking(false);
+    }
+  }
+
+  async function performReset() {
     setIsDeleting(true);
     try {
-      await wipeWalletGlobally();
+      await wipeWallet();
       if (logout) {
-        try {
-          // Timeout von 2 Sekunden, falls Privy sich aufhängt!
-          await Promise.race([
-            logout(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Privy logout timeout")), 2000))
-          ]);
-        } catch (e) {
-          console.warn("Privy logout failed or timed out, continuing wipe...", e);
-        }
+        await Promise.race([
+          logout(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Privy logout timed out.')), 5_000),
+          ),
+        ]).catch(() => undefined);
       }
+      setMnemonic(null);
+      setIsRevealed(false);
+      router.replace('/(auth)/login');
+    } catch (cause) {
+      Alert.alert(
+        'Wallet deletion failed',
+        cause instanceof Error ? cause.message : 'Local wallet data could not be removed.',
+      );
     } finally {
       setIsDeleting(false);
-      // Force a hard reload basically by jumping to Login
-      router.replace('/(auth)/login');
     }
-  };
+  }
+
+  function confirmReset() {
+    Alert.alert(
+      'Delete wallet from this device?',
+      'Make sure the recovery phrase is backed up. This removes local keys, history and swap caches.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete wallet',
+          style: 'destructive',
+          onPress: () => void performReset(),
+        },
+      ],
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} contentFit="contain" />
+        <Image
+          source={require('@/assets/images/logo_new.svg')}
+          style={{ width: 36, height: 36 }}
+          contentFit="contain"
+        />
       </View>
-      <Text style={styles.subtitle}>Manage your cross-chain wallet keys.</Text>
+      <Text style={styles.subtitle}>Manage protected wallet keys and network safety.</Text>
 
-      {mnemonic && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recovery Phrase</Text>
-          <Text style={styles.sectionSubtitle}>This phrase is the master key to your funds. Never share it with anyone.</Text>
-          
-          <TouchableOpacity 
-             style={styles.mnemonicBox} 
-             onPress={() => setIsRevealed(!isRevealed)}
-          >
-            <Text style={[styles.mnemonicText, !isRevealed && styles.blurredText]}>
-              {isRevealed ? mnemonic : "•••••••• •••••••• •••••••• •••••••• •••••••• •••••••• •••••••• •••••••• •••••••• •••••••• •••••••• ••••••••"}
-            </Text>
-            {!isRevealed && (
-              <View style={styles.overlayTextContainer}>
-                <Text style={styles.overlayText}>Tap to Reveal</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.networkBanner}>
+        <Text style={styles.sectionTitle}>
+          {appConfig.isMainnet ? 'Mainnet enabled' : 'Safe development networks'}
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          {appConfig.isMainnet
+            ? 'Real-fund transfers are enabled for this build.'
+            : 'Real-fund transfers are blocked until mainnet is explicitly enabled.'}
+        </Text>
+      </View>
 
       <View style={styles.section}>
-        <TouchableOpacity 
-          style={[styles.dangerButton, isDeleting && { opacity: 0.5 }]} 
-          onPress={handleReset}
+        <Text style={styles.sectionTitle}>Recovery phrase</Text>
+        <Text style={styles.sectionSubtitle}>
+          Device authentication is requested when supported. Never share this phrase.
+        </Text>
+        <TouchableOpacity
+          style={styles.mnemonicBox}
+          onPress={() => void toggleRecoveryPhrase()}
+          disabled={isUnlocking}
+        >
+          {isUnlocking ? (
+            <ActivityIndicator color="#ffb000" />
+          ) : isRevealed && mnemonic ? (
+            <ProtectedRecoveryPhrase phrase={mnemonic} />
+          ) : (
+            <Text style={styles.mnemonicText}>Hidden recovery phrase</Text>
+          )}
+          {!isRevealed && !isUnlocking && (
+            <Text style={styles.overlayText}>Tap to authenticate and reveal</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.dangerButton, isDeleting && { opacity: 0.5 }]}
+          onPress={confirmReset}
           disabled={isDeleting}
         >
           {isDeleting ? (
             <ActivityIndicator color="#ff4444" />
           ) : (
-            <Text style={styles.dangerButtonText}>Delete Wallet</Text>
+            <Text style={styles.dangerButtonText}>Delete wallet</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -87,11 +170,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0c',
-    paddingHorizontal: 16,
-  },
+  container: { flex: 1, backgroundColor: '#0a0a0c', paddingHorizontal: 16 },
   header: {
     marginTop: 60,
     marginBottom: 20,
@@ -99,30 +178,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  subtitle: {
-    color: '#8f8f9d'
+  title: { fontSize: 32, fontWeight: '800', color: '#fff' },
+  subtitle: { color: '#8f8f9d' },
+  networkBanner: {
+    marginTop: 28,
+    backgroundColor: 'rgba(107,92,195,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(107,92,195,0.4)',
+    borderRadius: 16,
+    padding: 18,
   },
   section: {
-    marginTop: 40,
+    marginTop: 32,
     borderTopWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    paddingTop: 40,
+    paddingTop: 32,
   },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  sectionSubtitle: {
-    color: '#8f8f9d',
-    marginBottom: 16,
-  },
+  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  sectionSubtitle: { color: '#8f8f9d', marginBottom: 16, lineHeight: 20 },
   mnemonicBox: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 24,
@@ -133,37 +206,19 @@ const styles = StyleSheet.create({
   },
   mnemonicText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     lineHeight: 28,
     fontFamily: 'monospace',
     textAlign: 'center',
-    letterSpacing: 1,
   },
-  blurredText: {
-    opacity: 0.3,
-  },
-  overlayTextContainer: {
-    position: 'absolute',
-    top: 0, bottom: 0, left: 0, right: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overlayText: {
-    color: '#ffb000',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  overlayText: { color: '#ffb000', fontWeight: '700', marginTop: 14 },
   dangerButton: {
-    backgroundColor: 'rgba(255, 60, 60, 0.1)',
+    backgroundColor: 'rgba(255,60,60,0.1)',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 60, 60, 0.3)',
+    borderColor: 'rgba(255,60,60,0.3)',
   },
-  dangerButtonText: {
-    color: '#ff4444',
-    fontWeight: '700',
-    fontSize: 16,
-  }
+  dangerButtonText: { color: '#ff4444', fontWeight: '700', fontSize: 16 },
 });

@@ -1,1 +1,0 @@
-const fs = require('fs'); const http = require('http'); http.createServer((req, res) => { let body = ''; req.on('data', c => body += c); req.on('end', () => { fs.writeFileSync('debug_payload.json', JSON.stringify(JSON.parse(body), null, 2)); res.end('ok'); process.exit(0); }); }).listen(9999);

@@ -1,57 +1,30 @@
 import 'react-native-get-random-values';
-import * as Crypto from 'expo-crypto';
-import { Buffer } from 'buffer';
-
-if (typeof global.Buffer === 'undefined') {
-  global.Buffer = Buffer;
-}
-
-if (typeof global.crypto !== 'object') {
-  (global as any).crypto = {};
-}
-if (!(global as any).crypto.getRandomValues) {
-  (global as any).crypto.getRandomValues = function (array: Uint8Array) {
-    const rnd = Crypto.getRandomBytes(array.byteLength || array.length);
-    for (let i = 0; i < (array.byteLength || array.length); i++) array[i] = rnd[i];
-    return array;
-  };
-}
-if (typeof window !== 'undefined' && !(window as any).crypto) {
-  (window as any).crypto = (global as any).crypto;
-}
-if (typeof globalThis !== 'undefined' && !(globalThis as any).crypto) {
-  (globalThis as any).crypto = (global as any).crypto;
-}
-
+import 'react-native-reanimated';
+import { View, Text } from 'react-native';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
 import * as Notifications from 'expo-notifications';
 import { PrivyProvider } from '@privy-io/expo';
+import { WalletProvider } from '@/hooks/useWalletAuth';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
+function AppStack() {
   return (
-    <PrivyProvider
-      appId={process.env.EXPO_PUBLIC_PRIVY_APP_ID!}
-      clientId={process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID!}
-    >
+    <WalletProvider>
       <ThemeProvider value={DarkTheme}>
         <Stack>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -60,6 +33,36 @@ export default function RootLayout() {
         </Stack>
         <StatusBar style="light" />
       </ThemeProvider>
+    </WalletProvider>
+  );
+}
+
+export default function RootLayout() {
+  const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
+  const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID;
+
+  if (!appId || !clientId) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0a0a0c',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
+        <Text style={{ color: '#fff', textAlign: 'center' }}>
+          Wallet configuration is incomplete. Set EXPO_PUBLIC_PRIVY_APP_ID and
+          EXPO_PUBLIC_PRIVY_CLIENT_ID.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <PrivyProvider appId={appId} clientId={clientId}>
+      <AppStack />
     </PrivyProvider>
   );
 }

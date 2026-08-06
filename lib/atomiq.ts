@@ -1,156 +1,157 @@
 import { Buffer } from 'buffer';
-if (typeof global.Buffer === 'undefined') {
-  global.Buffer = Buffer;
-}
+import { appConfig, assertMainnetPaymentsEnabled } from './config';
+import { decodeLightningInvoice, resolveInvoiceAmount } from './lightning';
 
-const solanaRpc = "https://solana-mainnet.rpc.extnode.com";
+if (typeof global.Buffer === 'undefined') global.Buffer = Buffer;
 
-(global as any).atomiqLogLevel = 3;
+let atomiqSdk: any;
+let atomiqSolana: any;
+let storageRnAsync: any;
+let factory: any;
+let swapper: any;
+let swapperPromise: Promise<any> | null = null;
 
-// Store static references dynamically to prevent Hoisting
-let atomiqSdk: any = null;
-let atomiqBase: any = null;
-let atomiqSolana: any = null;
-let solanaWeb3: any = null;
-let Factory: any = null;
 export let Tokens: any = null;
 
-let storageRnAsync: any = null;
-
-function ensureSDKLoaded() {
-    if (!atomiqSdk) {
-        atomiqSdk = require("@atomiqlabs/sdk");
-        atomiqBase = require("@atomiqlabs/base");
-        atomiqSolana = require("@atomiqlabs/chain-solana");
-        solanaWeb3 = require("@solana/web3.js");
-        storageRnAsync = require("@atomiqlabs/storage-rn-async");
-        
-        Factory = new atomiqSdk.SwapperFactory([atomiqSolana.SolanaInitializer]);
-        Tokens = Factory.Tokens;
-    }
+function ensureSDKLoaded(): void {
+  if (factory) return;
+  atomiqSdk = require('@atomiqlabs/sdk');
+  atomiqSolana = require('@atomiqlabs/chain-solana');
+  storageRnAsync = require('@atomiqlabs/storage-rn-async');
+  factory = new atomiqSdk.SwapperFactory([atomiqSolana.SolanaInitializer]);
+  Tokens = factory.Tokens;
 }
 
-let swapper: any = null;
-let isSwapperInitialized = false;
-
 export async function getAtomiqSwapper() {
-    ensureSDKLoaded();
-    if (!swapper || !isSwapperInitialized) {
-        swapper = Factory.newSwapper({
-            chains: {
-                SOLANA: { rpcUrl: "https://api.mainnet-beta.solana.com" }
-            },
-            bitcoinNetwork: atomiqSdk.BitcoinNetwork.MAINNET,
-            swapStorage: (chainId: any) => new storageRnAsync.RNAsyncUnifiedStorage(`atomiq_sdk_chain_${chainId}_`),
-            chainStorageCtor: (name: any) => new storageRnAsync.RNAsyncStorageManager(`atomiq_sdk_store_${name}_`)
-        });
-        try {
-            await swapper.init();
-            isSwapperInitialized = true;
-        } catch (e) {
-            swapper = null;
-            isSwapperInitialized = false;
-            throw e;
-        }
-    }
-    return swapper;
+  assertMainnetPaymentsEnabled('Atomiq swaps');
+  ensureSDKLoaded();
+  if (swapper) return swapper;
+  if (swapperPromise) return swapperPromise;
+
+  swapperPromise = (async () => {
+    const instance = factory.newSwapper({
+      chains: { SOLANA: { rpcUrl: appConfig.solanaRpcUrl } },
+      bitcoinNetwork: atomiqSdk.BitcoinNetwork.MAINNET,
+      swapStorage: (chainId: string) =>
+        new storageRnAsync.RNAsyncUnifiedStorage('atomiq_sdk_chain_' + chainId + '_'),
+      chainStorageCtor: (name: string) =>
+        new storageRnAsync.RNAsyncStorageManager('atomiq_sdk_store_' + name + '_'),
+    });
+    await instance.init();
+    swapper = instance;
+    return instance;
+  })();
+
+  try {
+    return await swapperPromise;
+  } finally {
+    swapperPromise = null;
+  }
+}
+
+interface SignableTransaction {
+  version?: unknown;
+  sign?: (signers: any[]) => void;
+  partialSign?: (...signers: any[]) => void;
+}
+
+function signOne<T extends SignableTransaction>(transaction: T, keypair: any): T {
+  if ('version' in transaction && typeof transaction.sign === 'function') {
+    transaction.sign([keypair]);
+    return transaction;
+  }
+  if (typeof transaction.partialSign === 'function') {
+    transaction.partialSign(keypair);
+    return transaction;
+  }
+  throw new Error('Atomiq returned an unsupported Solana transaction type.');
 }
 
 export function createAnchorWallet(keypair: any) {
-    ensureSDKLoaded();
-    return {
-        publicKey: keypair.publicKey,
-        signTransaction: async <T extends any>(tx: T) => {
-            if ('version' in tx) {
-                tx.sign([keypair]);
-            } else {
-                tx.partialSign(keypair);
-            }
-            return tx;
-        },
-        signAllTransactions: async <T extends any>(txs: T[]) => {
-            return Promise.all(txs.map(async (tx: any) => {
-                if ('version' in tx) {
-                    tx.sign([keypair]);
-                } else {
-                    tx.partialSign(keypair);
-                }
-                return tx;
-            }));
-        }
-    };
+  ensureSDKLoaded();
+  return {
+    publicKey: keypair.publicKey,
+    signTransaction: async <T extends SignableTransaction>(transaction: T) =>
+      signOne(transaction, keypair),
+    signAllTransactions: async <T extends SignableTransaction>(transactions: T[]) =>
+      transactions.map(transaction => signOne(transaction, keypair)),
+  };
 }
 
-export async function getAtomiqQuote(keypair: any, destination: string, amountSat: number, assetType: 'SOL' | 'USDC' = 'SOL') {
-    ensureSDKLoaded();
-    
-    console.log("\n==============================================");
-    console.log("[Atomiq Debug] Starting new Swapper Instance");
-    console.log("[Atomiq Debug] RPC URL: https://api.mainnet-beta.solana.com");
-    console.log("[Atomiq Debug] Bitcoin Network: MAINNET");
-    console.log("[Atomiq Debug] Intermediaries: Autodetect (No hardcoded URLs)");
-    
-    const swapper = await getAtomiqSwapper();
-    const anchorWallet = createAnchorWallet(keypair);
-    const solanaSigner = new atomiqSolana.SolanaSigner(anchorWallet);
+export async function getAtomiqQuote(
+  keypair: any,
+  destination: string,
+  amountSat: number,
+  assetType: 'SOL' | 'USDC' = 'SOL',
+) {
+  assertMainnetPaymentsEnabled('Atomiq swaps');
+  if (!keypair?.publicKey) throw new Error('Solana signer is unavailable.');
+  const invoice = decodeLightningInvoice(destination);
+  const verifiedAmount = resolveInvoiceAmount(invoice, amountSat);
+  if (verifiedAmount !== amountSat) throw new Error('Swap amount does not match the invoice.');
 
-    const btcAmountStr = (amountSat / 1e8).toFixed(8);
+  ensureSDKLoaded();
+  const activeSwapper = await getAtomiqSwapper();
+  const solanaSigner = new atomiqSolana.SolanaSigner(createAnchorWallet(keypair));
+  const fromToken = assetType === 'USDC' ? Tokens.SOLANA.USDC : Tokens.SOLANA.SOL;
+  if (!fromToken) throw new Error(assetType + ' is not supported by the Atomiq configuration.');
 
-    console.log("[Atomiq Debug] --- Quote Parameters ---");
-    console.log("[Atomiq Debug] User Solana Pubkey:", keypair.publicKey.toBase58());
-    console.log("[Atomiq Debug] Destination Invoice:", destination);
-    console.log("[Atomiq Debug] Amount (Sats):", amountSat);
-    console.log("[Atomiq Debug] Amount (BTC):", btcAmountStr);
-    console.log("[Atomiq Debug] Asset Type:", assetType);
-    
-    const fromToken = assetType === 'USDC' ? Tokens.SOLANA.USDC : Tokens.SOLANA.SOL;
-    console.log("[Atomiq Debug] Using fromToken address:", fromToken?.toString());
-    
-    try {
-        const limits = swapper.getSwapLimits(fromToken, Tokens.BITCOIN.BTCLN);
-        console.log("[Atomiq Debug] Swap Limits:", 
-            "Min Input:", limits?.input?.min?.toString(),
-            "Min Output:", limits?.output?.min?.toString()
-        );
-    } catch (e) {
-        console.log("[Atomiq Debug] Could not fetch swap limits:", e);
-    }
+  const swap = await activeSwapper.swap(
+    fromToken,
+    Tokens.BITCOIN.BTCLN,
+    invoice.amountSats === null ? (amountSat / 1e8).toFixed(8) : undefined,
+    atomiqSdk.SwapAmountType.EXACT_OUT,
+    solanaSigner.getAddress(),
+    invoice.invoice,
+  );
+  if (!swap?.getInput?.()) throw new Error('Atomiq returned an invalid quote.');
+  const quotedOutputSats = Number(swap.getOutput()?.rawAmount);
+  if (!Number.isSafeInteger(quotedOutputSats) || quotedOutputSats !== verifiedAmount) {
+    throw new Error('Atomiq quote output does not match the requested Lightning amount.');
+  }
+  return { swap, solanaSigner };
+}
 
-    // If destination is a bolt11 invoice, the amount parameter MUST be undefined in the SDK call
-    const isInvoice = destination.toLowerCase().startsWith('lnbc');
-    const swapAmount = isInvoice ? undefined : btcAmountStr;
-    console.log("[Atomiq Debug] isInvoice:", isInvoice, "| swapAmount sent to SDK:", swapAmount);
-
-    console.log("[Atomiq Debug] Calling swapper.swap()...");
-    try {
-        // Generates a local quote bounded by the LP liquidity, representing EXACT_OUT parameters
-        const swap = await swapper.swap(
-            fromToken, 
-            Tokens.BITCOIN.BTCLN,
-            swapAmount,
-            atomiqSdk.SwapAmountType.EXACT_OUT,
-            solanaSigner.getAddress(),
-            destination 
-        );
-
-        console.log("[Atomiq Debug] swapper.swap() SUCCEEDED!");
-        console.log("[Atomiq Debug] Atomiq Quote input required:", swap.getInput()?.toString());
-        console.log("==============================================\n");
-        
-        return { swap, solanaSigner };
-    } catch (error: any) {
-        console.error("\n[Atomiq Debug] swapper.swap() FAILED FATALLY!");
-        console.error("[Atomiq Debug] Error Name:", error?.name);
-        console.error("[Atomiq Debug] Error Message:", error?.message);
-        console.error("[Atomiq Debug] Stack Trace:", error?.stack);
-        console.error("==============================================\n");
-        throw error;
-    }
+export class AtomiqExecutionError extends Error {
+  constructor(message: string, readonly sourceTxId: string | null) {
+    super(message);
+    this.name = 'AtomiqExecutionError';
+  }
 }
 
 export async function executeAtomiqQuote(swap: any, solanaSigner: any) {
-    return await swap.execute(solanaSigner, {
-        onSourceTransactionSent: (txId: any) => console.log("Atomiq Source Tx:", txId),
-        onSwapSettled: (btcTxId: any) => console.log("Atomiq Swap Settled:", btcTxId)
+  if (!swap || !solanaSigner) throw new Error('Atomiq quote is incomplete.');
+  if (Number(swap.getQuoteExpiry?.()) <= Date.now()) throw new Error('Atomiq quote expired.');
+  let sourceTxId: string | null = null;
+  let destinationTxId: string | null = null;
+  try {
+    const success = await swap.execute(solanaSigner, {
+      onSourceTransactionSent: (txId: string) => {
+        sourceTxId = txId;
+      },
+      onSourceTransactionConfirmed: (txId: string) => {
+        sourceTxId = txId;
+      },
+      onSwapSettled: (txId: string) => {
+        destinationTxId = txId;
+      },
     });
+    if (!success) {
+      throw new AtomiqExecutionError(
+        'The swap was funded but the Lightning payment did not settle. Refund action may be required.',
+        sourceTxId,
+      );
+    }
+    const txId = destinationTxId || swap.getOutputTxId?.() || sourceTxId;
+    if (typeof txId !== 'string' || !txId) {
+      throw new AtomiqExecutionError('Atomiq settled without returning a transaction reference.', sourceTxId);
+    }
+    return { txId, sourceTxId, destinationTxId };
+  } catch (cause) {
+    if (cause instanceof AtomiqExecutionError || !sourceTxId) throw cause;
+    throw new AtomiqExecutionError(
+      'The swap failed after its source transaction was sent. Review or refund it in Atomiq.',
+      sourceTxId,
+    );
+  }
 }

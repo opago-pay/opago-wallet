@@ -1,10 +1,8 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { getSecureItem } from '../lib/storage';
 import { View, ActivityIndicator } from 'react-native';
+import { hasStoredMnemonic } from '../lib/storage';
 import { useWalletAuth } from '../hooks/useWalletAuth';
-
-const MNEMONIC_STORE_KEY = 'opago_wallet_mnemonic';
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
@@ -12,33 +10,40 @@ export default function Index() {
   const { loadOrGenerateWallet } = useWalletAuth();
 
   useEffect(() => {
-    async function checkAuth() {
+    let mounted = true;
+
+    async function checkWallet() {
       try {
-        const item = await getSecureItem(MNEMONIC_STORE_KEY);
-        if (item) {
-          await loadOrGenerateWallet();
-        }
-        setHasWallet(!!item);
-      } catch (e) {
-        // ignore
+        const exists = await hasStoredMnemonic();
+        if (exists) await loadOrGenerateWallet();
+        if (mounted) setHasWallet(exists);
+      } catch {
+        if (mounted) setHasWallet(false);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
-    checkAuth();
-  }, []);
+
+    void checkWallet();
+    return () => {
+      mounted = false;
+    };
+  }, [loadOrGenerateWallet]);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0a0a0c', justifyContent: 'center', alignItems: 'center' }}>
-         <ActivityIndicator color="#ffb000" />
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0a0a0c',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator color="#ffb000" />
       </View>
     );
   }
 
-  if (hasWallet) {
-    return <Redirect href="/(tabs)" />;
-  } else {
-    return <Redirect href="/(auth)/login" />;
-  }
+  return <Redirect href={hasWallet ? '/(tabs)' : '/(auth)/login'} />;
 }

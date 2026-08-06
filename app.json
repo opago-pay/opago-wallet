@@ -41,7 +41,12 @@
           }
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Allow Opago to unlock your protected recovery phrase."
+        }
+      ],
       "expo-sqlite",
       [
         "expo-camera",
