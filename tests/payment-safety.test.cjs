@@ -1,28 +1,14 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const test = require('node:test');
-const ts = require('typescript');
 
 process.env.NODE_ENV = 'test';
 process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'true';
 delete process.env.EXPO_PUBLIC_ENABLE_MAINNET;
 delete process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS;
 
-require.extensions['.ts'] = function compileTypeScript(module, filename) {
-  const source = fs.readFileSync(filename, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      esModuleInterop: true,
-      module: ts.ModuleKind.CommonJS,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: filename,
-  }).outputText;
-  module._compile(output, filename);
-};
+require('./register-typescript.cjs');
 
 const {
   calculateMaxLightningFee,
@@ -33,7 +19,12 @@ const {
   resolveInvoiceAmount,
 } = require('../lib/lightning.ts');
 const { assertSafeRemoteUrl } = require('../lib/config.ts');
-const { sparkTransferMatchesInvoice, verifyPaymentPreimage } = require('../lib/payments.ts');
+const {
+  payDecodedSparkInvoice,
+  sparkTransferMatchesInvoice,
+  verifyPaymentPreimage,
+} = require('../lib/payments.ts');
+const { parsePaymentAmount, resolveLnurlAmount } = require('../lib/payment-input.ts');
 
 function invoice(amountSats) {
   return {
@@ -113,4 +104,63 @@ test('allows HTTPS and explicitly enabled local development HTTP only', () => {
   assert.throws(() => assertSafeRemoteUrl('http://merchant.example/pay', 'test'), /must use HTTPS/i);
   assert.equal(assertSafeRemoteUrl('http://[::1]:3333/ocp', 'test').protocol, 'http:');
   assert.throws(() => assertSafeRemoteUrl('https://user:pass@merchant.example/pay', 'test'), /credentials/i);
+});
+
+test('parses SAT/EUR input and enforces LNURL ranges', () => {
+  assert.equal(parsePaymentAmount('', 'SAT', 50_000), 0);
+  assert.equal(parsePaymentAmount('123', 'SAT', 50_000), 123);
+  assert.equal(parsePaymentAmount('10,00', 'EUR', 10_000), 100_000);
+  assert.throws(() => parsePaymentAmount('1.5', 'SAT', 50_000), /whole numbers/i);
+  assert.throws(() => parsePaymentAmount('1', 'EUR', 0), /exchange rate/i);
+  assert.equal(resolveLnurlAmount(1_000, 1_000, 0), 1);
+  assert.equal(resolveLnurlAmount(1_000, 10_000, 5), 5);
+  assert.throws(() => resolveLnurlAmount(1_000, 10_000, 0), /requires an amount/i);
+  assert.throws(() => resolveLnurlAmount(1_000, 10_000, 11), /between 1 and 10/i);
+});
+
+test('records a Spark payment only after a matching proof and propagates failures', async () => {
+  const preimage = '00'.repeat(32);
+  const paymentHash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
+  const details = {
+    invoice: 'lnbcrt1validated-test-invoice',
+    amountSats: 50,
+    paymentHash,
+    expiresAt: Date.now() + 60_000,
+  };
+  let paymentRequest = null;
+  const result = await payDecodedSparkInvoice({
+    async getBalance() { return { balance: 100 }; },
+    async payLightningInvoice(request) {
+      paymentRequest = request;
+      return { preimage };
+    },
+  }, details);
+
+  assert.deepEqual(result, {
+    amountSats: 50,
+    paymentHash,
+    proof: preimage,
+    reference: 'ln:' + paymentHash,
+  });
+  assert.deepEqual(paymentRequest, {
+    invoice: details.invoice,
+    maxFeeSats: 1,
+    amountSatsToSend: undefined,
+    idempotencyKey: 'opago-' + paymentHash,
+  });
+
+  await assert.rejects(
+    payDecodedSparkInvoice({
+      async getBalance() { return { balance: 100 }; },
+      async payLightningInvoice() { throw new Error('route failed'); },
+    }, details),
+    /route failed/i,
+  );
+  await assert.rejects(
+    payDecodedSparkInvoice({
+      async getBalance() { return { balance: 100 }; },
+      async payLightningInvoice() { return { preimage: '01'.repeat(32) }; },
+    }, details),
+    /proof does not match/i,
+  );
 });

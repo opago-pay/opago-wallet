@@ -4,6 +4,7 @@ import {
   createPaymentReference,
   decodeLightningInvoice,
   resolveInvoiceAmount,
+  type LightningInvoiceDetails,
 } from './lightning';
 
 export interface SparkPaymentResult {
@@ -13,7 +14,7 @@ export interface SparkPaymentResult {
   reference: string;
 }
 
-interface SparkWalletLike {
+export interface SparkWalletLike {
   getBalance(): Promise<{ balance?: unknown; satsBalance?: { incoming?: unknown } }>;
   payLightningInvoice(input: {
     invoice: string;
@@ -40,12 +41,11 @@ export function verifyPaymentPreimage(preimage: unknown, paymentHash: string): s
   }
   return normalized;
 }
-export async function paySparkInvoice(
+export async function payDecodedSparkInvoice(
   wallet: SparkWalletLike,
-  invoiceInput: string,
+  invoice: LightningInvoiceDetails,
   requestedAmountSats?: number,
 ): Promise<SparkPaymentResult> {
-  const invoice = decodeLightningInvoice(invoiceInput);
   const amountSats = resolveInvoiceAmount(invoice, requestedAmountSats);
   const balanceData = await wallet.getBalance();
   const balanceSats =
@@ -69,6 +69,14 @@ export async function paySparkInvoice(
     proof,
     reference: createPaymentReference(invoice.paymentHash),
   };
+}
+
+export async function paySparkInvoice(
+  wallet: SparkWalletLike,
+  invoiceInput: string,
+  requestedAmountSats?: number,
+): Promise<SparkPaymentResult> {
+  return payDecodedSparkInvoice(wallet, decodeLightningInvoice(invoiceInput), requestedAmountSats);
 }
 
 export function sparkTransferMatchesInvoice(

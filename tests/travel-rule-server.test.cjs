@@ -36,7 +36,7 @@ test('Travel Rule merchant verifies canonical proofs and rejects replay', async 
   process.env.EIDAS_DEMO_INVOICE = 'lnbcrt1configured-demo-invoice';
   process.env.EIDAS_DEMO_AMOUNT_MSAT = '1000';
 
-  const { server } = require('../scratch_eidas_server.js');
+  const { server } = require('../demo/travel-rule-merchant.js');
   await listen(server);
   t.after(() => close(server));
   const merchantAddress = server.address();

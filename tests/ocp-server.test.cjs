@@ -8,7 +8,7 @@ process.env.OCP_DEMO_SOLANA_DESTINATION = Keypair.generate().publicKey.toBase58(
 process.env.OCP_DEMO_QUOTE_TTL_MS = '60000';
 delete process.env.OCP_DEMO_LIGHTNING_INVOICE;
 
-const { server } = require('../scratch_ocp_server.js');
+const { server } = require('../demo/ocp-server.js');
 
 test('OCP execution is quote-bound, expiring, and single-use', async t => {
   await new Promise((resolve, reject) => {

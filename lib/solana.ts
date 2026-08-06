@@ -53,23 +53,54 @@ function parsePositiveAmount(amount: number, decimals: number): bigint {
   }
   return BigInt(atomicAmount);
 }
-function getNativeTransferDeltaLamports(transaction: any, address: PublicKey): number {
-  const outer = transaction?.transaction?.message?.instructions || [];
-  const inner = (transaction?.meta?.innerInstructions || []).flatMap(
-    (group: { instructions?: any[] }) => group.instructions || [],
-  );
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function collectParsedInstructions(transaction: unknown): unknown[] {
+  if (!isRecord(transaction)) return [];
+  const transactionData = isRecord(transaction.transaction) ? transaction.transaction : null;
+  const message = transactionData && isRecord(transactionData.message) ? transactionData.message : null;
+  const outer = message && Array.isArray(message.instructions) ? message.instructions : [];
+  const meta = isRecord(transaction.meta) ? transaction.meta : null;
+  const innerGroups = meta && Array.isArray(meta.innerInstructions) ? meta.innerInstructions : [];
+  const inner = innerGroups.flatMap(group => {
+    if (!isRecord(group) || !Array.isArray(group.instructions)) return [];
+    return group.instructions;
+  });
+  return [...outer, ...inner];
+}
+
+function parseSystemTransfer(instruction: unknown): {
+  source: string;
+  destination: string;
+  lamports: number;
+} | null {
+  if (!isRecord(instruction) || instruction.program !== 'system' || !isRecord(instruction.parsed)) {
+    return null;
+  }
+  const parsed = instruction.parsed;
+  if (typeof parsed.type !== 'string' || !parsed.type.startsWith('transfer') || !isRecord(parsed.info)) {
+    return null;
+  }
+  const lamports = Number(parsed.info.lamports);
+  if (
+    typeof parsed.info.source !== 'string' ||
+    typeof parsed.info.destination !== 'string' ||
+    !Number.isSafeInteger(lamports) ||
+    lamports <= 0
+  ) return null;
+  return { source: parsed.info.source, destination: parsed.info.destination, lamports };
+}
+
+export function getNativeTransferDeltaLamports(transaction: unknown, address: PublicKey): number {
   let delta = 0;
-  for (const instruction of [...outer, ...inner]) {
-    const parsed = instruction?.parsed;
-    const info = parsed?.info;
-    if (
-      instruction?.program !== 'system' ||
-      !String(parsed?.type || '').startsWith('transfer') ||
-      !Number.isSafeInteger(Number(info?.lamports))
-    ) continue;
-    const lamports = Number(info.lamports);
-    if (info.destination === address.toBase58()) delta += lamports;
-    if (info.source === address.toBase58()) delta -= lamports;
+  const walletAddress = address.toBase58();
+  for (const instruction of collectParsedInstructions(transaction)) {
+    const transfer = parseSystemTransfer(instruction);
+    if (!transfer) continue;
+    if (transfer.destination === walletAddress) delta += transfer.lamports;
+    if (transfer.source === walletAddress) delta -= transfer.lamports;
   }
   return delta;
 }

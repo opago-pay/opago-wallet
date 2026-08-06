@@ -69,7 +69,7 @@ Configure at least one real destination for the chosen development network:
 $env:OCP_DEMO_SOLANA_DESTINATION='YOUR_DEVNET_ADDRESS'
 $env:OCP_DEMO_BIND_HOST='0.0.0.0'
 $env:OCP_DEMO_PUBLIC_URL='http://192.168.1.20:3333/ocp'
-node scratch_ocp_server.js
+npm run demo:ocp
 ~~~
 
 A quote expires after 60 seconds by default and can be executed once. Lightning is offered only when OCP_DEMO_LIGHTNING_INVOICE is supplied.
@@ -81,7 +81,7 @@ Explicit demo mode requires a bearer secret and never auto-completes:
 ~~~powershell
 $env:EID_DEMO_MODE='true'
 $env:EID_DEMO_SECRET='replace-with-a-long-random-secret'
-node opago_eid_backend.js
+npm run eid-backend
 ~~~
 
 The backend prints the demo session ID after the app starts a verification. Complete that exact session manually:
@@ -98,7 +98,7 @@ Non-demo use is intentionally blocked unless EID_ALLOW_IN_MEMORY_REFERENCE_BACKE
 The merchant verifies the exact signed payload, proof lifetime, and one-time use. It returns no placeholder invoice. Configure EIDAS_DEMO_INVOICE or a JSON invoice provider through EIDAS_DEMO_INVOICE_URL, then run:
 
 ~~~powershell
-node scratch_eidas_server.js
+npm run demo:travel-rule
 ~~~
 
 See TESTING_EIDAS.md for the complete local sequence.
@@ -107,7 +107,7 @@ See TESTING_EIDAS.md for the complete local sequence.
 
 - npm run typecheck: strict TypeScript compilation
 - npm run lint: Expo ESLint checks
-- npm test: payment input, amount binding, fee-cap, receive matching, and URL-policy tests
-- node --check opago_eid_backend.js: backend syntax check
+- npm test: payment success/failure, amount binding, wallet derivation, Solana parsing, OCP/eID replay, and URL-policy tests
+- node --check server/eid-backend.js: backend syntax check
 
-Payment code is concentrated in lib/lightning.ts, lib/payments.ts, lib/solana.ts, lib/lnurl-safe.ts, lib/ocp-safe.ts, and lib/eid.ts. UI screens should orchestrate these services and must not reintroduce payment fallbacks.
+Payment code is concentrated in lib/lightning.ts, lib/payments.ts, lib/solana.ts, lib/lnurl-safe.ts, lib/ocp-safe.ts, and lib/eid.ts. UI screens should orchestrate these services and must not reintroduce payment fallbacks. The reference eID service lives under server/, while presentation-only merchants live under demo/.

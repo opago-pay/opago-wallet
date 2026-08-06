@@ -19,7 +19,7 @@ Restart Expo after changing EXPO_PUBLIC_* values. Never enable local HTTP in a p
 $env:EID_DEMO_MODE='true'
 $env:EID_DEMO_SECRET='replace-with-a-long-random-secret'
 $env:EID_BIND_HOST='0.0.0.0'
-node opago_eid_backend.js
+npm run eid-backend
 ~~~
 
 The service uses an ephemeral Ed25519 key in demo mode. It creates sessions in PENDING state and does not auto-approve them.
@@ -44,7 +44,7 @@ Then expose the LAN callback and start the server:
 $env:EIDAS_DEMO_BIND_HOST='0.0.0.0'
 $env:EIDAS_DEMO_PUBLIC_BASE_URL='http://192.168.1.20:4444'
 $env:EIDAS_BACKEND_URL='http://127.0.0.1:5555'
-node scratch_eidas_server.js
+npm run demo:travel-rule
 ~~~
 
 The server prints an LNURL and QR code.

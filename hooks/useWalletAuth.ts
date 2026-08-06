@@ -8,10 +8,9 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateMnemonic, mnemonicToSeedSync } from 'bip39';
+import { generateMnemonic } from 'bip39';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { HDKey } from 'micro-ed25519-hdkey';
 import { usePrivy } from '@privy-io/expo';
 import * as Crypto from 'expo-crypto';
 import { initializeSparkWallet } from '../lib/spark';
@@ -23,6 +22,7 @@ import {
 } from '../lib/storage';
 import { wipeTransactions } from '../lib/database';
 import { appConfig } from '../lib/config';
+import { deriveSolanaKeypair } from '../lib/wallet-keys';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 
@@ -62,10 +62,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const initializeMnemonic = useCallback(
     async (mnemonic: string) => {
       setInitStatus('Deriving wallet keys...');
-      const seed = mnemonicToSeedSync(mnemonic);
-      const hd = HDKey.fromMasterSeed(seed.toString('hex'));
-      const derivedSeed = hd.derive("m/44'/501'/0'/0'").privateKey;
-      const keypair = Keypair.fromSeed(derivedSeed);
+      const keypair = deriveSolanaKeypair(mnemonic);
 
       if (appConfig.importSolanaKeyToPrivy) {
         setInitStatus('Linking the explicitly enabled identity wallet...');

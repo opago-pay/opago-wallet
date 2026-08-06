@@ -10,7 +10,7 @@ process.env.EID_BIND_HOST = '127.0.0.1';
 process.env.EID_SESSION_RATE_LIMIT_PER_MINUTE = '1';
 delete process.env.EID_ED25519_PRIVATE_KEY_PEM;
 
-const { server } = require('../opago_eid_backend.js');
+const { server } = require('../server/eid-backend.js');
 
 async function json(response) {
   const body = await response.json();
