@@ -1,6 +1,6 @@
 # Opago Wallet
 
-Opago Wallet is a mobile wallet prototype built with Expo and React Native. It explores a single protected recovery phrase across Hedera, Solana, and Bitcoin Lightning while keeping network selection, transaction validation, and test provisioning explicit.
+Opago Wallet is a mobile wallet built with Expo and React Native. It explores a single protected recovery phrase across Hedera, Solana, and Bitcoin Lightning while keeping network selection, transaction validation, and test provisioning explicit.
 
 The current release is intended for development and test networks. It is not an audited production wallet, a licensed financial service, or evidence of regulatory compliance. See [SECURITY.md](SECURITY.md) before using the code with identities or funds.
 
@@ -8,26 +8,49 @@ The current release is intended for development and test networks. It is not an 
 
 | Capability | Network | Status |
 | --- | --- | --- |
-| HBAR account discovery and transfer | Hedera testnet | Phase 1 complete; verified on a physical Android device |
+| HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 implemented; physical-device acceptance pending |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
-| Lightning send and receive | Spark regtest | Prototype |
+| Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
 | SOL/USDC-to-Lightning quotes | Explicitly enabled mainnet build | Experimental; disabled by default |
 | Payment-method negotiation | OpenCryptoPay-style local reference service | Prototype |
 | eID and Travel Rule hand-off | Local reference services | Demo only; not legal identity verification |
 
-Mainnet payments are disabled by default. Hedera remains testnet-only for Phase 1 even when other mainnet features are explicitly enabled.
+Mainnet payments are disabled by default. Hedera remains testnet-only even when other mainnet features are explicitly enabled.
 
-## Hedera Phase 1
+## Delivery phases
 
-The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.84.0` and is implemented directly in the React Native client:
+### Phase 0 - security and Android baseline
 
-- deterministic Ed25519 derivation from the wallet recovery phrase at `m/44'/3030'/0'/0'`;
-- account discovery through the Hedera testnet Mirror Node;
-- exact tinybar amount parsing without floating-point arithmetic;
-- on-device transaction signing and receipt validation;
-- an app-level transfer limit of at most `1 HBAR` per test transaction by default;
-- isolated local account provisioning without operator credentials in the app bundle.
+**Status: complete.** The wallet fails closed for unsupported networks and malformed payment data, keeps recovery material in native secure storage, blocks accidental real-fund execution by default, and builds and installs as an Expo 54 development client on a physical Android device.
+
+### Phase 1 - Hedera SDK spike
+
+**Planned window: 8-10 August 2026. Status: complete and physically verified.**
+
+- `@hiero-ledger/sdk` is pinned to the Expo-compatible version `2.84.0`.
+- Hedera is restricted to testnet.
+- The Ed25519 key is deterministically derived from the existing recovery phrase at `m/44'/3030'/0'/0'`.
+- The app discovers the matching account through the Mirror Node.
+- A small HBAR transfer is signed on-device and its receipt is validated.
+- Faucet/operator credentials exist only in the local provisioning process and never in `EXPO_PUBLIC_*` or the app bundle.
+
+### Phase 2 - HBAR as a complete wallet asset
+
+**Planned window: 10-15 August 2026. Status: implemented in code; final physical-device acceptance is pending.**
+
+- HBAR balance, numeric account ID, receive request, send flow, transaction status, history, and HashScan links are integrated.
+- Dashboard, Send, and Receive expose HBAR as a first-class asset with prominent `HEDERA TESTNET` labels.
+- Every HBAR payment has a dedicated review screen before signing and a success screen containing its transaction ID.
+- Recovery from the same BIP39 phrase derives the same Hedera key and rediscovers the matching testnet account.
+- All HBAR monetary values remain `bigint` tinybars. JavaScript floating-point numbers are never used for HBAR accounting.
+- Mirror Node account, balance, and history data use the official [Account API](https://docs.hedera.com/api-reference/accounts/get-account-by-alias-id-or-evm-address) and [Transaction API](https://docs.hedera.com/api-reference/transactions/list-transactions).
+
+## Hedera implementation
+
+The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.84.0` directly in the React Native client. Private keys remain in runtime memory while account data and transaction history come from the Hedera testnet Mirror Node.
+
+The app enforces an app-level limit of at most `1 HBAR` per test transaction by default. Account provisioning remains isolated from the app so no operator credential enters the client bundle.
 
 ### Verified Android testnet transaction
 
@@ -78,7 +101,7 @@ The default public devnet RPC is suitable for development and is rate-limited. A
 - Public remote endpoints must use HTTPS. Local/private HTTP requires an explicit development-only flag.
 - Lightning invoices are checked for network, expiry, payment hash, exact amount, available balance, and bounded fees.
 - OCP execution payloads must match the reviewed quote, asset, method, amount, identifier, and expiry.
-- Incoming payment confirmations are matched to an expected Lightning payment hash and amount or to a confirmed incoming Solana transfer.
+- Incoming payment confirmations are matched to an expected Lightning payment hash and amount, a confirmed incoming Solana transfer, or a new Hedera Mirror Node transaction.
 
 `EXPO_PUBLIC_*` variables are compiled into the client bundle. Never place recovery phrases, private keys, operator keys, faucet keys, bearer secrets, or other credentials in them.
 
@@ -100,7 +123,7 @@ The default public devnet RPC is suitable for development and is rate-limited. A
 - A physical Android device with USB debugging, or an Android emulator
 - Privy app and client IDs for the current authentication screen
 
-Wallet-key storage requires a native Android or iOS build. The Hedera Phase 1 device verification was performed on Android; iOS verification is outside the current milestone.
+Wallet-key storage requires a native Android or iOS build. Hedera Phase 1 was verified on Android; the full Phase 2 UI still requires its final physical-device acceptance run. iOS verification is outside the current milestone.
 
 ## Quick start
 
@@ -165,15 +188,18 @@ try {
 
 A `0x`-prefixed, 32-byte MetaMask key is parsed as ECDSA. For an unprefixed 32-byte raw key, set `HEDERA_OPERATOR_KEY_TYPE` to `ECDSA` or `ED25519`; DER-encoded Hedera keys are detected directly.
 
-If the public key already controls one testnet account, the script reports that account without requesting operator credentials. After provisioning, return to Settings, select **Refresh**, enter a different numeric testnet account ID, and review the transfer before signing.
+If the public key already controls one testnet account, the script reports that account without requesting operator credentials. After provisioning, return to the dashboard to refresh the HBAR balance, then select **Hedera** in Send or Receive.
 
 Relevant implementation files:
 
-- [`lib/hedera.ts`](lib/hedera.ts) - account discovery, amount validation, transaction signing, and receipt checks;
-- [`lib/wallet-keys.ts`](lib/wallet-keys.ts) - deterministic Hedera and Solana derivation;
-- [`components/hedera-testnet-spike.tsx`](components/hedera-testnet-spike.tsx) - Android testnet interface;
+- [`lib/hedera/config.ts`](lib/hedera/config.ts) - fixed testnet policy, account validation, and tinybar constants;
+- [`lib/hedera/keys.ts`](lib/hedera/keys.ts) - deterministic Hedera Ed25519 derivation;
+- [`lib/hedera/account.ts`](lib/hedera/account.ts) - account snapshots, exact balance, history, and status mapping;
+- [`lib/hedera/payments.ts`](lib/hedera/payments.ts) - receive requests, exact amounts, signing, and receipt checks;
+- [`lib/hedera/mirror.ts`](lib/hedera/mirror.ts) - bounded official Mirror Node REST access with int64 preservation;
+- [`lib/hedera/explorer.ts`](lib/hedera/explorer.ts) - validated Hedera testnet HashScan links;
 - [`scripts/hedera-provision-testnet.cjs`](scripts/hedera-provision-testnet.cjs) - local-only account creation and funding;
-- [`tests/hedera.test.cjs`](tests/hedera.test.cjs) - key, lookup, transfer-shape, amount, and secret-boundary tests.
+- [`tests/hedera.test.cjs`](tests/hedera.test.cjs) - key, exact amount, Mirror Node, history, status, QR, and secret-boundary tests.
 
 ## Configuration
 
@@ -182,9 +208,9 @@ Relevant implementation files:
 | `EXPO_PUBLIC_ENABLE_MAINNET` | `false` | Explicitly enables supported real-fund networks at build time |
 | `EXPO_PUBLIC_SOLANA_RPC_URL` | Solana devnet public RPC | Selects the Solana RPC endpoint |
 | `EXPO_PUBLIC_USDC_MINT` | empty | Enables the intended six-decimal USDC mint on the selected cluster |
-| `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Phase 1 accepts only `testnet` |
+| `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Hedera wallet support accepts only `testnet` |
 | `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Hedera testnet Mirror Node | Resolves the account for the derived public key |
-| `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated Phase 1 transfer |
+| `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated testnet transfer |
 | `EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS` | `100` | Additional ceiling used by Lightning fee validation |
 | `EXPO_PUBLIC_ALLOW_INSECURE_HTTP` | `false` | Allows private/local HTTP only in development |
 | `EXPO_PUBLIC_EID_BACKEND_URL` | empty | Enables the optional eID reference flow |
@@ -203,7 +229,7 @@ EXPO_PUBLIC_EID_BACKEND_URL=https://your-reviewed-eid-backend.example
 
 Before any release, replace public development infrastructure, validate the complete Spark and Atomiq deployment, repeat native device and failure-path testing, reassess the dependency tree, establish monitored RPC and backend services, and obtain independent security, privacy, and regulatory reviews.
 
-Hedera mainnet is not enabled by this flag. The Phase 1 implementation rejects any Hedera network other than testnet.
+Hedera mainnet is not enabled by this flag. The wallet rejects any Hedera network other than testnet.
 
 ## Reference services
 
@@ -239,7 +265,7 @@ npm test
 node --check server/eid-backend.js
 ```
 
-The test suite covers deterministic wallet derivation, Hedera key parsing and transaction construction, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, and remote URL policy.
+The test suite covers deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, receive requests, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, and remote URL policy.
 
 ## Security reporting
 

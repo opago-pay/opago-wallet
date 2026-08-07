@@ -1,37 +1,56 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { getTransactions, Transaction as LocalTransaction } from '@/lib/database';
+import { loadHederaHistory } from '@/lib/hedera/account';
+import { openHederaExplorerUrl } from '@/lib/hedera/explorer';
+import { formatTinybars } from '@/lib/hedera/payments';
 import { getSolanaBalances, getSolanaHistory } from '@/lib/solana';
 import { appConfig } from '@/lib/config';
 
 interface DisplayTransaction {
   key: string;
   type: 'incoming' | 'outgoing';
-  amount: number;
+  amountDisplay: string;
   asset: string;
   status: string;
   timestamp: string;
   txId: string | null;
+  explorerUrl?: string;
 }
 
 export default function HomeScreen() {
-  const { walletReady, sparkWallet, solanaKeypair, loadOrGenerateWallet } = useWalletAuth();
+  const {
+    walletReady,
+    sparkWallet,
+    solanaKeypair,
+    hederaAccount,
+    loadOrGenerateWallet,
+    refreshHederaAccount,
+  } = useWalletAuth();
   const rates = useExchangeRates();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [balances, setBalances] = useState({ spark: 0, sol: 0, usdc: 0 });
+  const [balances, setBalances] = useState({
+    spark: 0,
+    sol: 0,
+    usdc: 0,
+    hbarTinybars: 0n,
+  });
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -45,8 +64,10 @@ export default function HomeScreen() {
     try {
       const local = await getTransactions();
       const remote: DisplayTransaction[] = [];
+      const remoteErrors: string[] = [];
 
       if (sparkWallet) {
+        try {
         const [balance, transferResult] = await Promise.all([
           sparkWallet.getBalance(),
           sparkWallet.getTransfers(20, 0),
@@ -69,7 +90,7 @@ export default function HomeScreen() {
             key,
             txId: key,
             type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' : 'outgoing',
-            amount,
+            amountDisplay: amount.toLocaleString(),
             asset: 'SAT',
             status: 'confirmed',
             timestamp: transfer.createdTime
@@ -77,22 +98,69 @@ export default function HomeScreen() {
               : new Date().toISOString(),
           });
         }
+        } catch (cause) {
+          remoteErrors.push(
+            'Lightning: ' +
+              (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
+          );
+        }
       }
 
       if (solanaKeypair) {
+        try {
         const [solanaBalances, history] = await Promise.all([
           getSolanaBalances(solanaKeypair.publicKey),
           getSolanaHistory(solanaKeypair.publicKey),
         ]);
         setBalances(current => ({ ...current, ...solanaBalances }));
-        remote.push(...history.map(item => ({ ...item, key: item.txId })));
+        remote.push(...history.map(item => ({
+          key: item.txId,
+          txId: item.txId,
+          type: item.type,
+          amountDisplay: item.amount.toLocaleString(),
+          asset: item.asset,
+          status: item.status,
+          timestamp: item.timestamp,
+        })));
+        } catch (cause) {
+          remoteErrors.push(
+            'Solana: ' +
+              (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
+          );
+        }
+      }
+
+      try {
+        const account = await refreshHederaAccount();
+        setBalances(current => ({
+          ...current,
+          hbarTinybars: account?.balanceTinybars || 0n,
+        }));
+        if (account) {
+          const history = await loadHederaHistory(account.accountId, 20);
+          remote.push(...history.map(item => ({
+            key: 'hedera:' + item.transactionId,
+            txId: item.transactionId,
+            type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
+            amountDisplay: item.amountHbar,
+            asset: 'HBAR',
+            status: item.result.toLowerCase(),
+            timestamp: item.occurredAt,
+            explorerUrl: item.hashscanUrl,
+          })));
+        }
+      } catch (cause) {
+        remoteErrors.push(
+          'Hedera: ' +
+            (cause instanceof Error ? cause.message : 'Testnet data could not be loaded.'),
+        );
       }
 
       const localDisplay = local.map((item: LocalTransaction): DisplayTransaction => ({
         key: item.txId || 'local:' + item.id,
         txId: item.txId,
         type: item.type,
-        amount: item.amount,
+        amountDisplay: item.amount.toLocaleString(),
         asset: item.asset,
         status: item.status,
         timestamp: item.timestamp,
@@ -108,12 +176,19 @@ export default function HomeScreen() {
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
         ),
       );
+      setLoadError(remoteErrors.length ? remoteErrors.join(' ') : null);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
       setLoading(false);
     }
-  }, [loadOrGenerateWallet, solanaKeypair, sparkWallet, walletReady]);
+  }, [
+    loadOrGenerateWallet,
+    refreshHederaAccount,
+    solanaKeypair,
+    sparkWallet,
+    walletReady,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,6 +201,24 @@ export default function HomeScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await refresh();
     setRefreshing(false);
+  }
+
+  async function copyHederaAccountId() {
+    if (!hederaAccount) return;
+    await Clipboard.setStringAsync(hederaAccount.accountId);
+    Alert.alert('Copied', 'Hedera testnet account ID copied.');
+  }
+
+  async function openTransaction(transaction: DisplayTransaction) {
+    if (!transaction.explorerUrl) return;
+    try {
+      await openHederaExplorerUrl(transaction.explorerUrl);
+    } catch (cause) {
+      Alert.alert(
+        'Could not open HashScan',
+        cause instanceof Error ? cause.message : 'The explorer link is invalid.',
+      );
+    }
   }
 
   const totalEur =
@@ -147,6 +240,7 @@ export default function HomeScreen() {
         <View>
           <Text style={styles.eyebrow}>Portfolio</Text>
           <Text style={styles.total}>{totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}</Text>
+          <Text style={styles.valuationNote}>HBAR testnet is excluded from the EUR total.</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 42, height: 42 }} />
       </View>
@@ -157,10 +251,22 @@ export default function HomeScreen() {
         </View>
       )}
 
+      <View style={styles.testnetBanner}>
+        <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
+        <Text style={styles.testnetText}>Test HBAR has no real-world value.</Text>
+      </View>
+
       <View style={styles.balanceRow}>
         <BalanceCard label="Lightning" value={balances.spark.toLocaleString() + ' SAT'} color="#ffb000" />
         <BalanceCard label="Solana" value={balances.sol.toFixed(4) + ' SOL'} color="#8f7de8" />
         <BalanceCard label="USDC" value={balances.usdc.toFixed(2) + ' USDC'} color="#4e8cff" />
+        <BalanceCard
+          label="Hedera testnet"
+          value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
+          subtitle={hederaAccount ? hederaAccount.accountId + ' - tap to copy' : 'Account not provisioned'}
+          color="#27d3b2"
+          onPress={hederaAccount ? () => void copyHederaAccountId() : undefined}
+        />
       </View>
 
       <Text style={styles.sectionTitle}>Activity</Text>
@@ -170,7 +276,12 @@ export default function HomeScreen() {
         <Text style={styles.empty}>No transactions yet.</Text>
       ) : (
         transactions.map(transaction => (
-          <View key={transaction.key} style={styles.transaction}>
+          <TouchableOpacity
+            key={transaction.key}
+            style={styles.transaction}
+            onPress={() => void openTransaction(transaction)}
+            disabled={!transaction.explorerUrl}
+          >
             <View style={[styles.assetDot, { backgroundColor: assetColor(transaction.asset) }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.transactionTitle}>
@@ -178,12 +289,13 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.transactionMeta}>
                 {new Date(transaction.timestamp).toLocaleString()} - {transaction.status}
+                {transaction.explorerUrl ? ' - HashScan' : ''}
               </Text>
             </View>
             <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
-              {transaction.type === 'incoming' ? '+' : '-'}{transaction.amount.toLocaleString()}
+              {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))
       )}
       {loadError && <Text style={styles.error}>{loadError}</Text>}
@@ -191,19 +303,33 @@ export default function HomeScreen() {
   );
 }
 
-function BalanceCard({ label, value, color }: { label: string; value: string; color: string }) {
+function BalanceCard(props: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  color: string;
+  onPress?: () => void;
+}) {
   return (
-    <View style={styles.balanceCard}>
-      <View style={[styles.assetDot, { backgroundColor: color }]} />
-      <Text style={styles.balanceLabel}>{label}</Text>
-      <Text style={styles.balanceValue}>{value}</Text>
-    </View>
+    <TouchableOpacity
+      style={styles.balanceCard}
+      onPress={props.onPress}
+      disabled={!props.onPress}
+    >
+      <View style={[styles.assetDot, { backgroundColor: props.color }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.balanceLabel}>{props.label}</Text>
+        {props.subtitle && <Text style={styles.balanceSubtitle}>{props.subtitle}</Text>}
+      </View>
+      <Text style={styles.balanceValue}>{props.value}</Text>
+    </TouchableOpacity>
   );
 }
 
 function assetColor(asset: string) {
   if (asset === 'SOL') return '#8f7de8';
   if (asset === 'USDC') return '#4e8cff';
+  if (asset === 'HBAR') return '#27d3b2';
   return '#ffb000';
 }
 
@@ -213,6 +339,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: { color: '#8f8f9d', textTransform: 'uppercase', letterSpacing: 2, fontWeight: '700' },
   total: { color: '#fff', fontSize: 38, fontWeight: '800', marginTop: 6 },
+  valuationNote: { color: '#777783', fontSize: 11, marginTop: 4 },
   banner: {
     borderColor: 'rgba(107,92,195,0.5)',
     borderWidth: 1,
@@ -222,6 +349,17 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   bannerText: { color: '#c9c0ff', textAlign: 'center', fontSize: 13 },
+  testnetBanner: {
+    borderColor: '#ffb000',
+    borderWidth: 2,
+    backgroundColor: 'rgba(255,176,0,0.13)',
+    borderRadius: 12,
+    padding: 13,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  testnetTitle: { color: '#ffb000', fontWeight: '900', letterSpacing: 2, fontSize: 17 },
+  testnetText: { color: '#ffe2a3', marginTop: 3, fontSize: 12 },
   balanceRow: { gap: 10, marginTop: 22 },
   balanceCard: {
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -233,8 +371,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   assetDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
-  balanceLabel: { color: '#a0a0ab', flex: 1 },
-  balanceValue: { color: '#fff', fontWeight: '800' },
+  balanceLabel: { color: '#a0a0ab' },
+  balanceSubtitle: { color: '#666673', fontSize: 11, marginTop: 3 },
+  balanceValue: { color: '#fff', fontWeight: '800', marginLeft: 8 },
   sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 32, marginBottom: 14 },
   transaction: {
     flexDirection: 'row',

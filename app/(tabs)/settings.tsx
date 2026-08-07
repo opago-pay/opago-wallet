@@ -10,13 +10,13 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
 import { usePrivy } from '@privy-io/expo';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
-import { HederaTestnetSpike } from '@/components/hedera-testnet-spike';
 
 function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
   usePreventScreenCapture('opago-recovery-phrase');
@@ -25,7 +25,7 @@ function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { logout } = usePrivy();
-  const { wipeWallet } = useWalletAuth();
+  const { wipeWallet, hederaPublicKey } = useWalletAuth();
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -131,7 +131,20 @@ export default function SettingsScreen() {
         </Text>
       </View>
 
-      <HederaTestnetSpike />
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Hedera testnet provisioning key</Text>
+        <Text style={styles.sectionSubtitle}>
+          This public key is safe to copy into the local provisioning script. It is not a private key.
+        </Text>
+        <TouchableOpacity
+          style={styles.mnemonicBox}
+          disabled={!hederaPublicKey}
+          onPress={() => hederaPublicKey && void Clipboard.setStringAsync(hederaPublicKey)}
+        >
+          <Text style={styles.mnemonicText}>{hederaPublicKey || 'Wallet key is not ready.'}</Text>
+          {hederaPublicKey && <Text style={styles.overlayText}>Tap to copy public key</Text>}
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recovery phrase</Text>

@@ -1,6 +1,7 @@
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { appConfig } from '@/lib/config';
+import { formatTinybars } from '@/lib/hedera/payments';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 
@@ -22,10 +23,12 @@ export function PaymentForm(props: {
   onScan(): void;
   onReview(): void;
 }) {
+  const isHedera = props.source === 'hedera';
   const sources: [PaymentSource, string, string][] = [
     ['spark', 'Lightning', props.balances.spark + ' SAT'],
     ['solana', 'SOL', props.balances.sol.toFixed(4)],
     ['usdc', 'USDC', props.balances.usdc.toFixed(2)],
+    ['hedera', 'Hedera', formatTinybars(props.balances.hbarTinybars) + ' HBAR'],
   ];
 
   return (
@@ -34,11 +37,17 @@ export function PaymentForm(props: {
         <Text style={styles.title}>Send and bridge</Text>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
-      {!appConfig.isMainnet && (
+      {!appConfig.isMainnet && !isHedera && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>
             Safe development mode: real mainnet payments and Atomiq swaps are blocked.
           </Text>
+        </View>
+      )}
+      {isHedera && (
+        <View style={styles.testnetBanner}>
+          <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
+          <Text style={styles.testnetText}>Test HBAR only. These funds have no real value.</Text>
         </View>
       )}
       {props.balanceError && (
@@ -50,7 +59,7 @@ export function PaymentForm(props: {
         <View style={[styles.row, { alignItems: 'center' }]}>
           <TextInput
             style={[styles.input, styles.destinationInput, { flex: 1 }]}
-            placeholder="BOLT11, Lightning Address or LNURL"
+            placeholder={isHedera ? 'Hedera account ID (0.0.x) or payment QR' : 'BOLT11, Lightning Address or LNURL'}
             placeholderTextColor="#666"
             value={props.destination}
             onChangeText={props.onDestinationChange}
@@ -62,32 +71,40 @@ export function PaymentForm(props: {
             <Text style={styles.scanText}>Scan</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.label}>Amount (optional for fixed invoices)</Text>
+        <Text style={styles.label}>
+          {isHedera ? 'Amount in HBAR' : 'Amount (optional for fixed invoices)'}
+        </Text>
         <TextInput
           style={styles.input}
-          placeholder={props.currency === 'SAT' ? 'Satoshis' : 'Euro'}
+          placeholder={isHedera ? '0.00000001 HBAR minimum' : props.currency === 'SAT' ? 'Satoshis' : 'Euro'}
           placeholderTextColor="#666"
           value={props.amountInput}
           onChangeText={props.onAmountChange}
           keyboardType="decimal-pad"
         />
-        <View style={styles.row}>
-          {CURRENCIES.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={[styles.selector, props.currency === item && styles.selectorActive]}
-              onPress={() => props.onCurrencyChange(item)}
-            >
-              <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {!isHedera && (
+          <View style={styles.row}>
+            {CURRENCIES.map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.selector, props.currency === item && styles.selectorActive]}
+                onPress={() => props.onCurrencyChange(item)}
+              >
+                <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         <Text style={styles.label}>Pay from</Text>
-        <View style={styles.row}>
+        <View style={[styles.row, { flexWrap: 'wrap' }]}>
           {sources.map(([key, label, balance]) => (
             <TouchableOpacity
               key={key}
-              style={[styles.selector, props.source === key && styles.selectorActive]}
+              style={[
+                styles.selector,
+                { flexBasis: '47%' },
+                props.source === key && styles.selectorActive,
+              ]}
               onPress={() => props.onSourceChange(key)}
             >
               <Text style={[styles.selectorText, props.source === key && styles.selectorTextActive]}>{label}</Text>

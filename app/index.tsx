@@ -2,12 +2,10 @@ import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { hasStoredMnemonic } from '../lib/storage';
-import { useWalletAuth } from '../hooks/useWalletAuth';
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
   const [hasWallet, setHasWallet] = useState(false);
-  const { loadOrGenerateWallet } = useWalletAuth();
 
   useEffect(() => {
     let mounted = true;
@@ -15,7 +13,6 @@ export default function Index() {
     async function checkWallet() {
       try {
         const exists = await hasStoredMnemonic();
-        if (exists) await loadOrGenerateWallet();
         if (mounted) setHasWallet(exists);
       } catch {
         if (mounted) setHasWallet(false);
@@ -28,7 +25,7 @@ export default function Index() {
     return () => {
       mounted = false;
     };
-  }, [loadOrGenerateWallet]);
+  }, []);
 
   if (loading) {
     return (

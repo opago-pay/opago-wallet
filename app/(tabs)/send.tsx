@@ -19,6 +19,18 @@ import { sendSolanaAsset } from '@/lib/solana';
 import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
 import { PaymentForm } from '@/components/send/payment-form';
 import {
+  HederaReviewView,
+  HederaSuccessView,
+} from '@/components/send/hedera-payment-views';
+import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '@/lib/hedera/config';
+import { openHederaExplorerUrl } from '@/lib/hedera/explorer';
+import {
+  formatTinybars,
+  parseHederaPaymentRequest,
+  parseHederaTestTransferTinybars,
+  type HederaTransferResult,
+} from '@/lib/hedera/payments';
+import {
   BridgeQuoteView,
   IdentityRequiredView,
   OcpQuoteView,
@@ -32,6 +44,7 @@ import type {
   PaymentCurrency,
   PaymentSource,
   PendingEId,
+  PendingHederaPayment,
 } from '@/components/send/types';
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : 'Payment failed.';
@@ -55,11 +68,20 @@ function isExpectedEIdDeepLink(value: string): boolean {
 export default function SendScreen() {
   const router = useRouter();
   const rates = useExchangeRates();
-  const { sparkWallet, solanaKeypair, walletReady, loadOrGenerateWallet } = useWalletAuth();
+  const {
+    sparkWallet,
+    solanaKeypair,
+    walletReady,
+    hederaAccount,
+    loadOrGenerateWallet,
+    refreshHederaAccount,
+    sendHederaPayment,
+  } = useWalletAuth();
   const { balances, balanceError } = useWalletBalances({
     walletReady,
     sparkWallet,
     solanaPublicKey: solanaKeypair?.publicKey || null,
+    refreshHederaAccount,
   });
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [destination, setDestination] = useState('');
@@ -69,6 +91,8 @@ export default function SendScreen() {
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [successProof, setSuccessProof] = useState<string | null>(null);
+  const [pendingHedera, setPendingHedera] = useState<PendingHederaPayment | null>(null);
+  const [hederaResult, setHederaResult] = useState<HederaTransferResult | null>(null);
   const [ocpState, setOcpState] = useState<OcpState | null>(null);
   const [selectedOcpOption, setSelectedOcpOption] = useState<OcpOption | null>(null);
   const [bridgeQuote, setBridgeQuote] = useState<BridgeQuote | null>(null);
@@ -187,6 +211,40 @@ export default function SendScreen() {
     }
     setLoading(true);
     try {
+      if (source === 'hedera') {
+        const request = parseHederaPaymentRequest(raw);
+        const enteredAmount = amountInput.trim()
+          ? parseHederaTestTransferTinybars(amountInput)
+          : null;
+        if (
+          request.amountTinybars !== null &&
+          enteredAmount !== null &&
+          request.amountTinybars !== enteredAmount
+        ) {
+          throw new Error('The entered HBAR amount does not match the scanned payment request.');
+        }
+        const amountTinybars = request.amountTinybars ?? enteredAmount;
+        if (amountTinybars === null) {
+          throw new Error('Enter an HBAR amount or scan a request that includes one.');
+        }
+        const sourceAccount = hederaAccount || await refreshHederaAccount();
+        if (!sourceAccount) {
+          throw new Error('No Hedera testnet account exists for this recovery phrase.');
+        }
+        if (
+          amountTinybars + MAX_HEDERA_TRANSACTION_FEE_TINYBARS >
+          sourceAccount.balanceTinybars
+        ) {
+          throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
+        }
+        setPendingHedera({
+          recipientAccountId: request.accountId,
+          amountTinybars,
+          amountHbar: formatTinybars(amountTinybars),
+        });
+        return;
+      }
+
       const ocpUrl = await resolveOcpUrl(raw);
       if (ocpUrl) {
         try {
@@ -223,6 +281,25 @@ export default function SendScreen() {
       await executeInvoice(invoice, effectiveAmount > 0 ? effectiveAmount : undefined);
     } catch (cause) {
       Alert.alert('Payment failed', messageOf(cause));
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function executeHederaPayment() {
+    if (!pendingHedera) return;
+    setLoading(true);
+    try {
+      const result = await sendHederaPayment({
+        recipientAccountId: pendingHedera.recipientAccountId,
+        amountTinybars: pendingHedera.amountTinybars,
+      });
+      setPendingHedera(null);
+      setHederaResult(result);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (cause) {
+      Alert.alert('HBAR payment failed', messageOf(cause));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -329,6 +406,8 @@ export default function SendScreen() {
     setDestination('');
     setAmountInput('');
     setSuccessProof(null);
+    setPendingHedera(null);
+    setHederaResult(null);
     setOcpState(null);
     setSelectedOcpOption(null);
     setBridgeQuote(null);
@@ -349,6 +428,33 @@ export default function SendScreen() {
           void handleDestination(value);
         }}
         onCancel={() => setIsScanning(false)}
+      />
+    );
+  }
+
+  if (hederaResult) {
+    return (
+      <HederaSuccessView
+        result={hederaResult}
+        onOpenHashscan={() => {
+          void openHederaExplorerUrl(hederaResult.hashscanUrl).catch(cause =>
+            Alert.alert('Could not open HashScan', messageOf(cause)),
+          );
+        }}
+        onDashboard={() => router.replace('/(tabs)')}
+        onReset={reset}
+      />
+    );
+  }
+
+  if (pendingHedera && hederaAccount) {
+    return (
+      <HederaReviewView
+        payment={pendingHedera}
+        sourceAccountId={hederaAccount.accountId}
+        loading={loading}
+        onConfirm={() => void executeHederaPayment()}
+        onCancel={() => setPendingHedera(null)}
       />
     );
   }
@@ -414,7 +520,11 @@ export default function SendScreen() {
       onDestinationChange={setDestination}
       onAmountChange={setAmountInput}
       onCurrencyChange={setCurrency}
-      onSourceChange={setSource}
+      onSourceChange={nextSource => {
+        setSource(nextSource);
+        setDestination('');
+        setAmountInput('');
+      }}
       onScan={() => void openScanner()}
       onReview={() => void handleDestination()}
     />

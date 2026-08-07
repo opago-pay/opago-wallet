@@ -26,10 +26,14 @@ import { appConfig } from '../lib/config';
 import { deriveHederaPrivateKey, deriveSolanaKeypair } from '../lib/wallet-keys';
 import {
   findHederaTestnetAccount,
-  HederaAccountSnapshot,
-  HederaTransferResult,
-  sendHederaTestnetTransfer as executeHederaTestnetTransfer,
-} from '../lib/hedera';
+  loadHederaAccount,
+  type HederaAccountSnapshot,
+} from '../lib/hedera/account';
+import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '../lib/hedera/config';
+import {
+  sendHederaTestnetTransfer,
+  type HederaTransferResult,
+} from '../lib/hedera/payments';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 
@@ -41,13 +45,14 @@ interface WalletContextValue {
   solanaAddress: string | null;
   solanaKeypair: Keypair | null;
   hederaPublicKey: string | null;
+  hederaAccount: HederaAccountSnapshot | null;
   error: string | null;
   loadOrGenerateWallet(): Promise<void>;
   restoreWallet(mnemonic: string): Promise<void>;
-  getHederaTestnetAccount(): Promise<HederaAccountSnapshot | null>;
-  sendHederaTestnetTransfer(input: {
+  refreshHederaAccount(): Promise<HederaAccountSnapshot | null>;
+  sendHederaPayment(input: {
     recipientAccountId: string;
-    amountHbar: string;
+    amountTinybars: bigint;
   }): Promise<HederaTransferResult>;
   wipeWallet(): Promise<void>;
 }
@@ -57,15 +62,16 @@ const WalletContext = createContext<WalletContextValue | null>(null);
 export function WalletProvider({ children }: { children: ReactNode }) {
   const privy = usePrivy();
   const initializationRef = useRef<Promise<void> | null>(null);
+  const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initStatus, setInitStatus] = useState('');
-  const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const [walletReady, setWalletReady] = useState(false);
   const [sparkWallet, setSparkWallet] = useState<SparkWalletInstance | null>(null);
   const [solanaKeypair, setSolanaKeypair] = useState<Keypair | null>(null);
+  const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
+  const [hederaAccount, setHederaAccount] = useState<HederaAccountSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
   const clearRuntimeState = useCallback(() => {
     setSparkWallet(null);
     setSolanaKeypair(null);
@@ -73,6 +79,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setWalletReady(false);
     setInitStatus('');
     setHederaPublicKey(null);
+    setHederaAccount(null);
     setError(null);
   }, []);
 
@@ -99,6 +106,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       hederaPrivateKeyRef.current = hederaPrivateKey;
       setSolanaKeypair(keypair);
       setHederaPublicKey(hederaPrivateKey.publicKey.toStringRaw().toLowerCase());
+      setHederaAccount(null);
       setSparkWallet(spark);
       setWalletReady(true);
       setInitStatus('Ready');
@@ -155,16 +163,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [clearRuntimeState, initializeMnemonic, runExclusive],
   );
 
-  const getHederaTestnetAccount = useCallback(async () => {
+  const refreshHederaAccount = useCallback(async () => {
     const privateKey = hederaPrivateKeyRef.current;
     if (!walletReady || !privateKey) {
       throw new Error('Wallet keys are not ready for Hedera testnet.');
     }
-    return findHederaTestnetAccount(privateKey.publicKey);
+    const account = await findHederaTestnetAccount(privateKey.publicKey);
+    setHederaAccount(account);
+    return account;
   }, [walletReady]);
 
-  const sendHederaTestnetTransfer = useCallback(
-    async (input: { recipientAccountId: string; amountHbar: string }) => {
+  const sendHederaPayment = useCallback(
+    async (input: { recipientAccountId: string; amountTinybars: bigint }) => {
       const privateKey = hederaPrivateKeyRef.current;
       if (!walletReady || !privateKey) {
         throw new Error('Wallet keys are not ready for Hedera testnet.');
@@ -175,12 +185,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           'No Hedera testnet account exists for this wallet key. Run the local provisioning script first.',
         );
       }
-      return executeHederaTestnetTransfer({
+      if (
+        input.amountTinybars + MAX_HEDERA_TRANSACTION_FEE_TINYBARS >
+        account.balanceTinybars
+      ) {
+        throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
+      }
+      const result = await sendHederaTestnetTransfer({
         sourceAccountId: account.accountId,
         recipientAccountId: input.recipientAccountId,
-        amountHbar: input.amountHbar,
+        amountTinybars: input.amountTinybars,
         privateKey,
       });
+      const refreshed = await loadHederaAccount(account.accountId, privateKey.publicKey);
+      setHederaAccount(refreshed);
+      return result;
     },
     [walletReady],
   );
@@ -207,22 +226,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       solanaAddress: solanaKeypair?.publicKey.toBase58() || null,
       solanaKeypair,
       hederaPublicKey,
+      hederaAccount,
       error,
       loadOrGenerateWallet,
       restoreWallet,
-      getHederaTestnetAccount,
-      sendHederaTestnetTransfer,
+      refreshHederaAccount,
+      sendHederaPayment,
       wipeWallet,
     }),
     [
       error,
-      initStatus,
-      getHederaTestnetAccount,
+      hederaAccount,
       hederaPublicKey,
-      sendHederaTestnetTransfer,
+      initStatus,
       isInitializing,
       loadOrGenerateWallet,
+      refreshHederaAccount,
       restoreWallet,
+      sendHederaPayment,
       solanaKeypair,
       sparkWallet,
       walletReady,

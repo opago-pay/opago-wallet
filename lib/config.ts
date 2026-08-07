@@ -10,7 +10,7 @@ const configuredHederaNetwork = process.env.EXPO_PUBLIC_HEDERA_NETWORK || 'testn
 
 if (configuredHederaNetwork !== 'testnet') {
   throw new Error(
-    'Phase 1 supports Hedera testnet only. EXPO_PUBLIC_HEDERA_NETWORK must be testnet.',
+    'The Hedera wallet currently supports testnet only. EXPO_PUBLIC_HEDERA_NETWORK must be testnet.',
   );
 }
 

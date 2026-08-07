@@ -28,8 +28,6 @@ test('derives the documented Solana account deterministically from BIP39', () =>
   assert.throws(() => deriveSolanaKeypair('not a recovery phrase'), /valid BIP39/i);
 });
 
-test('counts only parsed system transfers involving the wallet', () => {
-
 test('derives the documented Hedera Ed25519 account deterministically from BIP39', () => {
   assert.equal(HEDERA_DERIVATION_PATH, "m/44'/3030'/0'/0'");
   assert.equal(
@@ -43,6 +41,8 @@ test('derives the documented Hedera Ed25519 account deterministically from BIP39
   );
   assert.throws(() => deriveHederaPrivateKey('not a recovery phrase'), /valid BIP39/i);
 });
+
+test('counts only parsed system transfers involving the wallet', () => {
   const wallet = new PublicKey(EXPECTED_ADDRESS);
   const other = '11111111111111111111111111111111';
   const transaction = {

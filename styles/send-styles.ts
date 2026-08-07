@@ -28,6 +28,17 @@ export const sendStyles = StyleSheet.create({
     marginBottom: 16,
   },
   bannerText: { color: '#c9c0ff', fontSize: 13, textAlign: 'center' },
+  testnetBanner: {
+    backgroundColor: 'rgba(255,176,0,0.14)',
+    borderColor: '#ffb000',
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  testnetTitle: { color: '#ffb000', fontSize: 18, fontWeight: '900', letterSpacing: 2 },
+  testnetText: { color: '#ffe2a3', fontSize: 12, marginTop: 4, textAlign: 'center' },
   card: {
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderColor: 'rgba(255,255,255,0.09)',
