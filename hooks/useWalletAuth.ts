@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateMnemonic } from 'bip39';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
+import type { PrivateKey } from '@hiero-ledger/sdk';
 import { usePrivy } from '@privy-io/expo';
 import * as Crypto from 'expo-crypto';
 import { initializeSparkWallet } from '../lib/spark';
@@ -22,7 +23,13 @@ import {
 } from '../lib/storage';
 import { wipeTransactions } from '../lib/database';
 import { appConfig } from '../lib/config';
-import { deriveSolanaKeypair } from '../lib/wallet-keys';
+import { deriveHederaPrivateKey, deriveSolanaKeypair } from '../lib/wallet-keys';
+import {
+  findHederaTestnetAccount,
+  HederaAccountSnapshot,
+  HederaTransferResult,
+  sendHederaTestnetTransfer as executeHederaTestnetTransfer,
+} from '../lib/hedera';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 
@@ -33,9 +40,15 @@ interface WalletContextValue {
   sparkWallet: SparkWalletInstance | null;
   solanaAddress: string | null;
   solanaKeypair: Keypair | null;
+  hederaPublicKey: string | null;
   error: string | null;
   loadOrGenerateWallet(): Promise<void>;
   restoreWallet(mnemonic: string): Promise<void>;
+  getHederaTestnetAccount(): Promise<HederaAccountSnapshot | null>;
+  sendHederaTestnetTransfer(input: {
+    recipientAccountId: string;
+    amountHbar: string;
+  }): Promise<HederaTransferResult>;
   wipeWallet(): Promise<void>;
 }
 
@@ -46,16 +59,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const initializationRef = useRef<Promise<void> | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initStatus, setInitStatus] = useState('');
+  const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const [walletReady, setWalletReady] = useState(false);
   const [sparkWallet, setSparkWallet] = useState<SparkWalletInstance | null>(null);
   const [solanaKeypair, setSolanaKeypair] = useState<Keypair | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
   const clearRuntimeState = useCallback(() => {
     setSparkWallet(null);
     setSolanaKeypair(null);
+    hederaPrivateKeyRef.current = null;
     setWalletReady(false);
     setInitStatus('');
+    setHederaPublicKey(null);
     setError(null);
   }, []);
 
@@ -63,6 +80,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async (mnemonic: string) => {
       setInitStatus('Deriving wallet keys...');
       const keypair = deriveSolanaKeypair(mnemonic);
+      const hederaPrivateKey = deriveHederaPrivateKey(mnemonic);
 
       if (appConfig.importSolanaKeyToPrivy) {
         setInitStatus('Linking the explicitly enabled identity wallet...');
@@ -78,7 +96,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       setInitStatus('Starting Lightning wallet...');
       const spark = await initializeSparkWallet(mnemonic);
+      hederaPrivateKeyRef.current = hederaPrivateKey;
       setSolanaKeypair(keypair);
+      setHederaPublicKey(hederaPrivateKey.publicKey.toStringRaw().toLowerCase());
       setSparkWallet(spark);
       setWalletReady(true);
       setInitStatus('Ready');
@@ -135,6 +155,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [clearRuntimeState, initializeMnemonic, runExclusive],
   );
 
+  const getHederaTestnetAccount = useCallback(async () => {
+    const privateKey = hederaPrivateKeyRef.current;
+    if (!walletReady || !privateKey) {
+      throw new Error('Wallet keys are not ready for Hedera testnet.');
+    }
+    return findHederaTestnetAccount(privateKey.publicKey);
+  }, [walletReady]);
+
+  const sendHederaTestnetTransfer = useCallback(
+    async (input: { recipientAccountId: string; amountHbar: string }) => {
+      const privateKey = hederaPrivateKeyRef.current;
+      if (!walletReady || !privateKey) {
+        throw new Error('Wallet keys are not ready for Hedera testnet.');
+      }
+      const account = await findHederaTestnetAccount(privateKey.publicKey);
+      if (!account) {
+        throw new Error(
+          'No Hedera testnet account exists for this wallet key. Run the local provisioning script first.',
+        );
+      }
+      return executeHederaTestnetTransfer({
+        sourceAccountId: account.accountId,
+        recipientAccountId: input.recipientAccountId,
+        amountHbar: input.amountHbar,
+        privateKey,
+      });
+    },
+    [walletReady],
+  );
+
   const wipeWallet = useCallback(async () => {
     if (initializationRef.current) await initializationRef.current.catch(() => undefined);
     const atomiqKeys = (await AsyncStorage.getAllKeys()).filter(key =>
@@ -156,14 +206,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       sparkWallet,
       solanaAddress: solanaKeypair?.publicKey.toBase58() || null,
       solanaKeypair,
+      hederaPublicKey,
       error,
       loadOrGenerateWallet,
       restoreWallet,
+      getHederaTestnetAccount,
+      sendHederaTestnetTransfer,
       wipeWallet,
     }),
     [
       error,
       initStatus,
+      getHederaTestnetAccount,
+      hederaPublicKey,
+      sendHederaTestnetTransfer,
       isInitializing,
       loadOrGenerateWallet,
       restoreWallet,

@@ -1,10 +1,18 @@
 import { clusterApiUrl } from '@solana/web3.js';
 
 type SparkNetwork = 'MAINNET' | 'REGTEST';
+type HederaNetwork = 'testnet';
 
 const isDevelopment = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 const mainnetEnabled = process.env.EXPO_PUBLIC_ENABLE_MAINNET === 'true';
 const insecureHttpEnabled = isDevelopment && process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP === 'true';
+const configuredHederaNetwork = process.env.EXPO_PUBLIC_HEDERA_NETWORK || 'testnet';
+
+if (configuredHederaNetwork !== 'testnet') {
+  throw new Error(
+    'Phase 1 supports Hedera testnet only. EXPO_PUBLIC_HEDERA_NETWORK must be testnet.',
+  );
+}
 
 export const appConfig = Object.freeze({
   isDevelopment,
@@ -15,6 +23,11 @@ export const appConfig = Object.freeze({
     clusterApiUrl(mainnetEnabled ? 'mainnet-beta' : 'devnet'),
   sparkNetwork: (mainnetEnabled ? 'MAINNET' : 'REGTEST') as SparkNetwork,
   eIdBackendUrl: process.env.EXPO_PUBLIC_EID_BACKEND_URL || '',
+  hederaNetwork: configuredHederaNetwork as HederaNetwork,
+  hederaMirrorNodeUrl:
+    process.env.EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL ||
+    'https://testnet.mirrornode.hedera.com',
+  hederaMaxTestTransferHbar: process.env.EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR || '1',
   importSolanaKeyToPrivy: process.env.EXPO_PUBLIC_IMPORT_SOLANA_TO_PRIVY === 'true',
   maxLightningFeeSats: Math.max(
     1,

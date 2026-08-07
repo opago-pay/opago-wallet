@@ -45,6 +45,35 @@ Fill in EXPO_PUBLIC_PRIVY_APP_ID and EXPO_PUBLIC_PRIVY_CLIENT_ID before starting
 
 USDC transfers on devnet require an explicit EXPO_PUBLIC_USDC_MINT. The mainnet USDC mint is selected only in an explicitly enabled mainnet build.
 
+## Hedera Phase 1 testnet
+
+The app derives a Hedera Ed25519 key at m/44'/3030'/0'/0', looks up its testnet account through the Mirror Node, and signs bounded HBAR test transfers on-device. Open Settings in the app and copy the displayed Hedera public key.
+
+Account lookup/creation and initial funding are deliberately separate from the app. Run the provisioning script only on the local development machine. Operator credentials must never be prefixed with EXPO_PUBLIC_, committed, or copied into the app configuration:
+
+~~~powershell
+$env:HEDERA_WALLET_PUBLIC_KEY='PUBLIC_KEY_COPIED_FROM_THE_APP'
+$env:HEDERA_OPERATOR_ID='0.0.YOUR_TESTNET_OPERATOR_ACCOUNT'
+$env:HEDERA_OPERATOR_KEY = [System.Net.NetworkCredential]::new(
+  '',
+  (Read-Host 'Hedera testnet operator key' -AsSecureString)
+).Password
+$env:HEDERA_INITIAL_BALANCE_HBAR='2'
+npm run hedera:provision
+~~~
+
+If the public key already has an account, the script reports it without requiring operator credentials. After provisioning, remove all sensitive process variables:
+
+~~~powershell
+Remove-Item Env:HEDERA_OPERATOR_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:HEDERA_OPERATOR_ID -ErrorAction SilentlyContinue
+Remove-Item Env:HEDERA_WALLET_PUBLIC_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:HEDERA_INITIAL_BALANCE_HBAR -ErrorAction SilentlyContinue
+~~~
+
+Return to Settings, tap Refresh, enter a different numeric testnet account ID, and confirm the transfer. Phase 1 is hard-limited to testnet and at most 1 HBAR per transfer by default.
+
+
 ## Mainnet builds
 
 Treat mainnet enablement as a release decision, not a runtime convenience:

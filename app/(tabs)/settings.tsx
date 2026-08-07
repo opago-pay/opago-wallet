@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import { usePrivy } from '@privy-io/expo';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
+import { HederaTestnetSpike } from '@/components/hedera-testnet-spike';
 
 function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
   usePreventScreenCapture('opago-recovery-phrase');
@@ -107,7 +109,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
         <Image
@@ -128,6 +130,8 @@ export default function SettingsScreen() {
             : 'Real-fund transfers are blocked until mainnet is explicitly enabled.'}
         </Text>
       </View>
+
+      <HederaTestnetSpike />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recovery phrase</Text>
@@ -165,12 +169,13 @@ export default function SettingsScreen() {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c', paddingHorizontal: 16 },
+  content: { paddingBottom: 50 },
   header: {
     marginTop: 60,
     marginBottom: 20,
