@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { PublicKey } = require('@solana/web3.js');
 require('./register-typescript.cjs');
@@ -54,6 +56,23 @@ test('derives the documented Hedera Ed25519 account deterministically from BIP39
     EXPECTED_HEDERA_PUBLIC_KEY,
   );
   assert.throws(() => deriveHederaPrivateKey('not a recovery phrase'), /valid BIP39/i);
+});
+
+test('keeps a revealed recovery phrase out of the accessibility tree', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(tabs)', 'settings.tsx'),
+    'utf8',
+  );
+  assert.equal(
+    source.match(/importantForAccessibility="no-hide-descendants"/g)?.length,
+    2,
+  );
+  assert.match(source, /collapsable=\{false\}/);
+  assert.match(source, /accessibilityElementsHidden/);
+  assert.match(source, /<SvgText/);
+  assert.doesNotMatch(source, /<Text[^>]*>\s*\{phrase\}/);
+  assert.match(source, /Recovery phrase revealed\. Tap to hide\./);
+  assert.doesNotMatch(source, /accessibilityLabel=\{(?:mnemonic|phrase)\}/);
 });
 
 test('counts only parsed system transfers involving the wallet', () => {

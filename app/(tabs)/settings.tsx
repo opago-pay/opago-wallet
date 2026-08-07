@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import Svg, { Text as SvgText } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
@@ -19,7 +20,44 @@ import { appConfig } from '@/lib/config';
 
 function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
   usePreventScreenCapture('opago-recovery-phrase');
-  return <Text style={styles.mnemonicText}>{phrase}</Text>;
+  const words = phrase.trim().split(/\s+/);
+  const columns = words.length > 12 ? 3 : 4;
+  const rowHeight = 30;
+  const canvasWidth = 600;
+  const canvasHeight = Math.ceil(words.length / columns) * rowHeight;
+
+  return (
+    <View
+      accessible={false}
+      accessibilityElementsHidden
+      collapsable={false}
+      importantForAccessibility="no-hide-descendants"
+      style={{ width: '100%' }}
+    >
+      <Svg
+        accessible={false}
+        accessibilityElementsHidden
+        height={canvasHeight}
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+        viewBox={'0 0 ' + canvasWidth + ' ' + canvasHeight}
+        width="100%"
+      >
+        {words.map((word, index) => (
+          <SvgText
+            key={index}
+            fill="#fff"
+            fontFamily="monospace"
+            fontSize={16}
+            x={(index % columns) * (canvasWidth / columns) + 8}
+            y={Math.floor(index / columns) * rowHeight + 21}
+          >
+            {index + 1 + '. ' + word}
+          </SvgText>
+        ))}
+      </Svg>
+    </View>
+  );
 }
 export default function SettingsScreen() {
   const router = useRouter();
@@ -145,6 +183,12 @@ export default function SettingsScreen() {
           style={styles.mnemonicBox}
           onPress={() => void toggleRecoveryPhrase()}
           disabled={isUnlocking}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isRevealed
+              ? 'Recovery phrase revealed. Tap to hide.'
+              : 'Hidden recovery phrase. Tap to authenticate and reveal.'
+          }
         >
           {isUnlocking ? (
             <ActivityIndicator color="#ffb000" />
