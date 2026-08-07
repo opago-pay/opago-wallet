@@ -9,6 +9,7 @@ The current release is intended for development and test networks. It is not an 
 | Capability | Network | Status |
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
+| Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 code complete; deployment pending |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -45,6 +46,76 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 - Recovery from the same BIP39 phrase derives the same Hedera key and rediscovers the matching testnet account.
 - All HBAR monetary values remain `bigint` tinybars. JavaScript floating-point numbers are never used for HBAR accounting.
 - Mirror Node account, balance, and history data use the official [Account API](https://docs.hedera.com/api-reference/accounts/get-account-by-alias-id-or-evm-address) and [Transaction API](https://docs.hedera.com/api-reference/transactions/list-transactions).
+
+### Phase 3 - contract and merchant demo
+
+**Planned window: 15-19 August 2026. Status: implementation complete; public testnet deployment pending.**
+
+- `OpagoHbarCheckout.sol` is a non-custodial, non-upgradeable checkout contract with no owner, fee, or withdrawal path.
+- Each `paymentId` is a domain-separated hash of the testnet chain, deployed contract, random request nonce, merchant EVM address, exact tinybar amount, and expiry.
+- The contract forwards the exact `msg.value` to the merchant atomically. Expired, altered, duplicate, replayed, invalid-recipient, and failed-forwarding calls revert.
+- Hardhat tests cover the successful payment and all seven required failure/replay scenarios.
+- The local merchant demo creates five-minute payment requests and scanner-ready QR codes.
+- The Android wallet verifies the merchant alias and exact pinned runtime-bytecode SHA-256 with the Mirror Node, shows contract details before signing, invokes `pay` directly through the Hiero SDK, and displays both transaction and payment IDs on success.
+- `deployments/hedera-testnet.json` is the versioned evidence record. It deliberately remains `pending` until a real deployment succeeds.
+
+The Phase 3 implementation does not claim a live contract yet. A contract ID, deployment transaction, bytecode hash, timestamp, and verification status are written only by the real deployment and verification scripts.
+
+#### Contract quality gates
+
+```powershell
+npm run contract:compile
+npm run contract:test
+npm run typecheck
+npm run lint
+npm test
+```
+
+The Solidity compiler is pinned through `package-lock.json` and Hardhat uses that local compiler with the `paris` EVM target.
+
+#### Hedera testnet deployment and source verification
+
+Run this only on a trusted development machine with a disposable funded testnet operator. The key is read into a process-local variable and is never written to the app, manifest, source tree, or an `EXPO_PUBLIC_*` variable.
+
+```powershell
+$env:HEDERA_OPERATOR_ID='0.0.YOUR_TESTNET_OPERATOR'
+$hederaDeploySecret = Read-Host 'Hedera testnet operator key' -AsSecureString
+$env:HEDERA_OPERATOR_KEY = [System.Net.NetworkCredential]::new(
+  '',
+  $hederaDeploySecret
+).Password
+
+try {
+  npm run contract:compile
+  npm run contract:deploy:testnet
+  npm run contract:verify:testnet
+} finally {
+  Remove-Item Env:HEDERA_OPERATOR_ID -ErrorAction SilentlyContinue
+  Remove-Item Env:HEDERA_OPERATOR_KEY -ErrorAction SilentlyContinue
+  Remove-Item Env:HEDERA_OPERATOR_KEY_TYPE -ErrorAction SilentlyContinue
+  Remove-Variable hederaDeploySecret -ErrorAction SilentlyContinue
+}
+```
+
+After deployment, copy the public `contractId` from `deployments/hedera-testnet.json` into the client build configuration and rebuild the native app:
+
+```dotenv
+EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=0.0.YOUR_DEPLOYED_CONTRACT
+EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=RUNTIME_HASH_FROM_DEPLOYMENT_MANIFEST
+```
+
+`npm run contract:verify:testnet` checks Mirror Node runtime bytecode and the Hedera consensus creation timestamp against the locked artifact, submits the standard compiler input to Sourcify for chain ID `296`, and follows the verification job to an exact runtime match.
+
+#### Merchant checkout demo
+
+Set a testnet merchant account, start the local server, open the shown URL on the development computer, and scan the displayed QR code in the wallet's Hedera Send flow.
+
+```powershell
+$env:HEDERA_MERCHANT_ID='0.0.YOUR_TESTNET_MERCHANT'
+npm run demo:hedera-checkout
+```
+
+The demo obtains the merchant EVM alias from the official Mirror Node instead of deriving a possibly incorrect long-zero address. Each page load creates a random nonce, derives a field-bound `paymentId`, and sets a five-minute expiry.
 
 ## Hedera implementation
 
@@ -138,7 +209,7 @@ The default public devnet RPC is suitable for development and is rate-limited. A
 - A physical Android device with USB debugging, or an Android emulator
 - Privy app and client IDs for the current authentication screen
 
-Wallet-key storage requires a native Android or iOS build. Hedera Phase 1 was verified on Android; the full Phase 2 UI still requires its final physical-device acceptance run. iOS verification is outside the current milestone.
+Wallet-key storage requires a native Android or iOS build. Hedera Phases 1 and 2 were verified on a physical Android device. The Phase 3 contract checkout requires a fresh post-deployment Android acceptance run. iOS verification is outside the current milestone.
 
 ## Quick start
 
@@ -226,6 +297,8 @@ Relevant implementation files:
 | `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Hedera wallet support accepts only `testnet` |
 | `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Hedera testnet Mirror Node | Resolves the account for the derived public key |
 | `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated testnet transfer |
+| `EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID` | empty | Enables only the deployed, verified Phase 3 testnet checkout contract |
+| `EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256` | empty | Pins the exact deployed Phase 3 runtime bytecode in the app build |
 | `EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS` | `100` | Additional ceiling used by Lightning fee validation |
 | `EXPO_PUBLIC_ALLOW_INSECURE_HTTP` | `false` | Allows private/local HTTP only in development |
 | `EXPO_PUBLIC_EID_BACKEND_URL` | empty | Enables the optional eID reference flow |
@@ -264,6 +337,9 @@ These services are not production backends. The eID service requires an explicit
 | --- | --- |
 | `app/` | Expo Router screens and navigation |
 | `components/` | Reusable UI and payment-state views |
+| `contracts/` | Solidity checkout contract and contract-only test helpers |
+| `contract-tests/` | Hardhat contract behavior and failure-path tests |
+| `deployments/` | Versioned public Hedera deployment evidence |
 | `hooks/` | Wallet lifecycle, balances, and app-facing orchestration |
 | `lib/` | Network clients, validation, signing, storage, and payment services |
 | `scripts/` | Local development and testnet provisioning tools |

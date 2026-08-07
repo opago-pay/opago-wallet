@@ -2,12 +2,19 @@
 
 # dependencies
 node_modules/
+.npm-cache/
+.hardhat-home/
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+
+# Solidity / Hardhat generated output
+/artifacts/
+/cache/
+/coverage/
 
 # Native
 .kotlin/

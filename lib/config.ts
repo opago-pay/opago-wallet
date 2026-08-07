@@ -28,6 +28,9 @@ export const appConfig = Object.freeze({
     process.env.EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL ||
     'https://testnet.mirrornode.hedera.com',
   hederaMaxTestTransferHbar: process.env.EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR || '1',
+  hederaCheckoutContractId: process.env.EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID || '',
+  hederaCheckoutRuntimeSha256:
+    process.env.EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 || '',
   importSolanaKeyToPrivy: process.env.EXPO_PUBLIC_IMPORT_SOLANA_TO_PRIVY === 'true',
   maxLightningFeeSats: Math.max(
     1,

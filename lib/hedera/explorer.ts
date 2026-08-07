@@ -7,6 +7,14 @@ export function getHederaAccountExplorerUrl(accountId: string): string {
   return HASHSCAN_TESTNET_BASE + '/account/' + parseHederaAccountId(accountId);
 }
 
+export function getHederaContractExplorerUrl(contractId: string): string {
+  const normalized = contractId.trim();
+  if (!/^0\.0\.[1-9]\d*$/.test(normalized)) {
+    throw new Error('Hedera contract ID must use numeric 0.0.x format.');
+  }
+  return HASHSCAN_TESTNET_BASE + '/contract/' + normalized;
+}
+
 export function canonicalHederaTransactionId(transactionId: string): string {
   const mirrorId = normalizeHederaTransactionIdForMirror(transactionId);
   const match = /^(\d+\.\d+\.\d+)-(\d+)-(\d{9})$/.exec(mirrorId);

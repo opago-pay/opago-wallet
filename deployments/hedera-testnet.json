@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "chainId": 296,
+  "status": "pending",
+  "contractName": "OpagoHbarCheckout",
+  "contractId": null,
+  "evmAddress": null,
+  "deploymentTransactionId": null,
+  "bytecodeSha256": null,
+  "runtimeBytecodeSha256": null,
+  "deploymentSubmittedAt": null,
+  "deploymentConsensusTimestamp": null,
+  "deployedAt": null,
+  "hashscanContractUrl": null,
+  "hashscanTransactionUrl": null,
+  "sourceVerification": {
+    "provider": "Sourcify",
+    "status": "pending",
+    "verifiedAt": null
+  }
+}

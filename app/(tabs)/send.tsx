@@ -23,6 +23,10 @@ import {
   HederaSuccessView,
 } from '@/components/send/hedera-payment-views';
 import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '@/lib/hedera/config';
+import {
+  parseHederaCheckoutRequest,
+  verifyHederaCheckoutRequest,
+} from '@/lib/hedera/checkout';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer';
 import {
   formatTinybars,
@@ -212,18 +216,21 @@ export default function SendScreen() {
     setLoading(true);
     try {
       if (source === 'hedera') {
-        const request = parseHederaPaymentRequest(raw);
+        const checkoutRequest = parseHederaCheckoutRequest(raw);
+        const directRequest = checkoutRequest ? null : parseHederaPaymentRequest(raw);
         const enteredAmount = amountInput.trim()
           ? parseHederaTestTransferTinybars(amountInput)
           : null;
+        const requestedAmount = checkoutRequest?.amountTinybars ?? directRequest?.amountTinybars;
         if (
-          request.amountTinybars !== null &&
+          requestedAmount !== null &&
+          requestedAmount !== undefined &&
           enteredAmount !== null &&
-          request.amountTinybars !== enteredAmount
+          requestedAmount !== enteredAmount
         ) {
           throw new Error('The entered HBAR amount does not match the scanned payment request.');
         }
-        const amountTinybars = request.amountTinybars ?? enteredAmount;
+        const amountTinybars = requestedAmount ?? enteredAmount;
         if (amountTinybars === null) {
           throw new Error('Enter an HBAR amount or scan a request that includes one.');
         }
@@ -237,10 +244,13 @@ export default function SendScreen() {
         ) {
           throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
         }
+        if (checkoutRequest) await verifyHederaCheckoutRequest(checkoutRequest);
         setPendingHedera({
-          recipientAccountId: request.accountId,
+          recipientAccountId:
+            checkoutRequest?.merchantAccountId ?? directRequest!.accountId,
           amountTinybars,
           amountHbar: formatTinybars(amountTinybars),
+          checkoutRequest: checkoutRequest ?? undefined,
         });
         return;
       }
@@ -294,6 +304,7 @@ export default function SendScreen() {
       const result = await sendHederaPayment({
         recipientAccountId: pendingHedera.recipientAccountId,
         amountTinybars: pendingHedera.amountTinybars,
+        checkoutRequest: pendingHedera.checkoutRequest,
       });
       setPendingHedera(null);
       setHederaResult(result);
@@ -441,6 +452,15 @@ export default function SendScreen() {
             Alert.alert('Could not open HashScan', messageOf(cause)),
           );
         }}
+        onOpenContract={
+          hederaResult.contractHashscanUrl
+            ? () => {
+                void openHederaExplorerUrl(hederaResult.contractHashscanUrl!).catch(cause =>
+                  Alert.alert('Could not open HashScan', messageOf(cause)),
+                );
+              }
+            : undefined
+        }
         onDashboard={() => router.replace('/(tabs)')}
         onReset={reset}
       />

@@ -34,6 +34,32 @@ export function HederaReviewView(props: {
           <Text style={styles.quoteLabel}>Network</Text>
           <Text style={styles.quoteValue}>Hedera testnet</Text>
         </View>
+        <View style={styles.quoteRow}>
+          <Text style={styles.quoteLabel}>Route</Text>
+          <Text style={styles.quoteValue}>
+            {props.payment.checkoutRequest ? 'Opago checkout contract' : 'Direct transfer'}
+          </Text>
+        </View>
+        {props.payment.checkoutRequest && (
+          <>
+            <View style={styles.quoteRow}>
+              <Text style={styles.quoteLabel}>Contract</Text>
+              <Text style={styles.quoteValue}>{props.payment.checkoutRequest.contractId}</Text>
+            </View>
+            <View style={styles.quoteRow}>
+              <Text style={styles.quoteLabel}>Payment ID</Text>
+              <Text style={styles.quoteValue} numberOfLines={1}>
+                {props.payment.checkoutRequest.paymentId}
+              </Text>
+            </View>
+            <View style={styles.quoteRow}>
+              <Text style={styles.quoteLabel}>Expires</Text>
+              <Text style={styles.quoteValue}>
+                {new Date(props.payment.checkoutRequest.expiresAt * 1000).toLocaleTimeString()}
+              </Text>
+            </View>
+          </>
+        )}
       </View>
       <TouchableOpacity style={styles.button} onPress={props.onConfirm} disabled={props.loading}>
         {props.loading ? (
@@ -56,6 +82,7 @@ export function HederaReviewView(props: {
 export function HederaSuccessView(props: {
   result: HederaTransferResult;
   onOpenHashscan(): void;
+  onOpenContract?(): void;
   onDashboard(): void;
   onReset(): void;
 }) {
@@ -73,9 +100,25 @@ export function HederaSuccessView(props: {
         <Text style={styles.label}>Transaction ID</Text>
         <Text style={styles.proofText} selectable>{props.result.transactionId}</Text>
       </View>
+      {props.result.paymentId && (
+        <View style={styles.proofBox}>
+          <Text style={styles.label}>Checkout payment ID</Text>
+          <Text style={styles.proofText} selectable>{props.result.paymentId}</Text>
+        </View>
+      )}
       <TouchableOpacity style={styles.button} onPress={props.onOpenHashscan}>
-        <Text style={styles.buttonText}>Open in HashScan</Text>
+        <Text style={styles.buttonText}>Open transaction in HashScan</Text>
       </TouchableOpacity>
+      {props.result.contractHashscanUrl && props.onOpenContract && (
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={props.onOpenContract}
+        >
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+            Open checkout contract
+          </Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[styles.button, styles.secondaryButton]}
         onPress={props.onDashboard}

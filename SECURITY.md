@@ -1,27 +1,37 @@
 # Security status
 
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-07
 
-This repository is a proof of concept and has not received an independent security audit. Do not use it for production custody, identity processing, or mainnet payments without a dedicated review.
+This repository is a proof of concept and has not received an independent security or smart-contract audit. Do not use it for production custody, identity processing, or mainnet payments without dedicated reviews.
 
 ## Dependency audit
 
-A non-breaking npm audit fix was applied to the lockfile. Targeted same-major overrides update brace-expansion, postcss, and both supported ws major lines to patched releases.
+The lockfile contains targeted same-major overrides for previously remediated `brace-expansion`, `postcss`, and supported `ws` lines. No forced or breaking `npm audit fix` was applied.
 
-The remaining production-tree report at review time is:
+The current npm advisory report is:
 
-- 0 critical
-- 4 high
-- 26 moderate
-- 30 total
+| Scope | Critical | High | Moderate | Low | Total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Production dependency tree | 0 | 60 | 27 | 0 | 87 |
+| Complete tree including development tools | 0 | 65 | 29 | 11 | 105 |
 
-The remaining high-severity findings cannot be resolved safely inside the current dependency constraints:
+These numbers count affected packages and dependency paths, not independent exploitable defects. The production report is dominated by unresolved transitive findings propagated through Expo/React Native, Hiero, Privy, Solana, Atomiq, and Spark. npm currently reports no compatible automatic fix for those paths.
 
-- bigint-buffer is pulled through Solana/Atomiq and has no upstream fix reported by npm.
+Phase 3 adds Hardhat, Ethers, and the pinned Solidity compiler as development-only dependencies. They are not bundled into the mobile app, but their toolchain has additional advisories through packages including `adm-zip`, `serialize-javascript`, `tmp`, `undici`, and `uuid`. Contract tooling must run only on trusted source and in a restricted development environment.
 
-The package names @atomiqlabs/chain-solana, @solana/buffer-layout-utils, and @solana/spl-token are reported as affected through the same unfixed bigint-buffer path rather than as three independent vulnerable implementations.
+Before any release:
 
-Before release, reassess the Solana/Atomiq dependency tree, run npm audit again, and document whether the remaining bigint-buffer advisory is reachable in the shipped native bundle.
+- reassess every reachable production advisory against the actual native bundle;
+- update upstream frameworks and SDKs when compatible patched releases exist;
+- audit `OpagoHbarCheckout.sol` independently and repeat its failure-path tests;
+- generate an SBOM and archive the exact lockfile, compiler version, bytecode hashes, and deployment evidence;
+- do not enable mainnet while unresolved reachable high-severity findings remain.
+
+## Smart-contract boundaries
+
+`OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or live testnet acceptance.
+
+The versioned deployment manifest remains `pending` until a real testnet deployment succeeds. Never insert fabricated contract IDs, transaction IDs, timestamps, hashes, or verification claims.
 
 ## Reporting
 

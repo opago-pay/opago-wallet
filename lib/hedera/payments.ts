@@ -20,12 +20,16 @@ export interface HederaPaymentRequest {
 }
 
 export interface HederaTransferResult {
+  mode: 'direct' | 'checkout';
   transactionId: string;
   status: 'SUCCESS';
   amountTinybars: bigint;
   amountHbar: string;
   recipientAccountId: string;
   hashscanUrl: string;
+  paymentId?: string;
+  contractId?: string;
+  contractHashscanUrl?: string;
 }
 
 export function parseHbarToTinybars(rawAmount: string, label = 'HBAR amount'): bigint {
@@ -156,6 +160,7 @@ export async function sendHederaTestnetTransfer(input: {
     }
     const transactionId = response.transactionId.toString();
     return {
+      mode: 'direct',
       transactionId,
       status: 'SUCCESS',
       amountTinybars: tinybars,

@@ -31,6 +31,10 @@ import {
 } from '../lib/hedera/account';
 import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '../lib/hedera/config';
 import {
+  sendHederaCheckoutPayment,
+  type HederaCheckoutRequest,
+} from '../lib/hedera/checkout';
+import {
   sendHederaTestnetTransfer,
   type HederaTransferResult,
 } from '../lib/hedera/payments';
@@ -54,6 +58,7 @@ interface WalletContextValue {
   sendHederaPayment(input: {
     recipientAccountId: string;
     amountTinybars: bigint;
+    checkoutRequest?: HederaCheckoutRequest;
   }): Promise<HederaTransferResult>;
   wipeWallet(): Promise<void>;
 }
@@ -181,7 +186,11 @@ function WalletProviderCore({
   }, [walletReady]);
 
   const sendHederaPayment = useCallback(
-    async (input: { recipientAccountId: string; amountTinybars: bigint }) => {
+    async (input: {
+      recipientAccountId: string;
+      amountTinybars: bigint;
+      checkoutRequest?: HederaCheckoutRequest;
+    }) => {
       const privateKey = hederaPrivateKeyRef.current;
       if (!walletReady || !privateKey) {
         throw new Error('Wallet keys are not ready for Hedera testnet.');
@@ -198,12 +207,27 @@ function WalletProviderCore({
       ) {
         throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
       }
-      const result = await sendHederaTestnetTransfer({
-        sourceAccountId: account.accountId,
-        recipientAccountId: input.recipientAccountId,
-        amountTinybars: input.amountTinybars,
-        privateKey,
-      });
+      if (
+        input.checkoutRequest &&
+        (
+          input.checkoutRequest.merchantAccountId !== input.recipientAccountId ||
+          input.checkoutRequest.amountTinybars !== input.amountTinybars
+        )
+      ) {
+        throw new Error('Checkout details changed before signing.');
+      }
+      const result = input.checkoutRequest
+        ? await sendHederaCheckoutPayment({
+            sourceAccountId: account.accountId,
+            request: input.checkoutRequest,
+            privateKey,
+          })
+        : await sendHederaTestnetTransfer({
+            sourceAccountId: account.accountId,
+            recipientAccountId: input.recipientAccountId,
+            amountTinybars: input.amountTinybars,
+            privateKey,
+          });
       const refreshed = await loadHederaAccount(account.accountId, privateKey.publicKey);
       setHederaAccount(refreshed);
       return result;

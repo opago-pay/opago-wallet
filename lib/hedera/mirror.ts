@@ -3,8 +3,16 @@ import { getHederaMirrorNodeBaseUrl, parseHederaAccountId } from './config';
 export interface MirrorAccountRecord {
   account?: string | null;
   deleted?: boolean | null;
+  evm_address?: string | null;
   balance?: { balance?: string | null; timestamp?: string | null } | null;
   key?: { _type?: string | null; key?: string | null } | null;
+}
+
+export interface MirrorContractRecord {
+  contract_id?: string | null;
+  deleted?: boolean | null;
+  evm_address?: string | null;
+  runtime_bytecode?: string | null;
 }
 
 export interface MirrorTransfer {
@@ -141,6 +149,21 @@ export async function listMirrorTransactions(
     'Hedera testnet transaction history',
   );
   return response?.transactions || [];
+}
+
+export async function getMirrorContractById(
+  rawContractId: string,
+): Promise<MirrorContractRecord | null> {
+  const contractId = rawContractId.trim();
+  if (!/^0\.0\.[1-9]\d*$/.test(contractId)) {
+    throw new Error('Hedera contract ID must use numeric 0.0.x format.');
+  }
+  const url = mirrorUrl('/api/v1/contracts/' + encodeURIComponent(contractId));
+  return fetchMirrorJson<MirrorContractRecord>(
+    url,
+    'Hedera testnet checkout contract',
+    true,
+  );
 }
 
 export function normalizeHederaTransactionIdForMirror(transactionId: string): string {
