@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -53,9 +53,11 @@ export default function HomeScreen() {
   });
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const refreshAfterInitializationRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!walletReady) {
+      refreshAfterInitializationRef.current = true;
       await loadOrGenerateWallet();
       return;
     }
@@ -65,6 +67,32 @@ export default function HomeScreen() {
       const local = await getTransactions();
       const remote: DisplayTransaction[] = [];
       const remoteErrors: string[] = [];
+
+      try {
+        const account = await refreshHederaAccount();
+        setBalances(current => ({
+          ...current,
+          hbarTinybars: account?.balanceTinybars || 0n,
+        }));
+        if (account) {
+          const history = await loadHederaHistory(account.accountId, 20);
+          remote.push(...history.map(item => ({
+            key: 'hedera:' + item.transactionId,
+            txId: item.transactionId,
+            type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
+            amountDisplay: item.amountHbar,
+            asset: 'HBAR',
+            status: item.result.toLowerCase(),
+            timestamp: item.occurredAt,
+            explorerUrl: item.hashscanUrl,
+          })));
+        }
+      } catch (cause) {
+        remoteErrors.push(
+          'Hedera: ' +
+            (cause instanceof Error ? cause.message : 'Testnet data could not be loaded.'),
+        );
+      }
 
       if (sparkWallet) {
         try {
@@ -130,32 +158,6 @@ export default function HomeScreen() {
         }
       }
 
-      try {
-        const account = await refreshHederaAccount();
-        setBalances(current => ({
-          ...current,
-          hbarTinybars: account?.balanceTinybars || 0n,
-        }));
-        if (account) {
-          const history = await loadHederaHistory(account.accountId, 20);
-          remote.push(...history.map(item => ({
-            key: 'hedera:' + item.transactionId,
-            txId: item.transactionId,
-            type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
-            amountDisplay: item.amountHbar,
-            asset: 'HBAR',
-            status: item.result.toLowerCase(),
-            timestamp: item.occurredAt,
-            explorerUrl: item.hashscanUrl,
-          })));
-        }
-      } catch (cause) {
-        remoteErrors.push(
-          'Hedera: ' +
-            (cause instanceof Error ? cause.message : 'Testnet data could not be loaded.'),
-        );
-      }
-
       const localDisplay = local.map((item: LocalTransaction): DisplayTransaction => ({
         key: item.txId || 'local:' + item.id,
         txId: item.txId,
@@ -189,6 +191,12 @@ export default function HomeScreen() {
     sparkWallet,
     walletReady,
   ]);
+
+  useEffect(() => {
+    if (!walletReady || !refreshAfterInitializationRef.current) return;
+    refreshAfterInitializationRef.current = false;
+    void refresh();
+  }, [refresh, walletReady]);
 
   useFocusEffect(
     useCallback(() => {
@@ -263,7 +271,15 @@ export default function HomeScreen() {
         <BalanceCard
           label="Hedera testnet"
           value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
-          subtitle={hederaAccount ? hederaAccount.accountId + ' - tap to copy' : 'Account not provisioned'}
+          subtitle={
+            hederaAccount
+              ? hederaAccount.accountId + ' - tap to copy'
+              : !walletReady
+                ? 'Initializing wallet...'
+                : loading
+                  ? 'Loading testnet account...'
+                  : 'Account not provisioned'
+          }
           color="#27d3b2"
           onPress={hederaAccount ? () => void copyHederaAccountId() : undefined}
         />
