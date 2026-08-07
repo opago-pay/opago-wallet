@@ -16,7 +16,7 @@ import {
   getSolanaReceiveSnapshot,
   SolanaReceiveSnapshot,
 } from '@/lib/solana';
-import { sendStyles as styles } from '../send-styles';
+import { sendStyles as styles } from '@/styles/send-styles';
 
 type ReceiveNetwork = 'lightning' | 'solana';
 
@@ -163,8 +163,8 @@ export default function ReceiveScreen() {
     setInvoiceAmountSats(0);
     setIsPaid(false);
     solanaSnapshot.current = null;
-  }, []);
     setSolanaReady(false);
+  }, []);
 
   useFocusEffect(useCallback(() => reset, [reset]));
 

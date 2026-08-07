@@ -4,6 +4,11 @@ import { Buffer } from 'buffer';
 
 global.Buffer = global.Buffer || Buffer;
 
+global.process = global.process || {};
+if (typeof global.process.version !== 'string') {
+  global.process.version = '';
+}
+
 if (typeof global.DOMException === 'undefined') {
   global.DOMException = class DOMException extends Error {
     constructor(message, name) {

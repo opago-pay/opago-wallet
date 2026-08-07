@@ -1,7 +1,7 @@
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { appConfig } from '@/lib/config';
-import { sendStyles as styles } from '@/app/send-styles';
+import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];

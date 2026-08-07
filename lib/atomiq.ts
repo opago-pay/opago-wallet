@@ -101,7 +101,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function loadModule(name: string): Record<string, unknown> {
-  const loaded: unknown = require(name);
+  let loaded: unknown;
+  switch (name) {
+    case '@atomiqlabs/sdk':
+      loaded = require('@atomiqlabs/sdk');
+      break;
+    case '@atomiqlabs/chain-solana':
+      loaded = require('@atomiqlabs/chain-solana');
+      break;
+    case '@atomiqlabs/storage-rn-async':
+      loaded = require('@atomiqlabs/storage-rn-async');
+      break;
+    default:
+      throw new Error('Unsupported Atomiq module: ' + name);
+  }
   if (!isRecord(loaded)) throw new Error(name + ' did not export a module object.');
   return loaded;
 }

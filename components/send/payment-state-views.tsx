@@ -1,7 +1,7 @@
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { sendStyles as styles } from '@/app/send-styles';
+import { sendStyles as styles } from '@/styles/send-styles';
 import type { BridgeQuote, OcpOption, OcpState } from './types';
 
 export function ScannerView(props: { onScanned(value: string): void; onCancel(): void }) {
