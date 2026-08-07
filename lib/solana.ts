@@ -17,9 +17,9 @@ import { appConfig, assertSafeRemoteUrl } from './config';
 
 export type SolanaAsset = 'SOL' | 'USDC';
 
-const SOLANA_GENESIS_HASHES = Object.freeze({
-  mainnet: '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+export const SOLANA_GENESIS_HASHES = Object.freeze({
+  mainnet: '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
 });
 let clusterVerification: Promise<void> | null = null;
 

@@ -36,6 +36,7 @@ import {
 } from '../lib/hedera/payments';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
+type PrivyClient = ReturnType<typeof usePrivy>;
 
 interface WalletContextValue {
   isInitializing: boolean;
@@ -59,8 +60,13 @@ interface WalletContextValue {
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
-export function WalletProvider({ children }: { children: ReactNode }) {
-  const privy = usePrivy();
+function WalletProviderCore({
+  children,
+  privy,
+}: {
+  children: ReactNode;
+  privy: PrivyClient | null;
+}) {
   const initializationRef = useRef<Promise<void> | null>(null);
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -90,6 +96,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const hederaPrivateKey = deriveHederaPrivateKey(mnemonic);
 
       if (appConfig.importSolanaKeyToPrivy) {
+        if (!privy) throw new Error('Privy wallet import is enabled but unavailable.');
         setInitStatus('Linking the explicitly enabled identity wallet...');
         const importer = (privy as unknown as {
           importWallet?: (input: { privateKey: string; chainType: 'solana' }) => Promise<unknown>;
@@ -214,8 +221,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       wipeTransactions(),
       atomiqKeys.length ? AsyncStorage.multiRemove(atomiqKeys) : Promise.resolve(),
     ]);
+    if (privy?.logout) {
+      await Promise.race([
+        privy.logout(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Privy logout timed out.')), 5_000),
+        ),
+      ]).catch(() => undefined);
+    }
     clearRuntimeState();
-  }, [clearRuntimeState]);
+  }, [clearRuntimeState, privy]);
 
   const value = useMemo<WalletContextValue>(
     () => ({
@@ -252,6 +267,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 
   return React.createElement(WalletContext.Provider, { value }, children);
+}
+
+function PrivyWalletProvider({ children }: { children: ReactNode }) {
+  const privy = usePrivy();
+  return React.createElement(WalletProviderCore, { children, privy });
+}
+
+export function WalletProvider({ children }: { children: ReactNode }) {
+  if (appConfig.importSolanaKeyToPrivy) {
+    return React.createElement(PrivyWalletProvider, { children });
+  }
+  return React.createElement(WalletProviderCore, { children, privy: null });
 }
 
 export function useWalletAuth(): WalletContextValue {

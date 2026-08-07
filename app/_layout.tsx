@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { PrivyProvider } from '@privy-io/expo';
 import { WalletProvider } from '@/hooks/useWalletAuth';
+import { appConfig } from '@/lib/config';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -39,6 +40,8 @@ function AppStack() {
 }
 
 export default function RootLayout() {
+  if (!appConfig.importSolanaKeyToPrivy) return <AppStack />;
+
   const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
   const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID;
 

@@ -8,7 +8,7 @@ The current release is intended for development and test networks. It is not an 
 
 | Capability | Network | Status |
 | --- | --- | --- |
-| HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 implemented; physical-device acceptance pending |
+| HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -37,7 +37,7 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 
 ### Phase 2 - HBAR as a complete wallet asset
 
-**Planned window: 10-15 August 2026. Status: implemented in code; final physical-device acceptance is pending.**
+**Planned window: 10-15 August 2026. Status: complete and physically verified.**
 
 - HBAR balance, numeric account ID, receive request, send flow, transaction status, history, and HashScan links are integrated.
 - Dashboard, Send, and Receive expose HBAR as a first-class asset with prominent `HEDERA TESTNET` labels.
@@ -66,6 +66,21 @@ The app enforces an app-level limit of at most `1 HBAR` per test transaction by 
 | Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786108189.439977724) |
 
 Testnet assets have no monetary value. The transaction above is public evidence of the Phase 1 device flow, not a production-readiness claim.
+
+### Phase 2 physical-device acceptance
+
+| Field | Result |
+| --- | --- |
+| Date | 2026-08-07 |
+| Device | Physical Android device |
+| Network | Hedera testnet |
+| Transfer | `0.00000001 HBAR` (`1` tinybar) |
+| Source | `0.0.9960666` |
+| Destination | `0.0.9958415` |
+| Consensus status | `SUCCESS` |
+| Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786122994.705663702) |
+
+The acceptance covered account discovery, exact balance and history loading, account-ID copy, receive QR generation, review-before-signing, on-device signing, Mirror Node status verification, HashScan opening, and post-transaction refresh.
 
 ### Hedera key and transaction flow
 

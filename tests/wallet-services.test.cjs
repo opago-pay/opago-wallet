@@ -11,12 +11,26 @@ const {
   HEDERA_DERIVATION_PATH,
   SOLANA_DERIVATION_PATH,
 } = require('../lib/wallet-keys.ts');
-const { getNativeTransferDeltaLamports } = require('../lib/solana.ts');
+const {
+  getNativeTransferDeltaLamports,
+  SOLANA_GENESIS_HASHES,
+} = require('../lib/solana.ts');
 
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const EXPECTED_ADDRESS = 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk';
 const EXPECTED_HEDERA_PUBLIC_KEY =
   '793af21fd5a0a7cc1076195263717fab12600496dfc7ad49e902acdd0bf22331';
+
+test('pins the complete Solana mainnet and devnet genesis hashes', () => {
+  assert.equal(
+    SOLANA_GENESIS_HASHES.mainnet,
+    '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+  );
+  assert.equal(
+    SOLANA_GENESIS_HASHES.devnet,
+    'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
+  );
+});
 
 test('derives the documented Solana account deterministically from BIP39', () => {
   assert.equal(SOLANA_DERIVATION_PATH, "m/44'/501'/0'/0'");

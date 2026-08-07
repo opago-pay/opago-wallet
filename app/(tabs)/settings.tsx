@@ -13,7 +13,6 @@ import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
-import { usePrivy } from '@privy-io/expo';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
@@ -24,7 +23,6 @@ function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
 }
 export default function SettingsScreen() {
   const router = useRouter();
-  const { logout } = usePrivy();
   const { wipeWallet, hederaPublicKey } = useWalletAuth();
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -72,14 +70,6 @@ export default function SettingsScreen() {
     setIsDeleting(true);
     try {
       await wipeWallet();
-      if (logout) {
-        await Promise.race([
-          logout(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Privy logout timed out.')), 5_000),
-          ),
-        ]).catch(() => undefined);
-      }
       setMnemonic(null);
       setIsRevealed(false);
       router.replace('/(auth)/login');
