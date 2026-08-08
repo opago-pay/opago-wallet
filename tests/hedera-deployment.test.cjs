@@ -11,6 +11,8 @@ const {
 } = require('../scripts/hedera-deploy-checkout.cjs');
 const {
   consensusTimestampToIso,
+  isExactRuntimeMatch,
+  sourcifyCompilerVersion,
 } = require('../scripts/hedera-verify-checkout.cjs');
 
 test('builds complete public deployment evidence from a successful receipt', () => {
@@ -32,6 +34,7 @@ test('builds complete public deployment evidence from a successful receipt', () 
   assert.equal(deployment.chainId, 296);
   assert.equal(deployment.status, 'deployed');
   assert.equal(deployment.contractId, '0.0.7777');
+  assert.equal(deployment.compilerSourceLineEndings, 'CRLF');
   assert.equal(deployment.deploymentConsensusTimestamp, '1700000000.123456789');
   assert.equal(
     deployment.bytecodeSha256,
@@ -65,4 +68,23 @@ test('converts Hedera consensus timestamps into reproducible ISO evidence', () =
     '2023-11-14T22:13:20.123Z',
   );
   assert.throws(() => consensusTimestampToIso('not-a-timestamp'), /invalid/i);
+});
+
+test('sends Sourcify a downloadable Solidity compiler version', () => {
+  assert.equal(
+    sourcifyCompilerVersion('0.8.28+commit.7893614a.Emscripten.clang'),
+    '0.8.28+commit.7893614a',
+  );
+  assert.equal(
+    sourcifyCompilerVersion('v0.8.28+commit.7893614a'),
+    '0.8.28+commit.7893614a',
+  );
+  assert.throws(() => sourcifyCompilerVersion('0.8.28'), /invalid/i);
+});
+
+test('accepts only Sourcify exact runtime-match statuses', () => {
+  assert.equal(isExactRuntimeMatch('exact_match'), true);
+  assert.equal(isExactRuntimeMatch('match'), true);
+  assert.equal(isExactRuntimeMatch('partial_match'), false);
+  assert.equal(isExactRuntimeMatch(null), false);
 });

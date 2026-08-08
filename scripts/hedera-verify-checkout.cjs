@@ -24,6 +24,18 @@ function sha256(bytecode) {
   return crypto.createHash('sha256').update(Buffer.from(hex, 'hex')).digest('hex');
 }
 
+function sourcifyCompilerVersion(value) {
+  const match = /^(?:v)?(\d+\.\d+\.\d+\+commit\.[0-9a-f]{8})(?:\..+)?$/i.exec(
+    String(value).trim(),
+  );
+  if (!match) throw new Error('Hardhat build info contains an invalid Solidity compiler version.');
+  return match[1];
+}
+
+function isExactRuntimeMatch(value) {
+  return value === 'match' || value === 'exact_match';
+}
+
 async function fetchJson(url, options, purpose) {
   const response = await fetch(url, {
     ...options,
@@ -72,7 +84,7 @@ async function waitForVerification(verificationId) {
       throw new Error('Sourcify job lookup failed with HTTP ' + job.response.status + '.');
     }
     if (job.body.isJobCompleted) {
-      if (job.body.error || job.body.contract?.runtimeMatch !== 'match') {
+      if (job.body.error || !isExactRuntimeMatch(job.body.contract?.runtimeMatch)) {
         throw new Error(
           'Sourcify verification did not produce an exact runtime match: ' +
             JSON.stringify(job.body.error || job.body.contract || {}),
@@ -163,7 +175,7 @@ async function main() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             stdJsonInput: build.input,
-            compilerVersion: build.solcLongVersion,
+            compilerVersion: sourcifyCompilerVersion(build.solcLongVersion),
             contractIdentifier: 'contracts/OpagoHbarCheckout.sol:OpagoHbarCheckout',
           }),
         },
@@ -185,7 +197,7 @@ async function main() {
     verifiedAt = completed.verifiedAt;
   } else if (!existing.response.ok) {
     throw new Error('Sourcify lookup failed with HTTP ' + existing.response.status + '.');
-  } else if (existing.body.runtimeMatch !== 'match') {
+  } else if (!isExactRuntimeMatch(existing.body.runtimeMatch)) {
     throw new Error('Sourcify does not report an exact runtime bytecode match.');
   }
 
@@ -214,4 +226,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { consensusTimestampToIso, sha256 };
+module.exports = {
+  consensusTimestampToIso,
+  isExactRuntimeMatch,
+  sha256,
+  sourcifyCompilerVersion,
+};

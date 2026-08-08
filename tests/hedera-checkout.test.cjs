@@ -263,8 +263,20 @@ test('keeps deployment evidence honest and operator secrets out of public data',
   );
   assert.equal(manifest.network, 'testnet');
   assert.equal(manifest.chainId, 296);
-  assert.equal(manifest.status, 'pending');
-  assert.equal(manifest.contractId, null);
+  assert.equal(manifest.status, 'deployed');
+  assert.equal(manifest.contractId, '0.0.9972670');
+  assert.equal(manifest.evmAddress, '0x0000000000000000000000000000000000982bbe');
+  assert.match(manifest.deploymentTransactionId, /^0\.0\.\d+@\d+\.\d{9}$/);
+  assert.match(manifest.bytecodeSha256, /^[0-9a-f]{64}$/);
+  assert.match(manifest.runtimeBytecodeSha256, /^[0-9a-f]{64}$/);
+  assert.equal(manifest.compilerSourceLineEndings, 'CRLF');
+  assert.equal(manifest.sourceVerification.provider, 'Sourcify');
+  assert.equal(manifest.sourceVerification.status, 'verified');
+  assert.ok(Date.parse(manifest.sourceVerification.verifiedAt));
+  assert.equal(
+    manifest.hashscanContractUrl,
+    'https://hashscan.io/testnet/contract/0.0.9972670',
+  );
   const publicEvidence = JSON.stringify(manifest);
   assert.doesNotMatch(publicEvidence, /operator|private.?key|faucet/i);
 

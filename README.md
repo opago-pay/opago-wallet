@@ -9,7 +9,7 @@ The current release is intended for development and test networks. It is not an 
 | Capability | Network | Status |
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
-| Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 code complete; deployment pending |
+| Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Deployed and source-verified; Android checkout acceptance pending |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -49,7 +49,7 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 
 ### Phase 3 - contract and merchant demo
 
-**Planned window: 15-19 August 2026. Status: implementation complete; public testnet deployment pending.**
+**Planned window: 15-19 August 2026. Status: deployed and source-verified on testnet; physical Android checkout acceptance pending.**
 
 - `OpagoHbarCheckout.sol` is a non-custodial, non-upgradeable checkout contract with no owner, fee, or withdrawal path.
 - Each `paymentId` is a domain-separated hash of the testnet chain, deployed contract, random request nonce, merchant EVM address, exact tinybar amount, and expiry.
@@ -57,9 +57,15 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 - Hardhat tests cover the successful payment and all seven required failure/replay scenarios.
 - The local merchant demo creates five-minute payment requests and scanner-ready QR codes.
 - The Android wallet verifies the merchant alias and exact pinned runtime-bytecode SHA-256 with the Mirror Node, shows contract details before signing, invokes `pay` directly through the Hiero SDK, and displays both transaction and payment IDs on success.
-- `deployments/hedera-testnet.json` is the versioned evidence record. It deliberately remains `pending` until a real deployment succeeds.
+- `deployments/hedera-testnet.json` is the versioned evidence record for contract `0.0.9972670`, its deployment transaction, compiler, timestamps, and bytecode hashes.
 
-The Phase 3 implementation does not claim a live contract yet. A contract ID, deployment transaction, bytecode hash, timestamp, and verification status are written only by the real deployment and verification scripts.
+The contract was deployed on 8 August 2026. Mirror Node runtime bytecode exactly matches the locked artifact, and Sourcify reports an exact runtime match. The remaining Phase 3 gate is the contract checkout acceptance run on the physical Android device.
+
+| Public testnet evidence | Link |
+| --- | --- |
+| Contract `0.0.9972670` | [View on HashScan](https://hashscan.io/testnet/contract/0.0.9972670) |
+| Deployment transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9959245%401786181037.989721534) |
+| Sourcify exact runtime match | [View verification record](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
 
 #### Contract quality gates
 
@@ -71,7 +77,7 @@ npm run lint
 npm test
 ```
 
-The Solidity compiler is pinned through `package-lock.json` and Hardhat uses that local compiler with the `paris` EVM target.
+The Solidity compiler is pinned through `package-lock.json` and Hardhat uses that local compiler with the `paris` EVM target. Compiler input is normalized to the CRLF line endings used by the verified deployment, so Linux, macOS, and Windows builds reproduce the versioned creation and runtime bytecode hashes.
 
 #### Hedera testnet deployment and source verification
 
@@ -97,11 +103,11 @@ try {
 }
 ```
 
-After deployment, copy the public `contractId` from `deployments/hedera-testnet.json` into the client build configuration and rebuild the native app:
+Use the public verified deployment values below in the client build configuration, then rebuild the native app:
 
 ```dotenv
-EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=0.0.YOUR_DEPLOYED_CONTRACT
-EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=RUNTIME_HASH_FROM_DEPLOYMENT_MANIFEST
+EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=0.0.9972670
+EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8
 ```
 
 `npm run contract:verify:testnet` checks Mirror Node runtime bytecode and the Hedera consensus creation timestamp against the locked artifact, submits the standard compiler input to Sourcify for chain ID `296`, and follows the verification job to an exact runtime match.
@@ -297,8 +303,8 @@ Relevant implementation files:
 | `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Hedera wallet support accepts only `testnet` |
 | `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Hedera testnet Mirror Node | Resolves the account for the derived public key |
 | `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated testnet transfer |
-| `EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID` | empty | Enables only the deployed, verified Phase 3 testnet checkout contract |
-| `EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256` | empty | Pins the exact deployed Phase 3 runtime bytecode in the app build |
+| `EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID` | `0.0.9972670` in `.env.example` | Enables only the deployed, verified Phase 3 testnet checkout contract |
+| `EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256` | verified hash in `.env.example` | Pins the exact deployed Phase 3 runtime bytecode in the app build |
 | `EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS` | `100` | Additional ceiling used by Lightning fee validation |
 | `EXPO_PUBLIC_ALLOW_INSECURE_HTTP` | `false` | Allows private/local HTTP only in development |
 | `EXPO_PUBLIC_EID_BACKEND_URL` | empty | Enables the optional eID reference flow |

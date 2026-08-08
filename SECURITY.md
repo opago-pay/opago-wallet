@@ -1,6 +1,6 @@
 # Security status
 
-Last reviewed: 2026-08-07
+Last reviewed: 2026-08-08
 
 This repository is a proof of concept and has not received an independent security or smart-contract audit. Do not use it for production custody, identity processing, or mainnet payments without dedicated reviews.
 
@@ -29,9 +29,9 @@ Before any release:
 
 ## Smart-contract boundaries
 
-`OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or live testnet acceptance.
+`OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or physical-device checkout acceptance.
 
-The versioned deployment manifest remains `pending` until a real testnet deployment succeeds. Never insert fabricated contract IDs, transaction IDs, timestamps, hashes, or verification claims.
+Contract `0.0.9972670` was deployed to Hedera testnet and its runtime bytecode was matched against the locked artifact through Mirror Node and Sourcify. The versioned manifest contains only public evidence; operator credentials remain local and must never be committed or exposed through `EXPO_PUBLIC_*`.
 
 ## Reporting
 

@@ -21,7 +21,9 @@ const ARTIFACT_PATH = path.join(
 );
 const DEPLOYMENT_PATH = path.join(ROOT, 'deployments', 'hedera-testnet.json');
 const HASHSCAN = 'https://hashscan.io/testnet';
-const MAX_DEPLOYMENT_FEE_TINYBAR = '500000000';
+// This is a transaction fee ceiling, not the amount charged. ContractCreateFlow
+// needs enough headroom for bytecode file operations plus contract creation.
+const MAX_DEPLOYMENT_FEE_TINYBAR = '5000000000';
 
 function required(name) {
   const value = process.env[name]?.trim();
@@ -100,6 +102,7 @@ function buildDeploymentRecord(input) {
     hashscanContractUrl: HASHSCAN + '/contract/' + input.contractId,
     hashscanTransactionUrl: transactionUrl(input.transactionId),
     compiler: require('solc').version(),
+    compilerSourceLineEndings: 'CRLF',
     sourceVerification: {
       provider: 'Sourcify',
       status: 'pending',

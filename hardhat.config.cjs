@@ -10,6 +10,17 @@ const {
 
 const SOLC_VERSION = '0.8.28';
 
+function normalizeSoliditySourceLineEndings(input) {
+  for (const source of Object.values(input.sources || {})) {
+    if (typeof source.content === 'string') {
+      // The verified testnet deployment was compiled from CRLF sources on
+      // Windows. Normalize explicitly so every platform recreates its bytecode.
+      source.content = source.content.replace(/\r\n|\r|\n/g, '\r\n');
+    }
+  }
+  return input;
+}
+
 subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(
   async ({ solcVersion }, _hre, runSuper) => {
     if (solcVersion !== SOLC_VERSION) return runSuper();
@@ -26,7 +37,8 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(
 subtask(TASK_COMPILE_SOLIDITY_RUN_SOLCJS).setAction(
   async ({ input, solcJsPath }) => {
     const solc = require('solc/wrapper')(require(solcJsPath));
-    return JSON.parse(solc.compile(JSON.stringify(input)));
+    const normalizedInput = normalizeSoliditySourceLineEndings(input);
+    return JSON.parse(solc.compile(JSON.stringify(normalizedInput)));
   },
 );
 
