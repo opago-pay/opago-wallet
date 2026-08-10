@@ -73,6 +73,7 @@ function WalletProviderCore({
   privy: PrivyClient | null;
 }) {
   const initializationRef = useRef<Promise<void> | null>(null);
+  const initializationGenerationRef = useRef(0);
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initStatus, setInitStatus] = useState('');
@@ -84,6 +85,7 @@ function WalletProviderCore({
   const [error, setError] = useState<string | null>(null);
 
   const clearRuntimeState = useCallback(() => {
+    initializationGenerationRef.current += 1;
     setSparkWallet(null);
     setSolanaKeypair(null);
     hederaPrivateKeyRef.current = null;
@@ -96,6 +98,7 @@ function WalletProviderCore({
 
   const initializeMnemonic = useCallback(
     async (mnemonic: string) => {
+      const generation = ++initializationGenerationRef.current;
       setInitStatus('Deriving wallet keys...');
       const keypair = deriveSolanaKeypair(mnemonic);
       const hederaPrivateKey = deriveHederaPrivateKey(mnemonic);
@@ -113,15 +116,28 @@ function WalletProviderCore({
         });
       }
 
-      setInitStatus('Starting Lightning wallet...');
-      const spark = await initializeSparkWallet(mnemonic);
+      if (initializationGenerationRef.current !== generation) return;
       hederaPrivateKeyRef.current = hederaPrivateKey;
       setSolanaKeypair(keypair);
       setHederaPublicKey(hederaPrivateKey.publicKey.toStringRaw().toLowerCase());
       setHederaAccount(null);
-      setSparkWallet(spark);
+      setSparkWallet(null);
       setWalletReady(true);
       setInitStatus('Ready');
+
+      // Lightning is an optional asset. Its network startup must never block
+      // the already-derived Hedera and Solana wallets from becoming usable.
+      void initializeSparkWallet(mnemonic)
+        .then(spark => {
+          if (initializationGenerationRef.current !== generation) return;
+          setSparkWallet(spark);
+        })
+        .catch(cause => {
+          if (initializationGenerationRef.current !== generation) return;
+          const message = cause instanceof Error ? cause.message : 'Lightning wallet initialization failed.';
+          setSparkWallet(null);
+          setError('Lightning wallet unavailable: ' + message);
+        });
     },
     [privy],
   );

@@ -75,6 +75,28 @@ test('keeps a revealed recovery phrase out of the accessibility tree', () => {
   assert.doesNotMatch(source, /accessibilityLabel=\{(?:mnemonic|phrase)\}/);
 });
 
+test('does not block Hedera wallet readiness on optional Spark startup', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'hooks', 'useWalletAuth.ts'),
+    'utf8',
+  );
+  const walletReadyIndex = source.indexOf('setWalletReady(true);');
+  const sparkStartupIndex = source.indexOf('void initializeSparkWallet(mnemonic)');
+
+  assert.ok(walletReadyIndex >= 0, 'wallet readiness assignment is missing');
+  assert.ok(sparkStartupIndex >= 0, 'background Spark startup is missing');
+  assert.ok(
+    walletReadyIndex < sparkStartupIndex,
+    'optional Spark startup must happen after Hedera and Solana are ready',
+  );
+  assert.match(source, /const initializationGenerationRef = useRef\(0\)/);
+  assert.match(
+    source,
+    /if \(initializationGenerationRef\.current !== generation\) return;/,
+  );
+  assert.match(source, /Lightning wallet unavailable:/);
+});
+
 test('counts only parsed system transfers involving the wallet', () => {
   const wallet = new PublicKey(EXPECTED_ADDRESS);
   const other = '11111111111111111111111111111111';

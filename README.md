@@ -9,7 +9,7 @@ The current release is intended for development and test networks. It is not an 
 | Capability | Network | Status |
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
-| Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Deployed and source-verified; Android checkout acceptance pending |
+| Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 complete; deployed, source-verified, and physically accepted |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -49,7 +49,7 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 
 ### Phase 3 - contract and merchant demo
 
-**Planned window: 15-19 August 2026. Status: deployed and source-verified on testnet; physical Android checkout acceptance pending.**
+**Planned window: 15-19 August 2026. Status: complete and physically verified on Hedera testnet.**
 
 - `OpagoHbarCheckout.sol` is a non-custodial, non-upgradeable checkout contract with no owner, fee, or withdrawal path.
 - Each `paymentId` is a domain-separated hash of the testnet chain, deployed contract, random request nonce, merchant EVM address, exact tinybar amount, and expiry.
@@ -59,12 +59,13 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 - The Android wallet verifies the merchant alias and exact pinned runtime-bytecode SHA-256 with the Mirror Node, shows contract details before signing, invokes `pay` directly through the Hiero SDK, and displays both transaction and payment IDs on success.
 - `deployments/hedera-testnet.json` is the versioned evidence record for contract `0.0.9972670`, its deployment transaction, compiler, timestamps, and bytecode hashes.
 
-The contract was deployed on 8 August 2026. Mirror Node runtime bytecode exactly matches the locked artifact, and Sourcify reports an exact runtime match. The remaining Phase 3 gate is the contract checkout acceptance run on the physical Android device.
+The contract was deployed on 8 August 2026. Mirror Node runtime bytecode exactly matches the locked artifact, Sourcify reports an exact runtime match, and the merchant QR checkout was signed and confirmed on a physical Android device on 10 August 2026.
 
 | Public testnet evidence | Link |
 | --- | --- |
 | Contract `0.0.9972670` | [View on HashScan](https://hashscan.io/testnet/contract/0.0.9972670) |
 | Deployment transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9959245%401786181037.989721534) |
+| Physical-device checkout transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) |
 | Sourcify exact runtime match | [View verification record](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
 
 #### Contract quality gates
@@ -158,6 +159,24 @@ Testnet assets have no monetary value. The transaction above is public evidence 
 | Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786122994.705663702) |
 
 The acceptance covered account discovery, exact balance and history loading, account-ID copy, receive QR generation, review-before-signing, on-device signing, Mirror Node status verification, HashScan opening, and post-transaction refresh.
+
+### Phase 3 physical-device checkout acceptance
+
+| Field | Result |
+| --- | --- |
+| Date | 2026-08-10 |
+| Device | Physical Android 14 device |
+| Network | Hedera testnet |
+| Checkout amount | `0.01 HBAR` (`1,000,000` tinybars) |
+| Source | `0.0.9960666` |
+| Merchant | `0.0.9944908` |
+| Contract | `0.0.9972670` |
+| Consensus and contract result | `SUCCESS` / `SUCCESS` |
+| Gas used | `195095` |
+| Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) |
+| Checkout payment ID | `0x912153f15b35410765fe7296c58c1956606377cf437bab9025cea1b62da8a381` |
+
+The wallet scanned the merchant demo QR, verified the merchant EVM alias and pinned runtime bytecode through the Mirror Node, displayed the contract-bound review, signed on-device, and showed the confirmed transaction and payment IDs. An independent Mirror Node lookup reported a `CONTRACTCALL` to `0.0.9972670` and an exact `1,000,000` tinybar transfer to the merchant.
 
 ### Hedera key and transaction flow
 
