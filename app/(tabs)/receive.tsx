@@ -9,7 +9,10 @@ import QRCode from 'react-native-qrcode-svg';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { addTransaction } from '@/lib/database';
-import { loadHederaHistory } from '@/lib/hedera/account';
+import {
+  findNewConfirmedIncomingHederaTransaction,
+  loadHederaHistory,
+} from '@/lib/hedera/account';
 import {
   buildHederaReceiveRequest,
   parseHederaTestTransferTinybars,
@@ -48,6 +51,7 @@ export default function ReceiveScreen() {
   const solanaSnapshot = useRef<SolanaReceiveSnapshot | null>(null);
   const [solanaReady, setSolanaReady] = useState(false);
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
+  const hederaExpectedAmountTinybars = useRef<bigint | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
   const [hederaRequest, setHederaRequest] = useState<string | null>(null);
 
@@ -154,10 +158,10 @@ export default function ReceiveScreen() {
         );
         if (!cancelled) setHederaReady(true);
       } else {
-        const incoming = history.find(
-          item =>
-            item.direction === 'received' &&
-            !hederaKnownTransactions.current!.has(item.transactionId),
+        const incoming = findNewConfirmedIncomingHederaTransaction(
+          history,
+          hederaKnownTransactions.current,
+          hederaExpectedAmountTinybars.current,
         );
         for (const item of history) {
           hederaKnownTransactions.current.add(item.transactionId);
@@ -167,10 +171,17 @@ export default function ReceiveScreen() {
           setReceivedDescription(description);
           setIsPaid(true);
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          await Notifications.scheduleNotificationAsync({
-            content: { title: 'Testnet HBAR received', body: description },
-            trigger: null,
-          });
+          try {
+            const permissions = await Notifications.getPermissionsAsync();
+            if (permissions.granted) {
+              await Notifications.scheduleNotificationAsync({
+                content: { title: 'Testnet HBAR received', body: description },
+                trigger: null,
+              });
+            }
+          } catch {
+            // Notification availability must not change a confirmed payment state.
+          }
           return;
         }
       }
@@ -234,7 +245,7 @@ export default function ReceiveScreen() {
       const amountTinybars = amountInput.trim()
         ? parseHederaTestTransferTinybars(amountInput)
         : null;
-      await Notifications.requestPermissionsAsync();
+      hederaExpectedAmountTinybars.current = amountTinybars;
       setHederaRequest(buildHederaReceiveRequest(account.accountId, amountTinybars));
     } catch (cause) {
       Alert.alert(
@@ -255,6 +266,7 @@ export default function ReceiveScreen() {
     solanaSnapshot.current = null;
     setSolanaReady(false);
     hederaKnownTransactions.current = null;
+    hederaExpectedAmountTinybars.current = null;
     setHederaReady(false);
     setHederaRequest(null);
   }, []);

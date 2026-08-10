@@ -174,7 +174,7 @@ function historyItemFromMirror(
   walletAccountId: string,
 ): HederaHistoryItem | null {
   if (
-    transaction.name !== 'CRYPTOTRANSFER' ||
+    !['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION'].includes(transaction.name || '') ||
     transaction.scheduled ||
     (transaction.nonce != null && transaction.nonce !== 0) ||
     !transaction.transaction_id ||
@@ -220,6 +220,19 @@ function historyItemFromMirror(
     result: transaction.result || 'UNKNOWN',
     hashscanUrl: getHederaTransactionExplorerUrl(transaction.transaction_id),
   };
+}
+
+export function findNewConfirmedIncomingHederaTransaction(
+  history: readonly HederaHistoryItem[],
+  knownTransactionIds: ReadonlySet<string>,
+  expectedAmountTinybars: bigint | null,
+): HederaHistoryItem | null {
+  return history.find(item =>
+    item.direction === 'received' &&
+    item.result === 'SUCCESS' &&
+    !knownTransactionIds.has(item.transactionId) &&
+    (expectedAmountTinybars === null || item.amountTinybars === expectedAmountTinybars)
+  ) || null;
 }
 
 export async function loadHederaHistory(

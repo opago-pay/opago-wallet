@@ -69,12 +69,12 @@ Completed evidence:
 
 - Separate Hedera testnet wallet and merchant accounts are active.
 - Direct HBAR transfer and contract checkout transactions were signed on a physical Android device and reached consensus with `SUCCESS`.
+- A wallet-generated exact-amount QR received `0.001 HBAR` from MetaMask on a physical Android device. The app accepted the payment only after the Mirror Node reported a new `SUCCESS` transaction for exactly `100,000` tinybars.
 - App restart, deterministic key derivation, and account rediscovery were exercised without exposing the recovery phrase or private key.
 - Automated tests cover testnet enforcement, network/configuration rejection, secret boundaries, checkout tampering, expiry, replay, duplicate payment IDs, wrong amounts, invalid merchants, failed forwarding, and reentrancy.
 
 Remaining acceptance gates:
 
-- receive HBAR through a wallet-generated QR code and record the incoming physical-device flow;
 - clear app data, restore the wallet from its recovery phrase, and verify the same Hedera account and history;
 - exercise offline, timeout, pending-transaction, and restart-during-payment behavior on the Android device;
 - physically reject expired, altered, replayed, and wrong-amount checkout requests;
@@ -212,6 +212,22 @@ The acceptance covered account discovery, exact balance and history loading, acc
 | Checkout payment ID | `0x912153f15b35410765fe7296c58c1956606377cf437bab9025cea1b62da8a381` |
 
 The wallet scanned the merchant demo QR, verified the merchant EVM alias and pinned runtime bytecode through the Mirror Node, displayed the contract-bound review, signed on-device, and showed the confirmed transaction and payment IDs. An independent Mirror Node lookup reported a `CONTRACTCALL` to `0.0.9972670` and an exact `1,000,000` tinybar transfer to the merchant.
+
+### Phase 4 physical-device receive acceptance
+
+| Field | Result |
+| --- | --- |
+| Date | 2026-08-10 |
+| Device | Physical Android 14 device |
+| Network | Hedera testnet |
+| Requested and received amount | `0.001 HBAR` (`100,000` tinybars) |
+| Source | `0.0.7314364` (MetaMask) |
+| Destination | `0.0.9960666` |
+| Mirror Node transaction type | `ETHEREUMTRANSACTION` |
+| Consensus status | `SUCCESS` |
+| Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.7314364%401786354442.132871379) |
+
+The first physical receive attempt exposed that MetaMask-originated HBAR transfers are returned as `ETHEREUMTRANSACTION`, while the wallet previously loaded only `CRYPTOTRANSFER` history. The receive flow now merges both official Mirror Node transaction types and confirms only a new, successful incoming transaction whose exact bigint tinybar amount matches the QR request. The application displayed `Funds confirmed` for the transaction above, and an independent Mirror Node lookup verified the same status and amount.
 
 ### Hedera key and transaction flow
 
@@ -420,7 +436,7 @@ npm run contract:test
 node --check server/eid-backend.js
 ```
 
-At the Phase 3 acceptance baseline recorded above, the application suite passes `44/44` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, receive requests, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+At the Phase 4 receive-acceptance baseline recorded above, the application suite passes `46/46` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

@@ -41,6 +41,11 @@ interface MirrorTransactionsResponse {
   transactions?: MirrorTransactionRecord[];
 }
 
+const HEDERA_HISTORY_TRANSACTION_TYPES = [
+  'CRYPTOTRANSFER',
+  'ETHEREUMTRANSACTION',
+] as const;
+
 const EXACT_INTEGER_FIELDS = /("(?:amount|balance|charged_tx_fee|max_fee)"\s*:\s*)(-?\d+)(?=\s*[,}\]])/g;
 
 function preserveExactIntegers(rawJson: string): string {
@@ -139,16 +144,38 @@ export async function listMirrorTransactions(
 ): Promise<MirrorTransactionRecord[]> {
   const accountId = parseHederaAccountId(rawAccountId);
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
-  const url = mirrorUrl('/api/v1/transactions');
-  url.searchParams.set('account.id', accountId);
-  url.searchParams.set('transactiontype', 'CRYPTOTRANSFER');
-  url.searchParams.set('limit', String(safeLimit));
-  url.searchParams.set('order', 'desc');
-  const response = await fetchMirrorJson<MirrorTransactionsResponse>(
-    url,
-    'Hedera testnet transaction history',
+  const responses = await Promise.all(
+    HEDERA_HISTORY_TRANSACTION_TYPES.map(async transactionType => {
+      const url = mirrorUrl('/api/v1/transactions');
+      url.searchParams.set('account.id', accountId);
+      url.searchParams.set('transactiontype', transactionType);
+      url.searchParams.set('limit', String(safeLimit));
+      url.searchParams.set('order', 'desc');
+      const response = await fetchMirrorJson<MirrorTransactionsResponse>(
+        url,
+        'Hedera testnet ' + transactionType.toLowerCase() + ' history',
+      );
+      return response?.transactions || [];
+    }),
   );
-  return response?.transactions || [];
+
+  const uniqueTransactions = new Map<string, MirrorTransactionRecord>();
+  for (const transaction of responses.flat()) {
+    const identity = [
+      transaction.transaction_id || '',
+      transaction.nonce ?? 0,
+      transaction.name || '',
+    ].join(':');
+    if (!uniqueTransactions.has(identity)) uniqueTransactions.set(identity, transaction);
+  }
+
+  return Array.from(uniqueTransactions.values())
+    .sort((left, right) =>
+      String(right.consensus_timestamp || '').localeCompare(
+        String(left.consensus_timestamp || ''),
+      ),
+    )
+    .slice(0, safeLimit);
 }
 
 export async function getMirrorContractById(

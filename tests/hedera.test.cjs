@@ -21,6 +21,7 @@ require('./register-typescript.cjs');
 const { deriveHederaPrivateKey } = require('../lib/wallet-keys.ts');
 const {
   buildHederaReceiveRequest,
+  findNewConfirmedIncomingHederaTransaction,
   findHederaTestnetAccount,
   formatTinybars,
   loadHederaHistory,
@@ -194,6 +195,83 @@ test('preserves Mirror Node int64 values and derives exact HBAR history', async 
   assert.equal(history[0].amountHbar, '2');
   assert.equal(history[0].counterpartyAccountId, '0.0.654321');
   assert.match(history[0].hashscanUrl, /^https:\/\/hashscan\.io\/testnet\/transaction\//);
+});
+
+test('loads MetaMask HBAR receipts from Ethereum transactions', async t => {
+  const originalFetch = global.fetch;
+  const requestedTypes = new Set();
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+  global.fetch = async input => {
+    const url = new URL(String(input));
+    const transactionType = url.searchParams.get('transactiontype');
+    requestedTypes.add(transactionType);
+    const body = transactionType === 'ETHEREUMTRANSACTION'
+      ? JSON.stringify({
+          transactions: [{
+            charged_tx_fee: 2_583_000,
+            consensus_timestamp: '1786353644.290689104',
+            name: 'ETHEREUMTRANSACTION',
+            nonce: 0,
+            result: 'SUCCESS',
+            scheduled: false,
+            transaction_id: '0.0.7314364-1786353637-092830345',
+            transfers: [
+              { account: '0.0.7314364', amount: -2_683_000 },
+              { account: '0.0.9960666', amount: 100_000 },
+              { account: '0.0.3', amount: 2_583_000 },
+            ],
+          }],
+        })
+      : JSON.stringify({ transactions: [] });
+    return {
+      redirected: false,
+      ok: true,
+      status: 200,
+      headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+      text: async () => body,
+    };
+  };
+
+  const history = await loadHederaHistory('0.0.9960666', 10);
+  assert.deepEqual(requestedTypes, new Set(['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION']));
+  assert.equal(history.length, 1);
+  assert.equal(history[0].direction, 'received');
+  assert.equal(history[0].amountTinybars, 100_000n);
+  assert.equal(history[0].amountHbar, '0.001');
+  assert.equal(history[0].result, 'SUCCESS');
+});
+
+test('accepts only a new successful incoming transaction with the requested amount', () => {
+  const base = {
+    consensusTimestamp: '1786353644.290689104',
+    occurredAt: '2026-08-10T09:20:44.290Z',
+    direction: 'received',
+    amountTinybars: 100_000n,
+    amountHbar: '0.001',
+    feeTinybars: 2_583_000n,
+    counterpartyAccountId: '0.0.7314364',
+    result: 'SUCCESS',
+    hashscanUrl: 'https://hashscan.io/testnet/transaction/example',
+  };
+  const history = [
+    { ...base, transactionId: 'wrong-amount', amountTinybars: 1n, amountHbar: '0.00000001' },
+    { ...base, transactionId: 'failed', result: 'INSUFFICIENT_ACCOUNT_BALANCE' },
+    { ...base, transactionId: 'known' },
+    { ...base, transactionId: 'exact-success' },
+  ];
+
+  const incoming = findNewConfirmedIncomingHederaTransaction(
+    history,
+    new Set(['known']),
+    100_000n,
+  );
+  assert.equal(incoming.transactionId, 'exact-success');
+  assert.equal(
+    findNewConfirmedIncomingHederaTransaction(history, new Set(['known']), 200_000n),
+    null,
+  );
 });
 
 test('reports pending and final Mirror Node transaction states', async t => {
