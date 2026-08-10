@@ -61,6 +61,41 @@ Mainnet payments are disabled by default. Hedera remains testnet-only even when 
 
 The contract was deployed on 8 August 2026. Mirror Node runtime bytecode exactly matches the locked artifact, Sourcify reports an exact runtime match, and the merchant QR checkout was signed and confirmed on a physical Android device on 10 August 2026.
 
+### Phase 4 - end-to-end and security acceptance
+
+**Planned window: 19-22 August 2026. Status: in progress.**
+
+Completed evidence:
+
+- Separate Hedera testnet wallet and merchant accounts are active.
+- Direct HBAR transfer and contract checkout transactions were signed on a physical Android device and reached consensus with `SUCCESS`.
+- App restart, deterministic key derivation, and account rediscovery were exercised without exposing the recovery phrase or private key.
+- Automated tests cover testnet enforcement, network/configuration rejection, secret boundaries, checkout tampering, expiry, replay, duplicate payment IDs, wrong amounts, invalid merchants, failed forwarding, and reentrancy.
+
+Remaining acceptance gates:
+
+- receive HBAR through a wallet-generated QR code and record the incoming physical-device flow;
+- clear app data, restore the wallet from its recovery phrase, and verify the same Hedera account and history;
+- exercise offline, timeout, pending-transaction, and restart-during-payment behavior on the Android device;
+- physically reject expired, altered, replayed, and wrong-amount checkout requests;
+- archive a redacted Logcat review proving that seeds, private keys, and complete signed transactions are not logged;
+- verify that failed or unresolved payments are never stored or displayed as successful.
+
+### Phase 5 - milestone evidence
+
+**Planned window: 22-24 August 2026. Status: in progress.**
+
+The repository already contains the Hedera testnet setup, architecture, reproducible quality commands, deployment manifest, contract and transaction links, source-verification record, and physical-device transaction evidence.
+
+Remaining milestone gates:
+
+- verify a clean clone with `npm ci`, all quality gates, a fresh Android development-client build, installation, and launch;
+- archive the final Phase 4 test matrix and redacted evidence;
+- prepare the final one-to-five-minute demo script and video showing balance, merchant QR scan, payment review, confirmation, success, and HashScan verification;
+- package the exact commit, lockfile, compiler metadata, deployment manifest, links, and release notes used for submission.
+
+25 August 2026 remains the submission and contingency day.
+
 | Public testnet evidence | Link |
 | --- | --- |
 | Contract `0.0.9972670` | [View on HashScan](https://hashscan.io/testnet/contract/0.0.9972670) |
@@ -234,7 +269,7 @@ The default public devnet RPC is suitable for development and is rate-limited. A
 - A physical Android device with USB debugging, or an Android emulator
 - Privy app and client IDs for the current authentication screen
 
-Wallet-key storage requires a native Android or iOS build. Hedera Phases 1 and 2 were verified on a physical Android device. The Phase 3 contract checkout requires a fresh post-deployment Android acceptance run. iOS verification is outside the current milestone.
+Wallet-key storage requires a native Android or iOS build. Hedera Phases 1, 2, and 3 were verified on a physical Android device. The recorded Phase 3 checkout used the installed development client with the current Metro bundle; a clean-clone, fresh native build and installation remain a Phase 5 release-evidence gate. iOS verification is outside the current milestone.
 
 ## Quick start
 
@@ -258,6 +293,8 @@ Run the local quality gates:
 npm run typecheck
 npm run lint
 npm test
+npm run contract:compile
+npm run contract:test
 ```
 
 To build, install, and launch the development client on a connected Android device:
@@ -378,10 +415,12 @@ These services are not production backends. The eID service requires an explicit
 npm run typecheck
 npm run lint
 npm test
+npm run contract:compile
+npm run contract:test
 node --check server/eid-backend.js
 ```
 
-The test suite covers deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, receive requests, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, and remote URL policy.
+At the Phase 3 acceptance baseline recorded above, the application suite passes `44/44` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, receive requests, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

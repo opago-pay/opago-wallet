@@ -1,6 +1,6 @@
 # Security status
 
-Last reviewed: 2026-08-08
+Last reviewed: 2026-08-10
 
 This repository is a proof of concept and has not received an independent security or smart-contract audit. Do not use it for production custody, identity processing, or mainnet payments without dedicated reviews.
 
@@ -8,7 +8,7 @@ This repository is a proof of concept and has not received an independent securi
 
 The lockfile contains targeted same-major overrides for previously remediated `brace-expansion`, `postcss`, and supported `ws` lines. No forced or breaking `npm audit fix` was applied.
 
-The current npm advisory report is:
+The npm advisory report captured from the 2026-08-08 lockfile is:
 
 | Scope | Critical | High | Moderate | Low | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -29,9 +29,11 @@ Before any release:
 
 ## Smart-contract boundaries
 
-`OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or physical-device checkout acceptance.
+`OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or production security review.
 
-Contract `0.0.9972670` was deployed to Hedera testnet and its runtime bytecode was matched against the locked artifact through Mirror Node and Sourcify. The versioned manifest contains only public evidence; operator credentials remain local and must never be committed or exposed through `EXPO_PUBLIC_*`.
+Contract `0.0.9972670` was deployed to Hedera testnet and its runtime bytecode was matched against the locked artifact through Mirror Node and Sourcify. On 2026-08-10, a physical Android device completed a contract checkout from wallet `0.0.9960666` to merchant `0.0.9944908`; Hedera consensus and the contract result were both `SUCCESS`. This proves the documented testnet path only and does not establish mainnet or production readiness.
+
+The versioned deployment manifest contains only public evidence. Operator credentials remain local and must never be committed or exposed through `EXPO_PUBLIC_*`.
 
 ## Reporting
 
