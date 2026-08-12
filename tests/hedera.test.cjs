@@ -31,7 +31,10 @@ const {
   parseHederaPaymentRequest,
   parseHederaTestTransferTinybars,
 } = require('../lib/hedera.ts');
-const { parseOperatorKey } = require('../scripts/hedera-provision-testnet.cjs');
+const {
+  assertOperatorKeyMatchesAccount,
+  parseOperatorKey,
+} = require('../scripts/hedera-provision-testnet.cjs');
 
 const MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -195,6 +198,22 @@ test('preserves Mirror Node int64 values and derives exact HBAR history', async 
   assert.equal(history[0].amountHbar, '2');
   assert.equal(history[0].counterpartyAccountId, '0.0.654321');
   assert.match(history[0].hashscanUrl, /^https:\/\/hashscan\.io\/testnet\/transaction\//);
+});
+
+test('rejects an operator key that does not belong to the configured account', () => {
+  const expected = PrivateKey.generateECDSA();
+  const wrong = PrivateKey.generateECDSA();
+  const mirrorAccount = { key: { key: expected.publicKey.toString() } };
+
+  assert.doesNotThrow(() => assertOperatorKeyMatchesAccount(expected, mirrorAccount));
+  assert.throws(
+    () => assertOperatorKeyMatchesAccount(wrong, mirrorAccount),
+    /does not match HEDERA_OPERATOR_ID.*No transaction was submitted/i,
+  );
+  assert.throws(
+    () => assertOperatorKeyMatchesAccount(expected, { key: { key: 'invalid' } }),
+    /did not return a supported public key/i,
+  );
 });
 
 test('loads MetaMask HBAR receipts from Ethereum transactions', async t => {

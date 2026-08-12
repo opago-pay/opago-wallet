@@ -2,7 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,10 +15,38 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
+import { appConfig } from '@/lib/config';
 import { useLoginWithOAuth } from '@privy-io/expo';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { validateMnemonic } from 'bip39';
 
 const { width, height } = Dimensions.get('window');
+
+function RecoveryInputScreenCaptureGuard() {
+  usePreventScreenCapture('opago-recovery-input');
+  return null;
+}
+
+function OAuthLoginButton({
+  disabled,
+  onSuccess,
+}: {
+  disabled: boolean;
+  onSuccess: () => Promise<void>;
+}) {
+  const { login } = useLoginWithOAuth({ onSuccess });
+
+  return (
+    <TouchableOpacity
+      style={styles.button}
+      onPress={() => login({ provider: 'google' })}
+      disabled={disabled}
+    >
+      <Text style={styles.providerIcon}>G</Text>
+      <Text style={styles.darkButtonText}>Continue with Google</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -34,6 +66,15 @@ export default function LoginScreen() {
     if (walletReady) router.replace('/(tabs)');
   }, [router, walletReady]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') return;
+      setMnemonicInput('');
+      setIsRestoring(false);
+    });
+    return () => subscription.remove();
+  }, []);
+
   async function runWalletAction(action: () => Promise<void>) {
     setBusy(true);
     try {
@@ -48,10 +89,6 @@ export default function LoginScreen() {
     }
   }
 
-  const { login: loginOAuth } = useLoginWithOAuth({
-    onSuccess: () => runWalletAction(loadOrGenerateWallet),
-  });
-
   async function handleRestore() {
     const phrase = mnemonicInput.trim().toLowerCase();
     if (!validateMnemonic(phrase)) {
@@ -65,91 +102,111 @@ export default function LoginScreen() {
   }
 
   const loading = busy || isInitializing;
+  const recoveryWordCount = mnemonicInput.trim()
+    ? mnemonicInput.trim().split(/\s+/).length
+    : 0;
 
   return (
     <View style={styles.container}>
       <View style={styles.glowOrb1} />
       <View style={styles.glowOrb2} />
-      <View style={styles.content}>
-        <Text style={styles.title}>Opago</Text>
-        <Text style={styles.subtitle}>Lightning / Solana / Identity</Text>
+      {isRestoring && <RecoveryInputScreenCaptureGuard />}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <Text style={styles.title}>Opago</Text>
+            <Text style={styles.subtitle}>Lightning / Solana / Identity</Text>
 
-        <View style={styles.card}>
-          {isRestoring ? (
-            <>
-              <Text style={styles.cardTitle}>Restore wallet</Text>
-              <Text style={styles.cardDesc}>
-                Enter the recovery phrase. It is stored only in the protected device keychain.
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Recovery phrase"
-                placeholderTextColor="#666"
-                value={mnemonicInput}
-                onChangeText={setMnemonicInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline
-              />
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton]}
-                onPress={() => void handleRestore()}
-                disabled={loading}
-              >
-                <Text style={styles.buttonText}>Restore now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => {
-                  setMnemonicInput('');
-                  setIsRestoring(false);
-                }}
-                disabled={loading}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.cardTitle}>Create wallet</Text>
-              <Text style={styles.cardDesc}>
-                Sign in with Google or create a device-local wallet without pretending to perform
-                an email login.
-              </Text>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => loginOAuth({ provider: 'google' })}
-                disabled={loading}
-              >
-                <Text style={styles.providerIcon}>G</Text>
-                <Text style={styles.darkButtonText}>Continue with Google</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.localButton]}
-                onPress={() => void runWalletAction(loadOrGenerateWallet)}
-                disabled={loading}
-              >
-                <Text style={styles.buttonText}>Create local wallet</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.restoreLink}
-                onPress={() => setIsRestoring(true)}
-                disabled={loading}
-              >
-                <Text style={styles.restoreText}>Restore from recovery phrase</Text>
-              </TouchableOpacity>
-            </>
-          )}
+            <View style={styles.card}>
+              {isRestoring ? (
+                <>
+                  <Text style={styles.cardTitle}>Restore wallet</Text>
+                  <Text style={styles.cardDesc}>
+                    Enter all recovery words in order, separated by spaces. The screen stays above
+                    the keyboard and capture is blocked while this form is open.
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="word 1 word 2 word 3 ..."
+                    placeholderTextColor="#666"
+                    value={mnemonicInput}
+                    onChangeText={setMnemonicInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="off"
+                    spellCheck={false}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                    accessibilityLabel="Recovery phrase input"
+                  />
+                  <Text style={styles.wordCount}>{recoveryWordCount} words entered</Text>
+                  <TouchableOpacity
+                    style={[styles.button, styles.primaryButton]}
+                    onPress={() => void handleRestore()}
+                    disabled={loading}
+                  >
+                    <Text style={styles.buttonText}>Restore now</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={() => {
+                      setMnemonicInput('');
+                      setIsRestoring(false);
+                    }}
+                    disabled={loading}
+                  >
+                    <Text style={styles.buttonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.cardTitle}>Create wallet</Text>
+                  <Text style={styles.cardDesc}>
+                    Sign in with Google or create a device-local wallet without pretending to
+                    perform an email login.
+                  </Text>
+                  {appConfig.importSolanaKeyToPrivy && (
+                    <OAuthLoginButton
+                      disabled={loading}
+                      onSuccess={() => runWalletAction(loadOrGenerateWallet)}
+                    />
+                  )}
+                  <TouchableOpacity
+                    style={[styles.button, styles.localButton]}
+                    onPress={() => void runWalletAction(loadOrGenerateWallet)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.buttonText}>Create local wallet</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.restoreLink}
+                    onPress={() => setIsRestoring(true)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.restoreText}>Restore from recovery phrase</Text>
+                  </TouchableOpacity>
+                </>
+              )}
 
-          {loading && (
-            <View style={styles.loading}>
-              <ActivityIndicator color="#ffb000" size="large" />
-              <Text style={styles.loadingText}>{initStatus || 'Preparing wallet...'}</Text>
+              {loading && (
+                <View style={styles.loading}>
+                  <ActivityIndicator color="#ffb000" size="large" />
+                  <Text style={styles.loadingText}>{initStatus || 'Preparing wallet...'}</Text>
+                </View>
+              )}
+              {error && !loading && <Text style={styles.errorText}>{error}</Text>}
             </View>
-          )}
-          {error && !loading && <Text style={styles.errorText}>{error}</Text>}
-        </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -158,9 +215,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0c',
+    overflow: 'hidden',
+  },
+  keyboardAvoidingView: { flex: 1, width: '100%' },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    paddingVertical: 32,
   },
   glowOrb1: {
     position: 'absolute',
@@ -213,6 +275,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     minHeight: 80,
   },
+  wordCount: { color: '#8f8f9d', marginTop: -10, marginBottom: 18, textAlign: 'right' },
   button: {
     backgroundColor: '#fff',
     minHeight: 56,

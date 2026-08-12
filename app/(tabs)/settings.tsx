@@ -3,9 +3,13 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -59,6 +63,27 @@ function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
     </View>
   );
 }
+
+function SensitiveInputScreenCaptureGuard() {
+  usePreventScreenCapture('opago-recovery-verification');
+  return null;
+}
+
+type BackupChallenge = {
+  positions: number[];
+  expectedWords: string[];
+};
+
+function selectBackupChallengePositions(wordCount: number): number[] {
+  if (wordCount < 3) throw new Error('Recovery phrase is incomplete.');
+  const available = Array.from({ length: wordCount }, (_, index) => index);
+  for (let index = available.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [available[index], available[swapIndex]] = [available[swapIndex], available[index]];
+  }
+  return available.slice(0, 3).sort((left, right) => left - right);
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { wipeWallet, hederaPublicKey } = useWalletAuth();
@@ -66,6 +91,27 @@ export default function SettingsScreen() {
   const [isRevealed, setIsRevealed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [backupVerified, setBackupVerified] = useState(false);
+  const [isVerifyingBackup, setIsVerifyingBackup] = useState(false);
+  const [backupChallenge, setBackupChallenge] = useState<BackupChallenge | null>(null);
+  const [backupChallengeIndex, setBackupChallengeIndex] = useState(0);
+  const [backupWordInput, setBackupWordInput] = useState('');
+  const [backupChallengeError, setBackupChallengeError] = useState('');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') return;
+      setMnemonic(null);
+      setIsRevealed(false);
+      setBackupChallenge(null);
+      setBackupChallengeIndex(0);
+      setBackupWordInput('');
+      setBackupChallengeError('');
+      setBackupVerified(false);
+    });
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     if (!isRevealed) return;
     const hide = () => {
@@ -73,12 +119,8 @@ export default function SettingsScreen() {
       setIsRevealed(false);
     };
     const timer = setTimeout(hide, 30_000);
-    const subscription = AppState.addEventListener('change', state => {
-      if (state !== 'active') hide();
-    });
     return () => {
       clearTimeout(timer);
-      subscription.remove();
     };
   }, [isRevealed]);
 
@@ -110,6 +152,11 @@ export default function SettingsScreen() {
       await wipeWallet();
       setMnemonic(null);
       setIsRevealed(false);
+      setBackupChallenge(null);
+      setBackupChallengeIndex(0);
+      setBackupWordInput('');
+      setBackupChallengeError('');
+      setBackupVerified(false);
       router.replace('/(auth)/login');
     } catch (cause) {
       Alert.alert(
@@ -121,7 +168,75 @@ export default function SettingsScreen() {
     }
   }
 
+  async function beginRecoveryBackupVerification() {
+    setIsVerifyingBackup(true);
+    try {
+      const phrase = await getSecureItem(MNEMONIC_STORE_KEY);
+      if (!phrase || !hederaPublicKey) throw new Error('Recovery phrase is unavailable.');
+      const words = phrase.trim().toLowerCase().split(/\s+/);
+      const positions = selectBackupChallengePositions(words.length);
+      setMnemonic(null);
+      setIsRevealed(false);
+      setBackupVerified(false);
+      setBackupChallenge({
+        positions,
+        expectedWords: positions.map(position => words[position]),
+      });
+      setBackupChallengeIndex(0);
+      setBackupWordInput('');
+      setBackupChallengeError('');
+    } catch (cause) {
+      setBackupVerified(false);
+      Alert.alert(
+        'Could not start backup verification',
+        cause instanceof Error ? cause.message : 'The phrase could not be verified.',
+      );
+    } finally {
+      setIsVerifyingBackup(false);
+    }
+  }
+
+  function cancelBackupVerification() {
+    setBackupChallenge(null);
+    setBackupChallengeIndex(0);
+    setBackupWordInput('');
+    setBackupChallengeError('');
+  }
+
+  function submitBackupChallengeWord() {
+    if (!backupChallenge) return;
+    const candidate = backupWordInput.trim().toLowerCase();
+    setBackupWordInput('');
+    if (candidate !== backupChallenge.expectedWords[backupChallengeIndex]) {
+      setBackupChallengeError(
+        `Word ${backupChallenge.positions[backupChallengeIndex] + 1} does not match your wallet.`,
+      );
+      return;
+    }
+
+    setBackupChallengeError('');
+    if (backupChallengeIndex < backupChallenge.positions.length - 1) {
+      setBackupChallengeIndex(index => index + 1);
+      return;
+    }
+
+    setBackupChallenge(null);
+    setBackupChallengeIndex(0);
+    setBackupVerified(true);
+    Alert.alert(
+      'Recovery backup verified',
+      'The paper backup matches this wallet. Deletion is unlocked only for this app session.',
+    );
+  }
+
   function confirmReset() {
+    if (!backupVerified) {
+      Alert.alert(
+        'Verify recovery backup first',
+        'Complete the three-word paper-backup check before deleting local keys.',
+      );
+      return;
+    }
     Alert.alert(
       'Delete wallet from this device?',
       'Make sure the recovery phrase is backed up. This removes local keys, history and swap caches.',
@@ -204,10 +319,110 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Verify backup before deletion</Text>
+        <Text style={styles.sectionSubtitle}>
+          Never type or send all recovery words. The app asks for three random word positions,
+          one at a time, and checks them locally against this exact wallet.
+        </Text>
         <TouchableOpacity
-          style={[styles.dangerButton, isDeleting && { opacity: 0.5 }]}
+          style={[
+            styles.verifyButton,
+            (isVerifyingBackup || isDeleting || backupVerified) && styles.disabledButton,
+          ]}
+          onPress={() => void beginRecoveryBackupVerification()}
+          disabled={isVerifyingBackup || isDeleting || backupVerified}
+        >
+          {isVerifyingBackup ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.verifyButtonText}>
+              {backupVerified ? 'Paper backup verified' : 'Start 3-word backup check'}
+            </Text>
+          )}
+        </TouchableOpacity>
+        {backupVerified && (
+          <Text style={styles.verifiedText}>
+            Verified for this session. Wallet deletion is now unlocked.
+          </Text>
+        )}
+      </View>
+
+      <Modal
+        visible={backupChallenge !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelBackupVerification}
+      >
+        {backupChallenge && <SensitiveInputScreenCaptureGuard />}
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.challengeCard}>
+              <Text style={styles.challengeEyebrow}>
+                PAPER BACKUP · {backupChallengeIndex + 1} OF 3
+              </Text>
+              <Text style={styles.challengeTitle}>
+                Enter word #{(backupChallenge?.positions[backupChallengeIndex] ?? 0) + 1}
+              </Text>
+              <Text style={styles.challengeSubtitle}>
+                Read only this numbered word from your paper backup. Never send it to support or
+                chat.
+              </Text>
+              <TextInput
+                key={backupChallengeIndex}
+                style={styles.verificationInput}
+                placeholder="One word"
+                placeholderTextColor="#666"
+                value={backupWordInput}
+                onChangeText={value => {
+                  setBackupWordInput(value);
+                  setBackupChallengeError('');
+                }}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
+                editable={!isDeleting}
+                returnKeyType={backupChallengeIndex === 2 ? 'done' : 'next'}
+                onSubmitEditing={submitBackupChallengeWord}
+                accessibilityLabel={`Recovery word ${
+                  (backupChallenge?.positions[backupChallengeIndex] ?? 0) + 1
+                }`}
+              />
+              {!!backupChallengeError && (
+                <Text style={styles.challengeError}>{backupChallengeError}</Text>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.verifyButton,
+                  !backupWordInput.trim() && styles.disabledButton,
+                ]}
+                onPress={submitBackupChallengeWord}
+                disabled={!backupWordInput.trim()}
+              >
+                <Text style={styles.verifyButtonText}>
+                  {backupChallengeIndex === 2 ? 'Verify paper backup' : 'Next word'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelButton} onPress={cancelBackupVerification}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[
+            styles.dangerButton,
+            (isDeleting || !backupVerified) && styles.disabledButton,
+          ]}
           onPress={confirmReset}
-          disabled={isDeleting}
+          disabled={isDeleting || !backupVerified}
         >
           {isDeleting ? (
             <ActivityIndicator color="#ff4444" />
@@ -264,6 +479,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   overlayText: { color: '#ffb000', fontWeight: '700', marginTop: 14 },
+  verificationInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    color: '#fff',
+    fontSize: 16,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    marginBottom: 12,
+  },
+  modalKeyboardView: { flex: 1 },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    padding: 24,
+  },
+  challengeCard: {
+    backgroundColor: '#17171c',
+    borderWidth: 1,
+    borderColor: 'rgba(107,92,195,0.65)',
+    borderRadius: 20,
+    padding: 24,
+  },
+  challengeEyebrow: {
+    color: '#ffb000',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 12,
+  },
+  challengeTitle: { color: '#fff', fontSize: 28, fontWeight: '800', marginBottom: 12 },
+  challengeSubtitle: { color: '#aaaab5', fontSize: 16, lineHeight: 23, marginBottom: 20 },
+  challengeError: { color: '#ff6767', lineHeight: 20, marginBottom: 12 },
+  cancelButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  cancelButtonText: { color: '#aaaab5', fontWeight: '700', fontSize: 16 },
+  verifyButton: {
+    backgroundColor: '#6b5cc3',
+    minHeight: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  verifiedText: { color: '#32d6b2', marginTop: 12, lineHeight: 20 },
+  disabledButton: { opacity: 0.4 },
   dangerButton: {
     backgroundColor: 'rgba(255,60,60,0.1)',
     padding: 16,

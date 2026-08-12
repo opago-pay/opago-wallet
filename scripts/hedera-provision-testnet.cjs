@@ -101,6 +101,35 @@ function normalizeMirrorKey(value) {
   }
 }
 
+function assertOperatorKeyMatchesAccount(operatorKey, mirrorAccount) {
+  const expected = normalizeMirrorKey(mirrorAccount?.key?.key || '');
+  const actual = operatorKey.publicKey.toStringRaw().toLowerCase();
+  if (!expected) {
+    throw new Error('Mirror Node did not return a supported public key for the operator account.');
+  }
+  if (actual !== expected) {
+    throw new Error(
+      'HEDERA_OPERATOR_KEY does not match HEDERA_OPERATOR_ID. No transaction was submitted.',
+    );
+  }
+}
+
+async function loadAccount(accountId) {
+  const response = await fetch(
+    MIRROR_NODE_URL + '/api/v1/accounts/' + encodeURIComponent(accountId),
+    {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!response.ok) {
+    throw new Error('Mirror Node operator lookup failed with HTTP ' + response.status + '.');
+  }
+  const account = await response.json();
+  if (account.deleted) throw new Error('The Hedera operator account is deleted.');
+  return account;
+}
+
 function formatTinybars(value) {
   const tinybars = BigInt(value);
   const whole = tinybars / TINYBARS_PER_HBAR;
@@ -170,6 +199,7 @@ async function main() {
   }
   const operatorId = AccountId.fromString(operatorIdValue);
   const operatorKey = parseOperatorKey(requiredEnvironment('HEDERA_OPERATOR_KEY'));
+  assertOperatorKeyMatchesAccount(operatorKey, await loadAccount(operatorIdValue));
   const initialTinybars = parsePositiveHbar(
     process.env.HEDERA_INITIAL_BALANCE_HBAR || '2',
     'HEDERA_INITIAL_BALANCE_HBAR',
@@ -211,5 +241,6 @@ if (require.main === module) {
 }
 
 module.exports = {
+  assertOperatorKeyMatchesAccount,
   parseOperatorKey,
 };

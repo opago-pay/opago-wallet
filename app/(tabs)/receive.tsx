@@ -118,6 +118,13 @@ export default function ReceiveScreen() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    function scheduleNextPoll() {
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        void initializeAndPoll().catch(() => scheduleNextPoll());
+      }, 12_000);
+    }
+
     async function initializeAndPoll() {
       if (!solanaSnapshot.current) {
         solanaSnapshot.current = await getSolanaReceiveSnapshot(activeKeypair.publicKey);
@@ -131,12 +138,10 @@ export default function ReceiveScreen() {
         await markPaid(incoming.amountSol, 'SOL', incoming.signature);
         return;
       }
-      if (!cancelled) timer = setTimeout(initializeAndPoll, 12_000);
+      scheduleNextPoll();
     }
 
-    void initializeAndPoll().catch(() => {
-      if (!cancelled) timer = setTimeout(initializeAndPoll, 12_000);
-    });
+    void initializeAndPoll().catch(() => scheduleNextPoll());
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
@@ -147,6 +152,13 @@ export default function ReceiveScreen() {
     if (network !== 'hedera' || !walletReady || isPaid) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+
+    function scheduleNextPoll() {
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        void initializeAndPoll().catch(() => scheduleNextPoll());
+      }, 8_000);
+    }
 
     async function initializeAndPoll() {
       const account = await refreshHederaAccount();
@@ -185,12 +197,10 @@ export default function ReceiveScreen() {
           return;
         }
       }
-      if (!cancelled) timer = setTimeout(initializeAndPoll, 8_000);
+      scheduleNextPoll();
     }
 
-    void initializeAndPoll().catch(() => {
-      if (!cancelled) timer = setTimeout(initializeAndPoll, 8_000);
-    });
+    void initializeAndPoll().catch(() => scheduleNextPoll());
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);

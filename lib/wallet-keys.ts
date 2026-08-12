@@ -24,3 +24,20 @@ export function deriveSolanaKeypair(mnemonic: string): Keypair {
   }
   return Keypair.fromSeed(privateKey);
 }
+
+export function recoveryPhraseMatchesHederaPublicKey(
+  mnemonic: string,
+  expectedPublicKey: string,
+): boolean {
+  const normalizedExpected = expectedPublicKey.trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalizedExpected)) return false;
+
+  try {
+    return (
+      deriveHederaPrivateKey(mnemonic).publicKey.toStringRaw().toLowerCase() ===
+      normalizedExpected
+    );
+  } catch {
+    return false;
+  }
+}

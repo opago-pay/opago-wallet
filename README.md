@@ -71,11 +71,11 @@ Completed evidence:
 - Direct HBAR transfer and contract checkout transactions were signed on a physical Android device and reached consensus with `SUCCESS`.
 - A wallet-generated exact-amount QR received `0.001 HBAR` from MetaMask on a physical Android device. The app accepted the payment only after the Mirror Node reported a new `SUCCESS` transaction for exactly `100,000` tinybars.
 - App restart, deterministic key derivation, and account rediscovery were exercised without exposing the recovery phrase or private key.
+- A physical Android recovery acceptance deleted the local wallet only after a three-word paper-backup challenge, restored from the protected entry form, and rediscovered account `0.0.10030291` with the original `2 HBAR` testnet balance.
 - Automated tests cover testnet enforcement, network/configuration rejection, secret boundaries, checkout tampering, expiry, replay, duplicate payment IDs, wrong amounts, invalid merchants, failed forwarding, and reentrancy.
 
 Remaining acceptance gates:
 
-- clear app data, restore the wallet from its recovery phrase, and verify the same Hedera account and history;
 - exercise offline, timeout, pending-transaction, and restart-during-payment behavior on the Android device;
 - physically reject expired, altered, replayed, and wrong-amount checkout requests;
 - archive a redacted Logcat review proving that seeds, private keys, and complete signed transactions are not logged;
@@ -101,6 +101,7 @@ Remaining milestone gates:
 | Contract `0.0.9972670` | [View on HashScan](https://hashscan.io/testnet/contract/0.0.9972670) |
 | Deployment transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9959245%401786181037.989721534) |
 | Physical-device checkout transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) |
+| Recovery-accepted wallet `0.0.10030291` | [View on HashScan](https://hashscan.io/testnet/account/0.0.10030291) |
 | Sourcify exact runtime match | [View verification record](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
 
 #### Contract quality gates
@@ -229,6 +230,21 @@ The wallet scanned the merchant demo QR, verified the merchant EVM alias and pin
 
 The first physical receive attempt exposed that MetaMask-originated HBAR transfers are returned as `ETHEREUMTRANSACTION`, while the wallet previously loaded only `CRYPTOTRANSFER` history. The receive flow now merges both official Mirror Node transaction types and confirms only a new, successful incoming transaction whose exact bigint tinybar amount matches the QR request. The application displayed `Funds confirmed` for the transaction above, and an independent Mirror Node lookup verified the same status and amount.
 
+### Phase 4 physical-device recovery acceptance
+
+| Field | Result |
+| --- | --- |
+| Date | 2026-08-12 |
+| Device | Physical Android 14 device |
+| Network | Hedera testnet |
+| Public key | `1953ffa170351ae5a33ff2f99e342090418a01905efda28116d81c3dfcbe3299` |
+| Account before deletion | `0.0.10030291` |
+| Balance before deletion | `2 HBAR` |
+| Account after recovery | `0.0.10030291` |
+| Balance after recovery | `2 HBAR` |
+
+The wallet was provisioned for the public key above, discovered the account and balance on Android, required three randomly selected paper-backup words before enabling local deletion, and returned to the unauthenticated create/restore screen after deletion. Restoring from the paper phrase derived the same Hedera key and rediscovered the same account and balance through the Mirror Node. Recovery display, verification, and entry block screen capture; phrase state is cleared when the app backgrounds; and deletion authorization lasts only for the current foreground session. No recovery phrase or private key is included in this evidence.
+
 ### Hedera key and transaction flow
 
 1. The app loads or creates a BIP39 recovery phrase in native secure storage.
@@ -257,6 +273,8 @@ The default public devnet RPC is suitable for development and is rate-limited. A
 - Recovery phrases are available only in native builds and are stored with Expo SecureStore using device-bound, when-unlocked access.
 - Device authentication is requested for recovery-phrase access when supported.
 - Recovery phrases are hidden when the app backgrounds or after 30 seconds, and screen capture is blocked while they are visible.
+- Local wallet deletion remains disabled until three randomly selected words from the paper backup match; that authorization is cleared whenever the app backgrounds.
+- Recovery entry stays above the software keyboard, reports only the entered word count, blocks screen capture, and clears phrase state when the app backgrounds.
 - Hedera and Solana use separate deterministic Ed25519 derivation paths from the same BIP39 phrase.
 - Browser storage is not accepted for seed material; wallet-key operations are disabled on web.
 - Solana RPC responses are checked against the selected cluster.
@@ -436,7 +454,7 @@ npm run contract:test
 node --check server/eid-backend.js
 ```
 
-At the Phase 4 receive-acceptance baseline recorded above, the application suite passes `46/46` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, exact bigint tinybar handling, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+At the Phase 4 recovery-acceptance baseline recorded above, the application suite passes `52/52` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact bigint tinybar handling, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

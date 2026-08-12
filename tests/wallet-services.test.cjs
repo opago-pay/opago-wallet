@@ -11,6 +11,7 @@ const {
   deriveHederaPrivateKey,
   deriveSolanaKeypair,
   HEDERA_DERIVATION_PATH,
+  recoveryPhraseMatchesHederaPublicKey,
   SOLANA_DERIVATION_PATH,
 } = require('../lib/wallet-keys.ts');
 const {
@@ -58,6 +59,25 @@ test('derives the documented Hedera Ed25519 account deterministically from BIP39
   assert.throws(() => deriveHederaPrivateKey('not a recovery phrase'), /valid BIP39/i);
 });
 
+test('verifies a recovery phrase against the exact Hedera public key', () => {
+  assert.equal(
+    recoveryPhraseMatchesHederaPublicKey(MNEMONIC, EXPECTED_HEDERA_PUBLIC_KEY),
+    true,
+  );
+  assert.equal(
+    recoveryPhraseMatchesHederaPublicKey(
+      'legal winner thank year wave sausage worth useful legal winner thank yellow',
+      EXPECTED_HEDERA_PUBLIC_KEY,
+    ),
+    false,
+  );
+  assert.equal(
+    recoveryPhraseMatchesHederaPublicKey('not a recovery phrase', EXPECTED_HEDERA_PUBLIC_KEY),
+    false,
+  );
+  assert.equal(recoveryPhraseMatchesHederaPublicKey(MNEMONIC, 'not-a-public-key'), false);
+});
+
 test('keeps a revealed recovery phrase out of the accessibility tree', () => {
   const source = readFileSync(
     path.join(__dirname, '..', 'app', '(tabs)', 'settings.tsx'),
@@ -73,6 +93,26 @@ test('keeps a revealed recovery phrase out of the accessibility tree', () => {
   assert.doesNotMatch(source, /<Text[^>]*>\s*\{phrase\}/);
   assert.match(source, /Recovery phrase revealed\. Tap to hide\./);
   assert.doesNotMatch(source, /accessibilityLabel=\{(?:mnemonic|phrase)\}/);
+});
+
+test('requires local recovery verification before deleting wallet keys', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(tabs)', 'settings.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(source, /recoveryPhraseMatchesHederaPublicKey/);
+  assert.match(source, /if \(!phrase \|\| !hederaPublicKey\)/);
+  assert.match(source, /selectBackupChallengePositions\(words\.length\)/);
+  assert.match(source, /expectedWords: positions\.map\(position => words\[position\]\)/);
+  assert.match(source, /backupChallenge && <SensitiveInputScreenCaptureGuard/);
+  assert.match(source, /usePreventScreenCapture\('opago-recovery-verification'\)/);
+  assert.match(source, /setBackupWordInput\(''\)/);
+  assert.match(source, /KeyboardAvoidingView/);
+  assert.match(source, /Start 3-word backup check/);
+  assert.match(source, /disabled=\{isDeleting \|\| !backupVerified\}/);
+  assert.match(source, /if \(!backupVerified\)/);
+  assert.match(source, /Deletion is unlocked only for this app session\./);
 });
 
 test('does not block Hedera wallet readiness on optional Spark startup', () => {
@@ -95,6 +135,54 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     /if \(initializationGenerationRef\.current !== generation\) return;/,
   );
   assert.match(source, /Lightning wallet unavailable:/);
+});
+
+test('does not mount the Privy OAuth hook in a local-wallet build', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(auth)', 'login.tsx'),
+    'utf8',
+  );
+  const loginScreen = source.slice(
+    source.indexOf('export default function LoginScreen'),
+    source.indexOf('const styles = StyleSheet.create'),
+  );
+
+  assert.match(source, /function OAuthLoginButton/);
+  assert.match(source, /const \{ login \} = useLoginWithOAuth\(\{ onSuccess \}\)/);
+  assert.doesNotMatch(loginScreen, /useLoginWithOAuth\(/);
+  assert.match(
+    loginScreen,
+    /appConfig\.importSolanaKeyToPrivy && \(\s*<OAuthLoginButton/,
+  );
+});
+
+test('keeps recovery entry visible above the keyboard and blocks capture', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(auth)', 'login.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /usePreventScreenCapture\('opago-recovery-input'\)/);
+  assert.match(source, /isRestoring && <RecoveryInputScreenCaptureGuard/);
+  assert.match(source, /<KeyboardAvoidingView/);
+  assert.match(source, /keyboardShouldPersistTaps="handled"/);
+  assert.match(source, /textAlignVertical="top"/);
+  assert.match(source, /\{recoveryWordCount\} words entered/);
+  assert.match(source, /setMnemonicInput\(''\);\s*setIsRestoring\(false\);/);
+});
+
+test('keeps receive polling rejections handled across scheduled retries', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(tabs)', 'receive.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(source, /setTimeout\(initializeAndPoll/);
+  assert.match(
+    source,
+    /setTimeout\(\(\) => \{\s*void initializeAndPoll\(\)\.catch\(\(\) => scheduleNextPoll\(\)\);/,
+  );
+  assert.match(source, /void initializeAndPoll\(\)\.catch\(\(\) => scheduleNextPoll\(\)\);/);
 });
 
 test('counts only parsed system transfers involving the wallet', () => {
