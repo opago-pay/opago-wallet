@@ -81,14 +81,14 @@ The complete physical-device matrix, public transaction links, fail-closed state
 
 ### Phase 5 - milestone evidence
 
-**Planned window: 22-24 August 2026. Status: in progress.**
+**Planned window: 22-24 August 2026. Status: release-candidate evidence in progress.**
 
-The repository already contains the Hedera testnet setup, architecture, reproducible quality commands, deployment manifest, contract and transaction links, source-verification record, and physical-device transaction evidence.
+The repository contains the Hedera testnet setup, architecture, reproducible quality command, deployment manifest, contract and transaction links, source-verification record, physical-device transaction evidence, release notes, and a submission-ready video sequence. The complete evidence index and clean-room procedure are in [PHASE5_MILESTONE.md](PHASE5_MILESTONE.md); the milestone changes are summarized in [RELEASE_NOTES.md](RELEASE_NOTES.md), and the one-to-five-minute recording plan is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
 Remaining milestone gates:
 
 - verify a clean clone with `npm ci`, all quality gates, a fresh Android development-client build, installation, and launch;
-- prepare the final one-to-five-minute demo script and video showing balance, merchant QR scan, payment review, confirmation, success, and HashScan verification;
+- record the final one-to-five-minute video showing balance, merchant QR scan, payment review, confirmation, success, and HashScan verification;
 - package the exact commit, lockfile, compiler metadata, deployment manifest, links, and release notes used for submission.
 
 25 August 2026 remains the submission and contingency day.
@@ -107,12 +107,10 @@ Remaining milestone gates:
 #### Contract quality gates
 
 ```powershell
-npm run contract:compile
-npm run contract:test
-npm run typecheck
-npm run lint
-npm test
+npm run phase5:verify
 ```
+
+This single cross-platform gate runs TypeScript, ESLint, all application tests, deterministic contract compilation and tests, and syntax checks for the local reference services and Hedera scripts. It disables the interactive Hardhat telemetry prompt so a clean-room verification cannot block waiting for input.
 
 The Solidity compiler is pinned through `package-lock.json` and Hardhat uses that local compiler with the `paris` EVM target. Compiler input is normalized to the CRLF line endings used by the verified deployment, so Linux, macOS, and Windows builds reproduce the versioned creation and runtime bytecode hashes.
 
@@ -331,14 +329,10 @@ EXPO_PUBLIC_PRIVY_APP_ID=your_app_id
 EXPO_PUBLIC_PRIVY_CLIENT_ID=your_client_id
 ```
 
-Run the local quality gates:
+Run the complete local quality gate:
 
 ```powershell
-npm run typecheck
-npm run lint
-npm test
-npm run contract:compile
-npm run contract:test
+npm run phase5:verify
 ```
 
 To build, install, and launch the development client on a connected Android device:
@@ -452,16 +446,13 @@ These services are not production backends. The eID service requires an explicit
 | `tests/` | Deterministic unit and integration-style tests with mocked remote boundaries |
 | `demo/` | Local merchant reference services |
 | `server/` | Local eID reference backend |
+| `PHASE4_ACCEPTANCE.md` | Physical-device security and failure-path evidence |
+| `PHASE5_MILESTONE.md` / `RELEASE_NOTES.md` / `DEMO_SCRIPT.md` | Submission index, milestone changes, clean-build procedure, and video plan |
 
 ## Quality gates
 
 ```powershell
-npm run typecheck
-npm run lint
-npm test
-npm run contract:compile
-npm run contract:test
-node --check server/eid-backend.js
+npm run phase5:verify
 ```
 
 At the completed Phase 4 baseline recorded above, the application suite passes `59/59` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact bigint tinybar handling, persisted pending/confirmed/failed Hedera states, offline and restart reconciliation, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
