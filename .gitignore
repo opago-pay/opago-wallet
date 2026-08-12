@@ -27,6 +27,7 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+.codex-local-evidence/
 
 # debug
 npm-debug.*

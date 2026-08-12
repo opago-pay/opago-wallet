@@ -3,7 +3,7 @@ import { Alert, AppState, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -71,6 +71,10 @@ function isExpectedEIdDeepLink(value: string): boolean {
 
 export default function SendScreen() {
   const router = useRouter();
+  const { hederaRequest, hederaRequestKey } = useLocalSearchParams<{
+    hederaRequest?: string | string[];
+    hederaRequestKey?: string | string[];
+  }>();
   const rates = useExchangeRates();
   const {
     sparkWallet,
@@ -105,10 +109,27 @@ export default function SendScreen() {
   const [eIdDemo, setEIdDemo] = useState(false);
   const waitingForEId = useRef(false);
   const completingEId = useRef(false);
+  const consumedHederaRequestKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
   }, [loadOrGenerateWallet, walletReady]);
+
+  useEffect(() => {
+    if (
+      typeof hederaRequest !== 'string' ||
+      typeof hederaRequestKey !== 'string' ||
+      consumedHederaRequestKey.current === hederaRequestKey
+    ) {
+      return;
+    }
+    consumedHederaRequestKey.current = hederaRequestKey;
+    setSource('hedera');
+    setDestination(hederaRequest);
+    setAmountInput('');
+    setPendingHedera(null);
+    setHederaResult(null);
+  }, [hederaRequest, hederaRequestKey]);
 
   const executeInvoice = useCallback(async (invoice: string, requestedAmount?: number) => {
     if (source === 'spark') {
@@ -310,7 +331,11 @@ export default function SendScreen() {
       setHederaResult(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
-      Alert.alert('HBAR payment failed', messageOf(cause));
+      Alert.alert(
+        'HBAR payment not confirmed',
+        messageOf(cause) +
+          '\n\nNo success was recorded. Refresh Activity and check HashScan before retrying.',
+      );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);

@@ -159,6 +159,7 @@ function completeSession(session, verifiedData) {
 
 function signedPayerData(session) {
   if (session.payerData) return session.payerData;
+  const issuedAt = Date.now();
   const payload = {
     name: session.verifiedData.displayName,
     identifier: session.verifiedData.subjectId,
@@ -167,8 +168,8 @@ function signedPayerData(session) {
     provider: session.verifiedData.provider,
     transactionReference: session.transactionReference,
     sessionNonce: session.nonce,
-    issuedAt: Date.now(),
-    expiresAt: Math.min(session.expiresAt, Date.now() + 60_000),
+    issuedAt,
+    expiresAt: Math.min(session.expiresAt, issuedAt + 60_000),
   };
   const canonicalPayload = JSON.stringify(payload);
   session.payerData = {

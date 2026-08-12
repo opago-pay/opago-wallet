@@ -38,6 +38,7 @@ import {
   sendHederaTestnetTransfer,
   type HederaTransferResult,
 } from '../lib/hedera/payments';
+import { hederaPaymentJournal } from '../lib/hedera/payment-journal-native';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 type PrivyClient = ReturnType<typeof usePrivy>;
@@ -237,15 +238,27 @@ function WalletProviderCore({
             sourceAccountId: account.accountId,
             request: input.checkoutRequest,
             privateKey,
+            lifecycle: {
+              onSubmitted: submission => hederaPaymentJournal.recordSubmitted(submission),
+              onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
+            },
           })
         : await sendHederaTestnetTransfer({
             sourceAccountId: account.accountId,
             recipientAccountId: input.recipientAccountId,
             amountTinybars: input.amountTinybars,
             privateKey,
+            lifecycle: {
+              onSubmitted: submission => hederaPaymentJournal.recordSubmitted(submission),
+              onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
+            },
           });
-      const refreshed = await loadHederaAccount(account.accountId, privateKey.publicKey);
-      setHederaAccount(refreshed);
+      try {
+        const refreshed = await loadHederaAccount(account.accountId, privateKey.publicKey);
+        setHederaAccount(refreshed);
+      } catch {
+        // A post-receipt balance refresh cannot invalidate a confirmed payment proof.
+      }
       return result;
     },
     [walletReady],
@@ -259,6 +272,7 @@ function WalletProviderCore({
     await Promise.all([
       deleteSecureItem(MNEMONIC_STORE_KEY),
       wipeTransactions(),
+      hederaPaymentJournal.clear(),
       atomiqKeys.length ? AsyncStorage.multiRemove(atomiqKeys) : Promise.resolve(),
     ]);
     if (privy?.logout) {

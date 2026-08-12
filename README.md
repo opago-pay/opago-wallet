@@ -63,7 +63,7 @@ The contract was deployed on 8 August 2026. Mirror Node runtime bytecode exactly
 
 ### Phase 4 - end-to-end and security acceptance
 
-**Planned window: 19-22 August 2026. Status: in progress.**
+**Planned window: 19-22 August 2026. Status: complete on 12 August 2026.**
 
 Completed evidence:
 
@@ -73,13 +73,11 @@ Completed evidence:
 - App restart, deterministic key derivation, and account rediscovery were exercised without exposing the recovery phrase or private key.
 - A physical Android recovery acceptance deleted the local wallet only after a three-word paper-backup challenge, restored from the protected entry form, and rediscovered account `0.0.10030291` with the original `2 HBAR` testnet balance.
 - Automated tests cover testnet enforcement, network/configuration rejection, secret boundaries, checkout tampering, expiry, replay, duplicate payment IDs, wrong amounts, invalid merchants, failed forwarding, and reentrancy.
+- Offline, bounded-timeout, pending-transaction, and force-stop/restart behavior were exercised on the physical device. A submitted transaction remained `pending` across process death and changed to `confirmed` only after Mirror Node reported `SUCCESS`.
+- Expired, altered-nonce, wrong-amount, and replayed checkout requests were physically rejected. The replay reached the deployed contract and returned `CONTRACT_REVERT_EXECUTED`; the app stored it as failed and never showed success.
+- A redacted 1,505-line app-process Logcat review found zero recovery/private-key labels, long signed payloads, signed-transaction labels, or fatal exceptions. Mobile application code contains no console logging calls.
 
-Remaining acceptance gates:
-
-- exercise offline, timeout, pending-transaction, and restart-during-payment behavior on the Android device;
-- physically reject expired, altered, replayed, and wrong-amount checkout requests;
-- archive a redacted Logcat review proving that seeds, private keys, and complete signed transactions are not logged;
-- verify that failed or unresolved payments are never stored or displayed as successful.
+The complete physical-device matrix, public transaction links, fail-closed state model, and redacted diagnostic counts are archived in [PHASE4_ACCEPTANCE.md](PHASE4_ACCEPTANCE.md).
 
 ### Phase 5 - milestone evidence
 
@@ -90,7 +88,6 @@ The repository already contains the Hedera testnet setup, architecture, reproduc
 Remaining milestone gates:
 
 - verify a clean clone with `npm ci`, all quality gates, a fresh Android development-client build, installation, and launch;
-- archive the final Phase 4 test matrix and redacted evidence;
 - prepare the final one-to-five-minute demo script and video showing balance, merchant QR scan, payment review, confirmation, success, and HashScan verification;
 - package the exact commit, lockfile, compiler metadata, deployment manifest, links, and release notes used for submission.
 
@@ -102,6 +99,9 @@ Remaining milestone gates:
 | Deployment transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9959245%401786181037.989721534) |
 | Physical-device checkout transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) |
 | Recovery-accepted wallet `0.0.10030291` | [View on HashScan](https://hashscan.io/testnet/account/0.0.10030291) |
+| Phase 4 restart-during-payment transfer | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.10030291%401786527531.288214115) |
+| Phase 4 successful checkout | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.10030291%401786528624.880688643) |
+| Phase 4 rejected replay | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.10030291%401786528712.770556312) |
 | Sourcify exact runtime match | [View verification record](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
 
 #### Contract quality gates
@@ -159,6 +159,16 @@ npm run demo:hedera-checkout
 ```
 
 The demo obtains the merchant EVM alias from the official Mirror Node instead of deriving a possibly incorrect long-zero address. Each page load creates a random nonce, derives a field-bound `paymentId`, and sets a five-minute expiry.
+
+For the reproducible Phase 4 negative matrix, generate fresh public test fixtures without any operator credential:
+
+```powershell
+$env:HEDERA_MERCHANT_ID='0.0.YOUR_TESTNET_MERCHANT'
+npm run phase4:checkout-fixtures
+Remove-Item Env:HEDERA_MERCHANT_ID
+```
+
+The output contains valid/replay, expired, altered-nonce, and wrong-amount deep links. The wallet accepts `opagowallet://hedera-checkout` links directly and applies the same parser, Mirror Node checks, confirmation screen, and contract call used by the QR scanner.
 
 ## Hedera implementation
 
@@ -454,7 +464,7 @@ npm run contract:test
 node --check server/eid-backend.js
 ```
 
-At the Phase 4 recovery-acceptance baseline recorded above, the application suite passes `52/52` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact bigint tinybar handling, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+At the completed Phase 4 baseline recorded above, the application suite passes `59/59` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact bigint tinybar handling, persisted pending/confirmed/failed Hedera states, offline and restart reconciliation, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

@@ -11,6 +11,9 @@ import { keccak_256 } from '@noble/hashes/sha3';
 import { appConfig } from '../config';
 import {
   assertHederaTestnet,
+  HEDERA_SDK_GRPC_DEADLINE_MS,
+  HEDERA_SDK_MAX_ATTEMPTS,
+  HEDERA_SDK_REQUEST_TIMEOUT_MS,
   MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
   parseHederaAccountId,
 } from './config';
@@ -28,6 +31,7 @@ import {
   parseHbarToTinybars,
   type HederaTransferResult,
 } from './payments';
+import type { HederaPaymentLifecycle } from './payment-journal';
 
 const CHECKOUT_HOST = 'hedera-checkout';
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
@@ -346,6 +350,7 @@ export async function sendHederaCheckoutPayment(input: {
   sourceAccountId: string;
   request: HederaCheckoutRequest;
   privateKey: PrivateKey;
+  lifecycle?: HederaPaymentLifecycle;
 }): Promise<HederaTransferResult> {
   await verifyHederaCheckoutRequest(input.request);
   const sourceAccountId = parseHederaAccountId(input.sourceAccountId, 'Source account ID');
@@ -358,15 +363,38 @@ export async function sendHederaCheckoutPayment(input: {
   client.setDefaultMaxTransactionFee(
     Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
   );
+  client.setGrpcDeadline(HEDERA_SDK_GRPC_DEADLINE_MS);
+  client.setRequestTimeout(HEDERA_SDK_REQUEST_TIMEOUT_MS);
+  client.setMaxAttempts(HEDERA_SDK_MAX_ATTEMPTS);
 
   try {
     const response = await buildHederaCheckoutTransaction(input.request).execute(client);
-    const receipt = await response.getReceipt(client);
+    const transactionId = response.transactionId.toString();
+    await input.lifecycle?.onSubmitted?.({
+      transactionId,
+      mode: 'checkout',
+      recipientAccountId: input.request.merchantAccountId,
+      amountTinybars,
+      paymentId: input.request.paymentId,
+    });
+    const receipt = await response
+      .getReceiptQuery(client)
+      .setValidateStatus(false)
+      .execute(client);
     const status = receipt.status.toString();
     if (status !== 'SUCCESS') {
+      await input.lifecycle?.onResolved?.({
+        transactionId,
+        state: 'failed',
+        result: status,
+      });
       throw new Error('Hedera checkout returned status ' + status + '.');
     }
-    const transactionId = response.transactionId.toString();
+    await input.lifecycle?.onResolved?.({
+      transactionId,
+      state: 'confirmed',
+      result: status,
+    });
     return {
       mode: 'checkout',
       transactionId,

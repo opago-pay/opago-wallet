@@ -22,6 +22,10 @@ const {
   parseHederaCheckoutRequest,
   verifyHederaCheckoutRequest,
 } = require('../lib/hedera/checkout.ts');
+const {
+  createRequest: createPhase4Request,
+  replaceParameter: replacePhase4Parameter,
+} = require('../scripts/hedera-phase4-checkout-fixtures.cjs');
 
 function requestUri(overrides = {}) {
   const values = {
@@ -67,6 +71,26 @@ test('matches Solidity packed payment-ID derivation exactly', () => {
     ],
   );
   assert.equal(computeHederaCheckoutPaymentId(input), expected);
+});
+
+test('generates reproducible physical Phase 4 checkout fixtures without secrets', () => {
+  const request = createPhase4Request({
+    contractId: '0.0.7777',
+    contractAddress: '0x0000000000000000000000000000000000001e61',
+    merchantId: '0.0.8888',
+    merchantEvmAddress: '0x1111111111111111111111111111111111111111',
+    amountTinybars: 1n,
+    expiresAt: 1_700_000_300,
+  });
+  assert.equal(parseHederaCheckoutRequest(request, 1_700_000_000).amountTinybars, 1n);
+  assert.throws(
+    () => parseHederaCheckoutRequest(
+      replacePhase4Parameter(request, 'amount', '0.00000002'),
+      1_700_000_000,
+    ),
+    /payment ID does not match/i,
+  );
+  assert.doesNotMatch(request, /private|mnemonic|operator/i);
 });
 
 test('parses a contract-bound exact Hedera checkout request', () => {

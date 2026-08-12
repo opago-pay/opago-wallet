@@ -4,6 +4,9 @@ import { appConfig, assertSafeRemoteUrl } from '../config';
 export const HEDERA_NETWORK = 'testnet' as const;
 export const TINYBARS_PER_HBAR = 100_000_000n;
 export const MAX_HEDERA_TRANSACTION_FEE_TINYBARS = 100_000_000n;
+export const HEDERA_SDK_REQUEST_TIMEOUT_MS = 20_000;
+export const HEDERA_SDK_GRPC_DEADLINE_MS = 10_000;
+export const HEDERA_SDK_MAX_ATTEMPTS = 3;
 
 const ACCOUNT_ID_PATTERN = /^0\.0\.[1-9]\d*$/;
 

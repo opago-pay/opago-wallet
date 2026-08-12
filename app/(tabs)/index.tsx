@@ -16,8 +16,13 @@ import { useFocusEffect } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { getTransactions, Transaction as LocalTransaction } from '@/lib/database';
-import { loadHederaHistory } from '@/lib/hedera/account';
-import { openHederaExplorerUrl } from '@/lib/hedera/explorer';
+import { loadHederaHistory, loadHederaTransactionStatus } from '@/lib/hedera/account';
+import {
+  getHederaTransactionExplorerUrl,
+  openHederaExplorerUrl,
+} from '@/lib/hedera/explorer';
+import { normalizeHederaTransactionIdForMirror } from '@/lib/hedera/mirror';
+import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { getSolanaBalances, getSolanaHistory } from '@/lib/solana';
 import { appConfig } from '@/lib/config';
@@ -68,6 +73,20 @@ export default function HomeScreen() {
       const remote: DisplayTransaction[] = [];
       const remoteErrors: string[] = [];
 
+      const journalRecords = await hederaPaymentJournal.reconcile(
+        loadHederaTransactionStatus,
+      );
+      remote.push(...journalRecords.map(item => ({
+        key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
+        txId: item.transactionId,
+        type: 'outgoing' as const,
+        amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
+        asset: 'HBAR',
+        status: item.state,
+        timestamp: item.createdAt,
+        explorerUrl: getHederaTransactionExplorerUrl(item.transactionId),
+      })));
+
       try {
         const account = await refreshHederaAccount();
         setBalances(current => ({
@@ -77,7 +96,7 @@ export default function HomeScreen() {
         if (account) {
           const history = await loadHederaHistory(account.accountId, 20);
           remote.push(...history.map(item => ({
-            key: 'hedera:' + item.transactionId,
+            key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
             txId: item.transactionId,
             type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
             amountDisplay: item.amountHbar,

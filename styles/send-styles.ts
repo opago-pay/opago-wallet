@@ -64,7 +64,7 @@ export const sendStyles = StyleSheet.create({
     minHeight: 54,
     marginBottom: 16,
   },
-  destinationInput: { minHeight: 88, textAlignVertical: 'top' },
+  destinationInput: { height: 88, textAlignVertical: 'top' },
   row: { flexDirection: 'row', gap: 8 },
   selector: {
     flex: 1,

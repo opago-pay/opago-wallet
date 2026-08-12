@@ -7,11 +7,15 @@ import {
 import {
   assertHederaTestnet,
   configuredHederaMaxTransferHbar,
+  HEDERA_SDK_GRPC_DEADLINE_MS,
+  HEDERA_SDK_MAX_ATTEMPTS,
+  HEDERA_SDK_REQUEST_TIMEOUT_MS,
   MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
   parseHederaAccountId,
   TINYBARS_PER_HBAR,
 } from './config';
 import { getHederaTransactionExplorerUrl } from './explorer';
+import type { HederaPaymentLifecycle } from './payment-journal';
 
 export interface HederaPaymentRequest {
   accountId: string;
@@ -127,6 +131,7 @@ export async function sendHederaTestnetTransfer(input: {
   recipientAccountId: string;
   amountTinybars: bigint;
   privateKey: PrivateKey;
+  lifecycle?: HederaPaymentLifecycle;
 }): Promise<HederaTransferResult> {
   assertHederaTestnet();
   const sourceAccountId = parseHederaAccountId(input.sourceAccountId, 'Source account ID');
@@ -143,6 +148,9 @@ export async function sendHederaTestnetTransfer(input: {
   client.setDefaultMaxTransactionFee(
     Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
   );
+  client.setGrpcDeadline(HEDERA_SDK_GRPC_DEADLINE_MS);
+  client.setRequestTimeout(HEDERA_SDK_REQUEST_TIMEOUT_MS);
+  client.setMaxAttempts(HEDERA_SDK_MAX_ATTEMPTS);
 
   try {
     const response = await new TransferTransaction()
@@ -153,12 +161,31 @@ export async function sendHederaTestnetTransfer(input: {
         Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
       )
       .execute(client);
-    const receipt = await response.getReceipt(client);
+    const transactionId = response.transactionId.toString();
+    await input.lifecycle?.onSubmitted?.({
+      transactionId,
+      mode: 'direct',
+      recipientAccountId,
+      amountTinybars: tinybars,
+    });
+    const receipt = await response
+      .getReceiptQuery(client)
+      .setValidateStatus(false)
+      .execute(client);
     const status = receipt.status.toString();
     if (status !== 'SUCCESS') {
+      await input.lifecycle?.onResolved?.({
+        transactionId,
+        state: 'failed',
+        result: status,
+      });
       throw new Error('Hedera testnet returned status ' + status + '.');
     }
-    const transactionId = response.transactionId.toString();
+    await input.lifecycle?.onResolved?.({
+      transactionId,
+      state: 'confirmed',
+      result: status,
+    });
     return {
       mode: 'direct',
       transactionId,

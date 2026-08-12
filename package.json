@@ -16,6 +16,7 @@
     "demo:travel-rule": "node ./demo/travel-rule-merchant.js",
     "hedera:provision": "node ./scripts/hedera-provision-testnet.cjs",
     "demo:hedera-checkout": "node ./demo/hedera-checkout-merchant.cjs",
+    "phase4:checkout-fixtures": "node ./scripts/hedera-phase4-checkout-fixtures.cjs",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
     "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs",
