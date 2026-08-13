@@ -5,7 +5,7 @@ Target duration: 2:30-3:30 minutes. Hard limit: 5 minutes.
 ## Before recording
 
 - Use the exact clean, tested commit recorded for submission.
-- Charge the Android device, enable USB debugging, and verify that the installed app opens normally.
+- Charge the Android device, enable authorized USB or wireless debugging, and verify that the installed app opens normally.
 - Keep the wallet on Hedera testnet account `0.0.10030291` and use a dedicated funded merchant testnet account.
 - Start the merchant page with `$env:HEDERA_MERCHANT_ID='0.0.YOUR_MERCHANT'; npm run demo:hedera-checkout` and open the displayed local URL on the computer.
 - Use a small testnet amount and create a fresh request immediately before recording so its five-minute expiry does not interrupt the take.

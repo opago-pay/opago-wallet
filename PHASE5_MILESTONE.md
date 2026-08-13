@@ -1,6 +1,6 @@
 # Phase 5 milestone package
 
-Last reviewed: 2026-08-12
+Last reviewed: 2026-08-13
 
 This document is the reproducible evidence index for the Opago Wallet Hedera testnet milestone. It describes a testnet proof of concept only. It is not a mainnet release, security audit, custody product, or regulatory-compliance claim.
 
@@ -70,13 +70,13 @@ npm ci
 npm run phase5:verify
 ```
 
-`git status --short` must be empty before configuration and after verification. `npm ci` must use the committed lockfile without updating it. The expected baseline is 59 passing application tests, 9 passing contract tests, successful TypeScript and ESLint checks, and successful syntax checks for the local reference services and Hedera scripts.
+`git status --short` must be empty before configuration and after verification. `npm ci` must use the committed lockfile without updating it. The expected baseline is 63 passing application tests, 9 passing contract tests, successful TypeScript and ESLint checks, and successful syntax checks for the local reference services and Hedera scripts.
 
 Public client configuration belongs in the untracked `.env`. The committed `.env.example` pins Hedera testnet and the verified checkout deployment. Add valid Privy public client identifiers locally if the authentication flow is exercised. Never put a recovery phrase, private key, operator/faucet key, callback secret, or bearer credential in `.env`, `EXPO_PUBLIC_*`, source files, screenshots, terminal history, or the video.
 
 ## Fresh Android build, installation, and launch
 
-Requirements are Node.js `20.19` or newer, Android Studio/JDK, an Android SDK, and a physical device with USB debugging. The repository intentionally excludes generated native directories, so the first command below creates Android native code from the reviewed Expo config.
+Requirements are Node.js `20.19` or newer, Android Studio/JDK, an Android SDK, and a physical device connected through authorized USB or wireless debugging. The repository intentionally excludes generated native directories, so the first command below creates Android native code from the reviewed Expo config.
 
 ```powershell
 npm run phase5:android

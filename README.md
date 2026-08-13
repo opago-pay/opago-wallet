@@ -85,6 +85,8 @@ The complete physical-device matrix, public transaction links, fail-closed state
 
 The repository contains the Hedera testnet setup, architecture, reproducible quality command, deployment manifest, contract and transaction links, source-verification record, physical-device transaction evidence, release notes, and a submission-ready video sequence. The complete evidence index and clean-room procedure are in [PHASE5_MILESTONE.md](PHASE5_MILESTONE.md); the milestone changes are summarized in [RELEASE_NOTES.md](RELEASE_NOTES.md), and the one-to-five-minute recording plan is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
+Dashboard refreshes bound and parallelize optional Lightning and Solana requests, so either service can fail without leaving Android pull-to-refresh running indefinitely or blocking already available Hedera data.
+
 Remaining milestone gates:
 
 - verify a clean clone with `npm ci`, all quality gates, a fresh Android development-client build, installation, and launch;

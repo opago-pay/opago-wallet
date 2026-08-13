@@ -1,6 +1,6 @@
 # Hedera testnet milestone release notes
 
-Release-candidate date: 2026-08-12
+Release-candidate date: 2026-08-13
 
 ## Scope
 
@@ -13,6 +13,7 @@ This milestone adds a complete Hedera testnet asset and merchant-checkout path t
 - `OpagoHbarCheckout`, a non-custodial testnet contract that binds each single-use payment to chain, contract, nonce, merchant, exact amount, and expiry.
 - A merchant QR demo, pinned deployed runtime verification, on-device contract signing, and public HashScan/Sourcify evidence.
 - A persistent non-secret payment journal with fail-closed pending, confirmed, and failed states across offline operation, timeouts, and process restarts.
+- Bounded parallel refreshes for optional Lightning and Solana dashboard data, so an unavailable service cannot leave Android pull-to-refresh spinning indefinitely.
 - Recovery and deletion safeguards, exact incoming-payment matching, replay rejection, testnet/mainnet separation, and redacted physical-device security acceptance.
 - A reproducible `npm run phase5:verify` quality gate, clean-clone/build instructions, evidence index, and a one-to-five-minute demo script.
 
@@ -34,7 +35,7 @@ On Windows, `npm run phase5:android` performs the clean dependency install, repo
 
 - TypeScript: pass.
 - ESLint: pass.
-- Application tests: 59/59 pass.
+- Application tests: 63/63 pass.
 - Contract tests: 9/9 pass.
 - Locked runtime bytecode: matches Hedera testnet Mirror Node.
 - Sourcify: verified.

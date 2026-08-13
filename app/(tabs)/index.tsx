@@ -26,6 +26,9 @@ import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { getSolanaBalances, getSolanaHistory } from '@/lib/solana';
 import { appConfig } from '@/lib/config';
+import { withTimeout } from '@/lib/promise-timeout';
+
+const OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000;
 
 interface DisplayTransaction {
   key: string;
@@ -113,69 +116,81 @@ export default function HomeScreen() {
         );
       }
 
-      if (sparkWallet) {
+      const refreshLightning = async () => {
+        if (!sparkWallet) return;
         try {
-        const [balance, transferResult] = await Promise.all([
-          sparkWallet.getBalance(),
-          sparkWallet.getTransfers(20, 0),
-        ]);
-        setBalances(current => ({
-          ...current,
-          spark: (Number(balance.balance) || 0) + (Number(balance.satsBalance?.incoming) || 0),
-        }));
+          const [balance, transferResult] = await withTimeout(
+            Promise.all([
+              sparkWallet.getBalance(),
+              sparkWallet.getTransfers(20, 0),
+            ]),
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Lightning wallet refresh timed out.',
+          );
+          setBalances(current => ({
+            ...current,
+            spark: (Number(balance.balance) || 0) + (Number(balance.satsBalance?.incoming) || 0),
+          }));
 
-        for (const transfer of transferResult.transfers || []) {
-          const status = String(transfer.status || '').toUpperCase();
-          if (!status.includes('COMPLETED')) continue;
-          const amount = Math.abs(Number(transfer.totalValue) || 0);
-          if (amount <= 0) continue;
-          const paymentHash = String(transfer.userRequest?.invoice?.paymentHash || '');
-          const key = /^[a-f0-9]{64}$/i.test(paymentHash)
-            ? 'ln:' + paymentHash.toLowerCase()
-            : 'spark:' + transfer.id;
-          remote.push({
-            key,
-            txId: key,
-            type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' : 'outgoing',
-            amountDisplay: amount.toLocaleString(),
-            asset: 'SAT',
-            status: 'confirmed',
-            timestamp: transfer.createdTime
-              ? new Date(transfer.createdTime).toISOString()
-              : new Date().toISOString(),
-          });
-        }
+          for (const transfer of transferResult.transfers || []) {
+            const status = String(transfer.status || '').toUpperCase();
+            if (!status.includes('COMPLETED')) continue;
+            const amount = Math.abs(Number(transfer.totalValue) || 0);
+            if (amount <= 0) continue;
+            const paymentHash = String(transfer.userRequest?.invoice?.paymentHash || '');
+            const key = /^[a-f0-9]{64}$/i.test(paymentHash)
+              ? 'ln:' + paymentHash.toLowerCase()
+              : 'spark:' + transfer.id;
+            remote.push({
+              key,
+              txId: key,
+              type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' : 'outgoing',
+              amountDisplay: amount.toLocaleString(),
+              asset: 'SAT',
+              status: 'confirmed',
+              timestamp: transfer.createdTime
+                ? new Date(transfer.createdTime).toISOString()
+                : new Date().toISOString(),
+            });
+          }
         } catch (cause) {
           remoteErrors.push(
             'Lightning: ' +
               (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
           );
         }
-      }
+      };
 
-      if (solanaKeypair) {
+      const refreshSolana = async () => {
+        if (!solanaKeypair) return;
         try {
-        const [solanaBalances, history] = await Promise.all([
-          getSolanaBalances(solanaKeypair.publicKey),
-          getSolanaHistory(solanaKeypair.publicKey),
-        ]);
-        setBalances(current => ({ ...current, ...solanaBalances }));
-        remote.push(...history.map(item => ({
-          key: item.txId,
-          txId: item.txId,
-          type: item.type,
-          amountDisplay: item.amount.toLocaleString(),
-          asset: item.asset,
-          status: item.status,
-          timestamp: item.timestamp,
-        })));
+          const [solanaBalances, history] = await withTimeout(
+            Promise.all([
+              getSolanaBalances(solanaKeypair.publicKey),
+              getSolanaHistory(solanaKeypair.publicKey),
+            ]),
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Solana wallet refresh timed out.',
+          );
+          setBalances(current => ({ ...current, ...solanaBalances }));
+          remote.push(...history.map(item => ({
+            key: item.txId,
+            txId: item.txId,
+            type: item.type,
+            amountDisplay: item.amount.toLocaleString(),
+            asset: item.asset,
+            status: item.status,
+            timestamp: item.timestamp,
+          })));
         } catch (cause) {
           remoteErrors.push(
             'Solana: ' +
               (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
           );
         }
-      }
+      };
+
+      await Promise.all([refreshLightning(), refreshSolana()]);
 
       const localDisplay = local.map((item: LocalTransaction): DisplayTransaction => ({
         key: item.txId || 'local:' + item.id,
@@ -225,9 +240,18 @@ export default function HomeScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await refresh();
-    setRefreshing(false);
+    try {
+      try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // Refresh must remain available if haptics are unavailable on a device.
+      }
+      await refresh();
+    } catch (cause) {
+      setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function copyHederaAccountId() {

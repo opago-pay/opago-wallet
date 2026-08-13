@@ -185,6 +185,21 @@ test('keeps receive polling rejections handled across scheduled retries', () => 
   assert.match(source, /void initializeAndPoll\(\)\.catch\(\(\) => scheduleNextPoll\(\)\);/);
 });
 
+test('bounds optional dashboard services and always releases pull-to-refresh', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', 'app', '(tabs)', 'index.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000/);
+  assert.match(source, /await Promise\.all\(\[refreshLightning\(\), refreshSolana\(\)\]\)/);
+  assert.equal(source.match(/await withTimeout\(/g)?.length, 2);
+  assert.match(
+    source,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+  );
+});
+
 test('counts only parsed system transfers involving the wallet', () => {
   const wallet = new PublicKey(EXPECTED_ADDRESS);
   const other = '11111111111111111111111111111111';
