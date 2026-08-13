@@ -18,6 +18,7 @@
     "demo:hedera-checkout": "node ./demo/hedera-checkout-merchant.cjs",
     "phase4:checkout-fixtures": "node ./scripts/hedera-phase4-checkout-fixtures.cjs",
     "phase5:verify": "node ./scripts/verify-phase5.cjs",
+    "phase5:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/finalize-phase5-android.ps1",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
     "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs",

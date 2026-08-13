@@ -30,6 +30,8 @@ The full deployment metadata and verification timestamps are versioned in [`depl
 
 ## Verification baseline
 
+On Windows, `npm run phase5:android` performs the clean dependency install, repository quality gates, fresh arm64 Android build, installation, launch, and local non-secret evidence capture for the exact checked-out commit.
+
 - TypeScript: pass.
 - ESLint: pass.
 - Application tests: 59/59 pass.

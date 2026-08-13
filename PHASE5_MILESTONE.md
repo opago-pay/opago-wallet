@@ -79,13 +79,10 @@ Public client configuration belongs in the untracked `.env`. The committed `.env
 Requirements are Node.js `20.19` or newer, Android Studio/JDK, an Android SDK, and a physical device with USB debugging. The repository intentionally excludes generated native directories, so the first command below creates Android native code from the reviewed Expo config.
 
 ```powershell
-adb kill-server
-adb start-server
-adb devices -l
-npm run android
+npm run phase5:android
 ```
 
-Continue only when `adb devices -l` shows exactly the intended device with state `device`. State `unauthorized` requires accepting the USB-debugging fingerprint on the phone. `npm run android` must complete the Gradle build, install `com.opago.wallet`, launch it on that device, and start or connect to Metro. Confirm that the dashboard opens, shows `HEDERA TESTNET`, displays the expected numeric account ID and balance, and can open Send and Receive without a render error.
+The Windows acceptance command refuses a dirty worktree or unsafe build environment, runs `npm ci` and every quality gate, requires exactly one authorized arm64 Android device, regenerates the native project, builds and installs `com.opago.wallet`, starts Metro, launches the app, and writes commit, lockfile, and APK hashes to ignored `.codex-local-evidence/phase5-android-evidence.json`. State `unauthorized` requires accepting the USB-debugging fingerprint on the phone. Confirm that the dashboard opens, shows `HEDERA TESTNET`, displays the expected numeric account ID and balance, and can open Send and Receive without a render error. Metro is deliberately left running for the manual checks and video capture.
 
 For an exact clean rebuild after changing native configuration, remove only the generated native output in the disposable clean clone and rerun `npm run android`; never delete a broad workspace directory. The native project and APK are derived artifacts and are not committed.
 

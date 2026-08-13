@@ -338,11 +338,10 @@ npm run phase5:verify
 To build, install, and launch the development client on a connected Android device:
 
 ```powershell
-adb devices
-npm run android
+npm run phase5:android
 ```
 
-The generated `android/` and `ios/` directories are intentionally not committed. Expo creates the native project during the local native build.
+The Windows acceptance command performs the clean install and quality gates, requires exactly one authorized arm64 device, creates the native project, builds and installs the APK, starts Metro, launches the app, and records non-secret commit/lockfile/APK hashes under ignored `.codex-local-evidence/`. The generated `android/` and `ios/` directories are intentionally not committed.
 
 ## Hedera testnet provisioning
 
