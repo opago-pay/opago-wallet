@@ -19,6 +19,12 @@ The current release is intended for development and test networks. It is not an 
 
 Mainnet payments are disabled by default. Hedera remains testnet-only even when other mainnet features are explicitly enabled.
 
+## Interface readiness
+
+Portfolio, Send, Receive, activity, and checkout selection share one asset identity system for Lightning, Solana, USDC, and Hedera. Scalable asset icons are paired with explicit network badges, so visual identity never obscures whether an asset is on regtest, devnet, testnet, or mainnet. Long payment forms remain scrollable on smaller Android screens, and selection, copy, scan, success, and explorer actions expose accessible roles or labels.
+
+The implemented scope and remaining physical-device visual checks are tracked in [UI_PRODUCTION_READINESS.md](UI_PRODUCTION_READINESS.md). This is an interface-quality milestone, not a claim that the wallet is audited or ready for real funds.
+
 ## Delivery phases
 
 ### Phase 0 - security and Android baseline

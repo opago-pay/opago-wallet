@@ -1,4 +1,5 @@
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { HederaTransferResult } from '@/lib/hedera/payments';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PendingHederaPayment } from './types';
@@ -11,7 +12,10 @@ export function HederaReviewView(props: {
   onCancel(): void;
 }) {
   return (
-    <View style={[styles.container, styles.centered]}>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={[styles.formContent, styles.centered]}
+    >
       <View style={[styles.testnetBanner, { width: '100%' }]}>
         <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
         <Text style={styles.testnetText}>Review every detail before signing.</Text>
@@ -75,7 +79,7 @@ export function HederaReviewView(props: {
       >
         <Text style={[styles.buttonText, styles.secondaryButtonText]}>Cancel</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -87,11 +91,16 @@ export function HederaSuccessView(props: {
   onReset(): void;
 }) {
   return (
-    <View style={[styles.container, styles.centered]}>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={[styles.formContent, styles.centered]}
+    >
       <View style={[styles.testnetBanner, { width: '100%' }]}>
         <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
       </View>
-      <View style={styles.successCircle}><Text style={styles.checkmark}>OK</Text></View>
+      <View style={styles.successCircle}>
+        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
+      </View>
       <Text style={styles.successTitle}>HBAR sent</Text>
       <Text style={styles.subtitle}>
         {props.result.amountHbar} HBAR was confirmed on Hedera testnet.
@@ -107,16 +116,20 @@ export function HederaSuccessView(props: {
         </View>
       )}
       <TouchableOpacity style={styles.button} onPress={props.onOpenHashscan}>
-        <Text style={styles.buttonText}>Open transaction in HashScan</Text>
+        <View style={styles.buttonContent}>
+          <Text style={styles.buttonText}>Open transaction in HashScan</Text>
+          <Ionicons name="open-outline" size={18} color="#111" />
+        </View>
       </TouchableOpacity>
       {props.result.contractHashscanUrl && props.onOpenContract && (
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={props.onOpenContract}
         >
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-            Open checkout contract
-          </Text>
+          <View style={styles.buttonContent}>
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>Open checkout contract</Text>
+            <Ionicons name="open-outline" size={18} color="#fff" />
+          </View>
         </TouchableOpacity>
       )}
       <TouchableOpacity
@@ -131,6 +144,6 @@ export function HederaSuccessView(props: {
       >
         <Text style={[styles.buttonText, styles.secondaryButtonText]}>Send another</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }

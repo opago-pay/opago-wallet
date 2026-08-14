@@ -17,7 +17,14 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: 'rgba(255,255,255,0.1)',
           elevation: 0,
-        }
+          minHeight: 62,
+          paddingTop: 6,
+          paddingBottom: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+        },
       }}>
       <Tabs.Screen
         name="index"

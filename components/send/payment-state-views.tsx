@@ -1,6 +1,8 @@
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import { AssetIcon } from '@/components/ui/asset-icon';
+import { walletAssetKeyFromSymbol } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { BridgeQuote, OcpOption, OcpState } from './types';
 
@@ -26,7 +28,9 @@ export function PaymentSuccessView(props: {
 }) {
   return (
     <View style={[styles.container, styles.centered]}>
-      <View style={styles.successCircle}><Text style={styles.checkmark}>OK</Text></View>
+      <View style={styles.successCircle}>
+        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
+      </View>
       <Text style={styles.successTitle}>Payment confirmed</Text>
       <Text style={styles.subtitle}>The payment was completed successfully.</Text>
       <View style={styles.proofBox}><Text style={styles.proofText}>{props.proof}</Text></View>
@@ -120,9 +124,12 @@ export function OcpQuoteView(props: {
             style={[styles.option, props.selected === option && styles.optionActive]}
             onPress={() => props.onSelect(option)}
           >
-            <View>
+            <View style={styles.optionIdentity}>
+              <AssetIcon asset={walletAssetKeyFromSymbol(option.asset)} size={38} />
+              <View>
               <Text style={styles.optionTitle}>{option.chain} {option.asset}</Text>
               <Text style={styles.optionMeta}>Fee: {option.fee}</Text>
+              </View>
             </View>
             <Text style={styles.optionTitle}>{option.amount}</Text>
           </TouchableOpacity>

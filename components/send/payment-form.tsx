@@ -1,7 +1,10 @@
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { AssetIcon } from '@/components/ui/asset-icon';
 import { appConfig } from '@/lib/config';
 import { formatTinybars } from '@/lib/hedera/payments';
+import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 
@@ -24,17 +27,24 @@ export function PaymentForm(props: {
   onReview(): void;
 }) {
   const isHedera = props.source === 'hedera';
-  const sources: [PaymentSource, string, string][] = [
-    ['spark', 'Lightning', props.balances.spark + ' SAT'],
-    ['solana', 'SOL', props.balances.sol.toFixed(4)],
-    ['usdc', 'USDC', props.balances.usdc.toFixed(2)],
-    ['hedera', 'Hedera', formatTinybars(props.balances.hbarTinybars) + ' HBAR'],
+  const sources: { source: PaymentSource; asset: WalletAssetKey; balance: string }[] = [
+    { source: 'spark', asset: 'lightning', balance: props.balances.spark + ' SAT' },
+    { source: 'solana', asset: 'solana', balance: props.balances.sol.toFixed(4) + ' SOL' },
+    { source: 'usdc', asset: 'usdc', balance: props.balances.usdc.toFixed(2) + ' USDC' },
+    { source: 'hedera', asset: 'hedera', balance: formatTinybars(props.balances.hbarTinybars) + ' HBAR' },
   ];
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={styles.formContent}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Send and bridge</Text>
+        <View>
+          <Text style={styles.title}>Send</Text>
+          <Text style={styles.screenSubtitle}>Choose an asset and review before signing.</Text>
+        </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
       {!appConfig.isMainnet && !isHedera && (
@@ -56,6 +66,7 @@ export function PaymentForm(props: {
         </View>
       )}
       <View style={styles.card}>
+        <Text style={styles.label}>Destination</Text>
         <View style={[styles.row, { alignItems: 'center' }]}>
           <TextInput
             style={[styles.input, styles.destinationInput, { flex: 1 }]}
@@ -67,7 +78,13 @@ export function PaymentForm(props: {
             autoCorrect={false}
             multiline
           />
-          <TouchableOpacity style={styles.scanButton} onPress={props.onScan}>
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={props.onScan}
+            accessibilityRole="button"
+            accessibilityLabel="Scan payment QR code"
+          >
+            <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
             <Text style={styles.scanText}>Scan</Text>
           </TouchableOpacity>
         </View>
@@ -89,6 +106,8 @@ export function PaymentForm(props: {
                 key={item}
                 style={[styles.selector, props.currency === item && styles.selectorActive]}
                 onPress={() => props.onCurrencyChange(item)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: props.currency === item }}
               >
                 <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
               </TouchableOpacity>
@@ -96,26 +115,48 @@ export function PaymentForm(props: {
           </View>
         )}
         <Text style={styles.label}>Pay from</Text>
-        <View style={[styles.row, { flexWrap: 'wrap' }]}>
-          {sources.map(([key, label, balance]) => (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.selector,
-                { flexBasis: '47%' },
-                props.source === key && styles.selectorActive,
-              ]}
-              onPress={() => props.onSourceChange(key)}
-            >
-              <Text style={[styles.selectorText, props.source === key && styles.selectorTextActive]}>{label}</Text>
-              <Text style={styles.optionMeta}>{balance}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.assetGrid}>
+          {sources.map(item => {
+            const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet);
+            const selected = props.source === item.source;
+            return (
+              <TouchableOpacity
+                key={item.source}
+                style={[styles.assetSelector, selected && styles.assetSelectorActive]}
+                onPress={() => props.onSourceChange(item.source)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}, balance ${item.balance}`}
+              >
+                <View style={styles.assetSelectorHeader}>
+                  <AssetIcon asset={item.asset} size={34} />
+                  {selected && <Ionicons name="checkmark-circle" size={20} color="#ffb000" />}
+                </View>
+                <Text style={[styles.assetSelectorTitle, selected && styles.selectorTextActive]}>
+                  {presentation.name}
+                </Text>
+                <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
+                <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <TouchableOpacity style={styles.button} onPress={props.onReview} disabled={props.loading || !props.walletReady}>
-          {props.loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Review payment</Text>}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={props.onReview}
+          disabled={props.loading || !props.walletReady}
+          accessibilityRole="button"
+        >
+          {props.loading ? (
+            <ActivityIndicator color="#111" />
+          ) : (
+            <View style={styles.buttonContent}>
+              <Text style={styles.buttonText}>Review payment</Text>
+              <Ionicons name="arrow-forward" size={19} color="#111" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }

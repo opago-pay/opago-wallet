@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
+import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { appConfig } from '@/lib/config';
 import { addTransaction } from '@/lib/database';
 import {
   findNewConfirmedIncomingHederaTransaction,
@@ -25,6 +28,7 @@ import {
   SolanaReceiveSnapshot,
 } from '@/lib/solana';
 import { sendStyles as styles } from '@/styles/send-styles';
+import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 
 type ReceiveNetwork = 'lightning' | 'solana' | 'hedera';
 
@@ -295,7 +299,9 @@ export default function ReceiveScreen() {
           <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
         </View>
       )}
-      <View style={styles.successCircle}><Text style={styles.checkmark}>OK</Text></View>
+      <View style={styles.successCircle}>
+        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
+      </View>
       <Text style={styles.successTitle}>Funds confirmed</Text>
       <Text style={styles.subtitle}>{receivedDescription || 'The exact incoming transaction was verified.'}</Text>
       <TouchableOpacity style={[styles.button, { marginTop: 24 }]} onPress={() => router.replace('/(tabs)')}>
@@ -317,37 +323,64 @@ export default function ReceiveScreen() {
         ? hederaRequest || ''
         : invoice || '';
 
+  const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
+    { network: 'lightning', asset: 'lightning' },
+    { network: 'solana', asset: 'solana' },
+    { network: 'hedera', asset: 'hedera' },
+  ];
+
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={styles.formContent}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Receive</Text>
+        <View>
+          <Text style={styles.title}>Receive</Text>
+          <Text style={styles.screenSubtitle}>Create a request for the selected network.</Text>
+        </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
       {network === 'hedera' && (
         <View style={styles.testnetBanner}>
-          <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
-          <Text style={styles.testnetText}>Receive test HBAR only.</Text>
+          <View style={styles.testnetBannerContent}>
+            <AssetIcon asset="hedera" size={34} />
+            <View>
+              <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
+              <Text style={styles.testnetText}>Receive test HBAR only.</Text>
+            </View>
+          </View>
         </View>
       )}
       <View style={styles.card}>
         <Text style={styles.label}>Network</Text>
-        <View style={styles.row}>
-          {(['lightning', 'solana', 'hedera'] as ReceiveNetwork[]).map(item => (
-            <TouchableOpacity
-              key={item}
-              style={[styles.selector, network === item && styles.selectorActive]}
-              onPress={() => {
-                reset();
-                setNetwork(item);
-                setAmountInput(item === 'hedera' ? '' : '10');
-                setIsEur(false);
-              }}
-            >
-              <Text style={[styles.selectorText, network === item && styles.selectorTextActive]}>
-                {item === 'lightning' ? 'Lightning' : item === 'solana' ? 'Solana' : 'Hedera'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.receiveNetworkRow}>
+          {receiveNetworks.map(item => {
+            const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet);
+            const selected = network === item.network;
+            return (
+              <TouchableOpacity
+                key={item.network}
+                style={[styles.receiveNetworkSelector, selected && styles.selectorActive]}
+                onPress={() => {
+                  reset();
+                  setNetwork(item.network);
+                  setAmountInput(item.network === 'hedera' ? '' : '10');
+                  setIsEur(false);
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
+              >
+                <AssetIcon asset={item.asset} size={34} />
+                <Text style={[styles.receiveNetworkText, selected && styles.selectorTextActive]}>
+                  {presentation.name}
+                </Text>
+                <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {network === 'lightning' && !invoice && (
@@ -377,9 +410,17 @@ export default function ReceiveScreen() {
             ) : hederaAccount ? (
               <>
                 <Text style={styles.label}>Account ID</Text>
-                <TouchableOpacity style={styles.proofBox} onPress={() => void copy(hederaAccount.accountId)}>
+                <TouchableOpacity
+                  style={styles.proofBox}
+                  onPress={() => void copy(hederaAccount.accountId)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Hedera account ID"
+                >
                   <Text style={styles.proofText} selectable>{hederaAccount.accountId}</Text>
-                  <Text style={styles.testnetText}>Tap to copy</Text>
+                  <View style={styles.copyHint}>
+                    <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
+                    <Text style={styles.copyHintText}>Tap to copy</Text>
+                  </View>
                 </TouchableOpacity>
                 {!hederaRequest && (
                   <>
@@ -405,13 +446,16 @@ export default function ReceiveScreen() {
         )}
 
         {qrValue && (
-          <View style={{ alignItems: 'center', marginTop: 18 }}>
-            <View style={{ backgroundColor: '#fff', padding: 16, borderRadius: 16 }}>
+          <View style={styles.qrSection}>
+            <View style={styles.qrCard}>
               <QRCode value={qrValue} size={210} />
             </View>
             <Text style={[styles.proofText, { marginTop: 18 }]} numberOfLines={3}>{qrValue}</Text>
             <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => void copy(qrValue)}>
-              <Text style={[styles.buttonText, styles.secondaryButtonText]}>Copy</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="copy-outline" size={18} color="#fff" />
+                <Text style={[styles.buttonText, styles.secondaryButtonText]}>Copy request</Text>
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -423,6 +467,6 @@ export default function ReceiveScreen() {
           <ActivityIndicator color="#ffb000" />
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }

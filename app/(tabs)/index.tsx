@@ -13,6 +13,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { getTransactions, Transaction as LocalTransaction } from '@/lib/database';
@@ -27,6 +29,11 @@ import { formatTinybars } from '@/lib/hedera/payments';
 import { getSolanaBalances, getSolanaHistory } from '@/lib/solana';
 import { appConfig } from '@/lib/config';
 import { withTimeout } from '@/lib/promise-timeout';
+import {
+  getWalletAssetPresentation,
+  walletAssetKeyFromSymbol,
+  type WalletAssetKey,
+} from '@/lib/wallet-assets';
 
 const OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000;
 
@@ -289,46 +296,67 @@ export default function HomeScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>Portfolio</Text>
-          <Text style={styles.total}>{totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}</Text>
-          <Text style={styles.valuationNote}>HBAR testnet is excluded from the EUR total.</Text>
+          <Text style={styles.eyebrow}>PORTFOLIO</Text>
+          <Text style={styles.headerTitle}>Your assets</Text>
         </View>
-        <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 42, height: 42 }} />
+        <View style={styles.brandMark}>
+          <Image source={require('@/assets/images/logo_new.svg')} style={styles.logo} />
+        </View>
+      </View>
+
+      <View style={styles.totalCard}>
+        <Text style={styles.totalLabel}>Total value</Text>
+        <Text style={styles.total}>{totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}</Text>
+        <Text style={styles.valuationNote}>HBAR testnet is excluded from the EUR total.</Text>
       </View>
 
       {!appConfig.isMainnet && (
-        <View style={styles.banner}>
+        <View style={styles.banner} accessibilityRole="summary">
+          <Ionicons name="shield-checkmark-outline" size={19} color="#c9c0ff" />
           <Text style={styles.bannerText}>Development networks - real mainnet payments are blocked</Text>
         </View>
       )}
 
       <View style={styles.testnetBanner}>
-        <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
-        <Text style={styles.testnetText}>Test HBAR has no real-world value.</Text>
+        <AssetIcon asset="hedera" size={36} />
+        <View style={styles.testnetCopy}>
+          <View style={styles.testnetTitleRow}>
+            <Text style={styles.testnetTitle}>Hedera</Text>
+            <NetworkBadge label="TESTNET" />
+          </View>
+          <Text style={styles.testnetText}>Test HBAR has no real-world value.</Text>
+        </View>
       </View>
 
-      <View style={styles.balanceRow}>
-        <BalanceCard label="Lightning" value={balances.spark.toLocaleString() + ' SAT'} color="#ffb000" />
-        <BalanceCard label="Solana" value={balances.sol.toFixed(4) + ' SOL'} color="#8f7de8" />
-        <BalanceCard label="USDC" value={balances.usdc.toFixed(2) + ' USDC'} color="#4e8cff" />
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Assets</Text>
+        <Text style={styles.sectionMeta}>4 assets</Text>
+      </View>
+
+      <View style={styles.assetList}>
+        <BalanceCard asset="lightning" value={balances.spark.toLocaleString() + ' SAT'} />
+        <BalanceCard asset="solana" value={balances.sol.toFixed(4) + ' SOL'} />
+        <BalanceCard asset="usdc" value={balances.usdc.toFixed(2) + ' USDC'} />
         <BalanceCard
-          label="Hedera testnet"
+          asset="hedera"
           value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
           subtitle={
             hederaAccount
-              ? hederaAccount.accountId + ' - tap to copy'
+              ? hederaAccount.accountId + ' · tap to copy'
               : !walletReady
                 ? 'Initializing wallet...'
                 : loading
                   ? 'Loading testnet account...'
                   : 'Account not provisioned'
           }
-          color="#27d3b2"
           onPress={hederaAccount ? () => void copyHederaAccountId() : undefined}
         />
       </View>
 
-      <Text style={styles.sectionTitle}>Activity</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Activity</Text>
+        {transactions.length > 0 && <Text style={styles.sectionMeta}>{transactions.length} latest</Text>}
+      </View>
       {loading && transactions.length === 0 ? (
         <ActivityIndicator color="#ffb000" />
       ) : transactions.length === 0 ? (
@@ -340,19 +368,21 @@ export default function HomeScreen() {
             style={styles.transaction}
             onPress={() => void openTransaction(transaction)}
             disabled={!transaction.explorerUrl}
+            accessibilityRole={transaction.explorerUrl ? 'link' : 'summary'}
+            accessibilityLabel={`${transaction.type === 'incoming' ? 'Received' : 'Sent'} ${transaction.amountDisplay} ${transaction.asset}, ${transaction.status}`}
           >
-            <View style={[styles.assetDot, { backgroundColor: assetColor(transaction.asset) }]} />
-            <View style={{ flex: 1 }}>
+            <AssetIcon asset={walletAssetKeyFromSymbol(transaction.asset)} size={38} />
+            <View style={styles.transactionBody}>
               <Text style={styles.transactionTitle}>
                 {transaction.type === 'incoming' ? 'Received' : 'Sent'} {transaction.asset}
               </Text>
               <Text style={styles.transactionMeta}>
-                {new Date(transaction.timestamp).toLocaleString()} - {transaction.status}
-                {transaction.explorerUrl ? ' - HashScan' : ''}
+                {new Date(transaction.timestamp).toLocaleString()} · {transaction.status}
+                {transaction.explorerUrl ? ' · HashScan' : ''}
               </Text>
             </View>
             <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
-              {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay}
+              {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
             </Text>
           </TouchableOpacity>
         ))
@@ -363,41 +393,74 @@ export default function HomeScreen() {
 }
 
 function BalanceCard(props: {
-  label: string;
+  asset: WalletAssetKey;
   value: string;
   subtitle?: string;
-  color: string;
   onPress?: () => void;
 }) {
+  const presentation = getWalletAssetPresentation(props.asset, appConfig.isMainnet);
+
   return (
     <TouchableOpacity
       style={styles.balanceCard}
       onPress={props.onPress}
       disabled={!props.onPress}
+      activeOpacity={props.onPress ? 0.72 : 1}
+      accessibilityRole={props.onPress ? 'button' : 'summary'}
+      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.subtitle || presentation.networkLabel}${props.onPress ? ', tap to copy account ID' : ''}`}
     >
-      <View style={[styles.assetDot, { backgroundColor: props.color }]} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.balanceLabel}>{props.label}</Text>
-        {props.subtitle && <Text style={styles.balanceSubtitle}>{props.subtitle}</Text>}
+      <AssetIcon asset={props.asset} size={44} />
+      <View style={styles.balanceDetails}>
+        <View style={styles.balanceTitleRow}>
+          <Text style={styles.balanceLabel}>{presentation.name}</Text>
+          <NetworkBadge label={presentation.networkBadge} />
+        </View>
+        <Text style={styles.balanceSubtitle}>{props.subtitle || presentation.networkLabel}</Text>
       </View>
-      <Text style={styles.balanceValue}>{props.value}</Text>
+      <View style={styles.balanceTrailing}>
+        <Text style={styles.balanceValue}>{props.value}</Text>
+        {props.onPress && <Ionicons name="copy-outline" size={16} color="#8f8f9d" />}
+      </View>
     </TouchableOpacity>
   );
 }
 
-function assetColor(asset: string) {
-  if (asset === 'SOL') return '#8f7de8';
-  if (asset === 'USDC') return '#4e8cff';
-  if (asset === 'HBAR') return '#27d3b2';
-  return '#ffb000';
+function NetworkBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.networkBadge}>
+      <Text style={styles.networkBadgeText}>{label}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c' },
   content: { paddingHorizontal: 16, paddingTop: 58, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eyebrow: { color: '#8f8f9d', textTransform: 'uppercase', letterSpacing: 2, fontWeight: '700' },
-  total: { color: '#fff', fontSize: 38, fontWeight: '800', marginTop: 6 },
+  eyebrow: { color: '#8f8f9d', letterSpacing: 2, fontSize: 12, fontWeight: '800' },
+  headerTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 3 },
+  brandMark: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: { width: 32, height: 32 },
+  totalCard: {
+    backgroundColor: '#141418',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
+    marginTop: 20,
+  },
+  totalLabel: { color: '#8f8f9d', fontSize: 13, fontWeight: '700' },
+  total: { color: '#fff', fontSize: 34, fontWeight: '800', marginTop: 4 },
   valuationNote: { color: '#777783', fontSize: 11, marginTop: 4 },
   banner: {
     borderColor: 'rgba(107,92,195,0.5)',
@@ -405,46 +468,85 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(107,92,195,0.12)',
     borderRadius: 12,
     padding: 12,
-    marginTop: 20,
-  },
-  bannerText: { color: '#c9c0ff', textAlign: 'center', fontSize: 13 },
-  testnetBanner: {
-    borderColor: '#ffb000',
-    borderWidth: 2,
-    backgroundColor: 'rgba(255,176,0,0.13)',
-    borderRadius: 12,
-    padding: 13,
     marginTop: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  testnetTitle: { color: '#ffb000', fontWeight: '900', letterSpacing: 2, fontSize: 17 },
-  testnetText: { color: '#ffe2a3', marginTop: 3, fontSize: 12 },
-  balanceRow: { gap: 10, marginTop: 22 },
+  bannerText: { color: '#c9c0ff', flexShrink: 1, fontSize: 12, fontWeight: '600' },
+  testnetBanner: {
+    borderColor: 'rgba(32,201,151,0.35)',
+    borderWidth: 1,
+    backgroundColor: 'rgba(32,201,151,0.08)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  testnetCopy: { flex: 1 },
+  testnetTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  testnetTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  testnetText: { color: '#91a9a1', marginTop: 4, fontSize: 12 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 28,
+    marginBottom: 12,
+  },
+  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  sectionMeta: { color: '#777783', fontSize: 12, fontWeight: '600' },
+  assetList: { gap: 10 },
   balanceCard: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: '#121216',
     borderColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  assetDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
-  balanceLabel: { color: '#a0a0ab' },
-  balanceSubtitle: { color: '#666673', fontSize: 11, marginTop: 3 },
-  balanceValue: { color: '#fff', fontWeight: '800', marginLeft: 8 },
-  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 32, marginBottom: 14 },
+  balanceDetails: { flex: 1, minWidth: 0 },
+  balanceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  balanceLabel: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  balanceSubtitle: { color: '#73737f', fontSize: 11, marginTop: 4 },
+  balanceTrailing: { alignItems: 'flex-end', gap: 5, maxWidth: '44%' },
+  balanceValue: { color: '#fff', fontWeight: '800', fontSize: 14, textAlign: 'right' },
+  networkBadge: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  networkBadgeText: { color: '#9b9ba7', fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
   transaction: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomColor: 'rgba(255,255,255,0.07)',
-    borderBottomWidth: 1,
-    paddingVertical: 14,
+    backgroundColor: '#121216',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 8,
+    gap: 11,
   },
+  transactionBody: { flex: 1, minWidth: 0 },
   transactionTitle: { color: '#fff', fontWeight: '700' },
   transactionMeta: { color: '#777783', fontSize: 12, marginTop: 4 },
-  transactionAmount: { color: '#fff', fontWeight: '800' },
+  transactionAmount: { color: '#fff', fontWeight: '800', fontSize: 12, marginLeft: 6 },
   incoming: { color: '#49d17d' },
-  empty: { color: '#777783', textAlign: 'center', marginTop: 18 },
+  empty: {
+    color: '#777783',
+    textAlign: 'center',
+    paddingVertical: 26,
+    backgroundColor: '#121216',
+    borderRadius: 14,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+  },
   error: { color: '#ff6666', textAlign: 'center', marginTop: 20 },
 });
