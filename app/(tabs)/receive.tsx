@@ -394,8 +394,18 @@ export default function ReceiveScreen() {
               placeholder={isEur ? 'Euro' : 'Satoshis'}
               placeholderTextColor="#666"
             />
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => setIsEur(value => !value)}>
-              <Text style={styles.secondaryButtonText}>{isEur ? 'Entered in EUR' : 'Entered in SAT'}</Text>
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton, styles.currencyToggle]}
+              onPress={() => setIsEur(value => !value)}
+              accessibilityRole="button"
+              accessibilityLabel={`Amount entered in ${isEur ? 'EUR' : 'SAT'}. Tap to switch currency.`}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="swap-horizontal" size={18} color="#fff" />
+                <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+                  {isEur ? 'Entered in EUR' : 'Entered in SAT'}
+                </Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.button, { marginTop: 18 }]} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
               {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create 10-minute invoice</Text>}

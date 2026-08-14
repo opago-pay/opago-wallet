@@ -147,6 +147,7 @@ export const sendStyles = StyleSheet.create({
   buttonText: { color: '#111', fontSize: 16, fontWeight: '800' },
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   secondaryButtonText: { color: '#fff' },
+  currencyToggle: { minHeight: 46, marginTop: 0 },
   scanButton: {
     paddingHorizontal: 14,
     minHeight: 44,
