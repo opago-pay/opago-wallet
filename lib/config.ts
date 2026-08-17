@@ -3,10 +3,25 @@ import { clusterApiUrl } from '@solana/web3.js';
 type SparkNetwork = 'MAINNET' | 'REGTEST';
 type HederaNetwork = 'testnet';
 
+const SOLANA_USDC_MINTS = Object.freeze({
+  mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  devnet: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+});
+
 const isDevelopment = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 const mainnetEnabled = process.env.EXPO_PUBLIC_ENABLE_MAINNET === 'true';
 const insecureHttpEnabled = isDevelopment && process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP === 'true';
 const configuredHederaNetwork = process.env.EXPO_PUBLIC_HEDERA_NETWORK || 'testnet';
+const expectedSolanaUsdcMint = mainnetEnabled
+  ? SOLANA_USDC_MINTS.mainnet
+  : SOLANA_USDC_MINTS.devnet;
+const configuredSolanaUsdcMint = process.env.EXPO_PUBLIC_USDC_MINT || expectedSolanaUsdcMint;
+
+if (configuredSolanaUsdcMint !== expectedSolanaUsdcMint) {
+  throw new Error(
+    'EXPO_PUBLIC_USDC_MINT must match the official Circle USDC mint for the selected Solana network.',
+  );
+}
 
 if (configuredHederaNetwork !== 'testnet') {
   throw new Error(
@@ -21,6 +36,8 @@ export const appConfig = Object.freeze({
   solanaRpcUrl:
     process.env.EXPO_PUBLIC_SOLANA_RPC_URL ||
     clusterApiUrl(mainnetEnabled ? 'mainnet-beta' : 'devnet'),
+  solanaMaxTestTransferSol: process.env.EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_SOL || '1',
+  solanaMaxTestTransferUsdc: process.env.EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_USDC || '100',
   sparkNetwork: (mainnetEnabled ? 'MAINNET' : 'REGTEST') as SparkNetwork,
   eIdBackendUrl: process.env.EXPO_PUBLIC_EID_BACKEND_URL || '',
   hederaNetwork: configuredHederaNetwork as HederaNetwork,
@@ -36,9 +53,7 @@ export const appConfig = Object.freeze({
     1,
     Number.parseInt(process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS || '100', 10) || 100,
   ),
-  usdcMint:
-    process.env.EXPO_PUBLIC_USDC_MINT ||
-    (mainnetEnabled ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' : ''),
+  usdcMint: configuredSolanaUsdcMint,
 });
 
 function isPrivateDevelopmentHost(hostname: string): boolean {

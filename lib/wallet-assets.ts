@@ -11,7 +11,7 @@ export interface WalletAssetPresentation {
 const BASE_ASSETS = {
   lightning: { name: 'Lightning', symbol: 'SAT', accent: '#f7931a' },
   solana: { name: 'Solana', symbol: 'SOL', accent: '#14f195' },
-  usdc: { name: 'USD Coin', symbol: 'USDC', accent: '#2775ca' },
+  usdc: { name: 'USDC', symbol: 'USDC', accent: '#2775ca' },
   hedera: { name: 'Hedera', symbol: 'HBAR', accent: '#27d3b2' },
 } as const;
 

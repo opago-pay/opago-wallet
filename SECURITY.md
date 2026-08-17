@@ -1,6 +1,6 @@
 # Security status
 
-Last reviewed: 2026-08-12
+Last reviewed: 2026-08-14
 
 This repository is a proof of concept and has not received an independent security or smart-contract audit. Do not use it for production custody, identity processing, or mainnet payments without dedicated reviews.
 
@@ -38,6 +38,10 @@ The versioned deployment manifest contains only public evidence. Operator creden
 ## Payment-state and diagnostic safeguards
 
 Hedera SDK operations use bounded request/deadline/attempt settings. Once the SDK returns a transaction ID, the app persists a non-secret journal record as `pending` before waiting for the receipt. Only an explicit `SUCCESS` receipt or Mirror Node result promotes it to `confirmed`; known non-success results become `failed`, and unavailable or unknown results remain `pending`. This state survives process death and prevents an unresolved payment from being shown as successful.
+
+Native Solana payments use exact `bigint` lamports or token base units throughout validation, construction, balance checks, history, and display formatting. The app verifies the RPC genesis hash, validates the selected USDC mint and associated token accounts, obtains the current blockhash and fee, simulates the signed transaction, and persists its public signature as `pending` before broadcast. A payment is shown as confirmed only after authoritative Solana RPC confirmation; ambiguous timeout, offline, or restart states remain pending and are reconciled later. Explorer links are restricted to the configured cluster. The journal contains public payment metadata only and never stores a recovery phrase, private key, or serialized signed transaction.
+
+Devnet SOL and USDC have no monetary value and are excluded from the dashboard's fiat total. Development builds enforce configurable per-transfer ceilings. Mainnet enablement remains a separate build-time decision and requires reviewed RPC infrastructure plus independent mobile, dependency, and key-management audits.
 
 Physical Phase 4 acceptance on 12 August 2026 covered offline operation, timeout, force-stop after submission, restart reconciliation, expired and altered checkout data, wrong amounts, and an on-chain replay rejection. The redacted app-process Logcat review found no recovery/private-key labels, complete signed-transaction payloads, or fatal exceptions. Public transaction links and aggregate counts are recorded in [PHASE4_ACCEPTANCE.md](PHASE4_ACCEPTANCE.md); raw device logs are intentionally not retained.
 

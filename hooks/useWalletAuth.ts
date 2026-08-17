@@ -39,6 +39,12 @@ import {
   type HederaTransferResult,
 } from '../lib/hedera/payments';
 import { hederaPaymentJournal } from '../lib/hedera/payment-journal-native';
+import type { SolanaAsset } from '../lib/solana/amounts';
+import {
+  sendSolanaTransfer,
+  type SolanaTransferResult,
+} from '../lib/solana/payments';
+import { solanaPaymentJournal } from '../lib/solana/payment-journal-native';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 type PrivyClient = ReturnType<typeof usePrivy>;
@@ -61,6 +67,13 @@ interface WalletContextValue {
     amountTinybars: bigint;
     checkoutRequest?: HederaCheckoutRequest;
   }): Promise<HederaTransferResult>;
+  sendSolanaPayment(input: {
+    recipientAddress: string;
+    amountBaseUnits: bigint;
+    asset: SolanaAsset;
+    reference?: string | null;
+    memo?: string | null;
+  }): Promise<SolanaTransferResult>;
   wipeWallet(): Promise<void>;
 }
 
@@ -264,6 +277,29 @@ function WalletProviderCore({
     [walletReady],
   );
 
+  const sendSolanaPayment = useCallback(
+    async (input: {
+      recipientAddress: string;
+      amountBaseUnits: bigint;
+      asset: SolanaAsset;
+      reference?: string | null;
+      memo?: string | null;
+    }) => {
+      if (!walletReady || !solanaKeypair) {
+        throw new Error('Wallet keys are not ready for Solana.');
+      }
+      return sendSolanaTransfer({
+        keypair: solanaKeypair,
+        ...input,
+        lifecycle: {
+          onSubmitted: submission => solanaPaymentJournal.recordSubmitted(submission),
+          onResolved: resolution => solanaPaymentJournal.recordResolved(resolution),
+        },
+      });
+    },
+    [solanaKeypair, walletReady],
+  );
+
   const wipeWallet = useCallback(async () => {
     if (initializationRef.current) await initializationRef.current.catch(() => undefined);
     const atomiqKeys = (await AsyncStorage.getAllKeys()).filter(key =>
@@ -273,6 +309,7 @@ function WalletProviderCore({
       deleteSecureItem(MNEMONIC_STORE_KEY),
       wipeTransactions(),
       hederaPaymentJournal.clear(),
+      solanaPaymentJournal.clear(),
       atomiqKeys.length ? AsyncStorage.multiRemove(atomiqKeys) : Promise.resolve(),
     ]);
     if (privy?.logout) {
@@ -301,6 +338,7 @@ function WalletProviderCore({
       restoreWallet,
       refreshHederaAccount,
       sendHederaPayment,
+      sendSolanaPayment,
       wipeWallet,
     }),
     [
@@ -313,6 +351,7 @@ function WalletProviderCore({
       refreshHederaAccount,
       restoreWallet,
       sendHederaPayment,
+      sendSolanaPayment,
       solanaKeypair,
       sparkWallet,
       walletReady,

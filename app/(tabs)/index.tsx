@@ -26,7 +26,15 @@ import {
 import { normalizeHederaTransactionIdForMirror } from '@/lib/hedera/mirror';
 import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
 import { formatTinybars } from '@/lib/hedera/payments';
-import { getSolanaBalances, getSolanaHistory } from '@/lib/solana';
+import {
+  formatSolanaAssetAmount,
+  getSolanaTransactionExplorerUrl,
+  loadSolanaHistory,
+  loadSolanaTransactionStatus,
+} from '@/lib/solana';
+import { loadResilientSolanaAccount } from '@/lib/solana/account-native';
+import { openSolanaExplorerUrl } from '@/lib/solana/explorer';
+import { solanaPaymentJournal } from '@/lib/solana/payment-journal-native';
 import { appConfig } from '@/lib/config';
 import { withTimeout } from '@/lib/promise-timeout';
 import {
@@ -34,6 +42,7 @@ import {
   walletAssetKeyFromSymbol,
   type WalletAssetKey,
 } from '@/lib/wallet-assets';
+import type { BalanceAvailability } from '@/components/send/types';
 
 const OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000;
 
@@ -46,6 +55,34 @@ interface DisplayTransaction {
   timestamp: string;
   txId: string | null;
   explorerUrl?: string;
+  explorerLabel?: 'HashScan' | 'Solana Explorer';
+}
+
+interface SparkBalanceResult {
+  balance?: unknown;
+  satsBalance?: { incoming?: unknown };
+}
+
+interface SparkTransferResult {
+  transfers?: {
+    id?: unknown;
+    status?: unknown;
+    totalValue?: unknown;
+    transferDirection?: unknown;
+    createdTime?: string | number;
+    userRequest?: { invoice?: { paymentHash?: unknown } };
+  }[];
+}
+
+function formatDashboardSolanaBalance(
+  amount: bigint,
+  asset: 'SOL' | 'USDC',
+  availability: BalanceAvailability,
+): string {
+  if (availability === 'loading') return 'Loading...';
+  if (availability === 'unavailable') return 'Unavailable';
+  const value = formatSolanaAssetAmount(amount, asset) + ' ' + asset;
+  return availability === 'stale' ? value + ' · last known' : value;
 }
 
 export default function HomeScreen() {
@@ -62,20 +99,31 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [balances, setBalances] = useState({
     spark: 0,
-    sol: 0,
-    usdc: 0,
+    solLamports: 0n,
+    usdcBaseUnits: 0n,
     hbarTinybars: 0n,
   });
+  const [solanaAvailability, setSolanaAvailability] = useState<{
+    SOL: BalanceAvailability;
+    USDC: BalanceAvailability;
+  }>({ SOL: 'loading', USDC: 'loading' });
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const refreshAfterInitializationRef = useRef(false);
+  const refreshInProgressRef = useRef(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceNetwork = false) => {
     if (!walletReady) {
       refreshAfterInitializationRef.current = true;
-      await loadOrGenerateWallet();
+      try {
+        await loadOrGenerateWallet();
+      } catch (cause) {
+        setLoadError(cause instanceof Error ? cause.message : 'Wallet initialization failed.');
+      }
       return;
     }
+    if (refreshInProgressRef.current) return;
+    refreshInProgressRef.current = true;
     setLoading(true);
     setLoadError(null);
     try {
@@ -83,19 +131,49 @@ export default function HomeScreen() {
       const remote: DisplayTransaction[] = [];
       const remoteErrors: string[] = [];
 
-      const journalRecords = await hederaPaymentJournal.reconcile(
-        loadHederaTransactionStatus,
-      );
-      remote.push(...journalRecords.map(item => ({
-        key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
-        txId: item.transactionId,
-        type: 'outgoing' as const,
-        amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
-        asset: 'HBAR',
-        status: item.state,
-        timestamp: item.createdAt,
-        explorerUrl: getHederaTransactionExplorerUrl(item.transactionId),
-      })));
+      try {
+        const journalRecords = await hederaPaymentJournal.reconcile(
+          loadHederaTransactionStatus,
+        );
+        remote.push(...journalRecords.map(item => ({
+          key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
+          txId: item.transactionId,
+          type: 'outgoing' as const,
+          amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
+          asset: 'HBAR',
+          status: item.state,
+          timestamp: item.createdAt,
+          explorerUrl: getHederaTransactionExplorerUrl(item.transactionId),
+          explorerLabel: 'HashScan' as const,
+        })));
+      } catch (cause) {
+        remoteErrors.push(
+          'Hedera journal: ' +
+            (cause instanceof Error ? cause.message : 'Local payment state could not be loaded.'),
+        );
+      }
+
+      const appendSolanaJournal = (
+        records: Awaited<ReturnType<typeof solanaPaymentJournal.list>>,
+      ) => remote.push(...records.map(item => ({
+          key: 'solana:' + item.signature,
+          txId: item.signature,
+          type: 'outgoing' as const,
+          amountDisplay: formatSolanaAssetAmount(BigInt(item.amountBaseUnits), item.asset),
+          asset: item.asset,
+          status: item.state,
+          timestamp: item.createdAt,
+          explorerUrl: getSolanaTransactionExplorerUrl(item.signature),
+          explorerLabel: 'Solana Explorer' as const,
+        })));
+      try {
+        appendSolanaJournal(await solanaPaymentJournal.list());
+      } catch (cause) {
+        remoteErrors.push(
+          'Solana journal: ' +
+            (cause instanceof Error ? cause.message : 'Local payment state could not be loaded.'),
+        );
+      }
 
       try {
         const account = await refreshHederaAccount();
@@ -114,6 +192,7 @@ export default function HomeScreen() {
             status: item.result.toLowerCase(),
             timestamp: item.occurredAt,
             explorerUrl: item.hashscanUrl,
+            explorerLabel: 'HashScan' as const,
           })));
         }
       } catch (cause) {
@@ -125,21 +204,34 @@ export default function HomeScreen() {
 
       const refreshLightning = async () => {
         if (!sparkWallet) return;
-        try {
-          const [balance, transferResult] = await withTimeout(
-            Promise.all([
-              sparkWallet.getBalance(),
-              sparkWallet.getTransfers(20, 0),
-            ]),
+        const [balanceResult, transferResult] = await Promise.allSettled([
+          withTimeout(
+            sparkWallet.getBalance() as Promise<SparkBalanceResult>,
             OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Lightning wallet refresh timed out.',
-          );
+            'Lightning balance refresh timed out.',
+          ),
+          withTimeout(
+            sparkWallet.getTransfers(20, 0) as Promise<SparkTransferResult>,
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Lightning history refresh timed out.',
+          ),
+        ]);
+        if (balanceResult.status === 'fulfilled') {
+          const balance = balanceResult.value;
           setBalances(current => ({
             ...current,
             spark: (Number(balance.balance) || 0) + (Number(balance.satsBalance?.incoming) || 0),
           }));
-
-          for (const transfer of transferResult.transfers || []) {
+        } else {
+          remoteErrors.push(
+            'Lightning balance: ' +
+              (balanceResult.reason instanceof Error
+                ? balanceResult.reason.message
+                : 'Wallet balance could not be loaded.'),
+          );
+        }
+        if (transferResult.status === 'fulfilled') {
+          for (const transfer of transferResult.value.transfers || []) {
             const status = String(transfer.status || '').toUpperCase();
             if (!status.includes('COMPLETED')) continue;
             const amount = Math.abs(Number(transfer.totalValue) || 0);
@@ -147,7 +239,7 @@ export default function HomeScreen() {
             const paymentHash = String(transfer.userRequest?.invoice?.paymentHash || '');
             const key = /^[a-f0-9]{64}$/i.test(paymentHash)
               ? 'ln:' + paymentHash.toLowerCase()
-              : 'spark:' + transfer.id;
+              : 'spark:' + String(transfer.id || 'unknown');
             remote.push({
               key,
               txId: key,
@@ -160,39 +252,90 @@ export default function HomeScreen() {
                 : new Date().toISOString(),
             });
           }
-        } catch (cause) {
+        } else {
           remoteErrors.push(
-            'Lightning: ' +
-              (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
+            'Lightning history: ' +
+              (transferResult.reason instanceof Error
+                ? transferResult.reason.message
+                : 'Wallet history could not be loaded.'),
           );
         }
       };
 
       const refreshSolana = async () => {
         if (!solanaKeypair) return;
-        try {
-          const [solanaBalances, history] = await withTimeout(
-            Promise.all([
-              getSolanaBalances(solanaKeypair.publicKey),
-              getSolanaHistory(solanaKeypair.publicKey),
-            ]),
+        const [accountResult, historyResult, journalResult] = await Promise.allSettled([
+          withTimeout(
+            loadResilientSolanaAccount(solanaKeypair.publicKey, {
+              forceRefresh: forceNetwork,
+            }),
             OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Solana wallet refresh timed out.',
+            'Solana balance refresh timed out.',
+          ),
+          withTimeout(
+            loadSolanaHistory(solanaKeypair.publicKey),
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Solana history refresh timed out.',
+          ),
+          withTimeout(
+            solanaPaymentJournal.reconcile(loadSolanaTransactionStatus),
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Solana payment reconciliation timed out.',
+          ),
+        ]);
+        if (accountResult.status === 'fulfilled') {
+          const solanaAccount = accountResult.value;
+          setSolanaAvailability(solanaAccount.availability);
+          setBalances(current => ({
+            ...current,
+            solLamports: solanaAccount.availability.SOL === 'unavailable'
+              ? current.solLamports
+              : solanaAccount.balanceLamports,
+            usdcBaseUnits: solanaAccount.availability.USDC === 'unavailable'
+              ? current.usdcBaseUnits
+              : solanaAccount.usdcBaseUnits,
+          }));
+          remoteErrors.push(...solanaAccount.warnings);
+        } else {
+          setSolanaAvailability(current => ({
+            SOL: current.SOL === 'loading' ? 'unavailable' : current.SOL,
+            USDC: current.USDC === 'loading' ? 'unavailable' : current.USDC,
+          }));
+          remoteErrors.push(
+            'Solana balance: ' +
+              (accountResult.reason instanceof Error
+                ? accountResult.reason.message
+                : 'Wallet balance could not be loaded.'),
           );
-          setBalances(current => ({ ...current, ...solanaBalances }));
-          remote.push(...history.map(item => ({
-            key: item.txId,
-            txId: item.txId,
+        }
+        if (journalResult.status === 'fulfilled') {
+          appendSolanaJournal(journalResult.value);
+        } else {
+          remoteErrors.push(
+            'Solana payment state: ' +
+              (journalResult.reason instanceof Error
+                ? journalResult.reason.message
+                : 'Payment state could not be reconciled.'),
+          );
+        }
+        if (historyResult.status === 'fulfilled') {
+          remote.push(...historyResult.value.map(item => ({
+            key: 'solana:' + item.signature,
+            txId: item.signature,
             type: item.type,
-            amountDisplay: item.amount.toLocaleString(),
+            amountDisplay: item.amountDisplay,
             asset: item.asset,
             status: item.status,
-            timestamp: item.timestamp,
+            timestamp: item.occurredAt,
+            explorerUrl: item.explorerUrl,
+            explorerLabel: 'Solana Explorer' as const,
           })));
-        } catch (cause) {
+        } else {
           remoteErrors.push(
-            'Solana: ' +
-              (cause instanceof Error ? cause.message : 'Wallet data could not be loaded.'),
+            'Solana history: ' +
+              (historyResult.reason instanceof Error
+                ? historyResult.reason.message
+                : 'Wallet history could not be loaded.'),
           );
         }
       };
@@ -208,21 +351,25 @@ export default function HomeScreen() {
         status: item.status,
         timestamp: item.timestamp,
       }));
-      const byId = new Map<string, DisplayTransaction>();
-      for (const item of localDisplay) byId.set(item.key, item);
-      for (const item of remote) {
-        const localItem = byId.get(item.key);
-        if (localItem?.status !== 'action_required') byId.set(item.key, item);
-      }
-      setTransactions(
-        Array.from(byId.values()).sort(
+      setTransactions(current => {
+        const byId = new Map<string, DisplayTransaction>();
+        if (remoteErrors.length) {
+          for (const item of current) byId.set(item.key, item);
+        }
+        for (const item of localDisplay) byId.set(item.key, item);
+        for (const item of remote) {
+          const localItem = byId.get(item.key);
+          if (localItem?.status !== 'action_required') byId.set(item.key, item);
+        }
+        return Array.from(byId.values()).sort(
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-        ),
-      );
+        ).slice(0, 100);
+      });
       setLoadError(remoteErrors.length ? remoteErrors.join(' ') : null);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
+      refreshInProgressRef.current = false;
       setLoading(false);
     }
   }, [
@@ -253,7 +400,7 @@ export default function HomeScreen() {
       } catch {
         // Refresh must remain available if haptics are unavailable on a device.
       }
-      await refresh();
+      await refresh(true);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
@@ -267,23 +414,38 @@ export default function HomeScreen() {
     Alert.alert('Copied', 'Hedera testnet account ID copied.');
   }
 
+  async function copySolanaAddress() {
+    if (!solanaKeypair) return;
+    await Clipboard.setStringAsync(solanaKeypair.publicKey.toBase58());
+    Alert.alert('Copied', 'Solana wallet address copied.');
+  }
+
   async function openTransaction(transaction: DisplayTransaction) {
     if (!transaction.explorerUrl) return;
     try {
-      await openHederaExplorerUrl(transaction.explorerUrl);
+      if (transaction.explorerLabel === 'Solana Explorer') {
+        await openSolanaExplorerUrl(transaction.explorerUrl);
+      } else {
+        await openHederaExplorerUrl(transaction.explorerUrl);
+      }
     } catch (cause) {
       Alert.alert(
-        'Could not open HashScan',
+        'Could not open explorer',
         cause instanceof Error ? cause.message : 'The explorer link is invalid.',
       );
     }
   }
 
   const totalEur =
-    rates.btcToEur > 0
+    appConfig.isMainnet &&
+    rates.btcToEur > 0 &&
+    solanaAvailability.SOL !== 'loading' &&
+    solanaAvailability.SOL !== 'unavailable' &&
+    solanaAvailability.USDC !== 'loading' &&
+    solanaAvailability.USDC !== 'unavailable'
       ? (balances.spark / 1e8) * rates.btcToEur +
-        balances.sol * rates.solToEur +
-        balances.usdc
+        Number(formatSolanaAssetAmount(balances.solLamports, 'SOL')) * rates.solToEur +
+        Number(formatSolanaAssetAmount(balances.usdcBaseUnits, 'USDC'))
       : null;
 
   return (
@@ -306,8 +468,14 @@ export default function HomeScreen() {
 
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total value</Text>
-        <Text style={styles.total}>{totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}</Text>
-        <Text style={styles.valuationNote}>HBAR testnet is excluded from the EUR total.</Text>
+        <Text style={styles.total}>
+          {!appConfig.isMainnet ? 'Not valued' : totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}
+        </Text>
+        <Text style={styles.valuationNote}>
+          {appConfig.isMainnet
+            ? 'HBAR testnet is excluded from the EUR total.'
+            : 'Development-network assets are excluded from fiat valuation.'}
+        </Text>
       </View>
 
       {!appConfig.isMainnet && (
@@ -317,17 +485,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View style={styles.testnetBanner}>
-        <AssetIcon asset="hedera" size={36} />
-        <View style={styles.testnetCopy}>
-          <View style={styles.testnetTitleRow}>
-            <Text style={styles.testnetTitle}>Hedera</Text>
-            <NetworkBadge label="TESTNET" />
-          </View>
-          <Text style={styles.testnetText}>Test HBAR has no real-world value.</Text>
-        </View>
-      </View>
-
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Assets</Text>
         <Text style={styles.sectionMeta}>4 assets</Text>
@@ -335,8 +492,26 @@ export default function HomeScreen() {
 
       <View style={styles.assetList}>
         <BalanceCard asset="lightning" value={balances.spark.toLocaleString() + ' SAT'} />
-        <BalanceCard asset="solana" value={balances.sol.toFixed(4) + ' SOL'} />
-        <BalanceCard asset="usdc" value={balances.usdc.toFixed(2) + ' USDC'} />
+        <BalanceCard
+          asset="solana"
+          value={formatDashboardSolanaBalance(
+            balances.solLamports,
+            'SOL',
+            solanaAvailability.SOL,
+          )}
+          subtitle={solanaKeypair ? solanaKeypair.publicKey.toBase58() + ' · tap to copy' : undefined}
+          onPress={solanaKeypair ? () => void copySolanaAddress() : undefined}
+        />
+        <BalanceCard
+          asset="usdc"
+          value={formatDashboardSolanaBalance(
+            balances.usdcBaseUnits,
+            'USDC',
+            solanaAvailability.USDC,
+          )}
+          subtitle={solanaKeypair ? solanaKeypair.publicKey.toBase58() + ' · tap to copy' : undefined}
+          onPress={solanaKeypair ? () => void copySolanaAddress() : undefined}
+        />
         <BalanceCard
           asset="hedera"
           value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
@@ -378,7 +553,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.transactionMeta}>
                 {new Date(transaction.timestamp).toLocaleString()} · {transaction.status}
-                {transaction.explorerUrl ? ' · HashScan' : ''}
+                {transaction.explorerUrl ? ' · ' + transaction.explorerLabel : ''}
               </Text>
             </View>
             <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
@@ -475,21 +650,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bannerText: { color: '#c9c0ff', flexShrink: 1, fontSize: 12, fontWeight: '600' },
-  testnetBanner: {
-    borderColor: 'rgba(32,201,151,0.35)',
-    borderWidth: 1,
-    backgroundColor: 'rgba(32,201,151,0.08)',
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  testnetCopy: { flex: 1 },
-  testnetTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  testnetTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  testnetText: { color: '#91a9a1', marginTop: 4, fontSize: 12 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

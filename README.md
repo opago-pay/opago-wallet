@@ -273,14 +273,30 @@ The operator account is used only to create and initially fund the wallet's test
 
 ## Solana integration
 
-The Solana account is deterministically derived from the same BIP39 recovery phrase at `m/44'/501'/0'/0'`. The implementation currently provides:
+The Solana account is deterministically derived from the same BIP39 recovery phrase at `m/44'/501'/0'/0'`. Native Solana payments do not depend on the Atomiq swap path. The implementation provides:
 
-- Solana devnet RPC access with an expected-cluster genesis-hash check;
-- native SOL balances, transfers, receive detection, and parsed transaction history;
-- SPL-token balance and transfer support for an explicitly configured six-decimal USDC mint;
-- associated-token-account creation when required;
-- confirmation-aware transaction submission;
-- optional Atomiq quotes for paying Lightning invoices from SOL or USDC in an explicitly enabled mainnet build.
+- exact SOL and USDC accounting as `bigint` lamports or token base units, with no floating-point chain calculations;
+- RPC access pinned to the expected devnet or mainnet genesis hash;
+- native SOL and reviewed six-decimal SPL USDC balances, transfers, receive detection, and parsed history;
+- strict plain-address and Solana Pay request parsing, including amount, mint, reference, label, message, and memo validation;
+- a dedicated review step before signing and a success page with the confirmed signature and cluster-bound Solana Explorer link;
+- associated-token-account validation and idempotent recipient-account creation when required;
+- recent blockhash expiry, fee and rent checks, signed simulation, bounded confirmation, and exact RPC-signature matching;
+- a persistent non-secret payment journal that remains `pending` across timeouts, offline operation, and process restarts until RPC state proves success or failure;
+- amount-bound SOL and USDC receive QRs with confirmed incoming-transfer detection and Explorer evidence;
+- explicit `DEVNET` presentation and configurable per-transfer development limits.
+
+The service boundary is split by responsibility under [`lib/solana/`](lib/solana): `config.ts`, `amounts.ts`, `requests.ts`, `account.ts`, `payments.ts`, `payment-journal.ts`, and `explorer.ts`. Native sending is orchestrated through the wallet-auth context so screens never handle private key bytes directly. Atomiq remains a separate experimental swap integration and is not used by the native SOL or USDC send/receive flows documented here.
+
+Fund a derived public address for a devnet device test without exposing any key material:
+
+```powershell
+$env:SOLANA_WALLET_ADDRESS='paste-the-address-shown-in-the-app'
+npm run solana:fund:devnet
+Remove-Item Env:SOLANA_WALLET_ADDRESS -ErrorAction SilentlyContinue
+```
+
+The script verifies the devnet genesis hash before requesting at most `2 SOL` from the public faucet. Faucet rate limits are external and do not indicate a wallet failure. Solana devnet uses Circle's official six-decimal USDC mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; test USDC can be requested from Circle's public faucet.
 
 The default public devnet RPC is suitable for development and is rate-limited. A reviewed, monitored RPC provider is required before production use. See the official [Solana cluster documentation](https://solana.com/docs/references/clusters).
 
@@ -400,7 +416,9 @@ Relevant implementation files:
 | --- | --- | --- |
 | `EXPO_PUBLIC_ENABLE_MAINNET` | `false` | Explicitly enables supported real-fund networks at build time |
 | `EXPO_PUBLIC_SOLANA_RPC_URL` | Solana devnet public RPC | Selects the Solana RPC endpoint |
-| `EXPO_PUBLIC_USDC_MINT` | empty | Enables the intended six-decimal USDC mint on the selected cluster |
+| `EXPO_PUBLIC_USDC_MINT` | Official Circle mint for the selected cluster | Overrides the reviewed six-decimal USDC mint when an explicitly reviewed deployment requires it |
+| `EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_SOL` | `1` | Upper bound for one app-initiated devnet SOL transfer |
+| `EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_USDC` | `100` | Upper bound for one app-initiated devnet USDC transfer |
 | `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Hedera wallet support accepts only `testnet` |
 | `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Hedera testnet Mirror Node | Resolves the account for the derived public key |
 | `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated testnet transfer |
@@ -462,7 +480,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-At the completed Phase 4 baseline recorded above, the application suite passes `59/59` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact bigint tinybar handling, persisted pending/confirmed/failed Hedera states, offline and restart reconciliation, Hedera account/history/status parsing, MetaMask-originated HBAR receipts, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, Solana transfer parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `77/77` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

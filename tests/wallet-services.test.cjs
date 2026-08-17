@@ -171,18 +171,18 @@ test('keeps recovery entry visible above the keyboard and blocks capture', () =>
   assert.match(source, /setMnemonicInput\(''\);\s*setIsRestoring\(false\);/);
 });
 
-test('keeps receive polling rejections handled across scheduled retries', () => {
+test('pauses receive polling off-screen and backs off after transient failures', () => {
   const source = readFileSync(
     path.join(__dirname, '..', 'app', '(tabs)', 'receive.tsx'),
     'utf8',
   );
 
-  assert.doesNotMatch(source, /setTimeout\(initializeAndPoll/);
-  assert.match(
-    source,
-    /setTimeout\(\(\) => \{\s*void initializeAndPoll\(\)\.catch\(\(\) => scheduleNextPoll\(\)\);/,
-  );
-  assert.match(source, /void initializeAndPoll\(\)\.catch\(\(\) => scheduleNextPoll\(\)\);/);
+  assert.match(source, /useIsFocused\(\)/);
+  assert.match(source, /AppState\.addEventListener\('change'/);
+  assert.match(source, /const pollingEnabled = isFocused && appIsActive/);
+  assert.match(source, /exponentialBackoffDelay\(/);
+  assert.match(source, /if \(!solanaRequest\) return;/);
+  assert.match(source, /hederaKnownTransactions\.current !== null && !hederaRequest/);
 });
 
 test('bounds optional dashboard services and always releases pull-to-refresh', () => {
@@ -193,10 +193,12 @@ test('bounds optional dashboard services and always releases pull-to-refresh', (
 
   assert.match(source, /OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000/);
   assert.match(source, /await Promise\.all\(\[refreshLightning\(\), refreshSolana\(\)\]\)/);
-  assert.equal(source.match(/await withTimeout\(/g)?.length, 2);
+  assert.match(source, /Promise\.allSettled\(/);
+  assert.match(source, /loadResilientSolanaAccount/);
+  assert.match(source, /refreshInProgressRef/);
   assert.match(
     source,
-    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(true\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
   );
 });
 
@@ -223,6 +225,6 @@ test('counts only parsed system transfers involving the wallet', () => {
     },
   };
 
-  assert.equal(getNativeTransferDeltaLamports(transaction, wallet), 1_250_000);
-  assert.equal(getNativeTransferDeltaLamports({ transaction: {} }, wallet), 0);
+  assert.equal(getNativeTransferDeltaLamports(transaction, wallet), 1_250_000n);
+  assert.equal(getNativeTransferDeltaLamports({ transaction: {} }, wallet), 0n);
 });

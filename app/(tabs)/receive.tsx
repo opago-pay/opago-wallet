@@ -1,11 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
@@ -23,17 +33,23 @@ import {
 import { decodeLightningInvoice } from '@/lib/lightning';
 import { sparkTransferMatchesInvoice } from '@/lib/payments';
 import {
-  findConfirmedIncomingSol,
+  buildSolanaReceiveRequest,
+  findNewConfirmedIncomingSolanaTransaction,
   getSolanaReceiveSnapshot,
-  SolanaReceiveSnapshot,
+  openSolanaExplorerUrl,
+  parseSolanaAssetAmount,
+  type SolanaAsset,
+  type SolanaReceiveSnapshot,
 } from '@/lib/solana';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
+import { exponentialBackoffDelay } from '@/lib/retry';
 
-type ReceiveNetwork = 'lightning' | 'solana' | 'hedera';
+type ReceiveNetwork = 'lightning' | 'solana' | 'usdc' | 'hedera';
 
 export default function ReceiveScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const rates = useExchangeRates();
   const {
     sparkWallet,
@@ -52,20 +68,32 @@ export default function ReceiveScreen() {
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [receivedDescription, setReceivedDescription] = useState('');
+  const [receivedExplorerUrl, setReceivedExplorerUrl] = useState<string | null>(null);
   const solanaSnapshot = useRef<SolanaReceiveSnapshot | null>(null);
   const [solanaReady, setSolanaReady] = useState(false);
+  const solanaExpectedAmountBaseUnits = useRef<bigint | null>(null);
+  const [solanaRequest, setSolanaRequest] = useState<string | null>(null);
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
   const hederaExpectedAmountTinybars = useRef<bigint | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
   const [hederaRequest, setHederaRequest] = useState<string | null>(null);
+  const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
+  const pollingEnabled = isFocused && appIsActive;
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
   }, [loadOrGenerateWallet, walletReady]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      setAppIsActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
   const markPaid = useCallback(async (
     amount: number,
-    asset: 'SAT' | 'SOL',
+    asset: 'SAT',
     txId: string,
     reference = txId,
   ) => {
@@ -84,9 +112,15 @@ export default function ReceiveScreen() {
   }, []);
 
   useEffect(() => {
-    if (!invoice || !invoicePaymentHash || !sparkWallet || isPaid) return;
+    if (!pollingEnabled || !invoice || !invoicePaymentHash || !sparkWallet || isPaid) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let consecutiveFailures = 0;
+
+    function scheduleNextPoll(delayMs: number) {
+      if (cancelled) return;
+      timer = setTimeout(() => void poll(), delayMs);
+    }
 
     async function poll() {
       try {
@@ -103,10 +137,11 @@ export default function ReceiveScreen() {
           );
           return;
         }
+        consecutiveFailures = 0;
       } catch {
-        // Temporary network failures are retried without changing payment state.
+        consecutiveFailures += 1;
       }
-      if (!cancelled) timer = setTimeout(poll, 2_500);
+      scheduleNextPoll(exponentialBackoffDelay(2_500, consecutiveFailures, 30_000));
     }
 
     void poll();
@@ -114,19 +149,31 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [invoice, invoiceAmountSats, invoicePaymentHash, isPaid, markPaid, sparkWallet]);
+  }, [invoice, invoiceAmountSats, invoicePaymentHash, isPaid, markPaid, pollingEnabled, sparkWallet]);
 
   useEffect(() => {
-    if (network !== 'solana' || !solanaKeypair || isPaid) return;
+    if (
+      !pollingEnabled ||
+      (network !== 'solana' && network !== 'usdc') ||
+      !solanaKeypair ||
+      isPaid
+    ) return;
     const activeKeypair = solanaKeypair;
+    const activeAsset: SolanaAsset = network === 'usdc' ? 'USDC' : 'SOL';
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let consecutiveFailures = 0;
 
-    function scheduleNextPoll() {
+    function scheduleNextPoll(delayMs: number) {
       if (cancelled) return;
-      timer = setTimeout(() => {
-        void initializeAndPoll().catch(() => scheduleNextPoll());
-      }, 12_000);
+      timer = setTimeout(runPoll, delayMs);
+    }
+
+    function runPoll() {
+      void initializeAndPoll().catch(() => {
+        consecutiveFailures += 1;
+        scheduleNextPoll(exponentialBackoffDelay(12_000, consecutiveFailures));
+      });
     }
 
     async function initializeAndPoll() {
@@ -134,37 +181,64 @@ export default function ReceiveScreen() {
         solanaSnapshot.current = await getSolanaReceiveSnapshot(activeKeypair.publicKey);
       }
       if (!cancelled) setSolanaReady(true);
-      const incoming = await findConfirmedIncomingSol(
-        activeKeypair.publicKey,
-        solanaSnapshot.current.latestSignature,
-      );
+      if (!solanaRequest) return;
+      const incoming = await findNewConfirmedIncomingSolanaTransaction({
+        address: activeKeypair.publicKey,
+        sinceSignature: solanaSnapshot.current.latestSignature,
+        asset: activeAsset,
+        expectedAmountBaseUnits: solanaExpectedAmountBaseUnits.current,
+      });
       if (incoming && !cancelled) {
-        await markPaid(incoming.amountSol, 'SOL', incoming.signature);
+        const description = incoming.amountDisplay + ' ' + incoming.asset + ' confirmed on ' +
+          (appConfig.isMainnet ? 'mainnet.' : 'devnet.');
+        setReceivedDescription(description);
+        setReceivedExplorerUrl(incoming.explorerUrl);
+        setIsPaid(true);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        try {
+          const permissions = await Notifications.getPermissionsAsync();
+          if (permissions.granted) {
+            await Notifications.scheduleNotificationAsync({
+              content: { title: 'Solana payment received', body: description },
+              trigger: null,
+            });
+          }
+        } catch {
+          // Notification availability must not change a confirmed payment state.
+        }
         return;
       }
-      scheduleNextPoll();
+      consecutiveFailures = 0;
+      scheduleNextPoll(12_000);
     }
 
-    void initializeAndPoll().catch(() => scheduleNextPoll());
+    runPoll();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isPaid, markPaid, network, solanaKeypair]);
+  }, [isPaid, network, pollingEnabled, solanaKeypair, solanaRequest]);
 
   useEffect(() => {
-    if (network !== 'hedera' || !walletReady || isPaid) return;
+    if (!pollingEnabled || network !== 'hedera' || !walletReady || isPaid) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let consecutiveFailures = 0;
 
-    function scheduleNextPoll() {
+    function scheduleNextPoll(delayMs: number) {
       if (cancelled) return;
-      timer = setTimeout(() => {
-        void initializeAndPoll().catch(() => scheduleNextPoll());
-      }, 8_000);
+      timer = setTimeout(runPoll, delayMs);
+    }
+
+    function runPoll() {
+      void initializeAndPoll().catch(() => {
+        consecutiveFailures += 1;
+        scheduleNextPoll(exponentialBackoffDelay(8_000, consecutiveFailures));
+      });
     }
 
     async function initializeAndPoll() {
+      if (hederaKnownTransactions.current !== null && !hederaRequest) return;
       const account = await refreshHederaAccount();
       if (!account) throw new Error('No Hedera testnet account exists for this wallet.');
       const history = await loadHederaHistory(account.accountId, 10);
@@ -201,15 +275,17 @@ export default function ReceiveScreen() {
           return;
         }
       }
-      scheduleNextPoll();
+      if (!hederaRequest) return;
+      consecutiveFailures = 0;
+      scheduleNextPoll(8_000);
     }
 
-    void initializeAndPoll().catch(() => scheduleNextPoll());
+    runPoll();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isPaid, network, refreshHederaAccount, walletReady]);
+  }, [hederaRequest, isPaid, network, pollingEnabled, refreshHederaAccount, walletReady]);
 
   function parseInvoiceAmount(): number {
     const value = Number(amountInput.replace(',', '.'));
@@ -271,14 +347,41 @@ export default function ReceiveScreen() {
     }
   }
 
+  async function prepareSolanaRequest() {
+    if (!solanaKeypair || (network !== 'solana' && network !== 'usdc')) return;
+    setLoading(true);
+    try {
+      const asset: SolanaAsset = network === 'usdc' ? 'USDC' : 'SOL';
+      const amountBaseUnits = amountInput.trim()
+        ? parseSolanaAssetAmount(amountInput, asset)
+        : null;
+      solanaExpectedAmountBaseUnits.current = amountBaseUnits;
+      setSolanaRequest(buildSolanaReceiveRequest({
+        recipientAddress: solanaKeypair.publicKey.toBase58(),
+        asset,
+        amountBaseUnits,
+      }));
+    } catch (cause) {
+      Alert.alert(
+        'Could not create Solana request',
+        cause instanceof Error ? cause.message : 'Solana is unavailable.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const reset = useCallback(() => {
     setInvoice(null);
     setInvoicePaymentHash(null);
     setInvoiceAmountSats(0);
     setIsPaid(false);
     setReceivedDescription('');
+    setReceivedExplorerUrl(null);
     solanaSnapshot.current = null;
     setSolanaReady(false);
+    solanaExpectedAmountBaseUnits.current = null;
+    setSolanaRequest(null);
     hederaKnownTransactions.current = null;
     hederaExpectedAmountTinybars.current = null;
     setHederaReady(false);
@@ -292,6 +395,18 @@ export default function ReceiveScreen() {
     Alert.alert('Copied', 'Payment destination copied to clipboard.');
   }
 
+  async function openReceivedTransaction() {
+    if (!receivedExplorerUrl) return;
+    try {
+      await openSolanaExplorerUrl(receivedExplorerUrl);
+    } catch (cause) {
+      Alert.alert(
+        'Could not open Solana Explorer',
+        cause instanceof Error ? cause.message : 'The explorer link is invalid.',
+      );
+    }
+  }
+
   if (isPaid) return (
     <View style={[styles.container, styles.centered]}>
       {network === 'hedera' && (
@@ -299,13 +414,33 @@ export default function ReceiveScreen() {
           <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
         </View>
       )}
+      {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
+        <View style={[styles.testnetBanner, { width: '100%' }]}>
+          <Text style={styles.testnetTitle}>SOLANA DEVNET</Text>
+        </View>
+      )}
       <View style={styles.successCircle}>
         <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
       </View>
       <Text style={styles.successTitle}>Funds confirmed</Text>
       <Text style={styles.subtitle}>{receivedDescription || 'The exact incoming transaction was verified.'}</Text>
-      <TouchableOpacity style={[styles.button, { marginTop: 24 }]} onPress={() => router.replace('/(tabs)')}>
-        <Text style={styles.buttonText}>Return to dashboard</Text>
+      {receivedExplorerUrl && (
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 24 }]}
+          onPress={() => void openReceivedTransaction()}
+          accessibilityRole="link"
+          accessibilityLabel="Open received transaction in Solana Explorer"
+        >
+          <Text style={styles.buttonText}>Open transaction in Solana Explorer</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        style={[styles.button, receivedExplorerUrl ? styles.secondaryButton : { marginTop: 24 }]}
+        onPress={() => router.replace('/(tabs)')}
+      >
+        <Text style={[styles.buttonText, receivedExplorerUrl && styles.secondaryButtonText]}>
+          Return to dashboard
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={reset}>
         <Text style={[styles.buttonText, styles.secondaryButtonText]}>Receive another</Text>
@@ -315,10 +450,8 @@ export default function ReceiveScreen() {
 
   const solanaAddress = solanaKeypair?.publicKey.toBase58() || '';
   const qrValue =
-    network === 'solana'
-      ? solanaAddress && solanaReady
-        ? 'solana:' + solanaAddress
-        : ''
+    network === 'solana' || network === 'usdc'
+      ? solanaRequest || ''
       : network === 'hedera'
         ? hederaRequest || ''
         : invoice || '';
@@ -326,6 +459,7 @@ export default function ReceiveScreen() {
   const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
     { network: 'lightning', asset: 'lightning' },
     { network: 'solana', asset: 'solana' },
+    { network: 'usdc', asset: 'usdc' },
     { network: 'hedera', asset: 'hedera' },
   ];
 
@@ -353,6 +487,17 @@ export default function ReceiveScreen() {
           </View>
         </View>
       )}
+      {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
+        <View style={styles.testnetBanner}>
+          <View style={styles.testnetBannerContent}>
+            <AssetIcon asset={network === 'usdc' ? 'usdc' : 'solana'} size={34} />
+            <View>
+              <Text style={styles.testnetTitle}>SOLANA DEVNET</Text>
+              <Text style={styles.testnetText}>Receive test assets only.</Text>
+            </View>
+          </View>
+        </View>
+      )}
       <View style={styles.card}>
         <Text style={styles.label}>Network</Text>
         <View style={styles.receiveNetworkRow}>
@@ -366,7 +511,7 @@ export default function ReceiveScreen() {
                 onPress={() => {
                   reset();
                   setNetwork(item.network);
-                  setAmountInput(item.network === 'hedera' ? '' : '10');
+                  setAmountInput(item.network === 'lightning' ? '10' : '');
                   setIsEur(false);
                 }}
                 accessibilityRole="radio"
@@ -455,6 +600,58 @@ export default function ReceiveScreen() {
           </>
         )}
 
+        {(network === 'solana' || network === 'usdc') && (
+          <>
+            {!solanaReady ? (
+              <ActivityIndicator color="#ffb000" />
+            ) : solanaAddress ? (
+              <>
+                <Text style={styles.label}>Wallet address</Text>
+                <TouchableOpacity
+                  style={styles.proofBox}
+                  onPress={() => void copy(solanaAddress)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Solana wallet address"
+                >
+                  <Text style={styles.proofText} selectable>{solanaAddress}</Text>
+                  <View style={styles.copyHint}>
+                    <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
+                    <Text style={styles.copyHintText}>Tap to copy</Text>
+                  </View>
+                </TouchableOpacity>
+                {!solanaRequest && (
+                  <>
+                    <Text style={styles.label}>
+                      Amount in {network === 'usdc' ? 'USDC' : 'SOL'} (optional)
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      value={amountInput}
+                      onChangeText={setAmountInput}
+                      keyboardType="decimal-pad"
+                      placeholder="Leave empty for an open request"
+                      placeholderTextColor="#666"
+                    />
+                    <TouchableOpacity
+                      style={styles.button}
+                      onPress={() => void prepareSolanaRequest()}
+                      disabled={loading}
+                    >
+                      {loading
+                        ? <ActivityIndicator color="#111" />
+                        : <Text style={styles.buttonText}>
+                            Create {network === 'usdc' ? 'USDC' : 'SOL'} receive QR
+                          </Text>}
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            ) : (
+              <Text style={styles.errorText}>Solana wallet is not ready.</Text>
+            )}
+          </>
+        )}
+
         {qrValue && (
           <View style={styles.qrSection}>
             <View style={styles.qrCard}>
@@ -470,10 +667,10 @@ export default function ReceiveScreen() {
           </View>
         )}
 
-        {network === 'solana' && !solanaAddress && (
+        {(network === 'solana' || network === 'usdc') && !solanaAddress && (
           <Text style={styles.errorText}>Solana wallet is not ready.</Text>
         )}
-        {network === 'solana' && solanaAddress && !solanaReady && (
+        {(network === 'solana' || network === 'usdc') && solanaAddress && !solanaReady && (
           <ActivityIndicator color="#ffb000" />
         )}
       </View>

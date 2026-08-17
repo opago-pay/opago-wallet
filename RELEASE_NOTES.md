@@ -1,6 +1,6 @@
 # Hedera testnet milestone release notes
 
-Release-candidate date: 2026-08-13
+Release-candidate date: 2026-08-14
 
 ## Scope
 
@@ -17,6 +17,7 @@ This milestone adds a complete Hedera testnet asset and merchant-checkout path t
 - A consistent asset identity and network-badge system across Portfolio, Send, Receive, activity, and checkout selection, with scalable icons and improved small-screen accessibility.
 - Recovery and deletion safeguards, exact incoming-payment matching, replay rejection, testnet/mainnet separation, and redacted physical-device security acceptance.
 - A reproducible `npm run phase5:verify` quality gate, clean-clone/build instructions, evidence index, and a one-to-five-minute demo script.
+- Native SOL and explicitly configured SPL USDC send/receive paths with exact `bigint` amounts, strict Solana Pay validation, fee/rent and simulation checks, review and Explorer screens, confirmed receive matching, and a restart-safe non-secret payment journal. These paths are independent of the experimental Atomiq swap integration.
 
 ## Public deployment
 
@@ -36,7 +37,7 @@ On Windows, `npm run phase5:android` performs the clean dependency install, repo
 
 - TypeScript: pass.
 - ESLint: pass.
-- Application tests: 67/67 pass.
+- Application tests: 77/77 pass.
 - Contract tests: 9/9 pass.
 - Locked runtime bytecode: matches Hedera testnet Mirror Node.
 - Sourcify: verified.

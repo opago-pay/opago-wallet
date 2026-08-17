@@ -25,6 +25,7 @@ test('defines presentation metadata for every wallet asset and development netwo
   assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'MAINNET');
   assert.equal(getWalletAssetPresentation('solana', true).networkBadge, 'MAINNET');
   assert.equal(getWalletAssetPresentation('hedera', true).networkBadge, 'TESTNET');
+  assert.equal(getWalletAssetPresentation('usdc', false).name, 'USDC');
 });
 
 test('maps transaction symbols to the same icons used by asset cards', () => {
@@ -49,6 +50,8 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   for (const asset of ['lightning', 'solana', 'usdc', 'hedera']) {
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
+  assert.match(portfolio, /Development networks - real mainnet payments are blocked/);
+  assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
   assert.doesNotMatch(portfolio, /assetDot/);

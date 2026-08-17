@@ -15,13 +15,25 @@ import { fetchOcpExecutionPayload, fetchOcpOptions, resolveOcpUrl } from '@/lib/
 import { normalizeLightningInput, isBolt11Invoice } from '@/lib/lightning';
 import { parsePaymentAmount, resolveLnurlAmount } from '@/lib/payment-input';
 import { paySparkInvoice } from '@/lib/payments';
-import { sendSolanaAsset } from '@/lib/solana';
+import {
+  formatSolanaAssetAmount,
+  loadSolanaAccount,
+  parseSolanaAssetAmount,
+  parseSolanaPaymentRequest,
+  sendSolanaAsset,
+  SolanaPaymentPendingError,
+} from '@/lib/solana';
+import { openSolanaExplorerUrl } from '@/lib/solana/explorer';
 import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
 import { PaymentForm } from '@/components/send/payment-form';
 import {
   HederaReviewView,
   HederaSuccessView,
 } from '@/components/send/hedera-payment-views';
+import {
+  SolanaReviewView,
+  SolanaSuccessView,
+} from '@/components/send/solana-payment-views';
 import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '@/lib/hedera/config';
 import {
   parseHederaCheckoutRequest,
@@ -49,6 +61,8 @@ import type {
   PaymentSource,
   PendingEId,
   PendingHederaPayment,
+  PendingSolanaPayment,
+  SolanaTransferResult,
 } from '@/components/send/types';
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : 'Payment failed.';
@@ -84,6 +98,7 @@ export default function SendScreen() {
     loadOrGenerateWallet,
     refreshHederaAccount,
     sendHederaPayment,
+    sendSolanaPayment,
   } = useWalletAuth();
   const { balances, balanceError } = useWalletBalances({
     walletReady,
@@ -101,6 +116,8 @@ export default function SendScreen() {
   const [successProof, setSuccessProof] = useState<string | null>(null);
   const [pendingHedera, setPendingHedera] = useState<PendingHederaPayment | null>(null);
   const [hederaResult, setHederaResult] = useState<HederaTransferResult | null>(null);
+  const [pendingSolana, setPendingSolana] = useState<PendingSolanaPayment | null>(null);
+  const [solanaResult, setSolanaResult] = useState<SolanaTransferResult | null>(null);
   const [ocpState, setOcpState] = useState<OcpState | null>(null);
   const [selectedOcpOption, setSelectedOcpOption] = useState<OcpOption | null>(null);
   const [bridgeQuote, setBridgeQuote] = useState<BridgeQuote | null>(null);
@@ -110,6 +127,7 @@ export default function SendScreen() {
   const waitingForEId = useRef(false);
   const completingEId = useRef(false);
   const consumedHederaRequestKey = useRef<string | null>(null);
+  const solanaSubmissionInFlight = useRef(false);
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
@@ -228,15 +246,59 @@ export default function SendScreen() {
     }
   }
 
-  async function handleDestination(scannedValue?: string) {
+  async function handleDestination(
+    scannedValue?: string,
+    sourceOverride?: PaymentSource,
+  ) {
     const raw = (scannedValue ?? destination).trim();
+    const activeSource = sourceOverride || source;
     if (!raw) {
       Alert.alert('Missing destination', 'Enter or scan a payment destination.');
       return;
     }
     setLoading(true);
     try {
-      if (source === 'hedera') {
+      if (activeSource === 'solana' || activeSource === 'usdc') {
+        if (!solanaKeypair) throw new Error('Solana signer is not ready.');
+        const asset = activeSource === 'usdc' ? 'USDC' as const : 'SOL' as const;
+        const request = parseSolanaPaymentRequest(raw, asset);
+        const enteredAmount = amountInput.trim() && (!sourceOverride || sourceOverride === source)
+          ? parseSolanaAssetAmount(amountInput, asset)
+          : null;
+        if (
+          request.amountBaseUnits !== null &&
+          enteredAmount !== null &&
+          request.amountBaseUnits !== enteredAmount
+        ) {
+          throw new Error('The entered amount does not match the scanned Solana payment request.');
+        }
+        const amountBaseUnits = request.amountBaseUnits ?? enteredAmount;
+        if (amountBaseUnits === null) {
+          throw new Error('Enter an amount or scan a Solana request that includes one.');
+        }
+        if (request.recipientAddress === solanaKeypair.publicKey.toBase58()) {
+          throw new Error('Source and recipient Solana addresses must be different.');
+        }
+        const account = await loadSolanaAccount(solanaKeypair.publicKey);
+        if (account.availability[asset] !== 'fresh') {
+          throw new Error(
+            'The current ' + asset + ' balance could not be verified. Please try again before paying.',
+          );
+        }
+        const available = asset === 'SOL' ? account.balanceLamports : account.usdcBaseUnits;
+        if (amountBaseUnits > available) {
+          throw new Error('Insufficient ' + asset + ' balance.');
+        }
+        setPendingSolana({
+          recipientAddress: request.recipientAddress,
+          asset,
+          amountBaseUnits,
+          amountDisplay: formatSolanaAssetAmount(amountBaseUnits, asset),
+          request,
+        });
+        return;
+      }
+      if (activeSource === 'hedera') {
         const checkoutRequest = parseHederaCheckoutRequest(raw);
         const directRequest = checkoutRequest ? null : parseHederaPaymentRequest(raw);
         const enteredAmount = amountInput.trim()
@@ -338,6 +400,37 @@ export default function SendScreen() {
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function executeSolanaPayment() {
+    if (!pendingSolana || solanaSubmissionInFlight.current) return;
+    solanaSubmissionInFlight.current = true;
+    setLoading(true);
+    try {
+      const result = await sendSolanaPayment({
+        recipientAddress: pendingSolana.recipientAddress,
+        amountBaseUnits: pendingSolana.amountBaseUnits,
+        asset: pendingSolana.asset,
+        reference: pendingSolana.request?.reference,
+        memo: pendingSolana.request?.memo,
+      });
+      setPendingSolana(null);
+      setSolanaResult(result);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (cause) {
+      if (cause instanceof SolanaPaymentPendingError) setPendingSolana(null);
+      Alert.alert(
+        cause instanceof SolanaPaymentPendingError
+          ? 'Solana payment pending'
+          : 'Solana payment not confirmed',
+        messageOf(cause) +
+          '\n\nNo success was recorded. Check Activity and Solana Explorer before retrying.',
+      );
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      solanaSubmissionInFlight.current = false;
       setLoading(false);
     }
   }
@@ -444,6 +537,8 @@ export default function SendScreen() {
     setSuccessProof(null);
     setPendingHedera(null);
     setHederaResult(null);
+    setPendingSolana(null);
+    setSolanaResult(null);
     setOcpState(null);
     setSelectedOcpOption(null);
     setBridgeQuote(null);
@@ -461,7 +556,14 @@ export default function SendScreen() {
         onScanned={value => {
           setIsScanning(false);
           setDestination(value);
-          void handleDestination(value);
+          const scannedSource: PaymentSource = /^solana:/i.test(value)
+            ? /(?:\?|&)spl-token=/i.test(value) ? 'usdc' : 'solana'
+            : source;
+          if (scannedSource !== source) {
+            setSource(scannedSource);
+            setAmountInput('');
+          }
+          void handleDestination(value, scannedSource);
         }}
         onCancel={() => setIsScanning(false)}
       />
@@ -492,6 +594,21 @@ export default function SendScreen() {
     );
   }
 
+  if (solanaResult) {
+    return (
+      <SolanaSuccessView
+        result={solanaResult}
+        onOpenExplorer={() => {
+          void openSolanaExplorerUrl(solanaResult.explorerUrl).catch(cause =>
+            Alert.alert('Could not open Solana Explorer', messageOf(cause)),
+          );
+        }}
+        onDashboard={() => router.replace('/(tabs)')}
+        onReset={reset}
+      />
+    );
+  }
+
   if (pendingHedera && hederaAccount) {
     return (
       <HederaReviewView
@@ -500,6 +617,18 @@ export default function SendScreen() {
         loading={loading}
         onConfirm={() => void executeHederaPayment()}
         onCancel={() => setPendingHedera(null)}
+      />
+    );
+  }
+
+  if (pendingSolana && solanaKeypair) {
+    return (
+      <SolanaReviewView
+        payment={pendingSolana}
+        sourceAddress={solanaKeypair.publicKey.toBase58()}
+        loading={loading}
+        onConfirm={() => void executeSolanaPayment()}
+        onCancel={() => setPendingSolana(null)}
       />
     );
   }

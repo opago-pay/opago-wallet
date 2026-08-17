@@ -41,6 +41,11 @@ const gates = [
     args: ['--check', 'demo/hedera-checkout-merchant.cjs'],
   },
   {
+    label: 'Solana devnet funding syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/solana-fund-devnet.cjs'],
+  },
+  {
     label: 'Hedera provisioning syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-provision-testnet.cjs'],

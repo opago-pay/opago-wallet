@@ -1,4 +1,5 @@
 import { getHederaMirrorNodeBaseUrl, parseHederaAccountId } from './config';
+import { retryWithBackoff } from '../retry';
 
 export interface MirrorAccountRecord {
   account?: string | null;
@@ -64,44 +65,46 @@ async function fetchMirrorJson<T>(
   purpose: string,
   allowNotFound = false,
 ): Promise<T | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const response = await fetch(url.toString(), {
-      headers: { accept: 'application/json' },
-      redirect: 'error',
-      signal: controller.signal,
-    });
-    if (response.redirected) throw new Error(purpose + ' redirected unexpectedly.');
-    if (allowNotFound && response.status === 404) return null;
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.toLowerCase().includes('application/json')) {
-      throw new Error(purpose + ' returned an unexpected content type.');
-    }
-    const rawBody = await response.text();
-    if (rawBody.length > 524_288) {
-      throw new Error(purpose + ' returned an oversized response.');
-    }
-
-    let parsed: unknown;
+  return retryWithBackoff(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
-      parsed = JSON.parse(preserveExactIntegers(rawBody));
-    } catch {
-      throw new Error(purpose + ' returned invalid JSON.');
+      const response = await fetch(url.toString(), {
+        headers: { accept: 'application/json' },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (response.redirected) throw new Error(purpose + ' redirected unexpectedly.');
+      if (allowNotFound && response.status === 404) return null;
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().includes('application/json')) {
+        throw new Error(purpose + ' returned an unexpected content type.');
+      }
+      const rawBody = await response.text();
+      if (rawBody.length > 524_288) {
+        throw new Error(purpose + ' returned an oversized response.');
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(preserveExactIntegers(rawBody));
+      } catch {
+        throw new Error(purpose + ' returned invalid JSON.');
+      }
+      if (!response.ok) {
+        throw new Error(mirrorErrorMessage(parsed, purpose + ' failed with HTTP ' + response.status + '.'));
+      }
+      return parsed as T;
+    } catch (cause) {
+      if (cause instanceof Error && cause.name === 'AbortError') {
+        throw new Error(purpose + ' timed out.');
+      }
+      throw cause;
+    } finally {
+      clearTimeout(timeout);
     }
-    if (!response.ok) {
-      throw new Error(mirrorErrorMessage(parsed, purpose + ' failed with HTTP ' + response.status + '.'));
-    }
-    return parsed as T;
-  } catch (cause) {
-    if (cause instanceof Error && cause.name === 'AbortError') {
-      throw new Error(purpose + ' timed out.');
-    }
-    throw cause;
-  } finally {
-    clearTimeout(timeout);
-  }
+  }, { maxAttempts: 2, baseDelayMs: 750, maxDelayMs: 1_500 });
 }
 
 function mirrorUrl(pathname: string): URL {
@@ -144,7 +147,7 @@ export async function listMirrorTransactions(
 ): Promise<MirrorTransactionRecord[]> {
   const accountId = parseHederaAccountId(rawAccountId);
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
-  const responses = await Promise.all(
+  const results = await Promise.allSettled(
     HEDERA_HISTORY_TRANSACTION_TYPES.map(async transactionType => {
       const url = mirrorUrl('/api/v1/transactions');
       url.searchParams.set('account.id', accountId);
@@ -158,6 +161,14 @@ export async function listMirrorTransactions(
       return response?.transactions || [];
     }),
   );
+  const responses = results
+    .filter((result): result is PromiseFulfilledResult<MirrorTransactionRecord[]> =>
+      result.status === 'fulfilled')
+    .map(result => result.value);
+  if (responses.length === 0) {
+    const failure = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
+    throw failure.reason;
+  }
 
   const uniqueTransactions = new Map<string, MirrorTransactionRecord>();
   for (const transaction of responses.flat()) {

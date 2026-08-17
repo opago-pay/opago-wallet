@@ -87,9 +87,10 @@ export const sendStyles = StyleSheet.create({
   selectorActive: { borderColor: '#ffb000', backgroundColor: 'rgba(255,176,0,0.12)' },
   selectorText: { color: '#8f8f9d', fontWeight: '700' },
   selectorTextActive: { color: '#ffb000' },
-  receiveNetworkRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  receiveNetworkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   receiveNetworkSelector: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     minHeight: 105,
     borderRadius: 12,
     borderWidth: 1,
@@ -202,7 +203,14 @@ export const sendStyles = StyleSheet.create({
     paddingVertical: 8,
   },
   quoteLabel: { color: '#8f8f9d' },
-  quoteValue: { color: '#fff', fontWeight: '700' },
+  quoteValue: {
+    color: '#fff',
+    fontWeight: '700',
+    flexShrink: 1,
+    maxWidth: '68%',
+    marginLeft: 12,
+    textAlign: 'right',
+  },
   option: {
     borderColor: '#33333d',
     borderWidth: 1,
