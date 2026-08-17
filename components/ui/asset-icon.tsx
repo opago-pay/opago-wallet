@@ -47,8 +47,8 @@ export function AssetIcon(props: {
           source={require('../../assets/images/hedera-logo.png')}
           resizeMode="contain"
           style={{
-            width: Math.round(size * 1.4),
-            height: Math.round(size * 1.4),
+            width: Math.round(size * 1.1),
+            height: Math.round(size * 1.1),
           }}
         />
       )}
