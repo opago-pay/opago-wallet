@@ -23,7 +23,7 @@ import {
   sendSolanaAsset,
   SolanaPaymentPendingError,
 } from '@/lib/solana';
-import { openSolanaExplorerUrl } from '@/lib/solana/explorer';
+import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
 import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
 import { PaymentForm } from '@/components/send/payment-form';
 import {
@@ -39,7 +39,7 @@ import {
   parseHederaCheckoutRequest,
   verifyHederaCheckoutRequest,
 } from '@/lib/hedera/checkout';
-import { openHederaExplorerUrl } from '@/lib/hedera/explorer';
+import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import {
   formatTinybars,
   parseHederaPaymentRequest,

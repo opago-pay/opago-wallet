@@ -10,6 +10,7 @@ const {
   getWalletAssetPresentation,
   walletAssetKeyFromSymbol,
 } = require('../lib/wallet-assets.ts');
+const { calculatePortfolioEur } = require('../lib/portfolio-valuation.ts');
 
 function readSource(...segments) {
   return readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
@@ -47,6 +48,8 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   assert.match(icon, /props\.asset === 'solana'/);
   assert.match(icon, /props\.asset === 'usdc'/);
   assert.match(icon, /props\.asset === 'hedera'/);
+  assert.match(icon, /hedera-logo\.png/);
+  assert.doesNotMatch(icon, /\\u210f/);
   for (const asset of ['lightning', 'solana', 'usdc', 'hedera']) {
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
@@ -55,6 +58,30 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
   assert.doesNotMatch(portfolio, /assetDot/);
+});
+
+test('values development-network balances at their mainnet-equivalent EUR prices', () => {
+  assert.equal(
+    calculatePortfolioEur(
+      {
+        sparkSats: 100_000_000,
+        solLamports: 2_000_000_000n,
+        usdcBaseUnits: 3_000_000n,
+        hbarTinybars: 4_000_000_000n,
+      },
+      {
+        btcToEur: 50_000,
+        solToEur: 100,
+        usdcToEur: 0.9,
+        hbarToEur: 0.2,
+      },
+    ),
+    50_210.7,
+  );
+
+  const portfolio = readSource('app', '(tabs)', 'index.tsx');
+  assert.doesNotMatch(portfolio, /Not valued/);
+  assert.match(portfolio, /Mainnet-price estimate only/);
 });
 
 test('uses graphical confirmation states instead of prototype OK text', () => {
@@ -67,5 +94,17 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
   for (const source of sources) {
     assert.match(source, /name="checkmark"/);
     assert.doesNotMatch(source, />OK<\/Text>/);
+  }
+});
+
+test('bundles native explorer links statically', () => {
+  const sources = [
+    readSource('lib', 'hedera', 'explorer-native.ts'),
+    readSource('lib', 'solana', 'explorer-native.ts'),
+  ];
+
+  for (const source of sources) {
+    assert.match(source, /import \* as Linking from 'expo-linking';/);
+    assert.doesNotMatch(source, /await import\(['"]expo-linking['"]\)/);
   }
 });

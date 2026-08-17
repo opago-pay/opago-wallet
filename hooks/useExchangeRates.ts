@@ -2,30 +2,51 @@ import { useEffect, useState } from 'react';
 import { fetchJson } from '@/lib/http';
 
 const CACHE_EXPIRY = 60_000;
-const FALLBACK_RATES = { btcToEur: 0, solToEur: 0 };
+export interface ExchangeRates {
+  btcToEur: number;
+  solToEur: number;
+  usdcToEur: number;
+  hbarToEur: number;
+}
+
+const FALLBACK_RATES: ExchangeRates = {
+  btcToEur: 0,
+  solToEur: 0,
+  usdcToEur: 0,
+  hbarToEur: 0,
+};
 let cachedRates = FALLBACK_RATES;
 let lastFetch = 0;
-let ratesRequest: Promise<typeof FALLBACK_RATES> | null = null;
+let ratesRequest: Promise<ExchangeRates> | null = null;
 
 interface CoinGeckoResponse {
   bitcoin?: { eur?: number };
   solana?: { eur?: number };
+  'usd-coin'?: { eur?: number };
+  'hedera-hashgraph'?: { eur?: number };
 }
 
-async function requestRates(): Promise<typeof FALLBACK_RATES> {
+function hasCompleteRates(rates: ExchangeRates): boolean {
+  return Object.values(rates).every(rate => Number.isFinite(rate) && rate > 0);
+}
+
+async function requestRates(): Promise<ExchangeRates> {
   if (ratesRequest) return ratesRequest;
   ratesRequest = (async () => {
     const data = await fetchJson<CoinGeckoResponse>(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur',
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana,usd-coin,hedera-hashgraph&vs_currencies=eur',
       {},
       { purpose: 'Exchange-rate service', timeoutMs: 8_000 },
     );
     const btcToEur = Number(data.bitcoin?.eur);
     const solToEur = Number(data.solana?.eur);
-    if (!(btcToEur > 0) || !(solToEur > 0)) {
+    const usdcToEur = Number(data['usd-coin']?.eur);
+    const hbarToEur = Number(data['hedera-hashgraph']?.eur);
+    const nextRates = { btcToEur, solToEur, usdcToEur, hbarToEur };
+    if (!hasCompleteRates(nextRates)) {
       throw new Error('Exchange-rate service returned invalid rates.');
     }
-    cachedRates = { btcToEur, solToEur };
+    cachedRates = nextRates;
     lastFetch = Date.now();
     return cachedRates;
   })();
@@ -43,7 +64,7 @@ export function useExchangeRates() {
     let cancelled = false;
 
     async function loadRates() {
-      if (Date.now() - lastFetch < CACHE_EXPIRY && cachedRates.btcToEur > 0) {
+      if (Date.now() - lastFetch < CACHE_EXPIRY && hasCompleteRates(cachedRates)) {
         setRates(cachedRates);
         return;
       }

@@ -30,7 +30,7 @@ export function getHederaTransactionExplorerUrl(transactionId: string): string {
   );
 }
 
-export async function openHederaExplorerUrl(rawUrl: string): Promise<void> {
+export function validateHederaExplorerUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
   if (
     url.protocol !== 'https:' ||
@@ -39,6 +39,5 @@ export async function openHederaExplorerUrl(rawUrl: string): Promise<void> {
   ) {
     throw new Error('Only Hedera testnet HashScan links can be opened.');
   }
-  const Linking = await import('expo-linking');
-  await Linking.openURL(url.toString());
+  return url.toString();
 }

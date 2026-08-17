@@ -26,7 +26,7 @@ export function getSolanaAccountExplorerUrl(address: string): string {
   return SOLANA_EXPLORER_BASE + '/address/' + parseSolanaPublicKey(address).toBase58() + clusterQuery();
 }
 
-export async function openSolanaExplorerUrl(rawUrl: string): Promise<void> {
+export function validateSolanaExplorerUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
   const expectedCluster = appConfig.isMainnet ? null : 'devnet';
   const path = url.pathname.split('/').filter(Boolean);
@@ -47,6 +47,5 @@ export async function openSolanaExplorerUrl(rawUrl: string): Promise<void> {
   ) {
     throw new Error('Only links for the configured Solana network can be opened.');
   }
-  const Linking = await import('expo-linking');
-  await Linking.openURL(url.toString());
+  return url.toString();
 }

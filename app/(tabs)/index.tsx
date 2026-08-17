@@ -21,8 +21,8 @@ import { getTransactions, Transaction as LocalTransaction } from '@/lib/database
 import { loadHederaHistory, loadHederaTransactionStatus } from '@/lib/hedera/account';
 import {
   getHederaTransactionExplorerUrl,
-  openHederaExplorerUrl,
 } from '@/lib/hedera/explorer';
+import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { normalizeHederaTransactionIdForMirror } from '@/lib/hedera/mirror';
 import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
 import { formatTinybars } from '@/lib/hedera/payments';
@@ -33,9 +33,10 @@ import {
   loadSolanaTransactionStatus,
 } from '@/lib/solana';
 import { loadResilientSolanaAccount } from '@/lib/solana/account-native';
-import { openSolanaExplorerUrl } from '@/lib/solana/explorer';
+import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
 import { solanaPaymentJournal } from '@/lib/solana/payment-journal-native';
 import { appConfig } from '@/lib/config';
+import { calculatePortfolioEur } from '@/lib/portfolio-valuation';
 import { withTimeout } from '@/lib/promise-timeout';
 import {
   getWalletAssetPresentation,
@@ -437,15 +438,19 @@ export default function HomeScreen() {
   }
 
   const totalEur =
-    appConfig.isMainnet &&
-    rates.btcToEur > 0 &&
     solanaAvailability.SOL !== 'loading' &&
     solanaAvailability.SOL !== 'unavailable' &&
     solanaAvailability.USDC !== 'loading' &&
     solanaAvailability.USDC !== 'unavailable'
-      ? (balances.spark / 1e8) * rates.btcToEur +
-        Number(formatSolanaAssetAmount(balances.solLamports, 'SOL')) * rates.solToEur +
-        Number(formatSolanaAssetAmount(balances.usdcBaseUnits, 'USDC'))
+      ? calculatePortfolioEur(
+          {
+            sparkSats: balances.spark,
+            solLamports: balances.solLamports,
+            usdcBaseUnits: balances.usdcBaseUnits,
+            hbarTinybars: balances.hbarTinybars,
+          },
+          rates,
+        )
       : null;
 
   return (
@@ -469,12 +474,12 @@ export default function HomeScreen() {
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total value</Text>
         <Text style={styles.total}>
-          {!appConfig.isMainnet ? 'Not valued' : totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}
+          {totalEur === null ? 'Unavailable' : 'EUR ' + totalEur.toFixed(2)}
         </Text>
         <Text style={styles.valuationNote}>
           {appConfig.isMainnet
-            ? 'HBAR testnet is excluded from the EUR total.'
-            : 'Development-network assets are excluded from fiat valuation.'}
+            ? 'Estimated using current EUR market prices.'
+            : 'Mainnet-price estimate only; development-network assets have no monetary value.'}
         </Text>
       </View>
 

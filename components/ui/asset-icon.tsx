@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import {
   getWalletAssetPresentation,
   type WalletAssetKey,
@@ -43,7 +43,14 @@ export function AssetIcon(props: {
         <Text style={[styles.usdcGlyph, { fontSize: Math.round(size * 0.53) }]}>$</Text>
       )}
       {props.asset === 'hedera' && (
-        <Text style={[styles.hederaGlyph, { fontSize: Math.round(size * 0.56) }]}>{'\u210f'}</Text>
+        <Image
+          source={require('../../assets/images/hedera-logo.png')}
+          resizeMode="contain"
+          style={{
+            width: Math.round(size * 1.4),
+            height: Math.round(size * 1.4),
+          }}
+        />
       )}
     </View>
   );
@@ -86,9 +93,5 @@ const styles = StyleSheet.create({
   usdcGlyph: {
     color: '#fff',
     fontWeight: '900',
-  },
-  hederaGlyph: {
-    color: '#fff',
-    fontWeight: '800',
   },
 });

@@ -36,11 +36,11 @@ import {
   buildSolanaReceiveRequest,
   findNewConfirmedIncomingSolanaTransaction,
   getSolanaReceiveSnapshot,
-  openSolanaExplorerUrl,
   parseSolanaAssetAmount,
   type SolanaAsset,
   type SolanaReceiveSnapshot,
 } from '@/lib/solana';
+import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { exponentialBackoffDelay } from '@/lib/retry';
