@@ -1,0 +1,60 @@
+# Hedera Mainnet threat model
+
+**Status:** initial Milestone 0 model. It must be revisited after the Mainnet account model is selected, after audit findings, and before final deployment.
+
+## Protected assets
+
+- recovery phrases and derived private keys;
+- user and merchant HBAR;
+- account IDs, aliases, and approved contract identity;
+- payment request integrity: network, merchant, amount, nonce, expiry, and payment ID;
+- transaction status and local payment journal integrity;
+- release signing key, deployment key, backend secrets, and production configuration;
+- public evidence linking source, compiler input, bytecode, deployment, and Android build.
+
+## Trust boundaries
+
+1. Android secure storage and in-memory signing state.
+2. QR/deep-link input received from an untrusted merchant or camera.
+3. Hedera consensus nodes used for submission and receipts.
+4. Mirror Node data used for account discovery, history, contract runtime, and reconciliation.
+5. Public merchant service generating payment requests.
+6. Build and release environment embedding public network metadata.
+7. Human-controlled Mainnet deployment, treasury, Play Console, and hosting accounts.
+
+## Principal threats and controls
+
+| Threat | Impact | Required control |
+| --- | --- | --- |
+| Testnet/Mainnet confusion | Real funds sent while the user believes they are testing | Matching build profile and network, explicit Mainnet flag, network-specific QR parsing, visible Mainnet warnings, network-bound HashScan and Mirror Node URLs |
+| Contract substitution | Payment sent through attacker-controlled bytecode | Build-time contract ID, pinned runtime SHA-256, Mirror Node runtime verification, chain-bound payment ID, review screen |
+| Merchant or amount tampering | Funds routed incorrectly | Payment ID binds chain ID, contract, nonce, merchant, amount, and expiry; exact tinybar arithmetic; final review |
+| Replay or duplicate submission | Repeated payment | Unique nonce and payment ID, on-chain duplicate rejection, local single-flight submission, reconciliation after restart |
+| False success | User or merchant treats a failed payment as final | Success only after consensus receipt or Mirror Node `SUCCESS`; pending and failed states remain distinct |
+| Key disclosure | Irrecoverable loss of funds | Secure storage, no secret logs, no operator key in bundle, local-only signing, redacted diagnostics, backup education |
+| Malicious or mismatched Mirror Node | Incorrect account, status, or contract data | Official network-bound endpoint in the initial pilot, HTTPS, response bounds, exact integer preservation, receipt/runtime checks |
+| Compromised merchant service | Fraudulent requests or availability loss | HTTPS, authentication, rate limits, persistence, idempotency, short expiry, no signing key in the service, health monitoring |
+| Dependency or supply-chain compromise | Key theft or manipulated transactions | Exact lockfile, reachability review, SBOM, secret scan, reproducible build, independent review |
+| Lost device or recovery phrase | Permanent user loss | Explicit backup verification, secure wipe, recovery test on a clean device, clear non-custodial support boundary |
+| Compromised release/deployment account | Malicious app or contract release | Human-controlled keys, least privilege, protected signing storage, two-person release review where possible, recorded artifact hashes |
+| Unbounded real-fund exposure | Large pilot loss | Human-approved per-payment and aggregate caps, limited cohort, canary transactions, staged rollout |
+
+## Fail-closed invariants
+
+- Mainnet cannot activate from an in-app switch.
+- `EXPO_PUBLIC_HEDERA_NETWORK=mainnet` is insufficient without the explicit global Mainnet flag and matching build profile.
+- A Mainnet build is invalid without a human-approved transfer cap, verified contract ID, and pinned runtime hash.
+- Payment requests for another network are rejected before review or signing.
+- HashScan and Mirror Node URLs must match the configured network.
+- Operator, faucet, deployment, merchant, and user private keys are never public build variables.
+- A timeout, crash, unknown result, or unavailable Mirror Node never becomes a successful payment.
+
+## Open design risks
+
+- Mainnet account onboarding is not selected. Existing wallet derivation is Ed25519; ECDSA alias-based auto-account creation requires an explicit migration decision.
+- The current merchant demo is local and is not a production service.
+- The contract and mobile key lifecycle have not received independent production security review.
+- Release signing, hosted monitoring, legal review, support ownership, and incident ownership are not yet established.
+- Mainnet limits and the pilot cohort have not been approved by Opago.
+
+These risks are release blockers, not documentation-only follow-ups.

@@ -199,7 +199,9 @@ export default function HomeScreen() {
       } catch (cause) {
         remoteErrors.push(
           'Hedera: ' +
-            (cause instanceof Error ? cause.message : 'Testnet data could not be loaded.'),
+            (cause instanceof Error
+              ? cause.message
+              : 'Hedera ' + appConfig.hederaNetwork + ' data could not be loaded.'),
         );
       }
 
@@ -412,7 +414,7 @@ export default function HomeScreen() {
   async function copyHederaAccountId() {
     if (!hederaAccount) return;
     await Clipboard.setStringAsync(hederaAccount.accountId);
-    Alert.alert('Copied', 'Hedera testnet account ID copied.');
+    Alert.alert('Copied', 'Hedera ' + appConfig.hederaNetwork + ' account ID copied.');
   }
 
   async function copySolanaAddress() {
@@ -526,7 +528,7 @@ export default function HomeScreen() {
               : !walletReady
                 ? 'Initializing wallet...'
                 : loading
-                  ? 'Loading testnet account...'
+                  ? 'Loading ' + appConfig.hederaNetwork + ' account...'
                   : 'Account not provisioned'
           }
           onPress={hederaAccount ? () => void copyHederaAccountId() : undefined}
@@ -578,7 +580,11 @@ function BalanceCard(props: {
   subtitle?: string;
   onPress?: () => void;
 }) {
-  const presentation = getWalletAssetPresentation(props.asset, appConfig.isMainnet);
+  const presentation = getWalletAssetPresentation(
+    props.asset,
+    appConfig.isMainnet,
+    appConfig.hederaNetwork,
+  );
 
   return (
     <TouchableOpacity

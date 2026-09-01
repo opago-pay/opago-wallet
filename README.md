@@ -10,6 +10,7 @@ The current release is intended for development and test networks. It is not an 
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
 | Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 complete; deployed, source-verified, and physically accepted |
+| Mainnet network isolation and release profiles | Hedera mainnet | Milestone 1 implementation complete; deployment and human release gates remain closed |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -17,7 +18,7 @@ The current release is intended for development and test networks. It is not an 
 | Payment-method negotiation | OpenCryptoPay-style local reference service | Prototype |
 | eID and Travel Rule hand-off | Local reference services | Demo only; not legal identity verification |
 
-Mainnet payments are disabled by default. Hedera remains testnet-only even when other mainnet features are explicitly enabled.
+Mainnet payments are disabled by default. Hedera Mainnet code paths require a matching Mainnet build profile, the global real-fund flag, a human-approved transfer cap, and pinned verified contract evidence. No Mainnet contract has been deployed and the default build remains testnet-only.
 
 ## Interface readiness
 
@@ -176,9 +177,240 @@ Remove-Item Env:HEDERA_MERCHANT_ID
 
 The output contains valid/replay, expired, altered-nonce, and wrong-amount deep links. The wallet accepts `opagowallet://hedera-checkout` links directly and applies the same parser, Mirror Node checks, confirmation screen, and contract call used by the QR scanner.
 
+## Hedera Mainnet implementation plan
+
+The target is a controlled, real-user Mainnet pilot in approximately seven to nine calendar weeks. Estimated technical effort is 32-52 person-days plus external audit, app-store, hosting, and decision lead time. A contract deployment alone is not considered a production release.
+
+The critical path is:
+
+`scope confirmation -> account model -> independent review -> Mainnet deployment -> signed release -> pilot payments -> submission evidence`
+
+### Responsibility boundary
+
+Codex owns repository-level technical delivery: architecture, code, tests, scripts, documentation, release checks, evidence validation, and step-by-step deployment guidance. Fabian and Opago retain every external authority: product and financial decisions, grant clarification, Mainnet funds and keys, auditors, hosting, legal review, app-store identity, real-user consent, real-fund authorization, video recording, and final submission.
+
+Mainnet private keys must never be sent through chat, committed to Git, stored in `EXPO_PUBLIC_*`, or embedded in an app bundle. Codex prepares deterministic commands and validation; the human key holder signs locally.
+
+### Mainnet Milestone 0 - scope and launch policy
+
+**Estimate: 1-3 days. Status: technical package complete; human confirmations pending.**
+
+Codex delivery:
+
+- version the product classification, Hedera service matrix, pilot scope, ownership boundary, and release blockers in [MAINNET_SCOPE.md](MAINNET_SCOPE.md);
+- maintain the Mainnet trust boundaries, abuse cases, controls, and fail-closed invariants in [MAINNET_THREAT_MODEL.md](MAINNET_THREAT_MODEL.md);
+- provide a ready-to-send Guardian clarification request in [THRIVE_MAINNET_CLARIFICATION.md](THRIVE_MAINNET_CLARIFICATION.md);
+- define an auditable Mainnet definition of done.
+
+Human/Opago delivery:
+
+- obtain written confirmation that Opago is a payment/wallet project rather than an AI, RWA, or DeFi-liquidity project;
+- confirm that HSCS, native HBAR transfers, and Mirror Node satisfy the product's required-service scope and that HTS/HCS are not mandatory without a product requirement;
+- select controlled beta versus unrestricted public launch and Android distribution channel;
+- approve pilot user count, per-payment cap, aggregate HBAR exposure, account funding policy, support owner, incident owner, and reviewers.
+
+Acceptance gate: the technical scope documents are versioned, and every human decision `M0-D1` through `M0-D7` in [MAINNET_SCOPE.md](MAINNET_SCOPE.md) has a recorded owner and answer.
+
+### Mainnet Milestone 1 - network isolation and release profiles
+
+**Estimate: 3-5 days. Status: technical implementation complete and verified.**
+
+Codex delivery:
+
+- support `testnet | mainnet` as build-time Hedera networks while keeping testnet as the default;
+- require the global real-fund flag and a matching Hedera build profile before Mainnet can initialize;
+- bind chain ID `296` to testnet and `295` to Mainnet payment-ID derivation;
+- bind official Mirror Node and HashScan routes to the selected network;
+- reject cross-network QR/deep-link requests before review or signing;
+- require a human-approved Mainnet transfer cap, verified contract ID, and pinned runtime SHA-256;
+- provide separate EAS testnet, Mainnet-candidate, and production profiles;
+- reserve an honest `not-deployed` Mainnet evidence manifest without inventing an address or transaction;
+- show the active Hedera network throughout asset, send, review, success, receive, account, and settings views;
+- cover valid profiles and partial/mismatched activation with isolated tests.
+
+Human/Opago delivery:
+
+- choose the final Mainnet transfer and aggregate pilot caps;
+- approve the Mainnet merchant identity, Android package/version policy, and pilot allowlist policy;
+- configure public production metadata only after the audited contract deployment.
+
+Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 93 application tests, and 9 contract tests.
+
+### Mainnet Milestone 2 - account lifecycle and recovery
+
+**Estimate: 5-10 days. Status: device-independent foundation implemented; onboarding decision and physical acceptance pending.**
+
+Codex delivery:
+
+- compare the existing Ed25519 lifecycle with ECDSA alias-based Mainnet account creation and record an architecture decision;
+- version Hedera key derivation and preserve explicit recovery compatibility;
+- add deterministic vectors, account discovery, account/network persistence, clean-device recovery, and unfunded-account UI;
+- implement the selected account creation or existing-account onboarding path without an operator secret in the app.
+
+Implemented without a physical device:
+
+- [HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md](HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md) records the proposed sponsor-created Ed25519 account model, considered alternatives, recovery invariants, and human decisions;
+- derivation version `1`, algorithm `ED25519`, and path `m/44'/3030'/0'/0'` are immutable exported metadata, and unknown versions fail closed;
+- network-separated account bindings cache only public metadata and are revalidated against the selected Mirror Node and derived key before use;
+- malformed, stale, cross-network, or different-wallet bindings are discarded, and wallet wipe removes both network bindings;
+- deterministic account-binding and recovery tests run without Mainnet funds or an Android device.
+
+Physical Android regression acceptance was completed on 31 August 2026 and is recorded in [MAINNET_ANDROID_BASELINE_ACCEPTANCE.md](MAINNET_ANDROID_BASELINE_ACCEPTANCE.md). It verifies cold-start account reattachment, wrong-network rejection, a confirmed direct Hedera testnet transfer, HashScan navigation, and post-payment reconciliation. This is a Testnet safety baseline only; it does not complete Mainnet onboarding or authorize real funds.
+
+Human/Opago delivery:
+
+- choose existing-account import, sponsored account creation, or first-deposit auto-creation;
+- create and fund a separate Mainnet treasury/sponsor account and merchant account;
+- approve sponsorship, abuse prevention, initial funding, and user-support rules.
+
+Acceptance gate: a fresh wallet can obtain or connect to a Mainnet account, receive HBAR, and recover the same account on a clean device using only its protected recovery material.
+
+### Mainnet Milestone 3 - contract hardening and independent review
+
+**Engineering estimate: 5-8 days. External lead time: typically 2-4 weeks. Status: planned.**
+
+Codex delivery:
+
+- extend unit, fuzz, invariant, replay, duplicate, expiry, wrong-network, forwarding-failure, reentrancy, and unusual-merchant tests;
+- add static analysis, exact compiler locking, deterministic compiler input, bytecode/runtime hashes, fee/gas review, and an audit package;
+- remediate findings and rerun the complete regression suite.
+
+Human/Opago delivery:
+
+- commission an independent smart-contract and mobile/key-lifecycle review;
+- provide the reviewer access and resolve or formally reject findings;
+- approve the exact final artifact only when no critical or high finding remains open.
+
+Acceptance gate: the reviewed source, compiler metadata, artifact, tests, and approved audit result identify one exact deployable bytecode.
+
+### Mainnet Milestone 4 - production merchant service
+
+**Estimate: 5-8 days. Status: planned.**
+
+Codex delivery:
+
+- convert the local checkout demo into a deployable HTTPS service with persistent payment state;
+- enforce unique payment IDs/nonces, short expiry, exact tinybar amounts, Mainnet contract binding, idempotent status checks, rate limits, retries, timeouts, health checks, and redacted logs;
+- expose pending, confirmed, expired, and failed states without any signing key in the browser or service.
+
+Human/Opago delivery:
+
+- provide a domain, hosting account, public merchant identity, retention decision, and approved privacy/legal text;
+- authorize production deployment and own service availability.
+
+Acceptance gate: an external user can create, scan, and verify a Mainnet request without access to Fabian's development machine.
+
+### Mainnet Milestone 5 - signed Android release
+
+**Estimate: 4-7 days. Status: planned.**
+
+Codex delivery:
+
+- separate development-client behavior from the release build and remove debug/sensitive logging;
+- produce reproducible signed-build inputs, versioning, Mainnet configuration checks, user-facing network/merchant/amount/fee review, payment caps, explorer checks, lifecycle tests, store copy, and release notes;
+- verify installation, launch, update, backgrounding, and restart without Metro or ADB.
+
+Human/Opago delivery:
+
+- own the Play Console or approved alternative distribution channel, upload key/keystore, Play App Signing, privacy policy, support URL, screenshots, branding approval, tester list, and publication action.
+
+Acceptance gate: a new Android device can install and use the signed release without a development computer.
+
+### Mainnet Milestone 6 - security, reliability, and operations
+
+**Estimate: 5-8 days. Status: planned.**
+
+Codex delivery:
+
+- reassess reachable dependency findings, update safely, generate an SBOM, scan secrets and bundles, and verify log redaction;
+- preserve pending payments across crashes, reconcile only to consensus-confirmed success, prevent double submission, and handle Mirror Node outages and timeouts;
+- provide health checks, incident, release, rollback, recovery, and support runbooks.
+
+Human/Opago delivery:
+
+- appoint support and incident owners, select monitoring, approve data retention and privacy behavior, obtain legal/regulatory review, and define the non-custodial support boundary for lost recovery phrases.
+
+Acceptance gate: operational ownership and failure handling are documented, tested, and capable of keeping unknown or failed transactions out of the successful state.
+
+### Mainnet Milestone 7 - deployment and canary
+
+**Estimate: 2-4 days. Status: planned.**
+
+Codex delivery:
+
+- finalize guarded Mainnet deployment and verification scripts;
+- validate network, operator ID, audited artifact, compiler metadata, fee caps, transaction, runtime, Sourcify status, and HashScan evidence;
+- populate `deployments/hedera-mainnet.json` only from verified public results and bind the release build to that exact contract.
+
+Human/Opago delivery:
+
+- fund and control the deployment account, approve the exact deployment, enter the key locally, authorize real fees, and approve the resulting contract identity.
+
+Acceptance gate: the Mainnet contract is source-verified, its runtime matches the audited artifact, and the signed app is pinned to it.
+
+### Mainnet Milestone 8 - real-user pilot
+
+**Estimate: 4-6 days. Status: planned.**
+
+Codex delivery:
+
+- provide and execute the acceptance matrix, inspect public transactions and redacted diagnostics, fix defects, rerun regressions, and prepare an anonymized technical report.
+
+Human/Opago delivery:
+
+- recruit three to five informed pilot users, approve the HBAR budget, obtain feedback consent, execute real-fund approvals, observe users, and collect feedback.
+
+Required scenarios include receive, direct send, checkout, wrong amount, expired QR, duplicate/replay, disconnect before and after submission, process restart while pending, clean-device recovery, wrong network/contract, and HashScan/Mirror Node evidence.
+
+Acceptance gate: at least one real-user Mainnet checkout succeeds; every negative or unknown case remains failed/pending and never becomes a false success.
+
+### Mainnet Milestone 9 - submission evidence
+
+**Estimate: 2-3 days. Status: planned.**
+
+Codex delivery:
+
+- produce the <=1,000-character summary, architecture, cleaned repository, release tag, commit/build/artifact hashes, contract and transaction links, installation steps, demo script, feedback summary, and final link checker.
+
+Human/Opago delivery:
+
+- grant repository access, record and host the 1-5 minute video, approve user feedback, submit the milestone form, and answer Guardian questions.
+
+The video must show the signed app, visible Mainnet status, real balance, public merchant page, QR request, final review, signing, confirmed success, HashScan transaction and contract, and wallet history.
+
+### Proposed schedule
+
+| Week | Technical critical path | Human/external parallel path |
+| --- | --- | --- |
+| 1 | Scope package and Mainnet network isolation | Thrive clarification and auditor outreach |
+| 2 | Account architecture and recovery | Mainnet accounts, pilot limits, onboarding decision |
+| 3 | Contract hardening and audit package | Commission audit and select hosting |
+| 4 | Merchant service and Android release | Domain, Play Console, legal/privacy material |
+| 5 | Audit remediation, security, and stability | Recruit pilot users |
+| 6 | Signed candidate and deployment rehearsal | Fund deployment account and approve artifact |
+| 7 | Mainnet deployment and canary | Authorize real-fund transactions |
+| 8 | User pilot, video, and evidence | Record and submit |
+| 9 | Contingency | Guardian follow-up |
+
+### Absolute Mainnet go/no-go gates
+
+No Mainnet deployment or real-user release is allowed while any of the following remains true:
+
+- grant classification or required-service scope is unresolved;
+- account and recovery architecture is not approved;
+- a private key could enter the bundle, repository, diagnostics, or public environment;
+- a reachable critical/high security issue or independent-review blocker is open;
+- the contract artifact is not deterministic and runtime-pinned;
+- the release depends on Metro, ADB, or a development client;
+- clean-device recovery has not passed;
+- Mainnet payment and aggregate pilot caps are absent;
+- the merchant service is local-only;
+- a failed, unknown, or timed-out transaction can be shown as successful;
+- support and incident owners are not assigned.
+
 ## Hedera implementation
 
-The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.84.0` directly in the React Native client. Private keys remain in runtime memory while account data and transaction history come from the Hedera testnet Mirror Node.
+The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.84.0` directly in the React Native client. Private keys remain in runtime memory while account data and transaction history come from the official Mirror Node selected and locked by the build profile. Testnet remains the safe default; Mainnet requires the complete release evidence tuple described above.
 
 The app enforces an app-level limit of at most `1 HBAR` per test transaction by default. Account provisioning remains isolated from the app so no operator credential enters the client bundle.
 
@@ -401,12 +633,12 @@ If the public key already controls one testnet account, the script reports that 
 
 Relevant implementation files:
 
-- [`lib/hedera/config.ts`](lib/hedera/config.ts) - fixed testnet policy, account validation, and tinybar constants;
+- [`lib/hedera/config.ts`](lib/hedera/config.ts) - build-bound network policy, official Mirror Node validation, account validation, chain IDs, and tinybar constants;
 - [`lib/hedera/keys.ts`](lib/hedera/keys.ts) - deterministic Hedera Ed25519 derivation;
 - [`lib/hedera/account.ts`](lib/hedera/account.ts) - account snapshots, exact balance, history, and status mapping;
 - [`lib/hedera/payments.ts`](lib/hedera/payments.ts) - receive requests, exact amounts, signing, and receipt checks;
 - [`lib/hedera/mirror.ts`](lib/hedera/mirror.ts) - bounded official Mirror Node REST access with int64 preservation;
-- [`lib/hedera/explorer.ts`](lib/hedera/explorer.ts) - validated Hedera testnet HashScan links;
+- [`lib/hedera/explorer.ts`](lib/hedera/explorer.ts) - validated network-bound HashScan links;
 - [`scripts/hedera-provision-testnet.cjs`](scripts/hedera-provision-testnet.cjs) - local-only account creation and funding;
 - [`tests/hedera.test.cjs`](tests/hedera.test.cjs) - key, exact amount, Mirror Node, history, status, QR, and secret-boundary tests.
 
@@ -419,9 +651,10 @@ Relevant implementation files:
 | `EXPO_PUBLIC_USDC_MINT` | Official Circle mint for the selected cluster | Overrides the reviewed six-decimal USDC mint when an explicitly reviewed deployment requires it |
 | `EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_SOL` | `1` | Upper bound for one app-initiated devnet SOL transfer |
 | `EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_USDC` | `100` | Upper bound for one app-initiated devnet USDC transfer |
-| `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Hedera wallet support accepts only `testnet` |
-| `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Hedera testnet Mirror Node | Resolves the account for the derived public key |
-| `EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR` | `1` | Upper bound for a single app-initiated testnet transfer |
+| `EXPO_PUBLIC_HEDERA_BUILD_PROFILE` | `testnet` | Must match the Hedera network; separates safe test builds from Mainnet releases |
+| `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Selects `testnet` or `mainnet` at build time; no in-app switch exists |
+| `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Official Mirror Node for selected network | Resolves accounts, balances, history, receipts, and contract runtime; wrong-network hosts are rejected |
+| `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR` | `1` on testnet; required on Mainnet | Human-approved upper bound for one app-initiated HBAR transfer |
 | `EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID` | `0.0.9972670` in `.env.example` | Enables only the deployed, verified Phase 3 testnet checkout contract |
 | `EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256` | verified hash in `.env.example` | Pins the exact deployed Phase 3 runtime bytecode in the app build |
 | `EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS` | `100` | Additional ceiling used by Lightning fee validation |
@@ -436,13 +669,19 @@ Mainnet enablement is a build-time release decision, not an in-app network switc
 
 ```dotenv
 EXPO_PUBLIC_ENABLE_MAINNET=true
+EXPO_PUBLIC_HEDERA_BUILD_PROFILE=mainnet
+EXPO_PUBLIC_HEDERA_NETWORK=mainnet
+EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL=https://mainnet.mirrornode.hedera.com
+EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=<human-approved-pilot-cap>
+EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=<verified-mainnet-contract-id>
+EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=<pinned-mainnet-runtime-sha256>
 EXPO_PUBLIC_SOLANA_RPC_URL=https://your-reviewed-mainnet-rpc.example
 EXPO_PUBLIC_EID_BACKEND_URL=https://your-reviewed-eid-backend.example
 ```
 
-Before any release, replace public development infrastructure, validate the complete Spark and Atomiq deployment, repeat native device and failure-path testing, reassess the dependency tree, establish monitored RPC and backend services, and obtain independent security, privacy, and regulatory reviews.
+Hedera Mainnet requires every listed Hedera value. Partial activation, a mismatched profile, a wrong-network Mirror Node, a missing transfer cap, or missing contract evidence fails during application configuration. The `mainnet-candidate` and `production` EAS profiles set only non-secret network identity; the approved cap and final deployment evidence must be configured in the protected EAS production environment after audit and deployment.
 
-Hedera mainnet is not enabled by this flag. The wallet rejects any Hedera network other than testnet.
+Before any release, replace public development infrastructure, validate the complete Spark and Atomiq deployment, repeat native device and failure-path testing, reassess the dependency tree, establish monitored RPC and backend services, and obtain independent security, privacy, and regulatory reviews. Network support in source code is not authorization to use real funds; the go/no-go gates in the Mainnet plan remain binding.
 
 ## Reference services
 

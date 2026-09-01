@@ -26,6 +26,10 @@ test('defines presentation metadata for every wallet asset and development netwo
   assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'MAINNET');
   assert.equal(getWalletAssetPresentation('solana', true).networkBadge, 'MAINNET');
   assert.equal(getWalletAssetPresentation('hedera', true).networkBadge, 'TESTNET');
+  assert.equal(
+    getWalletAssetPresentation('hedera', true, 'mainnet').networkBadge,
+    'MAINNET',
+  );
   assert.equal(getWalletAssetPresentation('usdc', false).name, 'USDC');
 });
 

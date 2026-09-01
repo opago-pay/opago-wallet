@@ -1,0 +1,16 @@
+{
+  "network": "mainnet",
+  "chainId": 295,
+  "status": "not-deployed",
+  "contractId": null,
+  "evmAddress": null,
+  "deploymentTransactionId": null,
+  "runtimeBytecodeSha256": null,
+  "sourceVerification": {
+    "provider": "Sourcify",
+    "status": "pending",
+    "verifiedAt": null
+  },
+  "hashscanContractUrl": null,
+  "note": "Milestone 1 reserves the honest Mainnet evidence shape. Final values are written only after audit approval and the Milestone 7 deployment."
+}

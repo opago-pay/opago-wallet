@@ -1,5 +1,4 @@
 import {
-  Client,
   ContractExecuteTransaction,
   ContractFunctionParameters,
   Hbar,
@@ -10,7 +9,11 @@ import { sha256 } from '@noble/hashes/sha256';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { appConfig } from '../config';
 import {
-  assertHederaTestnet,
+  assertHederaNetwork,
+  createHederaClient,
+  HEDERA_CHAIN_ID,
+  HEDERA_NETWORK,
+  HEDERA_NETWORK_LABEL,
   HEDERA_SDK_GRPC_DEADLINE_MS,
   HEDERA_SDK_MAX_ATTEMPTS,
   HEDERA_SDK_REQUEST_TIMEOUT_MS,
@@ -26,7 +29,7 @@ import {
   getMirrorContractById,
 } from './mirror';
 import {
-  assertHederaTestTransferAmount,
+  assertHederaTransferAmount,
   formatTinybars,
   parseHbarToTinybars,
   type HederaTransferResult,
@@ -42,7 +45,6 @@ const PAYMENT_DOMAIN = hexToBytes(
   '2cbcc7376617198b16e5d1ca7f3f2c64fb4cefed7bf20cd26d6e5a1af0230d9c',
   'Checkout domain',
 );
-const HEDERA_TESTNET_CHAIN_ID = 296n;
 const REQUIRED_PARAMETERS = [
   'network',
   'contractId',
@@ -59,7 +61,7 @@ export const MIN_CHECKOUT_REMAINING_SECONDS = 10;
 
 export interface HederaCheckoutRequest {
   kind: 'checkout';
-  network: 'testnet';
+  network: typeof HEDERA_NETWORK;
   contractId: string;
   merchantAccountId: string;
   merchantEvmAddress: string;
@@ -74,7 +76,9 @@ function configuredContractId(): string {
   const value = appConfig.hederaCheckoutContractId.trim();
   if (!CONTRACT_ID_PATTERN.test(value)) {
     throw new Error(
-      'Hedera checkout is not configured. Set a verified testnet contract ID at build time.',
+      'Hedera checkout is not configured. Set a verified ' +
+        HEDERA_NETWORK +
+        ' contract ID at build time.',
     );
   }
   return value;
@@ -160,7 +164,7 @@ export function computeHederaCheckoutPaymentId(input: {
 
   const packed = concatenate([
     PAYMENT_DOMAIN,
-    unsignedBytes(HEDERA_TESTNET_CHAIN_ID, 32, 'Hedera chain ID'),
+    unsignedBytes(HEDERA_CHAIN_ID, 32, 'Hedera chain ID'),
     hexToBytes(contractIdToEvmAddress(input.contractId), 'Checkout contract address'),
     hexToBytes(nonce, 'Checkout request nonce'),
     hexToBytes(merchant, 'Merchant EVM address'),
@@ -200,12 +204,14 @@ export function parseHederaCheckoutRequest(
     }
   }
 
-  if (requiredParameter(url, 'network').toLowerCase() !== 'testnet') {
-    throw new Error('Only Hedera testnet checkout requests are accepted.');
+  if (requiredParameter(url, 'network').toLowerCase() !== HEDERA_NETWORK) {
+    throw new Error('Only Hedera ' + HEDERA_NETWORK + ' checkout requests are accepted.');
   }
   const contractId = requiredParameter(url, 'contractId');
   if (!CONTRACT_ID_PATTERN.test(contractId) || contractId !== configuredContractId()) {
-    throw new Error('Checkout contract does not match the configured Hedera testnet contract.');
+    throw new Error(
+      'Checkout contract does not match the configured Hedera ' + HEDERA_NETWORK + ' contract.',
+    );
   }
   const merchantAccountId = parseHederaAccountId(
     requiredParameter(url, 'merchant'),
@@ -226,7 +232,7 @@ export function parseHederaCheckoutRequest(
   if (!BYTES32_PATTERN.test(requestNonce) || requestNonce === '0x' + '0'.repeat(64)) {
     throw new Error('Checkout request nonce is invalid.');
   }
-  const amountTinybars = assertHederaTestTransferAmount(
+  const amountTinybars = assertHederaTransferAmount(
     parseHbarToTinybars(requiredParameter(url, 'amount')),
   );
   const expiresRaw = requiredParameter(url, 'expiresAt');
@@ -256,7 +262,7 @@ export function parseHederaCheckoutRequest(
 
   return {
     kind: 'checkout',
-    network: 'testnet',
+    network: HEDERA_NETWORK,
     contractId,
     merchantAccountId,
     merchantEvmAddress,
@@ -271,7 +277,7 @@ export function parseHederaCheckoutRequest(
 export async function verifyHederaCheckoutRequest(
   request: HederaCheckoutRequest,
 ): Promise<void> {
-  assertHederaTestnet();
+  assertHederaNetwork();
   parseHederaCheckoutRequest(buildHederaCheckoutRequest(request));
   const [merchant, contract] = await Promise.all([
     getMirrorAccountById(request.merchantAccountId),
@@ -284,7 +290,7 @@ export async function verifyHederaCheckoutRequest(
     merchant.evm_address?.toLowerCase().replace(/^0x/, '') !==
       request.merchantEvmAddress.slice(2)
   ) {
-    throw new Error('Merchant account and EVM address do not match Hedera testnet.');
+    throw new Error('Merchant account and EVM address do not match ' + HEDERA_NETWORK_LABEL + '.');
   }
   if (
     !contract ||
@@ -295,7 +301,7 @@ export async function verifyHederaCheckoutRequest(
     !contract.runtime_bytecode ||
     contract.runtime_bytecode === '0x'
   ) {
-    throw new Error('Configured checkout contract is not active on Hedera testnet.');
+    throw new Error('Configured checkout contract is not active on ' + HEDERA_NETWORK_LABEL + '.');
   }
   const runtimeHash = bytesToHex(
     sha256(hexToBytes(contract.runtime_bytecode, 'Mirror Node runtime bytecode')),
@@ -307,7 +313,7 @@ export async function verifyHederaCheckoutRequest(
 
 export function buildHederaCheckoutRequest(request: HederaCheckoutRequest): string {
   const params = new URLSearchParams({
-    network: 'testnet',
+    network: HEDERA_NETWORK,
     contractId: request.contractId,
     merchant: request.merchantAccountId,
     merchantEvmAddress: request.merchantEvmAddress,
@@ -328,7 +334,7 @@ export function buildHederaCheckoutTransaction(
   request: HederaCheckoutRequest,
 ): ContractExecuteTransaction {
   parseHederaCheckoutRequest(buildHederaCheckoutRequest(request));
-  const amountTinybars = assertHederaTestTransferAmount(request.amountTinybars);
+  const amountTinybars = assertHederaTransferAmount(request.amountTinybars);
   const parameters = new ContractFunctionParameters()
     .addBytes32(bytes32(request.paymentId, 'Checkout payment ID'))
     .addBytes32(bytes32(request.requestNonce, 'Checkout request nonce'))
@@ -340,7 +346,7 @@ export function buildHederaCheckoutTransaction(
     .setGas(300_000)
     .setPayableAmount(Hbar.fromTinybars(amountTinybars.toString()))
     .setFunction('pay', parameters)
-    .setTransactionMemo('Opago Phase 3 HBAR checkout')
+    .setTransactionMemo('Opago HBAR ' + HEDERA_NETWORK + ' checkout')
     .setMaxTransactionFee(
       Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
     );
@@ -357,8 +363,8 @@ export async function sendHederaCheckoutPayment(input: {
   if (sourceAccountId === input.request.merchantAccountId) {
     throw new Error('Source and merchant Hedera accounts must be different.');
   }
-  const amountTinybars = assertHederaTestTransferAmount(input.request.amountTinybars);
-  const client = Client.forTestnet();
+  const amountTinybars = assertHederaTransferAmount(input.request.amountTinybars);
+  const client = createHederaClient();
   client.setOperator(sourceAccountId, input.privateKey);
   client.setDefaultMaxTransactionFee(
     Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),

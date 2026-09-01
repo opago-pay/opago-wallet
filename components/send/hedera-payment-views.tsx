@@ -1,6 +1,11 @@
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { HederaTransferResult } from '@/lib/hedera/payments';
+import {
+  HEDERA_NETWORK,
+  HEDERA_NETWORK_BADGE,
+  HEDERA_NETWORK_LABEL,
+} from '@/lib/hedera/config';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PendingHederaPayment } from './types';
 
@@ -17,8 +22,12 @@ export function HederaReviewView(props: {
       contentContainerStyle={[styles.formContent, styles.centered]}
     >
       <View style={[styles.testnetBanner, { width: '100%' }]}>
-        <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
-        <Text style={styles.testnetText}>Review every detail before signing.</Text>
+        <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
+        <Text style={styles.testnetText}>
+          {HEDERA_NETWORK === 'mainnet'
+            ? 'Real HBAR. This payment cannot be reversed.'
+            : 'Review every detail before signing.'}
+        </Text>
       </View>
       <Text style={styles.quoteTitle}>Confirm HBAR payment</Text>
       <View style={styles.quoteBox}>
@@ -36,7 +45,7 @@ export function HederaReviewView(props: {
         </View>
         <View style={styles.quoteRow}>
           <Text style={styles.quoteLabel}>Network</Text>
-          <Text style={styles.quoteValue}>Hedera testnet</Text>
+          <Text style={styles.quoteValue}>{HEDERA_NETWORK_LABEL}</Text>
         </View>
         <View style={styles.quoteRow}>
           <Text style={styles.quoteLabel}>Route</Text>
@@ -69,7 +78,9 @@ export function HederaReviewView(props: {
         {props.loading ? (
           <ActivityIndicator color="#111" />
         ) : (
-          <Text style={styles.buttonText}>Sign and send test HBAR</Text>
+          <Text style={styles.buttonText}>
+            Sign and send {HEDERA_NETWORK === 'mainnet' ? 'HBAR' : 'test HBAR'}
+          </Text>
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -96,14 +107,14 @@ export function HederaSuccessView(props: {
       contentContainerStyle={[styles.formContent, styles.centered]}
     >
       <View style={[styles.testnetBanner, { width: '100%' }]}>
-        <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
+        <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
       </View>
       <View style={styles.successCircle}>
         <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
       </View>
       <Text style={styles.successTitle}>HBAR sent</Text>
       <Text style={styles.subtitle}>
-        {props.result.amountHbar} HBAR was confirmed on Hedera testnet.
+        {props.result.amountHbar} HBAR was confirmed on {HEDERA_NETWORK_LABEL}.
       </Text>
       <View style={styles.proofBox}>
         <Text style={styles.label}>Transaction ID</Text>

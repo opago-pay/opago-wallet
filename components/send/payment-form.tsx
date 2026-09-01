@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { appConfig } from '@/lib/config';
 import { formatTinybars } from '@/lib/hedera/payments';
+import { HEDERA_NETWORK, HEDERA_NETWORK_BADGE } from '@/lib/hedera/config';
 import { formatSolanaAssetAmount } from '@/lib/solana/amounts';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
@@ -85,8 +86,12 @@ export function PaymentForm(props: {
       )}
       {isHedera && (
         <View style={styles.testnetBanner}>
-          <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
-          <Text style={styles.testnetText}>Test HBAR only. These funds have no real value.</Text>
+          <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
+          <Text style={styles.testnetText}>
+            {HEDERA_NETWORK === 'mainnet'
+              ? 'Real HBAR. Verify the recipient and amount before continuing.'
+              : 'Test HBAR only. These funds have no real value.'}
+          </Text>
         </View>
       )}
       {props.balanceError && (
@@ -170,7 +175,11 @@ export function PaymentForm(props: {
         <Text style={styles.label}>Pay from</Text>
         <View style={styles.assetGrid}>
           {sources.map(item => {
-            const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet);
+            const presentation = getWalletAssetPresentation(
+              item.asset,
+              appConfig.isMainnet,
+              appConfig.hederaNetwork,
+            );
             const selected = props.source === item.source;
             return (
               <TouchableOpacity

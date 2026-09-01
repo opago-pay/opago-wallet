@@ -275,9 +275,13 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hedera testnet provisioning key</Text>
+        <Text style={styles.sectionTitle}>
+          Hedera {appConfig.hederaNetwork} public key
+        </Text>
         <Text style={styles.sectionSubtitle}>
-          This public key is safe to copy into the local provisioning script. It is not a private key.
+          {appConfig.hederaNetwork === 'testnet'
+            ? 'This public key is safe to copy into the local provisioning script. It is not a private key.'
+            : 'This public key identifies the wallet account. It is not a private key and cannot authorize payments.'}
         </Text>
         <TouchableOpacity
           style={styles.mnemonicBox}

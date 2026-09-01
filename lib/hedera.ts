@@ -1,4 +1,5 @@
 export * from './hedera/account';
+export * from './hedera/account-binding';
 export * from './hedera/config';
 export * from './hedera/checkout';
 export * from './hedera/explorer';

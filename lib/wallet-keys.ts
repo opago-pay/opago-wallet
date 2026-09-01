@@ -4,10 +4,19 @@ import { derivePath } from 'ed25519-hd-key';
 import {
   deriveHederaPrivateKey,
   HEDERA_DERIVATION_PATH,
+  HEDERA_KEY_ALGORITHM,
+  HEDERA_KEY_DERIVATION,
+  HEDERA_KEY_DERIVATION_VERSION,
 } from './hedera/keys';
 
 export const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
-export { deriveHederaPrivateKey, HEDERA_DERIVATION_PATH };
+export {
+  deriveHederaPrivateKey,
+  HEDERA_DERIVATION_PATH,
+  HEDERA_KEY_ALGORITHM,
+  HEDERA_KEY_DERIVATION,
+  HEDERA_KEY_DERIVATION_VERSION,
+};
 
 function normalizeMnemonic(mnemonic: string): string {
   const normalized = mnemonic.trim().toLowerCase().replace(/\s+/g, ' ');

@@ -1,5 +1,5 @@
 import type { PublicKey } from '@hiero-ledger/sdk';
-import { parseHederaAccountId } from './config';
+import { HEDERA_NETWORK, parseHederaAccountId } from './config';
 import {
   getHederaAccountExplorerUrl,
   getHederaTransactionExplorerUrl,
@@ -88,7 +88,7 @@ function snapshotFromMirror(
   };
 }
 
-export async function findHederaTestnetAccount(
+export async function findHederaAccount(
   publicKey: string | PublicKey,
 ): Promise<HederaAccountSnapshot | null> {
   const normalizedPublicKey = normalizeHederaPublicKey(publicKey);
@@ -106,11 +106,14 @@ export async function findHederaTestnetAccount(
   if (matches.length === 0) return null;
   if (matches.length > 1) {
     throw new Error(
-      'More than one Hedera testnet account uses this key. A unique account is required.',
+      'More than one Hedera ' + HEDERA_NETWORK + ' account uses this key. A unique account is required.',
     );
   }
   return snapshotFromMirror(matches[0], normalizedPublicKey);
 }
+
+// Backward-compatible export for provisioning and Phase 1 acceptance tooling.
+export const findHederaTestnetAccount = findHederaAccount;
 
 export async function loadHederaAccount(
   accountId: string,
@@ -126,7 +129,7 @@ export async function loadHederaAccount(
 
 export async function loadHederaBalanceTinybars(accountId: string): Promise<bigint> {
   const account = await loadHederaAccount(accountId);
-  if (!account) throw new Error('Hedera testnet account was not found.');
+  if (!account) throw new Error('Hedera ' + HEDERA_NETWORK + ' account was not found.');
   return account.balanceTinybars;
 }
 

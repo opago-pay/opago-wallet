@@ -1,4 +1,8 @@
-import { getHederaMirrorNodeBaseUrl, parseHederaAccountId } from './config';
+import {
+  getHederaMirrorNodeBaseUrl,
+  HEDERA_NETWORK_LABEL,
+  parseHederaAccountId,
+} from './config';
 import { retryWithBackoff } from '../retry';
 
 export interface MirrorAccountRecord {
@@ -124,7 +128,7 @@ export async function findMirrorAccountsByPublicKey(
   url.searchParams.set('limit', '100');
   const response = await fetchMirrorJson<MirrorAccountsResponse>(
     url,
-    'Hedera testnet account lookup',
+    HEDERA_NETWORK_LABEL + ' account lookup',
   );
   return response?.accounts || [];
 }
@@ -136,7 +140,7 @@ export async function getMirrorAccountById(
   const url = mirrorUrl('/api/v1/accounts/' + encodeURIComponent(accountId));
   return fetchMirrorJson<MirrorAccountRecord>(
     url,
-    'Hedera testnet account',
+    HEDERA_NETWORK_LABEL + ' account',
     true,
   );
 }
@@ -156,7 +160,7 @@ export async function listMirrorTransactions(
       url.searchParams.set('order', 'desc');
       const response = await fetchMirrorJson<MirrorTransactionsResponse>(
         url,
-        'Hedera testnet ' + transactionType.toLowerCase() + ' history',
+        HEDERA_NETWORK_LABEL + ' ' + transactionType.toLowerCase() + ' history',
       );
       return response?.transactions || [];
     }),
@@ -199,7 +203,7 @@ export async function getMirrorContractById(
   const url = mirrorUrl('/api/v1/contracts/' + encodeURIComponent(contractId));
   return fetchMirrorJson<MirrorContractRecord>(
     url,
-    'Hedera testnet checkout contract',
+    HEDERA_NETWORK_LABEL + ' checkout contract',
     true,
   );
 }
@@ -224,7 +228,7 @@ export async function getMirrorTransaction(
   const url = mirrorUrl('/api/v1/transactions/' + encodeURIComponent(mirrorId));
   const response = await fetchMirrorJson<MirrorTransactionsResponse>(
     url,
-    'Hedera testnet transaction status',
+    HEDERA_NETWORK_LABEL + ' transaction status',
     true,
   );
   return response?.transactions?.find(item => item.nonce === 0 || item.nonce == null) || null;

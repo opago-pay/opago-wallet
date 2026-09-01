@@ -34,7 +34,10 @@ import {
   SolanaReviewView,
   SolanaSuccessView,
 } from '@/components/send/solana-payment-views';
-import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '@/lib/hedera/config';
+import {
+  HEDERA_NETWORK_LABEL,
+  MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
+} from '@/lib/hedera/config';
 import {
   parseHederaCheckoutRequest,
   verifyHederaCheckoutRequest,
@@ -43,7 +46,7 @@ import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import {
   formatTinybars,
   parseHederaPaymentRequest,
-  parseHederaTestTransferTinybars,
+  parseHederaTransferTinybars,
   type HederaTransferResult,
 } from '@/lib/hedera/payments';
 import {
@@ -302,7 +305,7 @@ export default function SendScreen() {
         const checkoutRequest = parseHederaCheckoutRequest(raw);
         const directRequest = checkoutRequest ? null : parseHederaPaymentRequest(raw);
         const enteredAmount = amountInput.trim()
-          ? parseHederaTestTransferTinybars(amountInput)
+          ? parseHederaTransferTinybars(amountInput)
           : null;
         const requestedAmount = checkoutRequest?.amountTinybars ?? directRequest?.amountTinybars;
         if (
@@ -319,7 +322,7 @@ export default function SendScreen() {
         }
         const sourceAccount = hederaAccount || await refreshHederaAccount();
         if (!sourceAccount) {
-          throw new Error('No Hedera testnet account exists for this recovery phrase.');
+          throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this recovery phrase.');
         }
         if (
           amountTinybars + MAX_HEDERA_TRANSACTION_FEE_TINYBARS >

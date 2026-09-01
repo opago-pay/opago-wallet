@@ -3,6 +3,13 @@ import { PrivateKey, PublicKey } from '@hiero-ledger/sdk';
 import { derivePath } from 'ed25519-hd-key';
 
 export const HEDERA_DERIVATION_PATH = "m/44'/3030'/0'/0'";
+export const HEDERA_KEY_DERIVATION_VERSION = 1 as const;
+export const HEDERA_KEY_ALGORITHM = 'ED25519' as const;
+export const HEDERA_KEY_DERIVATION = Object.freeze({
+  version: HEDERA_KEY_DERIVATION_VERSION,
+  algorithm: HEDERA_KEY_ALGORITHM,
+  path: HEDERA_DERIVATION_PATH,
+});
 
 function normalizeMnemonic(mnemonic: string): string {
   const normalized = mnemonic.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -21,7 +28,13 @@ function parsePublicKey(publicKey: string | PublicKey): PublicKey {
   return PublicKey.fromString(normalized);
 }
 
-export function deriveHederaPrivateKey(mnemonic: string): PrivateKey {
+export function deriveHederaPrivateKey(
+  mnemonic: string,
+  version: number = HEDERA_KEY_DERIVATION_VERSION,
+): PrivateKey {
+  if (version !== HEDERA_KEY_DERIVATION_VERSION) {
+    throw new Error('Unsupported Hedera key derivation version: ' + version + '.');
+  }
   const normalized = normalizeMnemonic(mnemonic);
   const seed = mnemonicToSeedSync(normalized);
   const privateKeyBytes = derivePath(

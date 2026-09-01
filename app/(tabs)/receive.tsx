@@ -28,8 +28,13 @@ import {
 } from '@/lib/hedera/account';
 import {
   buildHederaReceiveRequest,
-  parseHederaTestTransferTinybars,
+  parseHederaTransferTinybars,
 } from '@/lib/hedera/payments';
+import {
+  HEDERA_NETWORK,
+  HEDERA_NETWORK_BADGE,
+  HEDERA_NETWORK_LABEL,
+} from '@/lib/hedera/config';
 import { decodeLightningInvoice } from '@/lib/lightning';
 import { sparkTransferMatchesInvoice } from '@/lib/payments';
 import {
@@ -240,7 +245,7 @@ export default function ReceiveScreen() {
     async function initializeAndPoll() {
       if (hederaKnownTransactions.current !== null && !hederaRequest) return;
       const account = await refreshHederaAccount();
-      if (!account) throw new Error('No Hedera testnet account exists for this wallet.');
+      if (!account) throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this wallet.');
       const history = await loadHederaHistory(account.accountId, 10);
       if (hederaKnownTransactions.current === null) {
         hederaKnownTransactions.current = new Set(
@@ -257,7 +262,7 @@ export default function ReceiveScreen() {
           hederaKnownTransactions.current.add(item.transactionId);
         }
         if (incoming && !cancelled) {
-          const description = incoming.amountHbar + ' HBAR confirmed on testnet.';
+          const description = incoming.amountHbar + ' HBAR confirmed on ' + HEDERA_NETWORK + '.';
           setReceivedDescription(description);
           setIsPaid(true);
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -265,7 +270,7 @@ export default function ReceiveScreen() {
             const permissions = await Notifications.getPermissionsAsync();
             if (permissions.granted) {
               await Notifications.scheduleNotificationAsync({
-                content: { title: 'Testnet HBAR received', body: description },
+                content: { title: HEDERA_NETWORK_BADGE + ' HBAR received', body: description },
                 trigger: null,
               });
             }
@@ -331,16 +336,16 @@ export default function ReceiveScreen() {
     setLoading(true);
     try {
       const account = hederaAccount || await refreshHederaAccount();
-      if (!account) throw new Error('No Hedera testnet account exists for this wallet.');
+      if (!account) throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this wallet.');
       const amountTinybars = amountInput.trim()
-        ? parseHederaTestTransferTinybars(amountInput)
+        ? parseHederaTransferTinybars(amountInput)
         : null;
       hederaExpectedAmountTinybars.current = amountTinybars;
       setHederaRequest(buildHederaReceiveRequest(account.accountId, amountTinybars));
     } catch (cause) {
       Alert.alert(
         'Could not create HBAR request',
-        cause instanceof Error ? cause.message : 'Hedera testnet is unavailable.',
+        cause instanceof Error ? cause.message : HEDERA_NETWORK_LABEL + ' is unavailable.',
       );
     } finally {
       setLoading(false);
@@ -411,7 +416,7 @@ export default function ReceiveScreen() {
     <View style={[styles.container, styles.centered]}>
       {network === 'hedera' && (
         <View style={[styles.testnetBanner, { width: '100%' }]}>
-          <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
+          <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
         </View>
       )}
       {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
@@ -481,8 +486,12 @@ export default function ReceiveScreen() {
           <View style={styles.testnetBannerContent}>
             <AssetIcon asset="hedera" size={34} />
             <View>
-              <Text style={styles.testnetTitle}>HEDERA TESTNET</Text>
-              <Text style={styles.testnetText}>Receive test HBAR only.</Text>
+              <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
+              <Text style={styles.testnetText}>
+                {HEDERA_NETWORK === 'mainnet'
+                  ? 'Real HBAR. Verify the account before sharing.'
+                  : 'Receive test HBAR only.'}
+              </Text>
             </View>
           </View>
         </View>
@@ -502,7 +511,11 @@ export default function ReceiveScreen() {
         <Text style={styles.label}>Network</Text>
         <View style={styles.receiveNetworkRow}>
           {receiveNetworks.map(item => {
-            const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet);
+            const presentation = getWalletAssetPresentation(
+              item.asset,
+              appConfig.isMainnet,
+              appConfig.hederaNetwork,
+            );
             const selected = network === item.network;
             return (
               <TouchableOpacity
@@ -595,7 +608,7 @@ export default function ReceiveScreen() {
                 )}
               </>
             ) : (
-              <Text style={styles.errorText}>No Hedera testnet account was found.</Text>
+              <Text style={styles.errorText}>No {HEDERA_NETWORK_LABEL} account was found.</Text>
             )}
           </>
         )}

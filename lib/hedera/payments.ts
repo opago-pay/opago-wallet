@@ -1,12 +1,10 @@
+import { Hbar, PrivateKey, TransferTransaction } from '@hiero-ledger/sdk';
 import {
-  Client,
-  Hbar,
-  PrivateKey,
-  TransferTransaction,
-} from '@hiero-ledger/sdk';
-import {
-  assertHederaTestnet,
+  assertHederaNetwork,
+  createHederaClient,
   configuredHederaMaxTransferHbar,
+  HEDERA_NETWORK,
+  HEDERA_NETWORK_LABEL,
   HEDERA_SDK_GRPC_DEADLINE_MS,
   HEDERA_SDK_MAX_ATTEMPTS,
   HEDERA_SDK_REQUEST_TIMEOUT_MS,
@@ -20,7 +18,7 @@ import type { HederaPaymentLifecycle } from './payment-journal';
 export interface HederaPaymentRequest {
   accountId: string;
   amountTinybars: bigint | null;
-  network: 'testnet';
+  network: typeof HEDERA_NETWORK;
 }
 
 export interface HederaTransferResult {
@@ -59,15 +57,15 @@ export function formatTinybars(tinybars: bigint): string {
   return negative ? '-' + formatted : formatted;
 }
 
-export function assertHederaTestTransferAmount(tinybars: bigint): bigint {
+export function assertHederaTransferAmount(tinybars: bigint): bigint {
   if (tinybars <= 0n) throw new Error('HBAR amount must be greater than zero.');
   const maximum = parseHbarToTinybars(
     configuredHederaMaxTransferHbar,
-    'Configured Hedera test-transfer limit',
+    'Configured Hedera transfer limit',
   );
   if (tinybars > maximum) {
     throw new Error(
-      'HBAR amount exceeds the test-transfer limit of ' +
+      'HBAR amount exceeds the configured ' + HEDERA_NETWORK + ' transfer limit of ' +
         configuredHederaMaxTransferHbar +
         ' HBAR.',
     );
@@ -75,18 +73,22 @@ export function assertHederaTestTransferAmount(tinybars: bigint): bigint {
   return tinybars;
 }
 
-export function parseHederaTestTransferTinybars(rawAmount: string): bigint {
-  return assertHederaTestTransferAmount(parseHbarToTinybars(rawAmount));
+export function parseHederaTransferTinybars(rawAmount: string): bigint {
+  return assertHederaTransferAmount(parseHbarToTinybars(rawAmount));
 }
+
+// Backward-compatible names for the existing testnet acceptance scripts.
+export const assertHederaTestTransferAmount = assertHederaTransferAmount;
+export const parseHederaTestTransferTinybars = parseHederaTransferTinybars;
 
 export function buildHederaReceiveRequest(
   rawAccountId: string,
   amountTinybars: bigint | null = null,
 ): string {
   const accountId = parseHederaAccountId(rawAccountId);
-  const params = new URLSearchParams({ network: 'testnet' });
+  const params = new URLSearchParams({ network: HEDERA_NETWORK });
   if (amountTinybars !== null) {
-    params.set('amount', formatTinybars(assertHederaTestTransferAmount(amountTinybars)));
+    params.set('amount', formatTinybars(assertHederaTransferAmount(amountTinybars)));
   }
   return 'hedera:' + accountId + '?' + params.toString();
 }
@@ -97,7 +99,7 @@ export function parseHederaPaymentRequest(rawRequest: string): HederaPaymentRequ
     return {
       accountId: parseHederaAccountId(normalized),
       amountTinybars: null,
-      network: 'testnet',
+      network: HEDERA_NETWORK,
     };
   }
 
@@ -115,25 +117,25 @@ export function parseHederaPaymentRequest(rawRequest: string): HederaPaymentRequ
     }
   }
   const network = params.get('network');
-  if (network && network.toLowerCase() !== 'testnet') {
-    throw new Error('Only Hedera testnet payment requests are accepted.');
+  if (network && network.toLowerCase() !== HEDERA_NETWORK) {
+    throw new Error('Only Hedera ' + HEDERA_NETWORK + ' payment requests are accepted.');
   }
   const amount = params.get('amount');
   return {
     accountId: parseHederaAccountId(match[1]),
-    amountTinybars: amount ? parseHederaTestTransferTinybars(amount) : null,
-    network: 'testnet',
+    amountTinybars: amount ? parseHederaTransferTinybars(amount) : null,
+    network: HEDERA_NETWORK,
   };
 }
 
-export async function sendHederaTestnetTransfer(input: {
+export async function sendHederaTransfer(input: {
   sourceAccountId: string;
   recipientAccountId: string;
   amountTinybars: bigint;
   privateKey: PrivateKey;
   lifecycle?: HederaPaymentLifecycle;
 }): Promise<HederaTransferResult> {
-  assertHederaTestnet();
+  assertHederaNetwork();
   const sourceAccountId = parseHederaAccountId(input.sourceAccountId, 'Source account ID');
   const recipientAccountId = parseHederaAccountId(
     input.recipientAccountId,
@@ -142,8 +144,8 @@ export async function sendHederaTestnetTransfer(input: {
   if (sourceAccountId === recipientAccountId) {
     throw new Error('Source and recipient Hedera accounts must be different.');
   }
-  const tinybars = assertHederaTestTransferAmount(input.amountTinybars);
-  const client = Client.forTestnet();
+  const tinybars = assertHederaTransferAmount(input.amountTinybars);
+  const client = createHederaClient();
   client.setOperator(sourceAccountId, input.privateKey);
   client.setDefaultMaxTransactionFee(
     Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
@@ -156,7 +158,7 @@ export async function sendHederaTestnetTransfer(input: {
     const response = await new TransferTransaction()
       .addHbarTransfer(sourceAccountId, Hbar.fromTinybars((-tinybars).toString()))
       .addHbarTransfer(recipientAccountId, Hbar.fromTinybars(tinybars.toString()))
-      .setTransactionMemo('Opago Phase 2 HBAR testnet transfer')
+      .setTransactionMemo('Opago HBAR ' + HEDERA_NETWORK + ' transfer')
       .setMaxTransactionFee(
         Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
       )
@@ -179,7 +181,7 @@ export async function sendHederaTestnetTransfer(input: {
         state: 'failed',
         result: status,
       });
-      throw new Error('Hedera testnet returned status ' + status + '.');
+      throw new Error(HEDERA_NETWORK_LABEL + ' returned status ' + status + '.');
     }
     await input.lifecycle?.onResolved?.({
       transactionId,
@@ -199,3 +201,6 @@ export async function sendHederaTestnetTransfer(input: {
     client.close();
   }
 }
+
+// Kept until external integrations have migrated to the network-neutral API.
+export const sendHederaTestnetTransfer = sendHederaTransfer;

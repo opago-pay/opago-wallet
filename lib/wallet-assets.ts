@@ -18,13 +18,14 @@ const BASE_ASSETS = {
 export function getWalletAssetPresentation(
   asset: WalletAssetKey,
   mainnetEnabled: boolean,
+  hederaNetwork: 'testnet' | 'mainnet' = 'testnet',
 ): WalletAssetPresentation {
   const base = BASE_ASSETS[asset];
   if (asset === 'hedera') {
     return {
       ...base,
-      networkLabel: 'Hedera testnet',
-      networkBadge: 'TESTNET',
+      networkLabel: 'Hedera ' + hederaNetwork,
+      networkBadge: hederaNetwork === 'mainnet' ? 'MAINNET' : 'TESTNET',
     };
   }
   if (asset === 'lightning') {

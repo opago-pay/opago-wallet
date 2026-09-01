@@ -25,17 +25,23 @@ import { wipeTransactions } from '../lib/database';
 import { appConfig } from '../lib/config';
 import { deriveHederaPrivateKey, deriveSolanaKeypair } from '../lib/wallet-keys';
 import {
-  findHederaTestnetAccount,
   loadHederaAccount,
   type HederaAccountSnapshot,
 } from '../lib/hedera/account';
-import { MAX_HEDERA_TRANSACTION_FEE_TINYBARS } from '../lib/hedera/config';
+import {
+  clearHederaAccountBindings,
+  resolveHederaWalletAccount,
+} from '../lib/hedera/account-binding-native';
+import {
+  HEDERA_NETWORK,
+  MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
+} from '../lib/hedera/config';
 import {
   sendHederaCheckoutPayment,
   type HederaCheckoutRequest,
 } from '../lib/hedera/checkout';
 import {
-  sendHederaTestnetTransfer,
+  sendHederaTransfer,
   type HederaTransferResult,
 } from '../lib/hedera/payments';
 import { hederaPaymentJournal } from '../lib/hedera/payment-journal-native';
@@ -208,9 +214,9 @@ function WalletProviderCore({
   const refreshHederaAccount = useCallback(async () => {
     const privateKey = hederaPrivateKeyRef.current;
     if (!walletReady || !privateKey) {
-      throw new Error('Wallet keys are not ready for Hedera testnet.');
+      throw new Error('Wallet keys are not ready for Hedera ' + HEDERA_NETWORK + '.');
     }
-    const account = await findHederaTestnetAccount(privateKey.publicKey);
+    const account = await resolveHederaWalletAccount(privateKey.publicKey);
     setHederaAccount(account);
     return account;
   }, [walletReady]);
@@ -223,12 +229,14 @@ function WalletProviderCore({
     }) => {
       const privateKey = hederaPrivateKeyRef.current;
       if (!walletReady || !privateKey) {
-        throw new Error('Wallet keys are not ready for Hedera testnet.');
+        throw new Error('Wallet keys are not ready for Hedera ' + HEDERA_NETWORK + '.');
       }
-      const account = await findHederaTestnetAccount(privateKey.publicKey);
+      const account = await resolveHederaWalletAccount(privateKey.publicKey);
       if (!account) {
         throw new Error(
-          'No Hedera testnet account exists for this wallet key. Run the local provisioning script first.',
+          HEDERA_NETWORK === 'testnet'
+            ? 'No Hedera testnet account exists for this wallet key. Run the local provisioning script first.'
+            : 'No Hedera mainnet account exists for this wallet key. Fund or register the account before sending.',
         );
       }
       if (
@@ -256,7 +264,7 @@ function WalletProviderCore({
               onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
             },
           })
-        : await sendHederaTestnetTransfer({
+        : await sendHederaTransfer({
             sourceAccountId: account.accountId,
             recipientAccountId: input.recipientAccountId,
             amountTinybars: input.amountTinybars,
@@ -308,6 +316,7 @@ function WalletProviderCore({
     await Promise.all([
       deleteSecureItem(MNEMONIC_STORE_KEY),
       wipeTransactions(),
+      clearHederaAccountBindings(),
       hederaPaymentJournal.clear(),
       solanaPaymentJournal.clear(),
       atomiqKeys.length ? AsyncStorage.multiRemove(atomiqKeys) : Promise.resolve(),

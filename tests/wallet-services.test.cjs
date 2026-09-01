@@ -11,6 +11,9 @@ const {
   deriveHederaPrivateKey,
   deriveSolanaKeypair,
   HEDERA_DERIVATION_PATH,
+  HEDERA_KEY_ALGORITHM,
+  HEDERA_KEY_DERIVATION,
+  HEDERA_KEY_DERIVATION_VERSION,
   recoveryPhraseMatchesHederaPublicKey,
   SOLANA_DERIVATION_PATH,
 } = require('../lib/wallet-keys.ts');
@@ -47,6 +50,13 @@ test('derives the documented Solana account deterministically from BIP39', () =>
 
 test('derives the documented Hedera Ed25519 account deterministically from BIP39', () => {
   assert.equal(HEDERA_DERIVATION_PATH, "m/44'/3030'/0'/0'");
+  assert.equal(HEDERA_KEY_DERIVATION_VERSION, 1);
+  assert.equal(HEDERA_KEY_ALGORITHM, 'ED25519');
+  assert.deepEqual(HEDERA_KEY_DERIVATION, {
+    version: 1,
+    algorithm: 'ED25519',
+    path: "m/44'/3030'/0'/0'",
+  });
   assert.equal(
     deriveHederaPrivateKey(MNEMONIC).publicKey.toStringRaw(),
     EXPECTED_HEDERA_PUBLIC_KEY,
@@ -57,6 +67,7 @@ test('derives the documented Hedera Ed25519 account deterministically from BIP39
     EXPECTED_HEDERA_PUBLIC_KEY,
   );
   assert.throws(() => deriveHederaPrivateKey('not a recovery phrase'), /valid BIP39/i);
+  assert.throws(() => deriveHederaPrivateKey(MNEMONIC, 2), /unsupported.*version/i);
 });
 
 test('verifies a recovery phrase against the exact Hedera public key', () => {

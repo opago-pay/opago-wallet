@@ -6,17 +6,50 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
+        "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
+        "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
+      },
       "android": {
         "buildType": "apk"
       }
     },
-    "production": {}
+    "mainnet-candidate": {
+      "distribution": "internal",
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MAINNET": "true",
+        "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "mainnet",
+        "EXPO_PUBLIC_HEDERA_NETWORK": "mainnet",
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://mainnet.mirrornode.hedera.com"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MAINNET": "true",
+        "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "mainnet",
+        "EXPO_PUBLIC_HEDERA_NETWORK": "mainnet",
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://mainnet.mirrornode.hedera.com"
+      }
+    }
   },
   "submit": {
     "production": {}
