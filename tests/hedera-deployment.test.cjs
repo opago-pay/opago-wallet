@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { ContractCreateFlow } = require('@hiero-ledger/sdk');
+const { Client, ContractCreateFlow, Hbar } = require('@hiero-ledger/sdk');
 const {
   MAINNET_APPROVAL,
   NETWORKS,
@@ -98,6 +98,22 @@ test('builds network-specific Mainnet evidence without weakening testnet default
   assert.equal(resolveVerificationNetwork(['--network=mainnet']).name, 'mainnet');
   assert.throws(() => resolveDeploymentNetwork(['--network', 'previewnet']), /testnet or mainnet/i);
   assert.throws(() => transactionUrl(input.transactionId, 'previewnet'), /network is invalid/i);
+});
+
+test('keeps deployment fee ceilings compatible with the pinned SDK validation', () => {
+  for (const network of [NETWORKS.testnet, NETWORKS.mainnet]) {
+    const tinybars = BigInt(network.maxTransactionFeeTinybars);
+    assert.ok(tinybars > 0n);
+    assert.ok(tinybars <= 2_147_483_647n);
+    const client = network.name === 'mainnet' ? Client.forMainnet() : Client.forTestnet();
+    try {
+      assert.doesNotThrow(() =>
+        client.setDefaultMaxTransactionFee(Hbar.fromTinybars(network.maxTransactionFeeTinybars)),
+      );
+    } finally {
+      client.close();
+    }
+  }
 });
 
 test('requires an exact artifact hash and explicit approval before Mainnet deployment', t => {

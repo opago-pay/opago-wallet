@@ -236,7 +236,7 @@ Human/Opago delivery:
 - approve the Mainnet merchant identity, Android package/version policy, and pilot allowlist policy;
 - configure public production metadata only after the audited contract deployment.
 
-Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 104 application tests, and 9 contract tests.
+Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 105 application tests, and 9 contract tests.
 
 ### Mainnet Milestone 2 - account lifecycle and recovery
 
@@ -723,7 +723,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `104/104` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `105/105` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

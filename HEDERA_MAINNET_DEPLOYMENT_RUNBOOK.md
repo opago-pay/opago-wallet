@@ -38,7 +38,7 @@ Remove-Item Env:HEDERA_OPERATOR_ID -ErrorAction SilentlyContinue
 
 The preflight uses only public Mirror Node data. It verifies the network, account, public key type, balance, current ContractCreate gas price, undeployed manifest, and artifact hashes. It never accepts a private key and never submits a transaction.
 
-The deployment client caps each transaction at 25 HBAR. Because `ContractCreateFlow` can perform multiple network operations and a canary payment still needs funds, the preflight requires a 30 HBAR starting balance. This is a safety reserve, not the expected charge. Rerun the preflight immediately before deployment because fees and the HBAR/USD conversion can change.
+The deployment client caps each transaction at 20 HBAR. Because `ContractCreateFlow` can perform multiple network operations and a canary payment still needs funds, the preflight requires a 30 HBAR starting balance. This is a safety reserve, not the expected charge. The 20 HBAR ceiling also remains below the signed 32-bit tinybar validation boundary in the pinned SDK. Rerun the preflight immediately before deployment because fees and the HBAR/USD conversion can change.
 
 ## 2. Human authorization gate
 

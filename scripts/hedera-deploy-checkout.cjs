@@ -26,7 +26,7 @@ const NETWORKS = Object.freeze({
     deploymentPath: path.join(ROOT, 'deployments', 'hedera-testnet.json'),
     hashscan: 'https://hashscan.io/testnet',
     mirror: 'https://testnet.mirrornode.hedera.com',
-    maxTransactionFeeTinybars: '5000000000',
+    maxTransactionFeeTinybars: '2000000000',
   }),
   mainnet: Object.freeze({
     name: 'mainnet',
@@ -34,12 +34,14 @@ const NETWORKS = Object.freeze({
     deploymentPath: path.join(ROOT, 'deployments', 'hedera-mainnet.json'),
     hashscan: 'https://hashscan.io/mainnet',
     mirror: 'https://mainnet.mirrornode.hedera.com',
-    maxTransactionFeeTinybars: '2500000000',
+    maxTransactionFeeTinybars: '2000000000',
     minimumStartingBalanceTinybars: '3000000000',
   }),
 });
 // This is a transaction fee ceiling, not the amount charged. ContractCreateFlow
 // needs enough headroom for bytecode file operations plus contract creation.
+// The pinned SDK validates this value through Long.toInt(), so it must remain at
+// or below 2,147,483,647 tinybars even though Hbar itself supports larger values.
 const MAINNET_APPROVAL = 'DEPLOY_OPAGO_HBAR_CHECKOUT_TO_MAINNET';
 
 function required(name) {
