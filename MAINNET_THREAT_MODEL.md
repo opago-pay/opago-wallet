@@ -1,6 +1,6 @@
 # Hedera Mainnet threat model
 
-**Status:** initial Milestone 0 model. It must be revisited after the Mainnet account model is selected, after audit findings, and before final deployment.
+**Status:** updated after selection of user-funded Ed25519 alias activation. It must be revisited after review findings and before final deployment.
 
 ## Protected assets
 
@@ -51,7 +51,7 @@
 
 ## Open design risks
 
-- Mainnet account onboarding is not selected. Existing wallet derivation is Ed25519; ECDSA alias-based auto-account creation requires an explicit migration decision.
+- Mainnet onboarding uses user-funded first-deposit activation of the existing Ed25519 key alias. Exact sender-wallet interoperability and physical recovery acceptance remain pending; ECDSA import is deferred.
 - The current merchant demo is local and is not a production service.
 - The contract and mobile key lifecycle have not received independent production security review.
 - Release signing, hosted monitoring, legal review, support ownership, and incident ownership are not yet established.

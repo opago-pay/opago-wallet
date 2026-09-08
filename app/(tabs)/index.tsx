@@ -529,7 +529,7 @@ export default function HomeScreen() {
                 ? 'Initializing wallet...'
                 : loading
                   ? 'Loading ' + appConfig.hederaNetwork + ' account...'
-                  : 'Account not provisioned'
+                  : 'Activate in Receive'
           }
           onPress={hederaAccount ? () => void copyHederaAccountId() : undefined}
         />

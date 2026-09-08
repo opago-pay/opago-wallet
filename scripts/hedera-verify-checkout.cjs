@@ -5,7 +5,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEPLOYMENT_PATH = path.join(ROOT, 'deployments', 'hedera-testnet.json');
 const ARTIFACT_PATH = path.join(
   ROOT,
   'artifacts',
@@ -13,11 +12,35 @@ const ARTIFACT_PATH = path.join(
   'OpagoHbarCheckout.sol',
   'OpagoHbarCheckout.json',
 );
-const MIRROR = 'https://testnet.mirrornode.hedera.com';
 const SOURCIFY = 'https://sourcify.dev/server';
-const CHAIN_ID = '296';
 const VERIFICATION_POLL_ATTEMPTS = 20;
 const VERIFICATION_POLL_INTERVAL_MS = 2_000;
+const NETWORKS = Object.freeze({
+  testnet: Object.freeze({
+    name: 'testnet',
+    chainId: '296',
+    deploymentPath: path.join(ROOT, 'deployments', 'hedera-testnet.json'),
+    mirror: 'https://testnet.mirrornode.hedera.com',
+  }),
+  mainnet: Object.freeze({
+    name: 'mainnet',
+    chainId: '295',
+    deploymentPath: path.join(ROOT, 'deployments', 'hedera-mainnet.json'),
+    mirror: 'https://mainnet.mirrornode.hedera.com',
+  }),
+});
+
+function resolveVerificationNetwork(argv = process.argv.slice(2)) {
+  let value = 'testnet';
+  const equalsArgument = argv.find(argument => argument.startsWith('--network='));
+  const index = argv.indexOf('--network');
+  if (equalsArgument) value = equalsArgument.slice('--network='.length);
+  if (index >= 0) value = argv[index + 1] || '';
+  if (!Object.prototype.hasOwnProperty.call(NETWORKS, value)) {
+    throw new Error('Verification network must be explicitly set to testnet or mainnet.');
+  }
+  return NETWORKS[value];
+}
 
 function sha256(bytecode) {
   const hex = bytecode.replace(/^0x/, '');
@@ -111,21 +134,24 @@ function consensusTimestampToIso(value) {
 }
 
 async function main() {
-  if (!fs.existsSync(DEPLOYMENT_PATH)) throw new Error('Deployment manifest is missing.');
-  const deployment = JSON.parse(fs.readFileSync(DEPLOYMENT_PATH, 'utf8'));
+  const network = resolveVerificationNetwork();
+  if (!fs.existsSync(network.deploymentPath)) throw new Error('Deployment manifest is missing.');
+  const deployment = JSON.parse(fs.readFileSync(network.deploymentPath, 'utf8'));
   if (
+    deployment.network !== network.name ||
+    String(deployment.chainId) !== network.chainId ||
     deployment.status !== 'deployed' ||
     !/^0\.0\.[1-9]\d*$/.test(deployment.contractId || '') ||
     !/^0x[0-9a-f]{40}$/i.test(deployment.evmAddress || '')
   ) {
-    throw new Error('No real Hedera testnet deployment is recorded yet.');
+    throw new Error('No real Hedera ' + network.name + ' deployment is recorded yet.');
   }
   if (!fs.existsSync(ARTIFACT_PATH)) {
     throw new Error('Contract artifact is missing. Run npm run contract:compile.');
   }
   const artifact = JSON.parse(fs.readFileSync(ARTIFACT_PATH, 'utf8'));
   const mirrorUrl =
-    MIRROR + '/api/v1/contracts/' + encodeURIComponent(deployment.contractId);
+    network.mirror + '/api/v1/contracts/' + encodeURIComponent(deployment.contractId);
   const { response: mirrorResponse, body: mirrorContract } = await fetchJson(
     mirrorUrl,
     undefined,
@@ -154,7 +180,7 @@ async function main() {
   }
 
   const verifiedUrl =
-    SOURCIFY + '/v2/contract/' + CHAIN_ID + '/' + deployment.evmAddress;
+    SOURCIFY + '/v2/contract/' + network.chainId + '/' + deployment.evmAddress;
   const existing = await fetchJson(
     verifiedUrl,
     undefined,
@@ -169,7 +195,7 @@ async function main() {
     if (!verificationId) {
       const build = loadBuildInfo();
       const verification = await fetchJson(
-        SOURCIFY + '/v2/verify/' + CHAIN_ID + '/' + deployment.evmAddress,
+        SOURCIFY + '/v2/verify/' + network.chainId + '/' + deployment.evmAddress,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -210,8 +236,8 @@ async function main() {
   deployment.deploymentConsensusTimestamp = deploymentConsensusTimestamp;
   deployment.deployedAt = deployedAt;
   deployment.mirrorBytecodeMatchedAt = new Date().toISOString();
-  fs.writeFileSync(DEPLOYMENT_PATH, JSON.stringify(deployment, null, 2) + '\n', 'utf8');
-  console.log('Hedera testnet runtime bytecode matches the locked artifact.');
+  fs.writeFileSync(network.deploymentPath, JSON.stringify(deployment, null, 2) + '\n', 'utf8');
+  console.log('Hedera ' + network.name + ' runtime bytecode matches the locked artifact.');
   console.log('Sourcify status: ' + verificationStatus);
   if (verificationId) console.log('Verification ID: ' + verificationId);
 }
@@ -229,6 +255,7 @@ if (require.main === module) {
 module.exports = {
   consensusTimestampToIso,
   isExactRuntimeMatch,
+  resolveVerificationNetwork,
   sha256,
   sourcifyCompilerVersion,
 };

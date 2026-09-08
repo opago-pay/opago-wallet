@@ -56,6 +56,11 @@ const gates = [
     args: ['--check', 'scripts/hedera-deploy-checkout.cjs'],
   },
   {
+    label: 'Hedera Mainnet preflight syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/hedera-mainnet-preflight.cjs'],
+  },
+  {
     label: 'Hedera verification syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-verify-checkout.cjs'],

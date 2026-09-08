@@ -62,7 +62,7 @@ No Mainnet private key may be sent through chat, committed to Git, placed in an 
 | M0-D3 | Controlled beta versus unrestricted public launch | Fabian | Account and operations design |
 | M0-D4 | Pilot user count and per-payment/aggregate HBAR limits | Fabian | Mainnet release configuration |
 | M0-D5 | Android distribution channel | Fabian | Release workflow |
-| M0-D6 | Account onboarding and initial-funding policy | Fabian | Milestone 2 |
+| M0-D6 | Approved 2026-09-07: user-funded first HBAR deposit via Ed25519 key alias; pilot users already hold HBAR in a compatible wallet; no Opago sponsorship | Fabian | Sender compatibility and physical acceptance pending |
 | M0-D7 | Security reviewer, legal reviewer, support owner, and incident owner | Fabian | Go-live |
 
 ## Milestone 0 acceptance

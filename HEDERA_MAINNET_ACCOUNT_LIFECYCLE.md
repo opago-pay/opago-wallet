@@ -1,6 +1,6 @@
 # Hedera Mainnet account lifecycle decision
 
-**Status:** proposed architecture; Fabian/Opago approval of the onboarding and funding model is still required. No Mainnet account is created by this document or by the application build.
+**Status:** Fabian approved user-funded first-deposit activation on 7 September 2026. Pilot users must already hold HBAR in a compatible wallet. Opago does not sponsor account creation. Implementation and automated checks do not constitute physical-device or Mainnet acceptance.
 
 ## Decision summary
 
@@ -13,9 +13,9 @@ Opago should preserve the existing version-1 Hedera key derivation for the first
 | Path | `m/44'/3030'/0'/0'` |
 | Recovery input | Existing protected BIP39 phrase |
 
-The recommended pilot onboarding model is a sponsor-created native Hedera account controlled by the wallet's derived Ed25519 public key. The app may provide only the public key to an authenticated onboarding service. A separately controlled sponsor account pays the `AccountCreateTransaction`; its operator key never enters the app, repository, browser, QR payload, or any `EXPO_PUBLIC_*` variable.
+The approved pilot model uses the locally derived Ed25519 key alias. A first HBAR transfer to this alias auto-creates the account; the transfer payer bears creation and transfer fees. Opago does not submit or fund that transaction and needs no sponsor service or sponsor key. The alias is public and network-agnostic, so the selected network must always be displayed separately.
 
-This is a proposal until Opago approves the sponsor budget, abuse controls, user eligibility, and operator ownership.
+Pilot eligibility: users already hold HBAR in a sender supporting Ed25519 key-alias transfers. No external wallet or exchange is claimed compatible until tested. Users without such a sender are outside the initial pilot.
 
 ## Why the derivation remains unchanged
 
@@ -30,8 +30,9 @@ Changing the algorithm or path without an explicit migration would cause an exis
 
 | Option | Benefit | Cost/risk | Pilot position |
 | --- | --- | --- | --- |
+| First HBAR deposit to Ed25519 key alias | Existing recovery; no Opago sponsorship | Requires a compatible funded sender and network verification | Approved for controlled pilot |
 | Existing Mainnet account only | No sponsor infrastructure | New users cannot onboard; arbitrary imported keys are incompatible with the current phrase | Supported later as an advanced path, not sufficient alone |
-| Sponsor creates native account for derived Ed25519 public key | Preserves current recovery and numeric account-ID flow | Requires backend, HBAR budget, authentication, rate limits, and operator security | Recommended for controlled pilot |
+| Sponsor creates native account for derived Ed25519 public key | Preserves current recovery and numeric account-ID flow | Requires backend, HBAR budget, authentication, rate limits, and operator security | Not selected |
 | ECDSA alias/hollow-account path | Familiar MetaMask/EVM address flow | New derivation/key type, migration complexity, changed account identity | Deferred pending a separate architecture decision |
 
 ## Implemented foundation
@@ -44,15 +45,15 @@ Changing the algorithm or path without an explicit migration would cause an exis
 - A malformed, stale, cross-network, or different-wallet binding is discarded and account discovery runs again.
 - Wallet deletion removes bindings for both networks.
 
-## Proposed onboarding sequence
+## Approved onboarding sequence
 
-1. The wallet derives version-1 Ed25519 keys locally and displays the public key; no private material leaves secure storage/runtime memory.
-2. The authenticated user requests pilot onboarding from the production merchant/onboarding service.
-3. The service validates eligibility, idempotency, rate limits, aggregate sponsor exposure, and the public-key format.
-4. A human- or policy-controlled sponsor creates the account with the submitted public key and a capped initial balance.
-5. The service returns only the public transaction/account identifiers.
-6. The app independently discovers the account through the Mainnet Mirror Node and verifies that its on-chain key equals the locally derived public key.
-7. The account ID is cached as untrusted public metadata and revalidated before use.
+1. Derive the existing version-1 Ed25519 key locally.
+2. Look up the account on the configured Mirror Node and verify its public key. A lookup failure displays an error, not an activation prompt.
+3. If no account is found, display the SDK-encoded key alias and QR with the build network. Explain sender fees and compatibility requirements.
+4. The user sends HBAR from a compatible wallet on that same network. Never ask them for a sender private key in Opago.
+5. Poll while Receive is foreground; discover and verify the resulting account through Mirror Node. Repeated deposits must resolve to the same account.
+6. Switch to the normal numeric account receive flow only after verification. An account with zero balance exists but still cannot pay until it has enough HBAR for amount plus fees.
+7. Signing continues to require a fresh verified account; no automatic account-creation transaction is submitted by Opago.
 
 ## Recovery sequence
 
@@ -62,18 +63,19 @@ Changing the algorithm or path without an explicit migration would cause an exis
 4. Discover or load the Mainnet account and require an exact on-chain public-key match.
 5. Show the account and balance only after validation; never create a replacement account silently when an existing binding cannot be verified.
 
-## Human decisions blocking completion
+## Remaining decisions and acceptance
 
-- Approve sponsored account creation versus existing-account-only onboarding.
-- Name the sponsor/deployment account owner and backup operator.
-- Set initial funding, per-user, daily, and aggregate HBAR limits.
-- Define authentication, allowlist, rate-limit, replay, and abuse-response policy.
-- Decide whether a user may have more than one numeric account for the same key; the current wallet requires a unique match.
-- Approve the future position on ECDSA/MetaMask import and whether it is explicitly outside the first pilot.
+The concrete Android build and test procedure are in [HEDERA_ACTIVATION_TESTNET_ACCEPTANCE.md](HEDERA_ACTIVATION_TESTNET_ACCEPTANCE.md). HashPack is a documented sender candidate; exact-version interoperability remains pending.
 
-## Milestone 2 remaining acceptance
+- Confirm specific compatible sender wallets through an actual Testnet first-deposit test; record wallet version and transaction/account IDs.
+- Verify on a physical Android device: fresh wallet, first deposit, delayed Mirror indexing, restart, repeated deposit, recovery to the same account, and foreground/background behavior.
+- Confirm pilot size, transfer limits, distribution, support and incident owners. Sponsor budgets and sponsor operators are not required for this model.
+- Keep the unique-key match requirement; arbitrary existing-account import and ECDSA/MetaMask migration remain outside this pilot.
+- Mainnet canary activation and clean-device recovery remain gated by security and go-live approval. Never reuse exposed test keys.
 
-- Implement the approved onboarding service and idempotent account-creation workflow.
-- Exercise a real Mainnet account creation with a canary amount only after all go-live gates.
-- Recover the same Mainnet account and balance on a clean physical Android device.
-- Verify behavior for unfunded, missing, deleted, duplicated, mismatched, and temporarily unavailable accounts.
+## Local implementation evidence
+
+- Receive shows an SDK-generated Ed25519 key-alias QR only after an empty successful account lookup, with separate network and compatibility guidance.
+- Missing accounts keep polling; network errors remain errors. Existing accounts use the verified numeric-ID flow.
+- Automated tests exercise deterministic alias recovery, transfer serialization without submission, missing/unfunded/deleted/duplicate/mismatched accounts and lookup errors.
+- External sender interoperability and live Testnet auto-creation have not yet been verified. No Mainnet transaction was performed.

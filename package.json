@@ -16,14 +16,18 @@
     "demo:travel-rule": "node ./demo/travel-rule-merchant.js",
     "solana:fund:devnet": "node ./scripts/solana-fund-devnet.cjs",
     "hedera:provision": "node ./scripts/hedera-provision-testnet.cjs",
-    "demo:hedera-checkout": "node ./demo/hedera-checkout-merchant.cjs",
+    "demo:hedera-checkout": "node ./demo/hedera-checkout-merchant.cjs --network testnet",
+    "demo:hedera-checkout:mainnet": "node ./demo/hedera-checkout-merchant.cjs --network mainnet",
     "phase4:checkout-fixtures": "node ./scripts/hedera-phase4-checkout-fixtures.cjs",
     "phase5:verify": "node ./scripts/verify-phase5.cjs",
     "phase5:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/finalize-phase5-android.ps1",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
-    "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs",
-    "contract:verify:testnet": "node ./scripts/hedera-verify-checkout.cjs"
+    "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs --network testnet",
+    "contract:verify:testnet": "node ./scripts/hedera-verify-checkout.cjs --network testnet",
+    "contract:preflight:mainnet": "node ./scripts/hedera-mainnet-preflight.cjs",
+    "contract:deploy:mainnet": "node ./scripts/hedera-deploy-checkout.cjs --network mainnet",
+    "contract:verify:mainnet": "node ./scripts/hedera-verify-checkout.cjs --network mainnet"
   },
   "dependencies": {
     "@atomiqlabs/chain-solana": "^13.2.1",

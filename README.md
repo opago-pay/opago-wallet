@@ -179,7 +179,9 @@ The output contains valid/replay, expired, altered-nonce, and wrong-amount deep 
 
 ## Hedera Mainnet implementation plan
 
-The target is a controlled, real-user Mainnet pilot in approximately seven to nine calendar weeks. Estimated technical effort is 32-52 person-days plus external audit, app-store, hosting, and decision lead time. A contract deployment alone is not considered a production release.
+The immediate target is Thrive Milestone 2 by 10 October 2026: a verified Hedera Mainnet deployment, an operational Mainnet UI/payment path, public repository evidence, and a recorded real-HBAR demonstration. A contract deployment alone is not sufficient, and this grant target is narrower than making the entire multi-chain hackathon application production-ready.
+
+Current grant scope: this public repository remains the multi-chain hackathon project and keeps its existing Solana, USDC, Lightning, and swap functionality. Thrive Milestone 2 makes the **Hedera Mainnet integration and checkout path** grant-ready; it does not claim that every experimental feature in the repository is production-ready. A later production-wallet fork is planned separately with HBAR and Lightning only. Mainnet deployment commands and evidence gates are documented in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).
 
 The critical path is:
 
@@ -234,11 +236,11 @@ Human/Opago delivery:
 - approve the Mainnet merchant identity, Android package/version policy, and pilot allowlist policy;
 - configure public production metadata only after the audited contract deployment.
 
-Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 93 application tests, and 9 contract tests.
+Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 104 application tests, and 9 contract tests.
 
 ### Mainnet Milestone 2 - account lifecycle and recovery
 
-**Estimate: 5-10 days. Status: device-independent foundation implemented; onboarding decision and physical acceptance pending.**
+**Estimate: 5-10 days. Status: device-independent foundation implemented; user-funded activation selected; sender interoperability and physical acceptance pending.**
 
 Codex delivery:
 
@@ -249,7 +251,7 @@ Codex delivery:
 
 Implemented without a physical device:
 
-- [HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md](HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md) records the proposed sponsor-created Ed25519 account model, considered alternatives, recovery invariants, and human decisions;
+- [HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md](HEDERA_MAINNET_ACCOUNT_LIFECYCLE.md) records the approved user-funded Ed25519 key-alias activation model, recovery invariants, and outstanding acceptance;
 - derivation version `1`, algorithm `ED25519`, and path `m/44'/3030'/0'/0'` are immutable exported metadata, and unknown versions fail closed;
 - network-separated account bindings cache only public metadata and are revalidated against the selected Mirror Node and derived key before use;
 - malformed, stale, cross-network, or different-wallet bindings are discarded, and wallet wipe removes both network bindings;
@@ -259,9 +261,9 @@ Physical Android regression acceptance was completed on 31 August 2026 and is re
 
 Human/Opago delivery:
 
-- choose existing-account import, sponsored account creation, or first-deposit auto-creation;
-- create and fund a separate Mainnet treasury/sponsor account and merchant account;
-- approve sponsorship, abuse prevention, initial funding, and user-support rules.
+- verify the selected first-deposit auto-creation flow with a compatible external sender;
+- prepare the Mainnet deployment and merchant accounts; no per-user sponsor account is required;
+- approve pilot limits and user-support rules; users fund their own activation from an existing compatible HBAR wallet.
 
 Acceptance gate: a fresh wallet can obtain or connect to a Mainnet account, receive HBAR, and recover the same account on a clean device using only its protected recovery material.
 
@@ -334,13 +336,15 @@ Acceptance gate: operational ownership and failure handling are documented, test
 
 ### Mainnet Milestone 7 - deployment and canary
 
-**Estimate: 2-4 days. Status: planned.**
+**Estimate: 2-4 days. Status: guarded scripts and public preflight implemented; funding, authorization, deployment, verification, and canary pending.**
 
 Codex delivery:
 
 - finalize guarded Mainnet deployment and verification scripts;
 - validate network, operator ID, audited artifact, compiler metadata, fee caps, transaction, runtime, Sourcify status, and HashScan evidence;
 - populate `deployments/hedera-mainnet.json` only from verified public results and bind the release build to that exact contract.
+
+Prepared commands: `npm run contract:preflight:mainnet` performs a public, keyless, non-transactional account, fee, manifest, and artifact check. `npm run contract:deploy:mainnet` requires the matching account key, an exact approved runtime hash, and an explicit Mainnet approval phrase. `npm run contract:verify:mainnet` validates chain ID `295`, Mirror Node identity and runtime, consensus evidence, and Sourcify status. No Mainnet deployment has been executed.
 
 Human/Opago delivery:
 
@@ -719,7 +723,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `77/77` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `104/104` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

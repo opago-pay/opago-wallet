@@ -42,6 +42,52 @@ const RAW_PUBLIC_KEY =
   '793af21fd5a0a7cc1076195263717fab12600496dfc7ad49e902acdd0bf22331';
 const DER_PUBLIC_KEY = '302a300506032b6570032100' + RAW_PUBLIC_KEY;
 
+test('activation alias preserves the recovered Ed25519 key through SDK transfer serialization', () => {
+  const { buildHederaActivationAlias } = require('../lib/hedera/keys.ts');
+  const key = deriveHederaPrivateKey(MNEMONIC).publicKey;
+  const alias = buildHederaActivationAlias(key);
+  assert.equal(alias, buildHederaActivationAlias(key.toStringRaw()));
+  assert.equal(alias, buildHederaActivationAlias(key.toStringDer()));
+  assert.equal(AccountId.fromString(alias).aliasKey.toStringRaw(), key.toStringRaw());
+  const transaction = new TransferTransaction()
+    .addHbarTransfer('0.0.1234', Hbar.fromTinybars(-100))
+    .addHbarTransfer(alias, Hbar.fromTinybars(100))
+    .setNodeAccountIds([AccountId.fromString('0.0.3')])
+    .setTransactionId(TransactionId.generate('0.0.1234'))
+    .freeze();
+  const decoded = TransferTransaction.fromBytes(transaction.toBytes());
+  assert.equal(decoded.hbarTransfers.get(AccountId.fromString(alias)).toTinybars().toString(), '100');
+  assert.throws(() => buildHederaActivationAlias('not-a-key'));
+  assert.throws(() => buildHederaActivationAlias(PrivateKey.generateECDSA().publicKey), /Ed25519/i);
+});
+
+test('activation discovery distinguishes missing, unfunded, duplicate and unavailable accounts', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  let accounts = [];
+  let status = 200;
+  global.fetch = async input => ({
+    redirected: false, url: String(input), ok: status === 200, status,
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify({ accounts }),
+  });
+  assert.equal(await findHederaTestnetAccount(RAW_PUBLIC_KEY), null);
+  const account = {
+    account: '0.0.123456', deleted: false, balance: { balance: 0 },
+    key: { _type: 'ED25519', key: DER_PUBLIC_KEY },
+  };
+  accounts = [account];
+  assert.equal((await findHederaTestnetAccount(RAW_PUBLIC_KEY)).balanceTinybars, 0n);
+  accounts = [account, { ...account, account: '0.0.123457' }];
+  await assert.rejects(findHederaTestnetAccount(RAW_PUBLIC_KEY), /unique account/i);
+  accounts = [{ ...account, deleted: true }];
+  assert.equal(await findHederaTestnetAccount(RAW_PUBLIC_KEY), null);
+  accounts = [{ ...account, key: { key: PrivateKey.generateED25519().publicKey.toStringRaw() } }];
+  assert.equal(await findHederaTestnetAccount(RAW_PUBLIC_KEY), null);
+  status = 403;
+  await assert.rejects(findHederaTestnetAccount(RAW_PUBLIC_KEY), /403/);
+});
+
 test('normalizes Hedera Ed25519 public keys and rejects other algorithms', () => {
   assert.equal(normalizeHederaPublicKey(RAW_PUBLIC_KEY), RAW_PUBLIC_KEY);
   assert.equal(normalizeHederaPublicKey(DER_PUBLIC_KEY), RAW_PUBLIC_KEY);

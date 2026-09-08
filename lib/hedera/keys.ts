@@ -54,3 +54,10 @@ export function normalizeHederaPublicKey(publicKey: string | PublicKey): string 
   }
   return normalized;
 }
+
+// Use the SDK's key-alias encoding, never a raw key or an EVM address.
+// Aliases do not encode a network; the receive screen must display the build network.
+export function buildHederaActivationAlias(publicKey: string | PublicKey): string {
+  const normalized = normalizeHederaPublicKey(publicKey);
+  return PublicKey.fromStringED25519(normalized).toAccountId(0, 0).toString();
+}

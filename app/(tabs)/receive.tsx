@@ -49,6 +49,7 @@ import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { exponentialBackoffDelay } from '@/lib/retry';
+import { buildHederaActivationAlias } from '@/lib/hedera/keys';
 
 type ReceiveNetwork = 'lightning' | 'solana' | 'usdc' | 'hedera';
 
@@ -62,6 +63,7 @@ export default function ReceiveScreen() {
     loadOrGenerateWallet,
     solanaKeypair,
     hederaAccount,
+    hederaPublicKey,
     refreshHederaAccount,
   } = useWalletAuth();
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
@@ -81,9 +83,20 @@ export default function ReceiveScreen() {
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
   const hederaExpectedAmountTinybars = useRef<bigint | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
+  const [hederaLookupError, setHederaLookupError] = useState<string | null>(null);
+  const [hederaMissing, setHederaMissing] = useState(false);
   const [hederaRequest, setHederaRequest] = useState<string | null>(null);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const pollingEnabled = isFocused && appIsActive;
+
+  useEffect(() => {
+    hederaKnownTransactions.current = null;
+    hederaExpectedAmountTinybars.current = null;
+    setHederaRequest(null);
+    setHederaReady(false);
+    setHederaMissing(false);
+    setHederaLookupError(null);
+  }, [hederaPublicKey]);
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
@@ -236,7 +249,10 @@ export default function ReceiveScreen() {
     }
 
     function runPoll() {
-      void initializeAndPoll().catch(() => {
+      void initializeAndPoll().catch(cause => {
+        if (cancelled) return;
+        setHederaLookupError(cause instanceof Error ? cause.message : 'Account lookup unavailable.');
+        setHederaMissing(false);
         consecutiveFailures += 1;
         scheduleNextPoll(exponentialBackoffDelay(8_000, consecutiveFailures));
       });
@@ -245,7 +261,15 @@ export default function ReceiveScreen() {
     async function initializeAndPoll() {
       if (hederaKnownTransactions.current !== null && !hederaRequest) return;
       const account = await refreshHederaAccount();
-      if (!account) throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this wallet.');
+      if (cancelled) return;
+      setHederaLookupError(null);
+      setHederaMissing(!account);
+      if (!account) {
+        setHederaReady(false);
+        consecutiveFailures = 0;
+        scheduleNextPoll(8_000);
+        return;
+      }
       const history = await loadHederaHistory(account.accountId, 10);
       if (hederaKnownTransactions.current === null) {
         hederaKnownTransactions.current = new Set(
@@ -290,7 +314,7 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [hederaRequest, isPaid, network, pollingEnabled, refreshHederaAccount, walletReady]);
+  }, [hederaPublicKey, hederaRequest, isPaid, network, pollingEnabled, refreshHederaAccount, walletReady]);
 
   function parseInvoiceAmount(): number {
     const value = Number(amountInput.replace(',', '.'));
@@ -390,6 +414,8 @@ export default function ReceiveScreen() {
     hederaKnownTransactions.current = null;
     hederaExpectedAmountTinybars.current = null;
     setHederaReady(false);
+    setHederaLookupError(null);
+    setHederaMissing(false);
     setHederaRequest(null);
   }, []);
 
@@ -573,7 +599,36 @@ export default function ReceiveScreen() {
 
         {network === 'hedera' && (
           <>
-            {!hederaReady ? (
+            {hederaLookupError ? (
+              <Text style={styles.errorText}>
+                Account verification unavailable: {hederaLookupError} Retrying automatically. If you already deposited, wait for verification before sending again.
+              </Text>
+            ) : hederaMissing && hederaPublicKey ? (
+              <>
+                <Text style={styles.label}>Account not activated</Text>
+                <Text style={styles.subtitle}>
+                  Activate with an HBAR deposit on {HEDERA_NETWORK_LABEL} from a wallet that supports Ed25519 key-alias transfers. The sender pays the transfer and account-creation fees; Opago does not fund the account.
+                </Text>
+                <View style={{ backgroundColor: '#fff', padding: 16, alignSelf: 'center', marginVertical: 16 }}>
+                  <QRCode value={buildHederaActivationAlias(hederaPublicKey)} size={220} />
+                </View>
+                <TouchableOpacity
+                  style={styles.proofBox}
+                  onPress={() => void copy(buildHederaActivationAlias(hederaPublicKey))}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Hedera activation alias"
+                >
+                  <Text style={styles.proofText} selectable>{buildHederaActivationAlias(hederaPublicKey)}</Text>
+                  <Text style={styles.copyHintText}>Tap to copy activation address</Text>
+                </TouchableOpacity>
+                <Text style={styles.subtitle}>
+                  Use only a sender confirmed to support this address format. Exchange withdrawals are not yet verified. Select {HEDERA_NETWORK_BADGE} in the sending wallet; the address itself does not identify the network. Your private key stays on this device.
+                </Text>
+                <Text style={styles.subtitle}>
+                  Waiting for account verification. If you already deposited or restored a wallet, allow time for the network to update. Sending and checkout require a verified account and enough HBAR for fees.
+                </Text>
+              </>
+            ) : !hederaReady ? (
               <ActivityIndicator color="#ffb000" />
             ) : hederaAccount ? (
               <>

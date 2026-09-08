@@ -89,7 +89,7 @@ function WalletProviderCore({
   children,
   privy,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   privy: PrivyClient | null;
 }) {
   const initializationRef = useRef<Promise<void> | null>(null);
@@ -213,10 +213,14 @@ function WalletProviderCore({
 
   const refreshHederaAccount = useCallback(async () => {
     const privateKey = hederaPrivateKeyRef.current;
+    const generation = initializationGenerationRef.current;
     if (!walletReady || !privateKey) {
       throw new Error('Wallet keys are not ready for Hedera ' + HEDERA_NETWORK + '.');
     }
     const account = await resolveHederaWalletAccount(privateKey.publicKey);
+    if (generation !== initializationGenerationRef.current || privateKey !== hederaPrivateKeyRef.current) {
+      throw new Error('Wallet changed during Hedera account lookup.');
+    }
     setHederaAccount(account);
     return account;
   }, [walletReady]);
@@ -234,9 +238,7 @@ function WalletProviderCore({
       const account = await resolveHederaWalletAccount(privateKey.publicKey);
       if (!account) {
         throw new Error(
-          HEDERA_NETWORK === 'testnet'
-            ? 'No Hedera testnet account exists for this wallet key. Run the local provisioning script first.'
-            : 'No Hedera mainnet account exists for this wallet key. Fund or register the account before sending.',
+          'No Hedera ' + HEDERA_NETWORK + ' account exists for this wallet key. Open Receive to activate it with an HBAR deposit.',
         );
       }
       if (
@@ -371,16 +373,16 @@ function WalletProviderCore({
   return React.createElement(WalletContext.Provider, { value }, children);
 }
 
-function PrivyWalletProvider({ children }: { children: ReactNode }) {
+function PrivyWalletProvider({ children }: { children?: ReactNode }) {
   const privy = usePrivy();
-  return React.createElement(WalletProviderCore, { children, privy });
+  return React.createElement(WalletProviderCore, { privy }, children);
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   if (appConfig.importSolanaKeyToPrivy) {
-    return React.createElement(PrivyWalletProvider, { children });
+    return React.createElement(PrivyWalletProvider, null, children);
   }
-  return React.createElement(WalletProviderCore, { children, privy: null });
+  return React.createElement(WalletProviderCore, { privy: null }, children);
 }
 
 export function useWalletAuth(): WalletContextValue {
