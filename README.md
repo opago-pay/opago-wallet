@@ -2,7 +2,7 @@
 
 Opago Wallet is a mobile wallet built with Expo and React Native. It explores a single protected recovery phrase across Hedera, Solana, and Bitcoin Lightning while keeping network selection, transaction validation, and test provisioning explicit.
 
-The current release is intended for development and test networks. It is not an audited production wallet, a licensed financial service, or evidence of regulatory compliance. See [SECURITY.md](SECURITY.md) before using the code with identities or funds.
+The default mobile build is intended for development and test networks. The verified Hedera Mainnet contract does not by itself make the Android app an audited production wallet, a licensed financial service, or evidence of regulatory compliance. See [SECURITY.md](SECURITY.md) before using the code with identities or funds.
 
 ## Project status
 
@@ -10,7 +10,7 @@ The current release is intended for development and test networks. It is not an 
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
 | Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 complete; deployed, source-verified, and physically accepted |
-| Mainnet network isolation and release profiles | Hedera mainnet | Milestone 1 implementation complete; deployment and human release gates remain closed |
+| HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; Android canary pending |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -18,7 +18,7 @@ The current release is intended for development and test networks. It is not an 
 | Payment-method negotiation | OpenCryptoPay-style local reference service | Prototype |
 | eID and Travel Rule hand-off | Local reference services | Demo only; not legal identity verification |
 
-Mainnet payments are disabled by default. Hedera Mainnet code paths require a matching Mainnet build profile, the global real-fund flag, a human-approved transfer cap, and pinned verified contract evidence. No Mainnet contract has been deployed and the default build remains testnet-only.
+Mainnet payments remain disabled in the default build. Hedera Mainnet code paths require a matching Mainnet build profile, the global real-fund flag, a human-approved transfer cap, and the pinned verified contract `0.0.10850063`. The default build remains testnet-only.
 
 ## Interface readiness
 
@@ -112,6 +112,12 @@ Remaining milestone gates:
 | Phase 4 successful checkout | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.10030291%401786528624.880688643) |
 | Phase 4 rejected replay | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.10030291%401786528712.770556312) |
 | Sourcify exact runtime match | [View verification record](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
+
+| Public Mainnet deployment evidence | Link |
+| --- | --- |
+| Contract `0.0.10850063` | [View on HashScan](https://hashscan.io/mainnet/contract/0.0.10850063) |
+| Deployment transaction | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10848889%401788856737.537500943) |
+| Versioned deployment manifest | [`deployments/hedera-mainnet.json`](deployments/hedera-mainnet.json) |
 
 #### Contract quality gates
 
@@ -226,7 +232,7 @@ Codex delivery:
 - reject cross-network QR/deep-link requests before review or signing;
 - require a human-approved Mainnet transfer cap, verified contract ID, and pinned runtime SHA-256;
 - provide separate EAS testnet, Mainnet-candidate, and production profiles;
-- reserve an honest `not-deployed` Mainnet evidence manifest without inventing an address or transaction;
+- reserve an honest `not-deployed` Mainnet evidence manifest and replace it only from a real verified receipt;
 - show the active Hedera network throughout asset, send, review, success, receive, account, and settings views;
 - cover valid profiles and partial/mismatched activation with isolated tests.
 
@@ -336,7 +342,7 @@ Acceptance gate: operational ownership and failure handling are documented, test
 
 ### Mainnet Milestone 7 - deployment and canary
 
-**Estimate: 2-4 days. Status: guarded scripts and public preflight implemented; funding, authorization, deployment, verification, and canary pending.**
+**Estimate: 2-4 days. Status: contract deployed and source-verified on 8 September 2026; Android binding and canary pending.**
 
 Codex delivery:
 
@@ -344,7 +350,7 @@ Codex delivery:
 - validate network, operator ID, audited artifact, compiler metadata, fee caps, transaction, runtime, Sourcify status, and HashScan evidence;
 - populate `deployments/hedera-mainnet.json` only from verified public results and bind the release build to that exact contract.
 
-Prepared commands: `npm run contract:preflight:mainnet` performs a public, keyless, non-transactional account, fee, manifest, and artifact check. `npm run contract:deploy:mainnet` requires the matching account key, an exact approved runtime hash, and an explicit Mainnet approval phrase. `npm run contract:verify:mainnet` validates chain ID `295`, Mirror Node identity and runtime, consensus evidence, and Sourcify status. No Mainnet deployment has been executed.
+The keyless preflight passed against deployment account `0.0.10848889`. `npm run contract:deploy:mainnet` then deployed the approved runtime as contract `0.0.10850063`, and `npm run contract:verify:mainnet` validated chain ID `295`, Mirror Node identity and runtime, consensus evidence, and Sourcify status. The versioned manifest contains the exact public evidence; no operator key was written to the repository.
 
 Human/Opago delivery:
 

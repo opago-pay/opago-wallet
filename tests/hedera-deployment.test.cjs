@@ -183,16 +183,25 @@ test('validates public Mainnet preflight inputs without requiring private materi
   );
 });
 
-test('keeps Mainnet evidence explicitly undeployed until a real receipt exists', () => {
+test('locks Mainnet evidence to the verified real deployment receipt', () => {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(__dirname, '..', 'deployments', 'hedera-mainnet.json'), 'utf8'),
   );
   assert.equal(manifest.network, 'mainnet');
   assert.equal(manifest.chainId, 295);
-  assert.equal(manifest.status, 'not-deployed');
-  assert.equal(manifest.contractId, null);
-  assert.equal(manifest.deploymentTransactionId, null);
-  assert.equal(manifest.runtimeBytecodeSha256, null);
+  assert.equal(manifest.status, 'deployed');
+  assert.equal(manifest.contractId, '0.0.10850063');
+  assert.equal(manifest.evmAddress, '0x0000000000000000000000000000000000a58f0f');
+  assert.equal(
+    manifest.deploymentTransactionId,
+    '0.0.10848889@1788856737.537500943',
+  );
+  assert.equal(
+    manifest.runtimeBytecodeSha256,
+    '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
+  );
+  assert.equal(manifest.sourceVerification?.status, 'verified');
+  assert.match(manifest.hashscanContractUrl, /hashscan\.io\/mainnet\/contract\/0\.0\.10850063$/);
   assert.doesNotMatch(JSON.stringify(manifest), /private.?key|mnemonic|recovery phrase/i);
 });
 

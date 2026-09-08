@@ -1,6 +1,9 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 const { solidityPackedKeccak256 } = require('ethers');
 const {
@@ -60,9 +63,32 @@ test('builds a chain-bound Mainnet checkout request with exact tinybars', () => 
   );
 });
 
-test('refuses to generate Mainnet QR requests before verified deployment evidence exists', () => {
+test('loads only source-verified Mainnet deployment evidence', t => {
+  const mainnetDeployment = loadDeployment(NETWORKS.mainnet);
+  assert.equal(mainnetDeployment.contractId, '0.0.10850063');
+  assert.equal(
+    mainnetDeployment.runtimeBytecodeSha256,
+    '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
+  );
+
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'opago-mainnet-demo-'));
+  t.after(() => fs.rmSync(temporaryDirectory, { recursive: true, force: true }));
+  const pendingPath = path.join(temporaryDirectory, 'deployment.json');
+  fs.writeFileSync(
+    pendingPath,
+    JSON.stringify({
+      network: 'mainnet',
+      chainId: 295,
+      status: 'deployed',
+      contractId: '0.0.10850063',
+      evmAddress: '0x0000000000000000000000000000000000a58f0f',
+      runtimeBytecodeSha256:
+        '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
+      sourceVerification: { status: 'pending' },
+    }),
+  );
   assert.throws(
-    () => loadDeployment(NETWORKS.mainnet),
+    () => loadDeployment({ ...NETWORKS.mainnet, deploymentPath: pendingPath }),
     /deploy and verify.*mainnet first/i,
   );
   assert.equal(loadDeployment(NETWORKS.testnet).contractId, '0.0.9972670');

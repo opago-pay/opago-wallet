@@ -1,16 +1,26 @@
 {
+  "schemaVersion": 1,
   "network": "mainnet",
   "chainId": 295,
-  "status": "not-deployed",
-  "contractId": null,
-  "evmAddress": null,
-  "deploymentTransactionId": null,
-  "runtimeBytecodeSha256": null,
+  "status": "deployed",
+  "contractName": "OpagoHbarCheckout",
+  "contractId": "0.0.10850063",
+  "evmAddress": "0x0000000000000000000000000000000000a58f0f",
+  "deploymentTransactionId": "0.0.10848889@1788856737.537500943",
+  "bytecodeSha256": "315dcba363d403213144ccac813f90f8c57fd916aa5ee24d673666917a9513ad",
+  "runtimeBytecodeSha256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
+  "deploymentSubmittedAt": "2026-09-08T08:39:13.948Z",
+  "deploymentConsensusTimestamp": "1788856744.094524104",
+  "deployedAt": "2026-09-08T08:39:04.094Z",
+  "hashscanContractUrl": "https://hashscan.io/mainnet/contract/0.0.10850063",
+  "hashscanTransactionUrl": "https://hashscan.io/mainnet/transaction/0.0.10848889%401788856737.537500943",
+  "compiler": "0.8.28+commit.7893614a.Emscripten.clang",
+  "compilerSourceLineEndings": "CRLF",
   "sourceVerification": {
     "provider": "Sourcify",
-    "status": "pending",
-    "verifiedAt": null
+    "status": "verified",
+    "verificationId": null,
+    "verifiedAt": "2026-09-08T08:39:38Z"
   },
-  "hashscanContractUrl": null,
-  "note": "Milestone 1 reserves the honest Mainnet evidence shape. Final values are written only after audit approval and the Milestone 7 deployment."
+  "mirrorBytecodeMatchedAt": "2026-09-08T08:43:40.881Z"
 }

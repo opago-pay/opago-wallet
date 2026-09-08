@@ -1,6 +1,6 @@
 # Hedera Mainnet deployment runbook
 
-**Status:** prepared, not deployed. Do not run the real deployment until the public preflight passes and Opago explicitly authorizes the irreversible Mainnet transaction.
+**Status:** contract `0.0.10850063` deployed and source-verified on 8 September 2026; Android Mainnet canary pending. Do not run the deployment command again.
 
 ## Grant scope
 
@@ -19,11 +19,14 @@ The Hedera path uses HBAR, Hedera Smart Contract Service, consensus receipts, an
 | Mainnet Mirror Node | `https://mainnet.mirrornode.hedera.com` |
 | Mainnet explorer | `https://hashscan.io/mainnet` |
 | Contract | `OpagoHbarCheckout` |
+| Contract ID | `0.0.10850063` |
+| EVM address | `0x0000000000000000000000000000000000a58f0f` |
+| Deployment transaction | `0.0.10848889@1788856737.537500943` |
 | Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
 
 The account ID, public key type, contract hashes, transaction IDs, and deployed addresses are public. Private keys and recovery phrases are not evidence and must never be pasted into chat, Git, screenshots, `EXPO_PUBLIC_*`, or the deployment manifest.
 
-## 1. Public preflight — safe to run now
+## 1. Public preflight — completed before deployment
 
 Compile and test the exact artifact:
 
@@ -36,13 +39,13 @@ npm run contract:preflight:mainnet
 Remove-Item Env:HEDERA_OPERATOR_ID -ErrorAction SilentlyContinue
 ```
 
-The preflight uses only public Mirror Node data. It verifies the network, account, public key type, balance, current ContractCreate gas price, undeployed manifest, and artifact hashes. It never accepts a private key and never submits a transaction.
+The preflight used only public Mirror Node data. It verified the network, account, public key type, balance, current ContractCreate gas price, undeployed manifest, and artifact hashes. It never accepted a private key and never submitted a transaction. It now intentionally refuses to run because a deployment is already recorded.
 
 The deployment client caps each transaction at 20 HBAR. Because `ContractCreateFlow` can perform multiple network operations and a canary payment still needs funds, the preflight requires a 30 HBAR starting balance. This is a safety reserve, not the expected charge. The 20 HBAR ceiling also remains below the signed 32-bit tinybar validation boundary in the pinned SDK. Rerun the preflight immediately before deployment because fees and the HBAR/USD conversion can change.
 
-## 2. Human authorization gate
+## 2. Human authorization gate — completed
 
-Before entering a key, verify all of the following:
+The following conditions were verified before entering the key:
 
 - the preflight passes against `0.0.10848889` on Mainnet;
 - `npm run typecheck`, `npm run lint`, `npm test`, and `npm run contract:test` pass on the intended commit;
@@ -51,9 +54,11 @@ Before entering a key, verify all of the following:
 - Opago approves spending real HBAR and understands that a deployed immutable contract cannot be edited or deleted;
 - the key holder is at the local PowerShell prompt and will not reveal the key.
 
-## 3. Mainnet deployment — real HBAR
+## 3. Mainnet deployment — completed
 
-Run only after the human authorization gate. Enter the ED25519 private key into the hidden prompt locally:
+The approved artifact was deployed from source commit `bd68e8f` and reached consensus as contract `0.0.10850063`. The transaction is public on [HashScan](https://hashscan.io/mainnet/transaction/0.0.10848889%401788856737.537500943). The command below is retained as an audit record and must not be rerun; the script also refuses a recorded redeployment by default.
+
+Historical approved procedure:
 
 ```powershell
 Set-Location C:\dev\opago-wallet
@@ -74,9 +79,9 @@ try {
 
 The script independently loads the Mainnet account, checks that the entered private key belongs to it, refuses an empty account, verifies the approved artifact hash, refuses a recorded redeployment, and writes only public evidence after a successful receipt.
 
-## 4. Independent public verification
+## 4. Independent public verification — completed
 
-After a successful deployment:
+The following command completed successfully without a private key:
 
 ```powershell
 npm run contract:verify:mainnet
@@ -90,7 +95,7 @@ Verification requires all of these to match:
 - exact Sourcify runtime match;
 - consensus timestamp and public HashScan links.
 
-Do not configure the Android Mainnet build until verification succeeds and `deployments/hedera-mainnet.json` records `sourceVerification.status` as `verified`.
+`deployments/hedera-mainnet.json` now records the exact Mirror Node runtime match, Sourcify status `verified`, verification ID `d7f91325-8b0d-4fa5-9e8d-95a8a06402da`, and the public consensus evidence. The Android Mainnet build must use only this Contract ID and runtime hash.
 
 ## 4.1 Separate Mainnet merchant reference demo
 
