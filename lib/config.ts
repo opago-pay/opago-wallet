@@ -29,6 +29,21 @@ export interface HederaBuildPolicy {
   checkoutRuntimeSha256: string;
 }
 
+export function resolveHederaMainnetEnabled(
+  legacyGlobalValue?: string,
+  hederaValue?: string,
+): boolean {
+  for (const [name, value] of [
+    ['EXPO_PUBLIC_ENABLE_MAINNET', legacyGlobalValue],
+    ['EXPO_PUBLIC_ENABLE_HEDERA_MAINNET', hederaValue],
+  ] as const) {
+    if (value !== undefined && value !== '' && value !== 'true' && value !== 'false') {
+      throw new Error(name + ' must be true or false.');
+    }
+  }
+  return legacyGlobalValue === 'true' || hederaValue === 'true';
+}
+
 export function resolveHederaBuildPolicy(
   input: HederaBuildPolicyInput,
 ): HederaBuildPolicy {
@@ -44,7 +59,7 @@ export function resolveHederaBuildPolicy(
   const buildProfile = profileValue as HederaBuildProfile;
   if (network === 'mainnet' && !input.mainnetEnabled) {
     throw new Error(
-      'Hedera mainnet requires both EXPO_PUBLIC_HEDERA_NETWORK=mainnet and EXPO_PUBLIC_ENABLE_MAINNET=true.',
+      'Hedera mainnet requires EXPO_PUBLIC_HEDERA_NETWORK=mainnet and EXPO_PUBLIC_ENABLE_HEDERA_MAINNET=true.',
     );
   }
   if (buildProfile !== network) {
@@ -127,11 +142,15 @@ const SOLANA_USDC_MINTS = Object.freeze({
 
 const isDevelopment = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 const mainnetEnabled = process.env.EXPO_PUBLIC_ENABLE_MAINNET === 'true';
+const hederaMainnetEnabled = resolveHederaMainnetEnabled(
+  process.env.EXPO_PUBLIC_ENABLE_MAINNET,
+  process.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET,
+);
 const insecureHttpEnabled = isDevelopment && process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP === 'true';
 const hederaBuildPolicy = resolveHederaBuildPolicy({
   network: process.env.EXPO_PUBLIC_HEDERA_NETWORK,
   buildProfile: process.env.EXPO_PUBLIC_HEDERA_BUILD_PROFILE,
-  mainnetEnabled,
+  mainnetEnabled: hederaMainnetEnabled,
   mirrorNodeUrl: process.env.EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL,
   maxTransferHbar: process.env.EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR,
   legacyMaxTestTransferHbar: process.env.EXPO_PUBLIC_HEDERA_MAX_TEST_TRANSFER_HBAR,
@@ -152,6 +171,7 @@ if (configuredSolanaUsdcMint !== expectedSolanaUsdcMint) {
 export const appConfig = Object.freeze({
   isDevelopment,
   isMainnet: mainnetEnabled,
+  isHederaMainnet: hederaMainnetEnabled,
   allowInsecureHttp: insecureHttpEnabled,
   solanaRpcUrl:
     process.env.EXPO_PUBLIC_SOLANA_RPC_URL ||

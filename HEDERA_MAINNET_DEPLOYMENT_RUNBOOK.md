@@ -119,6 +119,13 @@ Remove-Item Env:HEDERA_MERCHANT_ID -ErrorAction SilentlyContinue
 
 After verification, pin the Android Mainnet build to the recorded Contract ID and runtime SHA-256. The canary evidence must show:
 
+```powershell
+Set-Location C:\dev\opago-wallet
+npm run android:mainnet-candidate
+```
+
+This creates and installs a standalone arm64 internal candidate under a separate package ID. It enables only Hedera Mainnet with a `1 HBAR` per-transaction cap and keeps Solana on devnet, Lightning on regtest, and swaps disabled. It is locally signed for physical acceptance and is not a Play Store release.
+
 1. visible Hedera Mainnet status and real HBAR balance;
 2. a freshly generated merchant request with a small amount;
 3. merchant, amount, fee context, contract, and network review before signing;

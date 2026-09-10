@@ -58,6 +58,7 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
   assert.match(portfolio, /Development networks - real mainnet payments are blocked/);
+  assert.match(portfolio, /Hedera Mainnet - real HBAR/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);

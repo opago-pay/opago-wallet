@@ -18,7 +18,7 @@ The default mobile build is intended for development and test networks. The veri
 | Payment-method negotiation | OpenCryptoPay-style local reference service | Prototype |
 | eID and Travel Rule hand-off | Local reference services | Demo only; not legal identity verification |
 
-Mainnet payments remain disabled in the default build. Hedera Mainnet code paths require a matching Mainnet build profile, the global real-fund flag, a human-approved transfer cap, and the pinned verified contract `0.0.10850063`. The default build remains testnet-only.
+Mainnet payments remain disabled in the default build. Hedera Mainnet code paths require the Hedera-specific real-fund flag, a matching build profile, a human-approved transfer cap, and the pinned verified contract `0.0.10850063`. The grant candidate enables only real HBAR; Solana remains devnet, Lightning remains regtest, and swaps remain blocked.
 
 ## Interface readiness
 
@@ -226,7 +226,7 @@ Acceptance gate: the technical scope documents are versioned, and every human de
 Codex delivery:
 
 - support `testnet | mainnet` as build-time Hedera networks while keeping testnet as the default;
-- require the global real-fund flag and a matching Hedera build profile before Mainnet can initialize;
+- require the Hedera-specific real-fund flag and a matching Hedera build profile before Mainnet can initialize;
 - bind chain ID `296` to testnet and `295` to Mainnet payment-ID derivation;
 - bind official Mirror Node and HashScan routes to the selected network;
 - reject cross-network QR/deep-link requests before review or signing;
@@ -242,7 +242,7 @@ Human/Opago delivery:
 - approve the Mainnet merchant identity, Android package/version policy, and pilot allowlist policy;
 - configure public production metadata only after the audited contract deployment.
 
-Acceptance gate: complete. A testnet build cannot submit to Mainnet, a Mainnet build cannot accept testnet requests or infrastructure, and no Mainnet build succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 105 application tests, and 9 contract tests.
+Acceptance gate: complete. A Hedera testnet profile cannot submit to Hedera Mainnet, a Hedera Mainnet profile cannot accept Hedera testnet requests or infrastructure, and no Hedera Mainnet profile succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 106 application tests, and 9 contract tests.
 
 ### Mainnet Milestone 2 - account lifecycle and recovery
 
@@ -657,6 +657,7 @@ Relevant implementation files:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `EXPO_PUBLIC_ENABLE_MAINNET` | `false` | Explicitly enables supported real-fund networks at build time |
+| `EXPO_PUBLIC_ENABLE_HEDERA_MAINNET` | `false` | Enables Hedera Mainnet independently without activating Solana, Lightning, or swaps |
 | `EXPO_PUBLIC_SOLANA_RPC_URL` | Solana devnet public RPC | Selects the Solana RPC endpoint |
 | `EXPO_PUBLIC_USDC_MINT` | Official Circle mint for the selected cluster | Overrides the reviewed six-decimal USDC mint when an explicitly reviewed deployment requires it |
 | `EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_SOL` | `1` | Upper bound for one app-initiated devnet SOL transfer |
@@ -678,18 +679,26 @@ See [`.env.example`](.env.example) for the complete development configuration.
 Mainnet enablement is a build-time release decision, not an in-app network switch:
 
 ```dotenv
-EXPO_PUBLIC_ENABLE_MAINNET=true
+EXPO_PUBLIC_ENABLE_MAINNET=false
+EXPO_PUBLIC_ENABLE_HEDERA_MAINNET=true
 EXPO_PUBLIC_HEDERA_BUILD_PROFILE=mainnet
 EXPO_PUBLIC_HEDERA_NETWORK=mainnet
 EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL=https://mainnet.mirrornode.hedera.com
-EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=<human-approved-pilot-cap>
-EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=<verified-mainnet-contract-id>
-EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=<pinned-mainnet-runtime-sha256>
-EXPO_PUBLIC_SOLANA_RPC_URL=https://your-reviewed-mainnet-rpc.example
-EXPO_PUBLIC_EID_BACKEND_URL=https://your-reviewed-eid-backend.example
+EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=1
+EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=0.0.10850063
+EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8
+EXPO_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 ```
 
-Hedera Mainnet requires every listed Hedera value. Partial activation, a mismatched profile, a wrong-network Mirror Node, a missing transfer cap, or missing contract evidence fails during application configuration. The `mainnet-candidate` and `production` EAS profiles set only non-secret network identity; the approved cap and final deployment evidence must be configured in the protected EAS production environment after audit and deployment.
+Hedera Mainnet requires every listed Hedera value. Partial activation, a mismatched profile, a wrong-network Mirror Node, a missing transfer cap, or missing contract evidence fails during application configuration. The `mainnet-candidate` and `production` EAS profiles pin the public verified deployment and deliberately leave the global multi-chain Mainnet switch disabled.
+
+On Windows, an authorized arm64 Android device can receive a standalone, locally signed internal candidate without Metro:
+
+```powershell
+npm run android:mainnet-candidate
+```
+
+The script rejects a dirty worktree, secrets in the build environment, mismatched deployment evidence, multiple devices, and non-arm64 targets. It records the exact commit and APK hash under the ignored `.codex-local-evidence/mainnet-candidate` directory. This internal APK uses a local debug certificate and is not the final Play Store release.
 
 Before any release, replace public development infrastructure, validate the complete Spark and Atomiq deployment, repeat native device and failure-path testing, reassess the dependency tree, establish monitored RPC and backend services, and obtain independent security, privacy, and regulatory reviews. Network support in source code is not authorization to use real funds; the go/no-go gates in the Mainnet plan remain binding.
 
@@ -729,7 +738,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `105/105` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `106/106` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

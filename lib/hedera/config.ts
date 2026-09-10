@@ -40,7 +40,7 @@ export function assertHederaNetwork(): void {
   if (appConfig.hederaNetwork !== HEDERA_NETWORK) {
     throw new Error('Hedera network configuration changed after application startup.');
   }
-  if (HEDERA_NETWORK === 'mainnet' && !appConfig.isMainnet) {
+  if (HEDERA_NETWORK === 'mainnet' && !appConfig.isHederaMainnet) {
     throw new Error('Hedera mainnet is disabled for this build.');
   }
 }

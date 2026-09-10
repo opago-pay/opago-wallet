@@ -481,14 +481,20 @@ export default function HomeScreen() {
         <Text style={styles.valuationNote}>
           {appConfig.isMainnet
             ? 'Estimated using current EUR market prices.'
-            : 'Mainnet-price estimate only; development-network assets have no monetary value.'}
+            : appConfig.isHederaMainnet
+              ? 'Hedera is real HBAR; development-network assets use mainnet-price estimates.'
+              : 'Mainnet-price estimate only; development-network assets have no monetary value.'}
         </Text>
       </View>
 
       {!appConfig.isMainnet && (
         <View style={styles.banner} accessibilityRole="summary">
           <Ionicons name="shield-checkmark-outline" size={19} color="#c9c0ff" />
-          <Text style={styles.bannerText}>Development networks - real mainnet payments are blocked</Text>
+          <Text style={styles.bannerText}>
+            {appConfig.isHederaMainnet
+              ? 'Hedera Mainnet - real HBAR. Solana and Lightning remain development networks.'
+              : 'Development networks - real mainnet payments are blocked'}
+          </Text>
         </View>
       )}
 

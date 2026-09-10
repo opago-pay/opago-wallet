@@ -265,12 +265,18 @@ export default function SettingsScreen() {
 
       <View style={styles.networkBanner}>
         <Text style={styles.sectionTitle}>
-          {appConfig.isMainnet ? 'Mainnet enabled' : 'Safe development networks'}
+          {appConfig.isMainnet
+            ? 'Mainnet enabled'
+            : appConfig.isHederaMainnet
+              ? 'Hedera Mainnet enabled'
+              : 'Safe development networks'}
         </Text>
         <Text style={styles.sectionSubtitle}>
           {appConfig.isMainnet
             ? 'Real-fund transfers are enabled for this build.'
-            : 'Real-fund transfers are blocked until mainnet is explicitly enabled.'}
+            : appConfig.isHederaMainnet
+              ? 'Real HBAR is enabled. Solana, USDC, Lightning, and swaps remain on safe development networks.'
+              : 'Real-fund transfers are blocked until mainnet is explicitly enabled.'}
         </Text>
       </View>
 

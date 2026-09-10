@@ -5,7 +5,10 @@ const test = require('node:test');
 
 require('./register-typescript.cjs');
 
-const { resolveHederaBuildPolicy } = require('../lib/config.ts');
+const {
+  resolveHederaBuildPolicy,
+  resolveHederaMainnetEnabled,
+} = require('../lib/config.ts');
 const {
   assertHederaMirrorNodeMatchesNetwork,
   getHederaChainId,
@@ -34,6 +37,13 @@ test('uses the official Hedera testnet profile by default', () => {
   assert.equal(getHederaHashscanBaseUrl('testnet'), 'https://hashscan.io/testnet');
 });
 
+test('allows Hedera Mainnet without enabling other real-fund networks', () => {
+  assert.equal(resolveHederaMainnetEnabled('false', 'true'), true);
+  assert.equal(resolveHederaMainnetEnabled('false', 'false'), false);
+  assert.equal(resolveHederaMainnetEnabled('true', undefined), true);
+  assert.throws(() => resolveHederaMainnetEnabled('yes', 'false'), /must be true or false/i);
+});
+
 test('activates Mainnet only with an explicit matching release profile', () => {
   assert.deepEqual(resolveHederaBuildPolicy(mainnetInput), {
     network: 'mainnet',
@@ -50,7 +60,7 @@ test('activates Mainnet only with an explicit matching release profile', () => {
 test('fails closed for partial Mainnet activation and network/profile mismatches', () => {
   assert.throws(
     () => resolveHederaBuildPolicy({ ...mainnetInput, mainnetEnabled: false }),
-    /requires both EXPO_PUBLIC_HEDERA_NETWORK=mainnet and EXPO_PUBLIC_ENABLE_MAINNET=true/i,
+    /requires EXPO_PUBLIC_HEDERA_NETWORK=mainnet and EXPO_PUBLIC_ENABLE_HEDERA_MAINNET=true/i,
   );
   assert.throws(
     () => resolveHederaBuildPolicy({ ...mainnetInput, buildProfile: 'testnet' }),
