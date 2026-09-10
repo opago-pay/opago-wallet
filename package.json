@@ -22,6 +22,7 @@
     "phase5:verify": "node ./scripts/verify-phase5.cjs",
     "phase5:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/finalize-phase5-android.ps1",
     "android:mainnet-candidate": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-hedera-mainnet-candidate.ps1",
+    "mainnet:config:verify": "node ./scripts/verify-hedera-mainnet-build-config.cjs",
     "contract:compile": "hardhat compile",
     "contract:test": "hardhat test",
     "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs --network testnet",

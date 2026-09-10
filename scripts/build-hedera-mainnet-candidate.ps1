@@ -83,7 +83,24 @@ if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') {
   throw 'Unable to record the exact Git commit.'
 }
 
-$settings = @{
+$qualitySettings = @{
+  CI = '1'
+  EXPO_NO_DOTENV = '1'
+  EXPO_NO_TELEMETRY = '1'
+  NODE_ENV = 'test'
+  EXPO_PUBLIC_ENABLE_MAINNET = 'false'
+  EXPO_PUBLIC_ENABLE_HEDERA_MAINNET = 'false'
+  EXPO_PUBLIC_HEDERA_NETWORK = 'testnet'
+  EXPO_PUBLIC_HEDERA_BUILD_PROFILE = 'testnet'
+  EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL = 'https://testnet.mirrornode.hedera.com'
+  EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR = '1'
+  EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID = '0.0.9972670'
+  EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
+  EXPO_PUBLIC_SOLANA_RPC_URL = 'https://api.devnet.solana.com'
+  EXPO_PUBLIC_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
+  EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
+}
+$buildSettings = @{
   CI = '1'
   EXPO_NO_DOTENV = '1'
   EXPO_NO_TELEMETRY = '1'
@@ -102,7 +119,7 @@ $settings = @{
 }
 $savedEnvironment = @{}
 $publicNames = @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith('EXPO_PUBLIC_') } | ForEach-Object Name)
-$managedNames = @($publicNames + $settings.Keys | Select-Object -Unique)
+$managedNames = @($publicNames + $qualitySettings.Keys + $buildSettings.Keys | Select-Object -Unique)
 foreach ($name in $managedNames) {
   $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
   [Environment]::SetEnvironmentVariable($name, $null, 'Process')
@@ -120,12 +137,18 @@ gradle.afterProject { project, state ->
 '@ | Set-Content -LiteralPath $initScript -Encoding ASCII
 
 try {
-  foreach ($name in $settings.Keys) {
-    [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process')
+  foreach ($name in $qualitySettings.Keys) {
+    [Environment]::SetEnvironmentVariable($name, $qualitySettings[$name], 'Process')
   }
 
   Invoke-CheckedCommand -Label 'Mainnet candidate quality gates' -FilePath 'npm.cmd' -ArgumentList @(
     'run', 'phase5:verify'
+  )
+  foreach ($name in $buildSettings.Keys) {
+    [Environment]::SetEnvironmentVariable($name, $buildSettings[$name], 'Process')
+  }
+  Invoke-CheckedCommand -Label 'Verify isolated Mainnet build configuration' -FilePath 'npm.cmd' -ArgumentList @(
+    'run', 'mainnet:config:verify'
   )
   Invoke-CheckedCommand -Label 'Generate fresh Android project' -FilePath 'npx.cmd' -ArgumentList @(
     'expo', 'prebuild', '--platform', 'android', '--clean', '--no-install'
