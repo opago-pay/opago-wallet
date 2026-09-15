@@ -11,6 +11,10 @@ const {
   createHederaPaymentJournal,
   HEDERA_PAYMENT_JOURNAL_KEY,
 } = require('../lib/hedera/payment-journal.ts');
+const {
+  HederaPaymentPendingError,
+  reconcileAmbiguousHederaSubmission,
+} = require('../lib/hedera/payments.ts');
 
 function memoryStorage() {
   const values = new Map();
@@ -117,13 +121,70 @@ test('fails closed when persisted journal data is malformed', async () => {
   );
 });
 
+test('recovers an ambiguous SDK response from authoritative Mirror Node success', async () => {
+  const resolutions = [];
+  const result = await reconcileAmbiguousHederaSubmission({
+    transactionId: submission().transactionId,
+    lifecycle: {
+      async onResolved(resolution) { resolutions.push(resolution); },
+    },
+    loadTransaction: async () => ({ result: 'SUCCESS', nonce: 0 }),
+  });
+  assert.equal(result, 'SUCCESS');
+  assert.deepEqual(resolutions, [{
+    transactionId: submission().transactionId,
+    state: 'confirmed',
+    result: 'SUCCESS',
+  }]);
+});
+
+test('keeps an ambiguous SDK response pending when Mirror Node has no final result', async () => {
+  let lookups = 0;
+  await assert.rejects(
+    reconcileAmbiguousHederaSubmission({
+      transactionId: submission().transactionId,
+      loadTransaction: async () => {
+        lookups += 1;
+        return null;
+      },
+      sleep: async () => undefined,
+      maxAttempts: 3,
+    }),
+    cause => cause instanceof HederaPaymentPendingError &&
+      cause.transactionId === submission().transactionId,
+  );
+  assert.equal(lookups, 3);
+});
+
+test('records an authoritative Mirror Node failure without claiming success', async () => {
+  const resolutions = [];
+  await assert.rejects(
+    reconcileAmbiguousHederaSubmission({
+      transactionId: submission().transactionId,
+      lifecycle: {
+        async onResolved(resolution) { resolutions.push(resolution); },
+      },
+      loadTransaction: async () => ({ result: 'INSUFFICIENT_PAYER_BALANCE', nonce: 0 }),
+    }),
+    /INSUFFICIENT_PAYER_BALANCE/,
+  );
+  assert.equal(resolutions[0].state, 'failed');
+});
+
 test('Hedera send paths journal before a non-validating receipt query and use bounded SDK calls', () => {
   const root = path.resolve(__dirname, '..');
   for (const relative of ['lib/hedera/payments.ts', 'lib/hedera/checkout.ts']) {
     const source = fs.readFileSync(path.join(root, relative), 'utf8');
-    const submittedAt = source.indexOf('onSubmitted?.');
-    const receiptAt = source.indexOf('.getReceiptQuery(client)');
-    assert.ok(submittedAt >= 0 && receiptAt > submittedAt, relative + ' must journal before receipt lookup');
+    const sendSource = source.slice(source.indexOf('export async function sendHedera'));
+    const transactionIdAt = sendSource.indexOf('TransactionId.generate');
+    const submittedAt = sendSource.indexOf('onSubmitted?.');
+    const executeAt = sendSource.indexOf('.execute(client)');
+    const receiptAt = sendSource.indexOf('.getReceiptQuery(client)');
+    assert.ok(transactionIdAt >= 0, relative + ' must assign a transaction ID before submission');
+    assert.ok(submittedAt > transactionIdAt && executeAt > submittedAt,
+      relative + ' must journal the assigned transaction ID before network submission');
+    assert.ok(receiptAt > executeAt, relative + ' must query the receipt only after submission');
+    assert.match(sendSource, /\.setTransactionId\(transactionId\)/);
     assert.match(source, /\.setValidateStatus\(false\)/);
     assert.match(source, /\.setRequestTimeout\(HEDERA_SDK_REQUEST_TIMEOUT_MS\)/);
     assert.match(source, /\.setMaxAttempts\(HEDERA_SDK_MAX_ATTEMPTS\)/);

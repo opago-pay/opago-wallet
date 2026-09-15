@@ -3,6 +3,7 @@ import {
   ContractFunctionParameters,
   Hbar,
   Long,
+  TransactionId,
   type PrivateKey,
 } from '@hiero-ledger/sdk';
 import { sha256 } from '@noble/hashes/sha256';
@@ -32,6 +33,7 @@ import {
   assertHederaTransferAmount,
   formatTinybars,
   parseHbarToTinybars,
+  reconcileAmbiguousHederaSubmission,
   type HederaTransferResult,
 } from './payments';
 import type { HederaPaymentLifecycle } from './payment-journal';
@@ -374,46 +376,86 @@ export async function sendHederaCheckoutPayment(input: {
   client.setMaxAttempts(HEDERA_SDK_MAX_ATTEMPTS);
 
   try {
-    const response = await buildHederaCheckoutTransaction(input.request).execute(client);
-    const transactionId = response.transactionId.toString();
+    const transactionId = TransactionId.generate(sourceAccountId);
+    const transactionIdString = transactionId.toString();
+    const transaction = buildHederaCheckoutTransaction(input.request)
+      .setTransactionId(transactionId);
     await input.lifecycle?.onSubmitted?.({
-      transactionId,
+      transactionId: transactionIdString,
       mode: 'checkout',
       recipientAccountId: input.request.merchantAccountId,
       amountTinybars,
       paymentId: input.request.paymentId,
     });
-    const receipt = await response
-      .getReceiptQuery(client)
-      .setValidateStatus(false)
-      .execute(client);
-    const status = receipt.status.toString();
+    let response;
+    try {
+      response = await transaction.execute(client);
+    } catch {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
+      });
+      return buildCheckoutTransferResult(input.request, transactionIdString, amountTinybars);
+    }
+    let status: string;
+    try {
+      const receipt = await response
+        .getReceiptQuery(client)
+        .setValidateStatus(false)
+        .execute(client);
+      status = receipt.status.toString();
+    } catch {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
+      });
+      return buildCheckoutTransferResult(input.request, transactionIdString, amountTinybars);
+    }
+    if (status === 'UNKNOWN') {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
+      });
+      return buildCheckoutTransferResult(input.request, transactionIdString, amountTinybars);
+    }
     if (status !== 'SUCCESS') {
       await input.lifecycle?.onResolved?.({
-        transactionId,
+        transactionId: transactionIdString,
         state: 'failed',
         result: status,
       });
       throw new Error('Hedera checkout returned status ' + status + '.');
     }
-    await input.lifecycle?.onResolved?.({
-      transactionId,
-      state: 'confirmed',
-      result: status,
-    });
-    return {
-      mode: 'checkout',
-      transactionId,
-      status: 'SUCCESS',
-      amountTinybars,
-      amountHbar: formatTinybars(amountTinybars),
-      recipientAccountId: input.request.merchantAccountId,
-      hashscanUrl: getHederaTransactionExplorerUrl(transactionId),
-      paymentId: input.request.paymentId,
-      contractId: input.request.contractId,
-      contractHashscanUrl: getHederaContractExplorerUrl(input.request.contractId),
-    };
+    try {
+      await input.lifecycle?.onResolved?.({
+        transactionId: transactionIdString,
+        state: 'confirmed',
+        result: status,
+      });
+    } catch {
+      // An authoritative receipt must not be hidden by local journal storage failure.
+    }
+    return buildCheckoutTransferResult(input.request, transactionIdString, amountTinybars);
   } finally {
     client.close();
   }
+}
+
+function buildCheckoutTransferResult(
+  request: HederaCheckoutRequest,
+  transactionId: string,
+  amountTinybars: bigint,
+): HederaTransferResult {
+  return {
+    mode: 'checkout',
+    transactionId,
+    status: 'SUCCESS',
+    amountTinybars,
+    amountHbar: formatTinybars(amountTinybars),
+    recipientAccountId: request.merchantAccountId,
+    hashscanUrl: getHederaTransactionExplorerUrl(transactionId),
+    paymentId: request.paymentId,
+    contractId: request.contractId,
+    contractHashscanUrl: getHederaContractExplorerUrl(request.contractId),
+  };
 }

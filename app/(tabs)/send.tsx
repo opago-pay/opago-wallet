@@ -45,6 +45,7 @@ import {
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import {
   formatTinybars,
+  HederaPaymentPendingError,
   parseHederaPaymentRequest,
   parseHederaTransferTinybars,
   type HederaTransferResult,
@@ -396,10 +397,12 @@ export default function SendScreen() {
       setHederaResult(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
+      if (cause instanceof HederaPaymentPendingError) setPendingHedera(null);
       Alert.alert(
-        'HBAR payment not confirmed',
-        messageOf(cause) +
-          '\n\nNo success was recorded. Refresh Activity and check HashScan before retrying.',
+        cause instanceof HederaPaymentPendingError
+          ? 'HBAR payment pending'
+          : 'HBAR payment not confirmed',
+        messageOf(cause) + '\n\nRefresh Activity and check HashScan before retrying.',
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {

@@ -1,4 +1,10 @@
-import { Hbar, PrivateKey, TransferTransaction } from '@hiero-ledger/sdk';
+import {
+  AccountId,
+  Hbar,
+  PrivateKey,
+  TransactionId,
+  TransferTransaction,
+} from '@hiero-ledger/sdk';
 import {
   assertHederaNetwork,
   createHederaClient,
@@ -13,6 +19,10 @@ import {
   TINYBARS_PER_HBAR,
 } from './config';
 import { getHederaTransactionExplorerUrl } from './explorer';
+import {
+  getMirrorTransaction,
+  type MirrorTransactionRecord,
+} from './mirror';
 import type { HederaPaymentLifecycle } from './payment-journal';
 
 export interface HederaPaymentRequest {
@@ -75,6 +85,82 @@ export function assertHederaTransferAmount(tinybars: bigint): bigint {
 
 export function parseHederaTransferTinybars(rawAmount: string): bigint {
   return assertHederaTransferAmount(parseHbarToTinybars(rawAmount));
+}
+
+export class HederaPaymentPendingError extends Error {
+  readonly transactionId: string;
+  readonly hashscanUrl: string;
+
+  constructor(transactionId: string) {
+    super(
+      'The transaction was prepared but Hedera has not returned an authoritative final status. ' +
+        'Transaction ID: ' + transactionId + '. Check Activity or HashScan before retrying.',
+    );
+    this.name = 'HederaPaymentPendingError';
+    this.transactionId = transactionId;
+    this.hashscanUrl = getHederaTransactionExplorerUrl(transactionId);
+  }
+}
+
+type MirrorTransactionLoader = (
+  transactionId: string,
+) => Promise<MirrorTransactionRecord | null>;
+
+async function recordResolutionBestEffort(
+  lifecycle: HederaPaymentLifecycle | undefined,
+  transactionId: string,
+  state: 'confirmed' | 'failed',
+  result: string,
+): Promise<void> {
+  try {
+    await lifecycle?.onResolved?.({ transactionId, state, result });
+  } catch {
+    // An authoritative network result must not be hidden by local journal storage failure.
+  }
+}
+
+export async function reconcileAmbiguousHederaSubmission(input: {
+  transactionId: string;
+  lifecycle?: HederaPaymentLifecycle;
+  loadTransaction?: MirrorTransactionLoader;
+  sleep?: (delayMs: number) => Promise<void>;
+  maxAttempts?: number;
+}): Promise<'SUCCESS'> {
+  const loadTransaction = input.loadTransaction || getMirrorTransaction;
+  const sleep = input.sleep || (delayMs => new Promise<void>(resolve => setTimeout(resolve, delayMs)));
+  const maxAttempts = input.maxAttempts ?? 3;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5) {
+    throw new Error('Hedera reconciliation attempts must be between 1 and 5.');
+  }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (attempt > 1) await sleep((attempt - 1) * 1_000);
+    let transaction: MirrorTransactionRecord | null = null;
+    try {
+      transaction = await loadTransaction(input.transactionId);
+    } catch {
+      // The durable pending journal remains authoritative until Mirror Node is reachable.
+    }
+    const result = String(transaction?.result || '').trim().toUpperCase();
+    if (!result || result === 'UNKNOWN') continue;
+    if (result === 'SUCCESS') {
+      await recordResolutionBestEffort(
+        input.lifecycle,
+        input.transactionId,
+        'confirmed',
+        result,
+      );
+      return 'SUCCESS';
+    }
+    await recordResolutionBestEffort(
+      input.lifecycle,
+      input.transactionId,
+      'failed',
+      result,
+    );
+    throw new Error(HEDERA_NETWORK_LABEL + ' returned status ' + result + '.');
+  }
+  throw new HederaPaymentPendingError(input.transactionId);
 }
 
 // Backward-compatible names for the existing testnet acceptance scripts.
@@ -155,51 +241,78 @@ export async function sendHederaTransfer(input: {
   client.setMaxAttempts(HEDERA_SDK_MAX_ATTEMPTS);
 
   try {
-    const response = await new TransferTransaction()
+    const transactionId = TransactionId.generate(AccountId.fromString(sourceAccountId));
+    const transactionIdString = transactionId.toString();
+    const transaction = new TransferTransaction()
+      .setTransactionId(transactionId)
       .addHbarTransfer(sourceAccountId, Hbar.fromTinybars((-tinybars).toString()))
       .addHbarTransfer(recipientAccountId, Hbar.fromTinybars(tinybars.toString()))
       .setTransactionMemo('Opago HBAR ' + HEDERA_NETWORK + ' transfer')
       .setMaxTransactionFee(
         Hbar.fromTinybars(MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS.toString()),
-      )
-      .execute(client);
-    const transactionId = response.transactionId.toString();
+      );
     await input.lifecycle?.onSubmitted?.({
-      transactionId,
+      transactionId: transactionIdString,
       mode: 'direct',
       recipientAccountId,
       amountTinybars: tinybars,
     });
-    const receipt = await response
-      .getReceiptQuery(client)
-      .setValidateStatus(false)
-      .execute(client);
-    const status = receipt.status.toString();
-    if (status !== 'SUCCESS') {
-      await input.lifecycle?.onResolved?.({
-        transactionId,
-        state: 'failed',
-        result: status,
+    let response;
+    try {
+      response = await transaction.execute(client);
+    } catch {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
       });
+      return buildDirectTransferResult(transactionIdString, recipientAccountId, tinybars);
+    }
+    let status: string;
+    try {
+      const receipt = await response
+        .getReceiptQuery(client)
+        .setValidateStatus(false)
+        .execute(client);
+      status = receipt.status.toString();
+    } catch {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
+      });
+      return buildDirectTransferResult(transactionIdString, recipientAccountId, tinybars);
+    }
+    if (status === 'UNKNOWN') {
+      await reconcileAmbiguousHederaSubmission({
+        transactionId: transactionIdString,
+        lifecycle: input.lifecycle,
+      });
+      return buildDirectTransferResult(transactionIdString, recipientAccountId, tinybars);
+    }
+    if (status !== 'SUCCESS') {
+      await recordResolutionBestEffort(input.lifecycle, transactionIdString, 'failed', status);
       throw new Error(HEDERA_NETWORK_LABEL + ' returned status ' + status + '.');
     }
-    await input.lifecycle?.onResolved?.({
-      transactionId,
-      state: 'confirmed',
-      result: status,
-    });
-    return {
-      mode: 'direct',
-      transactionId,
-      status: 'SUCCESS',
-      amountTinybars: tinybars,
-      amountHbar: formatTinybars(tinybars),
-      recipientAccountId,
-      hashscanUrl: getHederaTransactionExplorerUrl(transactionId),
-    };
+    await recordResolutionBestEffort(input.lifecycle, transactionIdString, 'confirmed', status);
+    return buildDirectTransferResult(transactionIdString, recipientAccountId, tinybars);
   } finally {
     client.close();
   }
+}
+
+function buildDirectTransferResult(
+  transactionId: string,
+  recipientAccountId: string,
+  amountTinybars: bigint,
+): HederaTransferResult {
+  return {
+    mode: 'direct',
+    transactionId,
+    status: 'SUCCESS',
+    amountTinybars,
+    amountHbar: formatTinybars(amountTinybars),
+    recipientAccountId,
+    hashscanUrl: getHederaTransactionExplorerUrl(transactionId),
+  };
 }
 
 // Kept until external integrations have migrated to the network-neutral API.
