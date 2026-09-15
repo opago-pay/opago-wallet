@@ -23,6 +23,21 @@ function Invoke-CheckedCommand {
   if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
 }
 
+function Get-Sha256Hex {
+  param([Parameter(Mandatory)] [string]$Path)
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 Set-Location -LiteralPath $repoRoot
 foreach ($requiredCommand in @('git.exe', 'node.exe', 'npm.cmd', 'npx.cmd', 'adb.exe')) {
   if (-not (Get-Command $requiredCommand -ErrorAction SilentlyContinue)) {
@@ -175,7 +190,7 @@ try {
   }
   $targetApk = Join-Path $outputDirectory 'opago-wallet-hedera-mainnet-candidate.apk'
   Copy-Item -LiteralPath $sourceApk -Destination $targetApk -Force
-  $apkHash = (Get-FileHash -LiteralPath $targetApk -Algorithm SHA256).Hash.ToLowerInvariant()
+  $apkHash = Get-Sha256Hex -Path $targetApk
 
   Invoke-CheckedCommand -Label 'Install Mainnet candidate' -FilePath 'adb.exe' -ArgumentList @(
     '-s', $DeviceSerial, 'install', '-r', $targetApk
@@ -199,6 +214,8 @@ try {
     standalone = $true
     hederaNetwork = 'mainnet'
     hederaMaximumTransferHbar = '1'
+    hederaDirectTransferFeeCeilingHbar = '0.1'
+    hederaCheckoutFeeCeilingHbar = '0.75'
     checkoutContractId = $expectedContractId
     runtimeBytecodeSha256 = $expectedRuntimeSha256
     solanaNetwork = 'devnet'
