@@ -8,7 +8,7 @@ import {
   HEDERA_SDK_GRPC_DEADLINE_MS,
   HEDERA_SDK_MAX_ATTEMPTS,
   HEDERA_SDK_REQUEST_TIMEOUT_MS,
-  MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
+  MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS,
   parseHederaAccountId,
   TINYBARS_PER_HBAR,
 } from './config';
@@ -148,7 +148,7 @@ export async function sendHederaTransfer(input: {
   const client = createHederaClient();
   client.setOperator(sourceAccountId, input.privateKey);
   client.setDefaultMaxTransactionFee(
-    Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
+    Hbar.fromTinybars(MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS.toString()),
   );
   client.setGrpcDeadline(HEDERA_SDK_GRPC_DEADLINE_MS);
   client.setRequestTimeout(HEDERA_SDK_REQUEST_TIMEOUT_MS);
@@ -160,7 +160,7 @@ export async function sendHederaTransfer(input: {
       .addHbarTransfer(recipientAccountId, Hbar.fromTinybars(tinybars.toString()))
       .setTransactionMemo('Opago HBAR ' + HEDERA_NETWORK + ' transfer')
       .setMaxTransactionFee(
-        Hbar.fromTinybars(MAX_HEDERA_TRANSACTION_FEE_TINYBARS.toString()),
+        Hbar.fromTinybars(MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS.toString()),
       )
       .execute(client);
     const transactionId = response.transactionId.toString();

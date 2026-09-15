@@ -1,7 +1,11 @@
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { HederaTransferResult } from '@/lib/hedera/payments';
 import {
+  formatTinybars,
+  type HederaTransferResult,
+} from '@/lib/hedera/payments';
+import {
+  getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK,
   HEDERA_NETWORK_BADGE,
   HEDERA_NETWORK_LABEL,
@@ -16,6 +20,9 @@ export function HederaReviewView(props: {
   onConfirm(): void;
   onCancel(): void;
 }) {
+  const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
+    props.payment.checkoutRequest ? 'checkout' : 'direct',
+  );
   return (
     <ScrollView
       style={styles.scrollContainer}
@@ -51,6 +58,12 @@ export function HederaReviewView(props: {
           <Text style={styles.quoteLabel}>Route</Text>
           <Text style={styles.quoteValue}>
             {props.payment.checkoutRequest ? 'Opago checkout contract' : 'Direct transfer'}
+          </Text>
+        </View>
+        <View style={styles.quoteRow}>
+          <Text style={styles.quoteLabel}>Maximum network fee</Text>
+          <Text style={styles.quoteValue}>
+            {formatTinybars(feeCeilingTinybars)} HBAR
           </Text>
         </View>
         {props.payment.checkoutRequest && (

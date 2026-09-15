@@ -6,10 +6,22 @@ export const HEDERA_CHAIN_ID = getHederaChainId(HEDERA_NETWORK);
 export const HEDERA_NETWORK_LABEL = 'Hedera ' + HEDERA_NETWORK;
 export const HEDERA_NETWORK_BADGE = HEDERA_NETWORK.toUpperCase();
 export const TINYBARS_PER_HBAR = 100_000_000n;
-export const MAX_HEDERA_TRANSACTION_FEE_TINYBARS = 100_000_000n;
+// These are safety ceilings, not quoted fees. Hedera charges the actual fee only.
+// Keep the direct-transfer ceiling small, while leaving enough room for the
+// checkout contract's 300,000 gas limit at the current Mainnet fee schedule.
+export const MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS = 10_000_000n;
+export const MAX_HEDERA_CHECKOUT_FEE_TINYBARS = 75_000_000n;
 export const HEDERA_SDK_REQUEST_TIMEOUT_MS = 20_000;
 export const HEDERA_SDK_GRPC_DEADLINE_MS = 10_000;
 export const HEDERA_SDK_MAX_ATTEMPTS = 3;
+
+export function getHederaPaymentFeeCeilingTinybars(
+  mode: 'direct' | 'checkout',
+): bigint {
+  return mode === 'checkout'
+    ? MAX_HEDERA_CHECKOUT_FEE_TINYBARS
+    : MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS;
+}
 
 const ACCOUNT_ID_PATTERN = /^0\.0\.[1-9]\d*$/;
 

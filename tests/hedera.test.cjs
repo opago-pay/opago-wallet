@@ -20,6 +20,11 @@ require('./register-typescript.cjs');
 
 const { deriveHederaPrivateKey } = require('../lib/wallet-keys.ts');
 const {
+  getHederaPaymentFeeCeilingTinybars,
+  MAX_HEDERA_CHECKOUT_FEE_TINYBARS,
+  MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS,
+} = require('../lib/hedera/config.ts');
+const {
   buildHederaReceiveRequest,
   findNewConfirmedIncomingHederaTransaction,
   findHederaTestnetAccount,
@@ -117,6 +122,15 @@ test('parses exact bounded HBAR test-transfer amounts without floating point', (
   assert.throws(() => parseHederaTestTransferTinybars('1.00000001'), /limit/i);
   assert.throws(() => parseHederaTestTransferTinybars('0.000000001'), /8 decimal/i);
   assert.throws(() => parseHederaTestTransferTinybars('1e-8'), /8 decimal/i);
+});
+
+test('uses mode-specific Hedera fee ceilings that allow a funded wallet to transact', () => {
+  assert.equal(MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS, 10_000_000n);
+  assert.equal(MAX_HEDERA_CHECKOUT_FEE_TINYBARS, 75_000_000n);
+  assert.equal(getHederaPaymentFeeCeilingTinybars('direct'), 10_000_000n);
+  assert.equal(getHederaPaymentFeeCeilingTinybars('checkout'), 75_000_000n);
+  assert.ok(1_000_000n + getHederaPaymentFeeCeilingTinybars('direct') < 100_000_000n);
+  assert.ok(1_000_000n + getHederaPaymentFeeCeilingTinybars('checkout') < 100_000_000n);
 });
 
 test('finds and verifies the unique testnet account for the derived public key', async t => {

@@ -175,6 +175,7 @@ test('builds the exact payable contract call used by the Android client', () => 
   assert.equal(transaction.contractId.toString(), request.contractId);
   assert.equal(transaction.gas.toString(), '300000');
   assert.equal(transaction.payableAmount.toTinybars().toString(), '1000000');
+  assert.equal(transaction.maxTransactionFee.toTinybars().toString(), '75000000');
   assert.equal(
     '0x' + Buffer.from(transaction.functionParameters).toString('hex'),
     expectedCall,

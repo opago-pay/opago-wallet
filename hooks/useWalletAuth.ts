@@ -33,8 +33,8 @@ import {
   resolveHederaWalletAccount,
 } from '../lib/hedera/account-binding-native';
 import {
+  getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK,
-  MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
 } from '../lib/hedera/config';
 import {
   sendHederaCheckoutPayment,
@@ -241,10 +241,10 @@ function WalletProviderCore({
           'No Hedera ' + HEDERA_NETWORK + ' account exists for this wallet key. Open Receive to activate it with an HBAR deposit.',
         );
       }
-      if (
-        input.amountTinybars + MAX_HEDERA_TRANSACTION_FEE_TINYBARS >
-        account.balanceTinybars
-      ) {
+      const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
+        input.checkoutRequest ? 'checkout' : 'direct',
+      );
+      if (input.amountTinybars + feeCeilingTinybars > account.balanceTinybars) {
         throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
       }
       if (

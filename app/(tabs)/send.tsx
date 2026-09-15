@@ -35,8 +35,8 @@ import {
   SolanaSuccessView,
 } from '@/components/send/solana-payment-views';
 import {
+  getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK_LABEL,
-  MAX_HEDERA_TRANSACTION_FEE_TINYBARS,
 } from '@/lib/hedera/config';
 import {
   parseHederaCheckoutRequest,
@@ -324,10 +324,10 @@ export default function SendScreen() {
         if (!sourceAccount) {
           throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this recovery phrase.');
         }
-        if (
-          amountTinybars + MAX_HEDERA_TRANSACTION_FEE_TINYBARS >
-          sourceAccount.balanceTinybars
-        ) {
+        const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
+          checkoutRequest ? 'checkout' : 'direct',
+        );
+        if (amountTinybars + feeCeilingTinybars > sourceAccount.balanceTinybars) {
           throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
         }
         if (checkoutRequest) await verifyHederaCheckoutRequest(checkoutRequest);
