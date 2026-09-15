@@ -1,4 +1,19 @@
 export type PaymentCurrency = 'SAT' | 'EUR';
+export type ScannablePaymentSource = 'spark' | 'solana' | 'usdc' | 'hedera';
+
+export function inferPaymentSourceFromRequest(
+  input: string,
+  fallback: ScannablePaymentSource = 'spark',
+): ScannablePaymentSource {
+  const value = input.trim();
+  if (/^(?:hedera:|0\.0\.[1-9]\d*(?:\?|$)|opagowallet:\/\/hedera-checkout(?:[/?]|$))/i.test(value)) {
+    return 'hedera';
+  }
+  if (/^solana:/i.test(value)) {
+    return /(?:\?|&)spl-token=/i.test(value) ? 'usdc' : 'solana';
+  }
+  return fallback;
+}
 
 export function parsePaymentAmount(
   input: string,

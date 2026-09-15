@@ -16,6 +16,7 @@ const {
   formatEurValue,
   friendlyPaymentStatus,
 } = require('../lib/wallet-display.ts');
+const { inferPaymentSourceFromRequest } = require('../lib/payment-input.ts');
 
 function readSource(...segments) {
   return readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
@@ -125,6 +126,29 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
     assert.match(source, /name="checkmark"/);
     assert.doesNotMatch(source, />OK<\/Text>/);
   }
+});
+
+test('keeps send and request focused on the first consumer decision', () => {
+  assert.equal(inferPaymentSourceFromRequest('hedera:0.0.123?amount=1'), 'hedera');
+  assert.equal(inferPaymentSourceFromRequest('0.0.123'), 'hedera');
+  assert.equal(
+    inferPaymentSourceFromRequest('opagowallet://hedera-checkout?paymentId=abc'),
+    'hedera',
+  );
+  assert.equal(inferPaymentSourceFromRequest('solana:abc'), 'solana');
+  assert.equal(inferPaymentSourceFromRequest('solana:abc?spl-token=mint'), 'usdc');
+  assert.equal(inferPaymentSourceFromRequest('lnbc123', 'spark'), 'spark');
+
+  const send = readSource('components', 'send', 'payment-form.tsx');
+  const receive = readSource('app', '(tabs)', 'receive.tsx');
+  assert.match(send, /Scan to pay/);
+  assert.match(send, /or choose what to send/);
+  assert.match(send, /sourceSelected/);
+  assert.match(receive, /What would you like to receive\?/);
+  assert.match(receive, /useState\(true\)/);
+  assert.match(receive, /Create request/);
+  assert.doesNotMatch(receive, />Invoice amount</);
+  assert.doesNotMatch(receive, />Create 10-minute invoice</);
 });
 
 test('bundles native explorer links statically', () => {

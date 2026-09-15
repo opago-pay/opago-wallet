@@ -13,7 +13,11 @@ import { AtomiqExecutionError, getAtomiqQuote, executeAtomiqQuote } from '@/lib/
 import { fetchInvoiceFromLNURLP, resolveLightningAddress, resolveLNURL } from '@/lib/lnurl-safe';
 import { fetchOcpExecutionPayload, fetchOcpOptions, resolveOcpUrl } from '@/lib/ocp-safe';
 import { normalizeLightningInput, isBolt11Invoice } from '@/lib/lightning';
-import { parsePaymentAmount, resolveLnurlAmount } from '@/lib/payment-input';
+import {
+  inferPaymentSourceFromRequest,
+  parsePaymentAmount,
+  resolveLnurlAmount,
+} from '@/lib/payment-input';
 import { paySparkInvoice } from '@/lib/payments';
 import {
   formatSolanaAssetAmount,
@@ -139,6 +143,7 @@ export default function SendScreen() {
   const [amountInput, setAmountInput] = useState('');
   const [currency, setCurrency] = useState<PaymentCurrency>('SAT');
   const [source, setSource] = useState<PaymentSource>('spark');
+  const [sourceSelected, setSourceSelected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [successProof, setSuccessProof] = useState<string | null>(null);
@@ -171,6 +176,7 @@ export default function SendScreen() {
     }
     consumedHederaRequestKey.current = hederaRequestKey;
     setSource('hedera');
+    setSourceSelected(true);
     setDestination(hederaRequest);
     setAmountInput('');
     setPendingHedera(null);
@@ -588,6 +594,7 @@ export default function SendScreen() {
     setPendingEId(null);
     setEIdSessionId(null);
     setEIdDemo(false);
+    setSourceSelected(false);
     waitingForEId.current = false;
   }, []);
 
@@ -599,9 +606,8 @@ export default function SendScreen() {
         onScanned={value => {
           setIsScanning(false);
           setDestination(value);
-          const scannedSource: PaymentSource = /^solana:/i.test(value)
-            ? /(?:\?|&)spl-token=/i.test(value) ? 'usdc' : 'solana'
-            : source;
+          const scannedSource = inferPaymentSourceFromRequest(value, source);
+          setSourceSelected(true);
           if (scannedSource !== source) {
             setSource(scannedSource);
             setAmountInput('');
@@ -730,6 +736,7 @@ export default function SendScreen() {
       amountInput={amountInput}
       currency={currency}
       source={source}
+      sourceSelected={sourceSelected}
       balances={balances}
       balanceError={balanceError}
       loading={loading}
@@ -739,6 +746,12 @@ export default function SendScreen() {
       onCurrencyChange={setCurrency}
       onSourceChange={nextSource => {
         setSource(nextSource);
+        setSourceSelected(true);
+        setDestination('');
+        setAmountInput('');
+      }}
+      onChangeSource={() => {
+        setSourceSelected(false);
         setDestination('');
         setAmountInput('');
       }}

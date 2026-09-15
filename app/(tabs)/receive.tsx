@@ -69,11 +69,12 @@ export default function ReceiveScreen() {
     refreshHederaAccount,
   } = useWalletAuth();
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
+  const [networkSelected, setNetworkSelected] = useState(false);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [invoicePaymentHash, setInvoicePaymentHash] = useState<string | null>(null);
   const [invoiceAmountSats, setInvoiceAmountSats] = useState(0);
-  const [amountInput, setAmountInput] = useState('10');
-  const [isEur, setIsEur] = useState(false);
+  const [amountInput, setAmountInput] = useState('');
+  const [isEur, setIsEur] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [receivedDescription, setReceivedDescription] = useState('');
@@ -353,7 +354,7 @@ export default function ReceiveScreen() {
       setInvoiceAmountSats(amountSats);
       setIsPaid(false);
     } catch (cause) {
-      Alert.alert('Invoice creation failed', cause instanceof Error ? cause.message : 'Spark is unavailable.');
+      Alert.alert('Could not create request', cause instanceof Error ? cause.message : 'Bitcoin payments are unavailable.');
     } finally {
       setLoading(false);
     }
@@ -422,7 +423,13 @@ export default function ReceiveScreen() {
     setHederaRequest(null);
   }, []);
 
-  useFocusEffect(useCallback(() => reset, [reset]));
+  useFocusEffect(useCallback(() => {
+    reset();
+    setNetwork('lightning');
+    setNetworkSelected(false);
+    setAmountInput('');
+    setIsEur(true);
+  }, [reset]));
 
   async function copy(value: string) {
     await Clipboard.setStringAsync(value);
@@ -490,6 +497,12 @@ export default function ReceiveScreen() {
     { network: 'usdc', asset: 'usdc' },
     { network: 'hedera', asset: 'hedera' },
   ];
+  const selectedReceiveNetwork = receiveNetworks.find(item => item.network === network)!;
+  const selectedReceivePresentation = getWalletAssetPresentation(
+    selectedReceiveNetwork.asset,
+    appConfig.isMainnet,
+    appConfig.hederaNetwork,
+  );
 
   return (
     <ScrollView
@@ -504,7 +517,7 @@ export default function ReceiveScreen() {
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
-      {network === 'hedera' && (
+      {networkSelected && network === 'hedera' && (
         <View style={styles.modeNotice}>
           <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
             <Ionicons
@@ -523,7 +536,7 @@ export default function ReceiveScreen() {
           </View>
         </View>
       )}
-      {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
+      {networkSelected && (network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
         <View style={styles.modeNotice}>
           <View style={styles.modeNoticeIcon}>
             <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
@@ -537,65 +550,89 @@ export default function ReceiveScreen() {
         </View>
       )}
       <View style={styles.card}>
-        <Text style={styles.label}>Receive with</Text>
-        <View style={styles.receiveNetworkRow}>
-          {receiveNetworks.map(item => {
-            const presentation = getWalletAssetPresentation(
-              item.asset,
-              appConfig.isMainnet,
-              appConfig.hederaNetwork,
-            );
-            const selected = network === item.network;
-            return (
+        {!networkSelected ? (
+          <>
+            <Text style={styles.choiceTitle}>What would you like to receive?</Text>
+            <View style={styles.receiveNetworkRow}>
+              {receiveNetworks.map(item => {
+                const presentation = getWalletAssetPresentation(
+                  item.asset,
+                  appConfig.isMainnet,
+                  appConfig.hederaNetwork,
+                );
+                return (
+                  <TouchableOpacity
+                    key={item.network}
+                    style={styles.receiveNetworkSelector}
+                    onPress={() => {
+                      reset();
+                      setNetwork(item.network);
+                      setNetworkSelected(true);
+                      setAmountInput('');
+                      setIsEur(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
+                  >
+                    <AssetIcon asset={item.asset} size={34} />
+                    <Text style={styles.receiveNetworkText}>{presentation.name}</Text>
+                    <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.selectedAssetRow}>
+              <AssetIcon asset={selectedReceiveNetwork.asset} size={38} />
+              <View style={styles.selectedAssetCopy}>
+                <Text style={styles.selectedAssetTitle}>{selectedReceivePresentation.name}</Text>
+                <Text style={styles.selectedAssetMeta}>{selectedReceivePresentation.networkBadge}</Text>
+              </View>
               <TouchableOpacity
-                key={item.network}
-                style={[styles.receiveNetworkSelector, selected && styles.selectorActive]}
+                style={styles.changeAssetButton}
                 onPress={() => {
                   reset();
-                  setNetwork(item.network);
-                  setAmountInput(item.network === 'lightning' ? '10' : '');
-                  setIsEur(false);
+                  setNetworkSelected(false);
+                  setAmountInput('');
+                  setIsEur(true);
                 }}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
+                accessibilityRole="button"
               >
-                <AssetIcon asset={item.asset} size={34} />
-                <Text style={[styles.receiveNetworkText, selected && styles.selectorTextActive]}>
-                  {presentation.name}
-                </Text>
-                <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
+                <Text style={styles.changeAssetText}>Change</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
+            </View>
 
         {network === 'lightning' && !invoice && (
           <>
-            <Text style={styles.label}>Invoice amount</Text>
+            <Text style={styles.label}>Amount</Text>
             <TextInput
               style={styles.input}
               value={amountInput}
               onChangeText={setAmountInput}
               keyboardType="decimal-pad"
-              placeholder={isEur ? 'Euro' : 'Satoshis'}
+              placeholder={isEur ? '0.00 EUR' : 'Satoshis'}
               placeholderTextColor="#666"
             />
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton, styles.currencyToggle]}
-              onPress={() => setIsEur(value => !value)}
-              accessibilityRole="button"
-              accessibilityLabel={`Amount entered in ${isEur ? 'EUR' : 'SAT'}. Tap to switch currency.`}
-            >
-              <View style={styles.buttonContent}>
-                <Ionicons name="swap-horizontal" size={18} color="#fff" />
-                <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                  {isEur ? 'Entered in EUR' : 'Entered in SAT'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, { marginTop: 18 }]} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
-              {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create 10-minute invoice</Text>}
+            <View style={styles.row}>
+              {(['EUR', 'SAT'] as const).map(currency => {
+                const selected = isEur ? currency === 'EUR' : currency === 'SAT';
+                return (
+                  <TouchableOpacity
+                    key={currency}
+                    style={[styles.selector, selected && styles.selectorActive]}
+                    onPress={() => setIsEur(currency === 'EUR')}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                  >
+                    <Text style={[styles.selectorText, selected && styles.selectorTextActive]}>{currency}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity style={styles.button} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
+              {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create request</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -742,6 +779,8 @@ export default function ReceiveScreen() {
         )}
         {(network === 'solana' || network === 'usdc') && solanaAddress && !solanaReady && (
           <ActivityIndicator color="#ffb000" />
+        )}
+          </>
         )}
       </View>
     </ScrollView>

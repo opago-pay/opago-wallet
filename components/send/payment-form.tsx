@@ -28,6 +28,7 @@ export function PaymentForm(props: {
   amountInput: string;
   currency: PaymentCurrency;
   source: PaymentSource;
+  sourceSelected: boolean;
   balances: WalletBalances;
   balanceError: string | null;
   loading: boolean;
@@ -36,6 +37,7 @@ export function PaymentForm(props: {
   onAmountChange(value: string): void;
   onCurrencyChange(value: PaymentCurrency): void;
   onSourceChange(value: PaymentSource): void;
+  onChangeSource(): void;
   onScan(): void;
   onReview(): void;
 }) {
@@ -63,6 +65,12 @@ export function PaymentForm(props: {
     },
     { source: 'hedera', asset: 'hedera', balance: formatTinybars(props.balances.hbarTinybars) + ' HBAR' },
   ];
+  const selectedSource = sources.find(item => item.source === props.source)!;
+  const selectedPresentation = getWalletAssetPresentation(
+    selectedSource.asset,
+    appConfig.isMainnet,
+    appConfig.hederaNetwork,
+  );
 
   return (
     <ScrollView
@@ -77,7 +85,7 @@ export function PaymentForm(props: {
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
-      {!appConfig.isMainnet && !isHedera && !isNativeSolana && (
+      {props.sourceSelected && !appConfig.isMainnet && !isHedera && !isNativeSolana && (
         <View style={styles.modeNotice}>
           <View style={styles.modeNoticeIcon}>
             <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
@@ -88,7 +96,7 @@ export function PaymentForm(props: {
           </View>
         </View>
       )}
-      {isHedera && (
+      {props.sourceSelected && isHedera && (
         <View style={styles.modeNotice}>
           <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
             <Ionicons
@@ -114,7 +122,7 @@ export function PaymentForm(props: {
           <Text style={styles.bannerText}>Some balances may be out of date. Please try again.</Text>
         </View>
       )}
-      {isNativeSolana && !appConfig.isMainnet && (
+      {props.sourceSelected && isNativeSolana && !appConfig.isMainnet && (
         <View style={styles.modeNotice}>
           <View style={styles.modeNoticeIcon}>
             <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
@@ -128,113 +136,147 @@ export function PaymentForm(props: {
         </View>
       )}
       <View style={styles.card}>
-        <Text style={styles.label}>Pay with</Text>
-        <View style={styles.assetGrid}>
-          {sources.map(item => {
-            const presentation = getWalletAssetPresentation(
-              item.asset,
-              appConfig.isMainnet,
-              appConfig.hederaNetwork,
-            );
-            const selected = props.source === item.source;
-            return (
-              <TouchableOpacity
-                key={item.source}
-                style={[styles.assetSelector, selected && styles.assetSelectorActive]}
-                onPress={() => props.onSourceChange(item.source)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}, balance ${item.balance}`}
-              >
-                <View style={styles.assetSelectorHeader}>
-                  <AssetIcon asset={item.asset} size={34} />
-                  {selected && <Ionicons name="checkmark-circle" size={20} color="#ffb000" />}
-                </View>
-                <Text style={[styles.assetSelectorTitle, selected && styles.selectorTextActive]}>
-                  {presentation.name}
-                </Text>
-                <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
-                <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <Text style={styles.label}>Who are you paying?</Text>
-        <View style={[styles.row, { alignItems: 'center' }]}>
-          <TextInput
-            style={[styles.input, styles.destinationInput, { flex: 1 }]}
-            placeholder={
-              isHedera
-                ? 'Scan a payment code or enter an account'
-                : isNativeSolana
-                  ? 'Scan a payment code or enter an address'
-                  : 'Scan or paste a Lightning request'
-            }
-            placeholderTextColor="#666"
-            value={props.destination}
-            onChangeText={props.onDestinationChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline
-          />
-          <TouchableOpacity
-            style={styles.scanButton}
-            onPress={props.onScan}
-            accessibilityRole="button"
-            accessibilityLabel="Scan payment QR code"
-          >
-            <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
-            <Text style={styles.scanText}>Scan QR</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.label}>Amount</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={
-            isHedera
-              ? 'HBAR'
-              : props.source === 'solana'
-                ? 'SOL'
-                : props.source === 'usdc'
-                  ? 'USDC'
-                  : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
-          }
-          placeholderTextColor="#666"
-          value={props.amountInput}
-          onChangeText={props.onAmountChange}
-          keyboardType="decimal-pad"
-        />
-        {!isHedera && !isNativeSolana && (
-          <View style={styles.row}>
-            {CURRENCIES.map(item => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.selector, props.currency === item && styles.selectorActive]}
-                onPress={() => props.onCurrencyChange(item)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: props.currency === item }}
-              >
-                <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        <TouchableOpacity
-          style={[styles.button, (props.loading || !props.walletReady) && styles.buttonDisabled]}
-          onPress={props.onReview}
-          disabled={props.loading || !props.walletReady}
-          accessibilityRole="button"
-        >
-          {props.loading ? (
-            <ActivityIndicator color="#111" />
-          ) : (
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={19} color="#111" />
+        {!props.sourceSelected ? (
+          <>
+            <TouchableOpacity
+              style={[styles.button, styles.primaryChoiceButton]}
+              onPress={props.onScan}
+              accessibilityRole="button"
+              accessibilityLabel="Scan a payment QR code"
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="qr-code-outline" size={22} color="#111" />
+                <Text style={styles.buttonText}>Scan to pay</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.choiceDivider}>
+              <View style={styles.choiceDividerLine} />
+              <Text style={styles.choiceDividerText}>or choose what to send</Text>
+              <View style={styles.choiceDividerLine} />
             </View>
-          )}
-        </TouchableOpacity>
+            <View style={styles.assetGrid}>
+              {sources.map(item => {
+                const presentation = getWalletAssetPresentation(
+                  item.asset,
+                  appConfig.isMainnet,
+                  appConfig.hederaNetwork,
+                );
+                return (
+                  <TouchableOpacity
+                    key={item.source}
+                    style={styles.assetSelector}
+                    onPress={() => props.onSourceChange(item.source)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}, balance ${item.balance}`}
+                  >
+                    <View style={styles.assetSelectorHeader}>
+                      <AssetIcon asset={item.asset} size={34} />
+                      <Ionicons name="chevron-forward" size={18} color="#696974" />
+                    </View>
+                    <Text style={styles.assetSelectorTitle}>{presentation.name}</Text>
+                    <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
+                    <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.selectedAssetRow}>
+              <AssetIcon asset={selectedSource.asset} size={38} />
+              <View style={styles.selectedAssetCopy}>
+                <Text style={styles.selectedAssetTitle}>{selectedPresentation.name}</Text>
+                <Text style={styles.selectedAssetMeta}>
+                  {selectedSource.balance} · {selectedPresentation.networkBadge}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.changeAssetButton}
+                onPress={props.onChangeSource}
+                accessibilityRole="button"
+              >
+                <Text style={styles.changeAssetText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}>Who are you paying?</Text>
+            <View style={[styles.row, { alignItems: 'center' }]}>
+              <TextInput
+                style={[styles.input, styles.destinationInput, { flex: 1 }]}
+                placeholder={
+                  isHedera
+                    ? 'Scan a payment code or enter an account'
+                    : isNativeSolana
+                      ? 'Scan a payment code or enter an address'
+                      : 'Scan or paste a Lightning request'
+                }
+                placeholderTextColor="#666"
+                value={props.destination}
+                onChangeText={props.onDestinationChange}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={props.onScan}
+                accessibilityRole="button"
+                accessibilityLabel="Scan payment QR code"
+              >
+                <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
+                <Text style={styles.scanText}>Scan QR</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.label}>Amount</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={
+                isHedera
+                  ? 'HBAR'
+                  : props.source === 'solana'
+                    ? 'SOL'
+                    : props.source === 'usdc'
+                      ? 'USDC'
+                      : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
+              }
+              placeholderTextColor="#666"
+              value={props.amountInput}
+              onChangeText={props.onAmountChange}
+              keyboardType="decimal-pad"
+            />
+            {!isHedera && !isNativeSolana && (
+              <View style={styles.row}>
+                {CURRENCIES.map(item => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[styles.selector, props.currency === item && styles.selectorActive]}
+                    onPress={() => props.onCurrencyChange(item)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: props.currency === item }}
+                  >
+                    <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.button, (props.loading || !props.walletReady) && styles.buttonDisabled]}
+              onPress={props.onReview}
+              disabled={props.loading || !props.walletReady}
+              accessibilityRole="button"
+            >
+              {props.loading ? (
+                <ActivityIndicator color="#111" />
+              ) : (
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>Continue</Text>
+                  <Ionicons name="arrow-forward" size={19} color="#111" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </ScrollView>
   );
