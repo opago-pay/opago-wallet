@@ -2,11 +2,11 @@
 
 **Due:** 10 October 2026
 
-**Status:** Mainnet contract deployed and source-verified; Android canary, video, and submission pending
+**Status:** Mainnet contract deployed and source-verified; physical Android canary accepted; video and submission pending
 
 **Scope:** the Hedera Mainnet wallet and checkout path in the public multi-chain Opago hackathon repository
 
-This document remains intentionally incomplete until the Android canary and video evidence exist. Never replace a missing value with a Testnet link, an intended transaction, or a manually invented identifier.
+This document remains intentionally incomplete until the video and final submission evidence exist. Never replace a missing value with a Testnet link, an intended transaction, or a manually invented identifier.
 
 ## Submission fields
 
@@ -59,11 +59,11 @@ Optional and pending. Record only consented, non-sensitive pilot feedback. Inclu
 - [x] `npm run contract:deploy:mainnet` reached Mainnet consensus successfully.
 - [x] `npm run contract:verify:mainnet` confirmed Mirror Node bytecode and Sourcify status.
 - [x] `deployments/hedera-mainnet.json` contains only script-derived public evidence.
-- [ ] The Mainnet Android build is pinned to that contract ID and runtime hash.
+- [x] The Mainnet Android build is pinned to that contract ID and runtime hash.
 - [ ] The signed release starts without Metro, ADB, or development tooling.
-- [ ] One small real-HBAR checkout succeeds from a separate consumer wallet to the merchant.
+- [x] One small real-HBAR checkout succeeds from a separate consumer wallet to the merchant.
 - [ ] One expired or invalid request remains failed and never appears successful.
-- [ ] App history, Mirror Node, and HashScan agree on the transaction and amount.
+- [x] App history, Mirror Node, and HashScan agree on the transaction and amount.
 - [ ] The video is 1-5 minutes and shows all required evidence without secrets.
 - [ ] The repository URL resolves publicly and the submitted commit hash is recorded.
 - [ ] The final written summary contains no claim that exceeds the recorded evidence.
@@ -76,16 +76,16 @@ Fill this table only from verified build and deployment output:
 | --- | --- |
 | Deployment source commit | `bd68e8f68498dd825c51bdbf2bb43a38c600c513` |
 | Final submission commit | pending |
-| Android version/build | pending |
+| Android version/build | `1.0.0`; internal candidate `d2501899cf30850a8f15c30771be49907f4a7605`; APK SHA-256 `491b62a9afe80f0539846c6a16be424c4dc7528a3b8bf64be5067afc487f190b` |
 | Contract ID | `0.0.10850063` |
 | Contract EVM address | `0x0000000000000000000000000000000000a58f0f` |
 | Deployment transaction | `0.0.10848889@1788856737.537500943` |
 | Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
 | Sourcify status | `verified` (`d7f91325-8b0d-4fa5-9e8d-95a8a06402da`) |
-| Canary payment transaction | pending |
-| Merchant account | pending |
-| Consumer account | pending |
+| Canary payment transaction | [`0.0.10861984@1789478514.756946872`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872) |
+| Merchant account | `0.0.10848889` |
+| Consumer account | `0.0.10861984` |
 | Video URL | pending |
 | Submission timestamp | pending |
 
-Deployment procedure and secret-handling rules are defined in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).
+The complete public transaction and physical-device record is in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). Deployment procedure and secret-handling rules are defined in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).

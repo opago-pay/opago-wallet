@@ -10,7 +10,7 @@ The default mobile build is intended for development and test networks. The veri
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
 | Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 complete; deployed, source-verified, and physically accepted |
-| HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; Android canary pending |
+| HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; physical Android canary accepted |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -117,6 +117,9 @@ Remaining milestone gates:
 | --- | --- |
 | Contract `0.0.10850063` | [View on HashScan](https://hashscan.io/mainnet/contract/0.0.10850063) |
 | Deployment transaction | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10848889%401788856737.537500943) |
+| Physical-device direct transfer | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789477423.490632405) |
+| Physical-device contract checkout | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872) |
+| Android canary acceptance | [`HEDERA_MAINNET_CANARY_ACCEPTANCE.md`](HEDERA_MAINNET_CANARY_ACCEPTANCE.md) |
 | Versioned deployment manifest | [`deployments/hedera-mainnet.json`](deployments/hedera-mainnet.json) |
 
 #### Contract quality gates
@@ -342,7 +345,7 @@ Acceptance gate: operational ownership and failure handling are documented, test
 
 ### Mainnet Milestone 7 - deployment and canary
 
-**Estimate: 2-4 days. Status: contract deployed and source-verified on 8 September 2026; Android binding and canary pending.**
+**Estimate: 2-4 days. Status: complete; contract verified on 8 September and physical Android canary accepted on 15 September 2026.**
 
 Codex delivery:
 
@@ -358,9 +361,11 @@ Human/Opago delivery:
 
 Acceptance gate: the Mainnet contract is source-verified, its runtime matches the audited artifact, and the signed app is pinned to it.
 
+The internal candidate pinned to source commit `d2501899cf30850a8f15c30771be49907f4a7605` completed a real `0.01 HBAR` checkout from consumer account `0.0.10861984` to merchant account `0.0.10848889`. Contract `0.0.10850063`, the official Mirror Node, HashScan, the success screen, and refreshed wallet history all reported the same successful transaction. Full public evidence and remaining release limitations are recorded in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md).
+
 ### Mainnet Milestone 8 - real-user pilot
 
-**Estimate: 4-6 days. Status: planned.**
+**Estimate: 4-6 days. Status: in progress; single-device real-fund canary passed, wider pilot and negative-path acceptance pending.**
 
 Codex delivery:
 
@@ -738,7 +743,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `106/106` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `110/110` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 
