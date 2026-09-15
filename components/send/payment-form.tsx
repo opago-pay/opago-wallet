@@ -72,107 +72,63 @@ export function PaymentForm(props: {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Send</Text>
-          <Text style={styles.screenSubtitle}>Choose an asset and review before signing.</Text>
+          <Text style={styles.title}>Send money</Text>
+          <Text style={styles.screenSubtitle}>Choose how you want to pay.</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
       {!appConfig.isMainnet && !isHedera && !isNativeSolana && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Safe development mode: real mainnet Lightning payments are blocked.
-          </Text>
+        <View style={styles.modeNotice}>
+          <View style={styles.modeNoticeIcon}>
+            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
+          </View>
+          <View style={styles.modeNoticeCopy}>
+            <Text style={styles.modeNoticeTitle}>Bitcoin demo mode</Text>
+            <Text style={styles.modeNoticeText}>Test payments only — no real Bitcoin.</Text>
+          </View>
         </View>
       )}
       {isHedera && (
-        <View style={styles.testnetBanner}>
-          <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
-          <Text style={styles.testnetText}>
+        <View style={styles.modeNotice}>
+          <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
+            <Ionicons
+              name={HEDERA_NETWORK === 'mainnet' ? 'shield-checkmark' : 'flask-outline'}
+              size={18}
+              color={HEDERA_NETWORK === 'mainnet' ? '#49d17d' : '#b7a8ff'}
+            />
+          </View>
+          <View style={styles.modeNoticeCopy}>
+            <Text style={styles.modeNoticeTitle}>
+              HBAR · {HEDERA_NETWORK_BADGE}
+            </Text>
+            <Text style={styles.modeNoticeText}>
             {HEDERA_NETWORK === 'mainnet'
-              ? 'Real HBAR. Verify the recipient and amount before continuing.'
-              : 'Test HBAR only. These funds have no real value.'}
-          </Text>
+              ? 'Real payments are active.'
+              : 'Test payments only — no real value.'}
+            </Text>
+          </View>
         </View>
       )}
       {props.balanceError && (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>{props.balanceError}</Text>
+          <Text style={styles.bannerText}>Some balances may be out of date. Please try again.</Text>
         </View>
       )}
       {isNativeSolana && !appConfig.isMainnet && (
-        <View style={styles.testnetBanner}>
-          <Text style={styles.testnetTitle}>SOLANA DEVNET</Text>
-          <Text style={styles.testnetText}>Test SOL and tokens only. These funds have no real value.</Text>
+        <View style={styles.modeNotice}>
+          <View style={styles.modeNoticeIcon}>
+            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
+          </View>
+          <View style={styles.modeNoticeCopy}>
+            <Text style={styles.modeNoticeTitle}>
+              {props.source === 'usdc' ? 'USDC' : 'Solana'} · DEVNET
+            </Text>
+            <Text style={styles.modeNoticeText}>Test payments only — no real value.</Text>
+          </View>
         </View>
       )}
       <View style={styles.card}>
-        <Text style={styles.label}>Destination</Text>
-        <View style={[styles.row, { alignItems: 'center' }]}>
-          <TextInput
-            style={[styles.input, styles.destinationInput, { flex: 1 }]}
-            placeholder={
-              isHedera
-                ? 'Hedera account ID (0.0.x) or payment QR'
-                : isNativeSolana
-                  ? 'Solana address or Solana Pay QR'
-                  : 'BOLT11, Lightning Address or LNURL'
-            }
-            placeholderTextColor="#666"
-            value={props.destination}
-            onChangeText={props.onDestinationChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline
-          />
-          <TouchableOpacity
-            style={styles.scanButton}
-            onPress={props.onScan}
-            accessibilityRole="button"
-            accessibilityLabel="Scan payment QR code"
-          >
-            <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
-            <Text style={styles.scanText}>Scan</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.label}>
-          {isHedera
-            ? 'Amount in HBAR'
-            : isNativeSolana
-              ? 'Amount in ' + (props.source === 'usdc' ? 'USDC' : 'SOL')
-              : 'Amount (optional for fixed invoices)'}
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder={
-            isHedera
-              ? '0.00000001 HBAR minimum'
-              : props.source === 'solana'
-                ? '0.000000001 SOL minimum'
-                : props.source === 'usdc'
-                  ? '0.000001 USDC minimum'
-                  : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
-          }
-          placeholderTextColor="#666"
-          value={props.amountInput}
-          onChangeText={props.onAmountChange}
-          keyboardType="decimal-pad"
-        />
-        {!isHedera && !isNativeSolana && (
-          <View style={styles.row}>
-            {CURRENCIES.map(item => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.selector, props.currency === item && styles.selectorActive]}
-                onPress={() => props.onCurrencyChange(item)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: props.currency === item }}
-              >
-                <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        <Text style={styles.label}>Pay from</Text>
+        <Text style={styles.label}>Pay with</Text>
         <View style={styles.assetGrid}>
           {sources.map(item => {
             const presentation = getWalletAssetPresentation(
@@ -203,8 +159,69 @@ export function PaymentForm(props: {
             );
           })}
         </View>
+
+        <Text style={styles.label}>Who are you paying?</Text>
+        <View style={[styles.row, { alignItems: 'center' }]}>
+          <TextInput
+            style={[styles.input, styles.destinationInput, { flex: 1 }]}
+            placeholder={
+              isHedera
+                ? 'Scan a payment code or enter an account'
+                : isNativeSolana
+                  ? 'Scan a payment code or enter an address'
+                  : 'Scan or paste a Lightning request'
+            }
+            placeholderTextColor="#666"
+            value={props.destination}
+            onChangeText={props.onDestinationChange}
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={props.onScan}
+            accessibilityRole="button"
+            accessibilityLabel="Scan payment QR code"
+          >
+            <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
+            <Text style={styles.scanText}>Scan QR</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.label}>Amount</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={
+            isHedera
+              ? 'HBAR'
+              : props.source === 'solana'
+                ? 'SOL'
+                : props.source === 'usdc'
+                  ? 'USDC'
+                  : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
+          }
+          placeholderTextColor="#666"
+          value={props.amountInput}
+          onChangeText={props.onAmountChange}
+          keyboardType="decimal-pad"
+        />
+        {!isHedera && !isNativeSolana && (
+          <View style={styles.row}>
+            {CURRENCIES.map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.selector, props.currency === item && styles.selectorActive]}
+                onPress={() => props.onCurrencyChange(item)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: props.currency === item }}
+              >
+                <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, (props.loading || !props.walletReady) && styles.buttonDisabled]}
           onPress={props.onReview}
           disabled={props.loading || !props.walletReady}
           accessibilityRole="button"
@@ -213,7 +230,7 @@ export function PaymentForm(props: {
             <ActivityIndicator color="#111" />
           ) : (
             <View style={styles.buttonContent}>
-              <Text style={styles.buttonText}>Review payment</Text>
+              <Text style={styles.buttonText}>Continue</Text>
               <Ionicons name="arrow-forward" size={19} color="#111" />
             </View>
           )}

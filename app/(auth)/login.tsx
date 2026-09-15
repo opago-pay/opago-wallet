@@ -18,6 +18,7 @@ import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { appConfig } from '@/lib/config';
 import { useLoginWithOAuth } from '@privy-io/expo';
 import { usePreventScreenCapture } from 'expo-screen-capture';
+import { Image } from 'expo-image';
 import { validateMnemonic } from 'bip39';
 
 const { width, height } = Dimensions.get('window');
@@ -92,7 +93,10 @@ export default function LoginScreen() {
   async function handleRestore() {
     const phrase = mnemonicInput.trim().toLowerCase();
     if (!validateMnemonic(phrase)) {
-      Alert.alert('Invalid phrase', 'Enter a valid 12- or 24-word recovery phrase.');
+      Alert.alert(
+        'Those words do not look right',
+        'Check the order and spelling of your 12- or 24-word recovery phrase.',
+      );
       return;
     }
     await runWalletAction(async () => {
@@ -121,17 +125,28 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
+            <View style={styles.logoWrap}>
+              <Image
+                source={require('@/assets/images/logo_new.svg')}
+                style={styles.logo}
+                contentFit="contain"
+              />
+            </View>
             <Text style={styles.title}>Opago</Text>
-            <Text style={styles.subtitle}>Lightning / Solana / Identity</Text>
+            <Text style={styles.subtitle}>Crypto payments made simple.</Text>
 
             <View style={styles.card}>
               {isRestoring ? (
                 <>
-                  <Text style={styles.cardTitle}>Restore wallet</Text>
+                  <Text style={styles.cardTitle}>Welcome back</Text>
                   <Text style={styles.cardDesc}>
-                    Enter all recovery words in order, separated by spaces. The screen stays above
-                    the keyboard and capture is blocked while this form is open.
+                    Enter your recovery words in the same order as your backup.
                   </Text>
+                  <View style={styles.safetyNote}>
+                    <Text style={styles.safetyNoteText}>
+                      Your words stay on this device. Never send them to anyone.
+                    </Text>
+                  </View>
                   <TextInput
                     style={styles.input}
                     placeholder="word 1 word 2 word 3 ..."
@@ -153,7 +168,7 @@ export default function LoginScreen() {
                     onPress={() => void handleRestore()}
                     disabled={loading}
                   >
-                    <Text style={styles.buttonText}>Restore now</Text>
+                    <Text style={styles.buttonText}>Restore my wallet</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.button, styles.secondaryButton]}
@@ -168,10 +183,9 @@ export default function LoginScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={styles.cardTitle}>Create wallet</Text>
+                  <Text style={styles.cardTitle}>Your money. Your wallet.</Text>
                   <Text style={styles.cardDesc}>
-                    Sign in with Google or create a device-local wallet without pretending to
-                    perform an email login.
+                    Create a secure wallet on this device or restore one you already have.
                   </Text>
                   {appConfig.importSolanaKeyToPrivy && (
                     <OAuthLoginButton
@@ -184,14 +198,14 @@ export default function LoginScreen() {
                     onPress={() => void runWalletAction(loadOrGenerateWallet)}
                     disabled={loading}
                   >
-                    <Text style={styles.buttonText}>Create local wallet</Text>
+                    <Text style={styles.buttonText}>Create a new wallet</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.restoreLink}
                     onPress={() => setIsRestoring(true)}
                     disabled={loading}
                   >
-                    <Text style={styles.restoreText}>Restore from recovery phrase</Text>
+                    <Text style={styles.restoreText}>I already have a wallet</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -199,7 +213,7 @@ export default function LoginScreen() {
               {loading && (
                 <View style={styles.loading}>
                   <ActivityIndicator color="#ffb000" size="large" />
-                  <Text style={styles.loadingText}>{initStatus || 'Preparing wallet...'}</Text>
+                  <Text style={styles.loadingText}>{initStatus || 'Securing your wallet…'}</Text>
                 </View>
               )}
               {error && !loading && <Text style={styles.errorText}>{error}</Text>}
@@ -247,25 +261,41 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.5 }],
   },
   content: { width: '100%', paddingHorizontal: 24, alignItems: 'center', zIndex: 10 },
-  title: { fontSize: 48, fontWeight: '800', color: '#fff', marginBottom: 8 },
+  logoWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  logo: { width: 46, height: 46 },
+  title: { fontSize: 42, fontWeight: '800', color: '#fff', marginBottom: 8 },
   subtitle: {
     fontSize: 16,
     color: '#8f8f9d',
     fontWeight: '500',
-    marginBottom: 48,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+    marginBottom: 36,
   },
   card: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 24,
-    padding: 32,
+    padding: 26,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
   cardTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 8 },
   cardDesc: { fontSize: 15, color: '#a0a0ab', marginBottom: 28, lineHeight: 22 },
+  safetyNote: {
+    backgroundColor: 'rgba(255,176,0,0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: -12,
+    marginBottom: 18,
+  },
+  safetyNoteText: { color: '#c3a06d', fontSize: 12, lineHeight: 18 },
   input: {
     backgroundColor: '#1a1a1f',
     color: '#fff',

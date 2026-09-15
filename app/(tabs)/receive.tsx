@@ -46,8 +46,10 @@ import {
   type SolanaReceiveSnapshot,
 } from '@/lib/solana';
 import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
+import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
+import { compactWalletIdentifier } from '@/lib/wallet-display';
 import { exponentialBackoffDelay } from '@/lib/retry';
 import { buildHederaActivationAlias } from '@/lib/hedera/keys';
 
@@ -288,6 +290,7 @@ export default function ReceiveScreen() {
         if (incoming && !cancelled) {
           const description = incoming.amountHbar + ' HBAR confirmed on ' + HEDERA_NETWORK + '.';
           setReceivedDescription(description);
+          setReceivedExplorerUrl(incoming.hashscanUrl);
           setIsPaid(true);
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           try {
@@ -423,16 +426,20 @@ export default function ReceiveScreen() {
 
   async function copy(value: string) {
     await Clipboard.setStringAsync(value);
-    Alert.alert('Copied', 'Payment destination copied to clipboard.');
+    Alert.alert('Copied', 'Payment information copied to your clipboard.');
   }
 
   async function openReceivedTransaction() {
     if (!receivedExplorerUrl) return;
     try {
-      await openSolanaExplorerUrl(receivedExplorerUrl);
+      if (network === 'hedera') {
+        await openHederaExplorerUrl(receivedExplorerUrl);
+      } else {
+        await openSolanaExplorerUrl(receivedExplorerUrl);
+      }
     } catch (cause) {
       Alert.alert(
-        'Could not open Solana Explorer',
+        'Could not open receipt',
         cause instanceof Error ? cause.message : 'The explorer link is invalid.',
       );
     }
@@ -440,41 +447,31 @@ export default function ReceiveScreen() {
 
   if (isPaid) return (
     <View style={[styles.container, styles.centered]}>
-      {network === 'hedera' && (
-        <View style={[styles.testnetBanner, { width: '100%' }]}>
-          <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
-        </View>
-      )}
-      {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
-        <View style={[styles.testnetBanner, { width: '100%' }]}>
-          <Text style={styles.testnetTitle}>SOLANA DEVNET</Text>
-        </View>
-      )}
       <View style={styles.successCircle}>
         <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
       </View>
-      <Text style={styles.successTitle}>Funds confirmed</Text>
-      <Text style={styles.subtitle}>{receivedDescription || 'The exact incoming transaction was verified.'}</Text>
-      {receivedExplorerUrl && (
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 24 }]}
-          onPress={() => void openReceivedTransaction()}
-          accessibilityRole="link"
-          accessibilityLabel="Open received transaction in Solana Explorer"
-        >
-          <Text style={styles.buttonText}>Open transaction in Solana Explorer</Text>
-        </TouchableOpacity>
-      )}
+      <Text style={styles.successTitle}>Payment received</Text>
+      <Text style={[styles.subtitle, styles.centerText]}>
+        {receivedDescription || 'The payment is complete and saved in your activity.'}
+      </Text>
       <TouchableOpacity
-        style={[styles.button, receivedExplorerUrl ? styles.secondaryButton : { marginTop: 24 }]}
+        style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
         onPress={() => router.replace('/(tabs)')}
       >
-        <Text style={[styles.buttonText, receivedExplorerUrl && styles.secondaryButtonText]}>
-          Return to dashboard
-        </Text>
+        <Text style={styles.buttonText}>Done</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={reset}>
-        <Text style={[styles.buttonText, styles.secondaryButtonText]}>Receive another</Text>
+      {receivedExplorerUrl && (
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton, styles.fullWidthButton]}
+          onPress={() => void openReceivedTransaction()}
+          accessibilityRole="link"
+          accessibilityLabel="View payment receipt"
+        >
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>View receipt</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity style={styles.textButton} onPress={reset}>
+        <Text style={styles.textButtonText}>Request another payment</Text>
       </TouchableOpacity>
     </View>
   );
@@ -502,39 +499,45 @@ export default function ReceiveScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Receive</Text>
-          <Text style={styles.screenSubtitle}>Create a request for the selected network.</Text>
+          <Text style={styles.title}>Request money</Text>
+          <Text style={styles.screenSubtitle}>Choose how you want to get paid.</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
       {network === 'hedera' && (
-        <View style={styles.testnetBanner}>
-          <View style={styles.testnetBannerContent}>
-            <AssetIcon asset="hedera" size={34} />
-            <View>
-              <Text style={styles.testnetTitle}>HEDERA {HEDERA_NETWORK_BADGE}</Text>
-              <Text style={styles.testnetText}>
+        <View style={styles.modeNotice}>
+          <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
+            <Ionicons
+              name={HEDERA_NETWORK === 'mainnet' ? 'shield-checkmark' : 'flask-outline'}
+              size={18}
+              color={HEDERA_NETWORK === 'mainnet' ? '#49d17d' : '#b7a8ff'}
+            />
+          </View>
+          <View style={styles.modeNoticeCopy}>
+              <Text style={styles.modeNoticeTitle}>HBAR · {HEDERA_NETWORK_BADGE}</Text>
+              <Text style={styles.modeNoticeText}>
                 {HEDERA_NETWORK === 'mainnet'
-                  ? 'Real HBAR. Verify the account before sharing.'
-                  : 'Receive test HBAR only.'}
+                  ? 'Real payments are active.'
+                  : 'Test payments only — no real value.'}
               </Text>
-            </View>
           </View>
         </View>
       )}
       {(network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
-        <View style={styles.testnetBanner}>
-          <View style={styles.testnetBannerContent}>
-            <AssetIcon asset={network === 'usdc' ? 'usdc' : 'solana'} size={34} />
-            <View>
-              <Text style={styles.testnetTitle}>SOLANA DEVNET</Text>
-              <Text style={styles.testnetText}>Receive test assets only.</Text>
-            </View>
+        <View style={styles.modeNotice}>
+          <View style={styles.modeNoticeIcon}>
+            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
+          </View>
+          <View style={styles.modeNoticeCopy}>
+            <Text style={styles.modeNoticeTitle}>
+              {network === 'usdc' ? 'USDC' : 'Solana'} · DEVNET
+            </Text>
+            <Text style={styles.modeNoticeText}>Test payments only — no real value.</Text>
           </View>
         </View>
       )}
       <View style={styles.card}>
-        <Text style={styles.label}>Network</Text>
+        <Text style={styles.label}>Receive with</Text>
         <View style={styles.receiveNetworkRow}>
           {receiveNetworks.map(item => {
             const presentation = getWalletAssetPresentation(
@@ -605,9 +608,9 @@ export default function ReceiveScreen() {
               </Text>
             ) : hederaMissing && hederaPublicKey ? (
               <>
-                <Text style={styles.label}>Account not activated</Text>
+                <Text style={styles.label}>Add HBAR to get started</Text>
                 <Text style={styles.subtitle}>
-                  Activate with an HBAR deposit on {HEDERA_NETWORK_LABEL} from a wallet that supports Ed25519 key-alias transfers. The sender pays the transfer and account-creation fees; Opago does not fund the account.
+                  Send HBAR to the QR code below from a compatible Hedera wallet. Your Opago wallet will become ready automatically after the first deposit.
                 </Text>
                 <View style={{ backgroundColor: '#fff', padding: 16, alignSelf: 'center', marginVertical: 16 }}>
                   <QRCode value={buildHederaActivationAlias(hederaPublicKey)} size={220} />
@@ -619,27 +622,27 @@ export default function ReceiveScreen() {
                   accessibilityLabel="Copy Hedera activation alias"
                 >
                   <Text style={styles.proofText} selectable>{buildHederaActivationAlias(hederaPublicKey)}</Text>
-                  <Text style={styles.copyHintText}>Tap to copy activation address</Text>
+                    <Text style={styles.copyHintText}>Tap to copy deposit address</Text>
                 </TouchableOpacity>
                 <Text style={styles.subtitle}>
-                  Use only a sender confirmed to support this address format. Exchange withdrawals are not yet verified. Select {HEDERA_NETWORK_BADGE} in the sending wallet; the address itself does not identify the network. Your private key stays on this device.
+                  Choose Hedera {HEDERA_NETWORK_BADGE} in the sending wallet. Keep this screen open while Opago checks for the deposit.
                 </Text>
                 <Text style={styles.subtitle}>
-                  Waiting for account verification. If you already deposited or restored a wallet, allow time for the network to update. Sending and checkout require a verified account and enough HBAR for fees.
+                  Already sent it? We are checking automatically. This can take a short moment.
                 </Text>
               </>
             ) : !hederaReady ? (
               <ActivityIndicator color="#ffb000" />
             ) : hederaAccount ? (
               <>
-                <Text style={styles.label}>Account ID</Text>
+                <Text style={styles.label}>Your HBAR account</Text>
                 <TouchableOpacity
                   style={styles.proofBox}
                   onPress={() => void copy(hederaAccount.accountId)}
                   accessibilityRole="button"
                   accessibilityLabel="Copy Hedera account ID"
                 >
-                  <Text style={styles.proofText} selectable>{hederaAccount.accountId}</Text>
+                  <Text style={styles.accountDisplay}>{compactWalletIdentifier(hederaAccount.accountId)}</Text>
                   <View style={styles.copyHint}>
                     <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
                     <Text style={styles.copyHintText}>Tap to copy</Text>
@@ -647,7 +650,7 @@ export default function ReceiveScreen() {
                 </TouchableOpacity>
                 {!hederaRequest && (
                   <>
-                    <Text style={styles.label}>Amount in HBAR (optional)</Text>
+                    <Text style={styles.label}>Amount (optional)</Text>
                     <TextInput
                       style={styles.input}
                       value={amountInput}
@@ -657,7 +660,7 @@ export default function ReceiveScreen() {
                       placeholderTextColor="#666"
                     />
                     <TouchableOpacity style={styles.button} onPress={() => void prepareHederaRequest()} disabled={loading}>
-                      {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create HBAR receive QR</Text>}
+                      {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create payment QR</Text>}
                     </TouchableOpacity>
                   </>
                 )}
@@ -674,14 +677,14 @@ export default function ReceiveScreen() {
               <ActivityIndicator color="#ffb000" />
             ) : solanaAddress ? (
               <>
-                <Text style={styles.label}>Wallet address</Text>
+                <Text style={styles.label}>Your payment address</Text>
                 <TouchableOpacity
                   style={styles.proofBox}
                   onPress={() => void copy(solanaAddress)}
                   accessibilityRole="button"
                   accessibilityLabel="Copy Solana wallet address"
                 >
-                  <Text style={styles.proofText} selectable>{solanaAddress}</Text>
+                  <Text style={styles.accountDisplay}>{compactWalletIdentifier(solanaAddress)}</Text>
                   <View style={styles.copyHint}>
                     <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
                     <Text style={styles.copyHintText}>Tap to copy</Text>
@@ -690,7 +693,7 @@ export default function ReceiveScreen() {
                 {!solanaRequest && (
                   <>
                     <Text style={styles.label}>
-                      Amount in {network === 'usdc' ? 'USDC' : 'SOL'} (optional)
+                      Amount (optional)
                     </Text>
                     <TextInput
                       style={styles.input}
@@ -708,7 +711,7 @@ export default function ReceiveScreen() {
                       {loading
                         ? <ActivityIndicator color="#111" />
                         : <Text style={styles.buttonText}>
-                            Create {network === 'usdc' ? 'USDC' : 'SOL'} receive QR
+                            Create payment QR
                           </Text>}
                     </TouchableOpacity>
                   </>
@@ -725,11 +728,10 @@ export default function ReceiveScreen() {
             <View style={styles.qrCard}>
               <QRCode value={qrValue} size={210} />
             </View>
-            <Text style={[styles.proofText, { marginTop: 18 }]} numberOfLines={3}>{qrValue}</Text>
             <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => void copy(qrValue)}>
               <View style={styles.buttonContent}>
                 <Ionicons name="copy-outline" size={18} color="#fff" />
-                <Text style={[styles.buttonText, styles.secondaryButtonText]}>Copy request</Text>
+                <Text style={[styles.buttonText, styles.secondaryButtonText]}>Copy payment link</Text>
               </View>
             </TouchableOpacity>
           </View>

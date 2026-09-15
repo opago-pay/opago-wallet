@@ -11,6 +11,11 @@ const {
   walletAssetKeyFromSymbol,
 } = require('../lib/wallet-assets.ts');
 const { calculatePortfolioEur } = require('../lib/portfolio-valuation.ts');
+const {
+  compactWalletIdentifier,
+  formatEurValue,
+  friendlyPaymentStatus,
+} = require('../lib/wallet-display.ts');
 
 function readSource(...segments) {
   return readFileSync(path.join(__dirname, '..', ...segments), 'utf8');
@@ -31,6 +36,12 @@ test('defines presentation metadata for every wallet asset and development netwo
     'MAINNET',
   );
   assert.equal(getWalletAssetPresentation('usdc', false).name, 'USDC');
+  assert.equal(getWalletAssetPresentation('hedera', false).name, 'HBAR');
+  assert.equal(getWalletAssetPresentation('lightning', false).name, 'Bitcoin');
+  assert.equal(
+    getWalletAssetPresentation('usdc', false).description,
+    'Digital dollars on Solana',
+  );
 });
 
 test('maps transaction symbols to the same icons used by asset cards', () => {
@@ -57,15 +68,29 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   for (const asset of ['lightning', 'solana', 'usdc', 'hedera']) {
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
-  assert.match(portfolio, /Development networks - real mainnet payments are blocked/);
-  assert.match(portfolio, /Hedera Mainnet - real HBAR/);
+  assert.match(portfolio, /HBAR payments are live/);
+  assert.match(portfolio, /Bitcoin, Solana and USDC are still for testing/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
   assert.doesNotMatch(portfolio, /assetDot/);
 });
 
-test('values development-network balances at their mainnet-equivalent EUR prices', () => {
+test('keeps technical wallet data behind friendly display labels', () => {
+  assert.equal(compactWalletIdentifier('0.0.10861984'), 'Account ••• 61984');
+  assert.equal(compactWalletIdentifier('Da9biHrA6ghVMz19Lj6b4nmin'), 'Da9bi…4nmin');
+  assert.equal(friendlyPaymentStatus('SUCCESS'), 'Completed');
+  assert.equal(friendlyPaymentStatus('submitted'), 'Processing');
+  assert.equal(friendlyPaymentStatus('action_required'), 'Needs attention');
+  assert.match(formatEurValue(12.5), /12\.50/);
+
+  const review = readSource('components', 'send', 'hedera-payment-views.tsx');
+  assert.match(review, /Show payment details/);
+  assert.match(review, /Send \{props\.payment\.amountHbar\} HBAR/);
+  assert.match(review, /View receipt/);
+});
+
+test('shows a clearly labelled estimate for development-network balances', () => {
   assert.equal(
     calculatePortfolioEur(
       {
@@ -86,7 +111,7 @@ test('values development-network balances at their mainnet-equivalent EUR prices
 
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
   assert.doesNotMatch(portfolio, /Not valued/);
-  assert.match(portfolio, /Mainnet-price estimate only/);
+  assert.match(portfolio, /Demo balance based on current market prices/);
 });
 
 test('uses graphical confirmation states instead of prototype OK text', () => {

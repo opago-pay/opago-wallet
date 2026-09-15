@@ -71,6 +71,30 @@ import type {
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : 'Payment failed.';
 
+function friendlyPaymentMessage(cause: unknown, asset = 'payment'): string {
+  const message = messageOf(cause);
+  const normalized = message.toLowerCase();
+  if (normalized.includes('insufficient') || normalized.includes('not enough')) {
+    return `There is not enough ${asset} to cover this payment and its network fee.`;
+  }
+  if (normalized.includes('expired')) {
+    return 'This payment request has expired. Ask for a new QR code.';
+  }
+  if (normalized.includes('does not match') || normalized.includes('wrong amount')) {
+    return 'The entered amount is different from the payment request. Check it and try again.';
+  }
+  if (normalized.includes('no ') && normalized.includes('account')) {
+    return `Your ${asset} account is not ready yet. Open Request to finish setting it up.`;
+  }
+  if (normalized.includes('contract_revert') || normalized.includes('rejected')) {
+    return 'The payment was rejected. No successful payment was recorded.';
+  }
+  if (normalized.includes('unavailable') || normalized.includes('timeout')) {
+    return 'The payment network is taking too long to respond. Please try again in a moment.';
+  }
+  return 'We could not prepare this payment. Check the recipient and amount, then try again.';
+}
+
 function confirmPayment(message: string): Promise<boolean> {
   return new Promise(resolve => Alert.alert('Confirm payment', message, [
     { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
@@ -257,7 +281,7 @@ export default function SendScreen() {
     const raw = (scannedValue ?? destination).trim();
     const activeSource = sourceOverride || source;
     if (!raw) {
-      Alert.alert('Missing destination', 'Enter or scan a payment destination.');
+      Alert.alert('Who are you paying?', 'Scan a payment QR code or enter the recipient.');
       return;
     }
     setLoading(true);
@@ -377,7 +401,19 @@ export default function SendScreen() {
       }
       await executeInvoice(invoice, effectiveAmount > 0 ? effectiveAmount : undefined);
     } catch (cause) {
-      Alert.alert('Payment failed', messageOf(cause));
+      Alert.alert(
+        'Check this payment',
+        friendlyPaymentMessage(
+          cause,
+          activeSource === 'hedera'
+            ? 'HBAR'
+            : activeSource === 'usdc'
+              ? 'USDC'
+              : activeSource === 'solana'
+                ? 'SOL'
+                : 'Bitcoin',
+        ),
+      );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -397,12 +433,13 @@ export default function SendScreen() {
       setHederaResult(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
-      if (cause instanceof HederaPaymentPendingError) setPendingHedera(null);
+      const isPending = cause instanceof HederaPaymentPendingError;
+      if (isPending) setPendingHedera(null);
       Alert.alert(
-        cause instanceof HederaPaymentPendingError
-          ? 'HBAR payment pending'
-          : 'HBAR payment not confirmed',
-        messageOf(cause) + '\n\nRefresh Activity and check HashScan before retrying.',
+        isPending ? 'Payment is still processing' : 'Payment not completed',
+        isPending
+          ? 'Do not send it again. Open Home and refresh Recent activity to check the final result.'
+          : friendlyPaymentMessage(cause, 'HBAR'),
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -426,13 +463,13 @@ export default function SendScreen() {
       setSolanaResult(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
-      if (cause instanceof SolanaPaymentPendingError) setPendingSolana(null);
+      const isPending = cause instanceof SolanaPaymentPendingError;
+      if (isPending) setPendingSolana(null);
       Alert.alert(
-        cause instanceof SolanaPaymentPendingError
-          ? 'Solana payment pending'
-          : 'Solana payment not confirmed',
-        messageOf(cause) +
-          '\n\nNo success was recorded. Check Activity and Solana Explorer before retrying.',
+        isPending ? 'Payment is still processing' : 'Payment not completed',
+        isPending
+          ? 'Do not send it again. Open Home and refresh Recent activity to check the final result.'
+          : friendlyPaymentMessage(cause, pendingSolana.asset),
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {

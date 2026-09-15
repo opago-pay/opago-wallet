@@ -4,15 +4,36 @@ export interface WalletAssetPresentation {
   name: string;
   symbol: 'SAT' | 'SOL' | 'USDC' | 'HBAR';
   accent: string;
+  description: string;
   networkLabel: string;
   networkBadge: 'MAINNET' | 'REGTEST' | 'DEVNET' | 'TESTNET';
 }
 
 const BASE_ASSETS = {
-  lightning: { name: 'Lightning', symbol: 'SAT', accent: '#f7931a' },
-  solana: { name: 'Solana', symbol: 'SOL', accent: '#14f195' },
-  usdc: { name: 'USDC', symbol: 'USDC', accent: '#2775ca' },
-  hedera: { name: 'Hedera', symbol: 'HBAR', accent: '#27d3b2' },
+  lightning: {
+    name: 'Bitcoin',
+    symbol: 'SAT',
+    accent: '#f7931a',
+    description: 'Fast payments with Lightning',
+  },
+  solana: {
+    name: 'Solana',
+    symbol: 'SOL',
+    accent: '#14f195',
+    description: 'SOL on the Solana network',
+  },
+  usdc: {
+    name: 'USDC',
+    symbol: 'USDC',
+    accent: '#2775ca',
+    description: 'Digital dollars on Solana',
+  },
+  hedera: {
+    name: 'HBAR',
+    symbol: 'HBAR',
+    accent: '#27d3b2',
+    description: 'Fast payments with Hedera',
+  },
 } as const;
 
 export function getWalletAssetPresentation(

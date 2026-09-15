@@ -29,7 +29,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Assets',
+          title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="wallet.pass.fill" color={color} />,
         }}
       />
@@ -43,14 +43,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="receive"
         options={{
-          title: 'Receive',
+          title: 'Request',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: 'Security',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
         }}
       />

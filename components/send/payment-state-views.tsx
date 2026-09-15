@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,11 @@ export function ScannerView(props: { onScanned(value: string): void; onCancel():
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={({ data }) => props.onScanned(data)}
       />
+      <View style={styles.cameraHeader} pointerEvents="none">
+        <Text style={styles.cameraTitle}>Scan payment code</Text>
+        <Text style={styles.cameraSubtitle}>Hold the QR code inside the frame</Text>
+      </View>
+      <View style={styles.scannerFrame} pointerEvents="none" />
       <TouchableOpacity style={styles.cameraClose} onPress={props.onCancel}>
         <Text style={styles.cameraCloseText}>Cancel</Text>
       </TouchableOpacity>
@@ -26,19 +32,40 @@ export function PaymentSuccessView(props: {
   onDashboard(): void;
   onReset(): void;
 }) {
+  const [showDetails, setShowDetails] = useState(false);
   return (
     <View style={[styles.container, styles.centered]}>
       <View style={styles.successCircle}>
         <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
       </View>
-      <Text style={styles.successTitle}>Payment confirmed</Text>
-      <Text style={styles.subtitle}>The payment was completed successfully.</Text>
-      <View style={styles.proofBox}><Text style={styles.proofText}>{props.proof}</Text></View>
-      <TouchableOpacity style={styles.button} onPress={props.onDashboard}>
-        <Text style={styles.buttonText}>Return to dashboard</Text>
+      <Text style={styles.successTitle}>Payment sent</Text>
+      <Text style={[styles.subtitle, styles.centerText]}>It is complete and saved in your activity.</Text>
+      <View style={styles.successSummary}>
+        <Ionicons name="shield-checkmark-outline" size={19} color="#49d17d" />
+        <Text style={styles.successSummaryText}>Payment confirmed</Text>
+      </View>
+      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={props.onDashboard}>
+        <Text style={styles.buttonText}>Done</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={props.onReset}>
-        <Text style={[styles.buttonText, styles.secondaryButtonText]}>Send another</Text>
+      <TouchableOpacity
+        style={styles.detailsToggle}
+        onPress={() => setShowDetails(value => !value)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showDetails }}
+      >
+        <Text style={styles.detailsToggleText}>
+          {showDetails ? 'Hide payment details' : 'Show payment details'}
+        </Text>
+        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color="#9b9ba7" />
+      </TouchableOpacity>
+      {showDetails && (
+        <View style={styles.technicalDetails}>
+          <Text style={styles.label}>Payment reference</Text>
+          <Text style={styles.proofText}>{props.proof}</Text>
+        </View>
+      )}
+      <TouchableOpacity style={styles.textButton} onPress={props.onReset}>
+        <Text style={styles.textButtonText}>Send another payment</Text>
       </TouchableOpacity>
     </View>
   );

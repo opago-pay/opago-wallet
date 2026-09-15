@@ -1,6 +1,6 @@
 # UI production-readiness plan
 
-This plan covers interface quality only. It does not change the wallet's testnet-only release status or claim that the product is ready for real funds.
+This plan covers interface quality only. It does not claim that the complete multi-chain application is audited or ready for unrestricted production use. The guarded Hedera Mainnet candidate is documented separately.
 
 ## 1. Asset identity and consistency - complete
 
@@ -29,15 +29,26 @@ This plan covers interface quality only. It does not change the wallet's testnet
 - UI tests lock the four asset identities, ticker-to-icon mapping, graphical success states, and removal of anonymous portfolio dots.
 - The complete application and contract suites remain mandatory through `npm run phase5:verify`.
 
-## 5. Physical-device visual acceptance - pending
+## 5. Consumer simplicity - implemented
+
+- Replace duplicate portfolio and asset headings with a single wallet hierarchy, clear estimated balance, and two primary actions.
+- Present Lightning as Bitcoin and Hedera as HBAR while retaining the exact network badge next to each asset.
+- Shorten wallet identifiers in everyday views and expose copying as an explicit action.
+- Translate raw transaction states into `Completed`, `Processing`, or `Needs attention` without changing the stored network result.
+- Lead Send and Request with plain questions such as payment method, recipient, and amount.
+- Keep full account IDs, transaction signatures, payment IDs, contract IDs, and explorer evidence behind voluntary payment-details and receipt controls.
+- Use consumer-safe error copy for insufficient funds, expired requests, mismatched amounts, unavailable networks, and unresolved submissions while preserving the no-retry safety rule.
+- Keep Mainnet and development modes visible through compact status rows instead of dominant technical warning cards.
+
+## 6. Physical-device visual acceptance - pending
 
 Run this after the UI commit is available in the clean acceptance checkout:
 
-1. Build and install a fresh arm64 development-client APK.
-2. Inspect Portfolio with long balances and a populated activity list.
+1. Build and install a fresh arm64 standalone Hedera Mainnet candidate APK.
+2. Inspect Home with long balances and a populated activity list.
 3. Inspect Send with each asset selected, the keyboard open, and a scanned Hedera checkout request.
 4. Inspect Receive for Lightning, Solana, and Hedera, including a generated QR and copy action.
-5. Complete one Hedera testnet checkout and verify the review, success, and HashScan actions.
+5. Use a non-payable Mainnet review fixture to inspect review and details without sending another payment; reuse the already accepted Mainnet transaction for receipt evidence.
 6. Check small-screen clipping, touch targets, contrast, dynamic text, and German/English string overflow before recording the milestone video.
 
 ## Deliberately deferred

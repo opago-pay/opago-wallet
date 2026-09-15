@@ -120,7 +120,7 @@ test('requires local recovery verification before deleting wallet keys', () => {
   assert.match(source, /usePreventScreenCapture\('opago-recovery-verification'\)/);
   assert.match(source, /setBackupWordInput\(''\)/);
   assert.match(source, /KeyboardAvoidingView/);
-  assert.match(source, /Start 3-word backup check/);
+  assert.match(source, /Check my backup/);
   assert.match(source, /disabled=\{isDeleting \|\| !backupVerified\}/);
   assert.match(source, /if \(!backupVerified\)/);
   assert.match(source, /Deletion is unlocked only for this app session\./);

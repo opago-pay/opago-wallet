@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Text as SvgText } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
@@ -97,6 +98,7 @@ export default function SettingsScreen() {
   const [backupChallengeIndex, setBackupChallengeIndex] = useState(0);
   const [backupWordInput, setBackupWordInput] = useState('');
   const [backupChallengeError, setBackupChallengeError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -254,55 +256,69 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
+        <View>
+          <Text style={styles.title}>Security</Text>
+          <Text style={styles.subtitle}>Protect your wallet and your backup.</Text>
+        </View>
         <Image
           source={require('@/assets/images/logo_new.svg')}
           style={{ width: 36, height: 36 }}
           contentFit="contain"
         />
       </View>
-      <Text style={styles.subtitle}>Manage protected wallet keys and network safety.</Text>
-
       <View style={styles.networkBanner}>
         <Text style={styles.sectionTitle}>
           {appConfig.isMainnet
-            ? 'Mainnet enabled'
+            ? 'Real payments are active'
             : appConfig.isHederaMainnet
-              ? 'Hedera Mainnet enabled'
-              : 'Safe development networks'}
+              ? 'HBAR payments are active'
+              : 'Demo mode is active'}
         </Text>
         <Text style={styles.sectionSubtitle}>
           {appConfig.isMainnet
-            ? 'Real-fund transfers are enabled for this build.'
+            ? 'This wallet can send real funds. Always check every payment before confirming.'
             : appConfig.isHederaMainnet
-              ? 'Real HBAR is enabled. Solana, USDC, Lightning, and swaps remain on safe development networks.'
-              : 'Real-fund transfers are blocked until mainnet is explicitly enabled.'}
+              ? 'HBAR uses Mainnet. Bitcoin, Solana and USDC are clearly marked as demo assets.'
+              : 'All assets in this version are for testing only.'}
         </Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Hedera {appConfig.hederaNetwork} public key
-        </Text>
-        <Text style={styles.sectionSubtitle}>
-          {appConfig.hederaNetwork === 'testnet'
-            ? 'This public key is safe to copy into the local provisioning script. It is not a private key.'
-            : 'This public key identifies the wallet account. It is not a private key and cannot authorize payments.'}
-        </Text>
-        <TouchableOpacity
-          style={styles.mnemonicBox}
-          disabled={!hederaPublicKey}
-          onPress={() => hederaPublicKey && void Clipboard.setStringAsync(hederaPublicKey)}
-        >
-          <Text style={styles.mnemonicText}>{hederaPublicKey || 'Wallet key is not ready.'}</Text>
-          {hederaPublicKey && <Text style={styles.overlayText}>Tap to copy public key</Text>}
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.advancedToggle}
+        onPress={() => setShowAdvanced(value => !value)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showAdvanced }}
+      >
+        <View style={styles.advancedCopy}>
+          <Text style={styles.advancedTitle}>Advanced wallet details</Text>
+          <Text style={styles.advancedSubtitle}>Public keys and network information</Text>
+        </View>
+        <Ionicons name={showAdvanced ? 'chevron-up' : 'chevron-down'} size={20} color="#8f8f9d" />
+      </TouchableOpacity>
+
+      {showAdvanced && (
+        <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>
+            Hedera {appConfig.hederaNetwork} public key
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            This public key identifies your account. It cannot authorize a payment.
+          </Text>
+          <TouchableOpacity
+            style={styles.mnemonicBox}
+            disabled={!hederaPublicKey}
+            onPress={() => hederaPublicKey && void Clipboard.setStringAsync(hederaPublicKey)}
+          >
+            <Text style={styles.mnemonicText}>{hederaPublicKey || 'Wallet key is not ready.'}</Text>
+            {hederaPublicKey && <Text style={styles.overlayText}>Tap to copy public key</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recovery phrase</Text>
+        <Text style={styles.sectionTitle}>Secret recovery phrase</Text>
         <Text style={styles.sectionSubtitle}>
-          Device authentication is requested when supported. Never share this phrase.
+          This is the only backup for your wallet. Write it down and never share it.
         </Text>
         <TouchableOpacity
           style={styles.mnemonicBox}
@@ -329,10 +345,9 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Verify backup before deletion</Text>
+        <Text style={styles.sectionTitle}>Check your backup</Text>
         <Text style={styles.sectionSubtitle}>
-          Never type or send all recovery words. The app asks for three random word positions,
-          one at a time, and checks them locally against this exact wallet.
+          We ask for three words from your paper backup. The check happens only on this device.
         </Text>
         <TouchableOpacity
           style={[
@@ -346,13 +361,13 @@ export default function SettingsScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.verifyButtonText}>
-              {backupVerified ? 'Paper backup verified' : 'Start 3-word backup check'}
+              {backupVerified ? 'Backup checked' : 'Check my backup'}
             </Text>
           )}
         </TouchableOpacity>
         {backupVerified && (
           <Text style={styles.verifiedText}>
-            Verified for this session. Wallet deletion is now unlocked.
+            Your paper backup matches this wallet.
           </Text>
         )}
       </View>
@@ -426,6 +441,10 @@ export default function SettingsScreen() {
       </Modal>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Remove this wallet</Text>
+        <Text style={styles.sectionSubtitle}>
+          Only remove it after checking your paper backup. You will need those words to restore it.
+        </Text>
         <TouchableOpacity
           style={[
             styles.dangerButton,
@@ -437,7 +456,7 @@ export default function SettingsScreen() {
           {isDeleting ? (
             <ActivityIndicator color="#ff4444" />
           ) : (
-            <Text style={styles.dangerButtonText}>Delete wallet</Text>
+            <Text style={styles.dangerButtonText}>Remove wallet from this device</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -462,6 +481,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(107,92,195,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(107,92,195,0.4)',
+    borderRadius: 16,
+    padding: 18,
+  },
+  advancedToggle: {
+    marginTop: 16,
+    backgroundColor: '#121216',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  advancedCopy: { flex: 1 },
+  advancedTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  advancedSubtitle: { color: '#7f7f8b', fontSize: 12, marginTop: 3 },
+  advancedSection: {
+    marginTop: 12,
+    backgroundColor: '#121216',
     borderRadius: 16,
     padding: 18,
   },

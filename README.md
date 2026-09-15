@@ -22,7 +22,7 @@ Mainnet payments remain disabled in the default build. Hedera Mainnet code paths
 
 ## Interface readiness
 
-Portfolio, Send, Receive, activity, and checkout selection share one asset identity system for Lightning, Solana, USDC, and Hedera. Scalable asset icons are paired with explicit network badges, so visual identity never obscures whether an asset is on regtest, devnet, testnet, or mainnet. Long payment forms remain scrollable on smaller Android screens, and selection, copy, scan, success, and explorer actions expose accessible roles or labels.
+Home, Send, Request, activity, and checkout selection share one asset identity system for Bitcoin Lightning, Solana, USDC, and HBAR. The consumer flow leads with recipient, amount, balance, and clear actions; long addresses, transaction signatures, payment IDs, and contract details stay available behind explicit copy or details controls. Scalable asset icons and compact network badges still make regtest, devnet, testnet, and mainnet unambiguous. Long forms remain scrollable on smaller Android screens, and selection, copy, scan, success, and receipt actions expose accessible roles or labels.
 
 The implemented scope and remaining physical-device visual checks are tracked in [UI_PRODUCTION_READINESS.md](UI_PRODUCTION_READINESS.md). This is an interface-quality milestone, not a claim that the wallet is audited or ready for real funds.
 
@@ -491,7 +491,7 @@ The wallet scanned the merchant demo QR, verified the merchant EVM alias and pin
 | Consensus status | `SUCCESS` |
 | Transaction | [View on HashScan](https://hashscan.io/testnet/transaction/0.0.7314364%401786354442.132871379) |
 
-The first physical receive attempt exposed that MetaMask-originated HBAR transfers are returned as `ETHEREUMTRANSACTION`, while the wallet previously loaded only `CRYPTOTRANSFER` history. The receive flow now merges both official Mirror Node transaction types and confirms only a new, successful incoming transaction whose exact bigint tinybar amount matches the QR request. The application displayed `Funds confirmed` for the transaction above, and an independent Mirror Node lookup verified the same status and amount.
+The first physical receive attempt exposed that MetaMask-originated HBAR transfers are returned as `ETHEREUMTRANSACTION`, while the wallet previously loaded only `CRYPTOTRANSFER` history. The receive flow now merges both official Mirror Node transaction types and confirms only a new, successful incoming transaction whose exact bigint tinybar amount matches the QR request. The application displayed its confirmed payment-received state for the transaction above, and an independent Mirror Node lookup verified the same status and amount.
 
 ### Phase 4 physical-device recovery acceptance
 
@@ -743,7 +743,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `110/110` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `111/111` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, consumer-safe identifier and status presentation, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 
