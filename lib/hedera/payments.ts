@@ -179,6 +179,13 @@ export function buildHederaReceiveRequest(
   return 'hedera:' + accountId + '?' + params.toString();
 }
 
+export function buildHederaWalletQrValue(rawAccountId: string): string {
+  // Third-party Hedera wallets such as HashPack expect a plain numeric account
+  // ID in their recipient scanner. Keep the richer Opago request URI separate
+  // so an optional requested amount can still be tracked inside Opago.
+  return parseHederaAccountId(rawAccountId);
+}
+
 export function parseHederaPaymentRequest(rawRequest: string): HederaPaymentRequest {
   const normalized = rawRequest.trim();
   if (/^0\.0\.[1-9]\d*$/.test(normalized)) {

@@ -28,6 +28,7 @@ import {
 } from '@/lib/hedera/account';
 import {
   buildHederaReceiveRequest,
+  buildHederaWalletQrValue,
   parseHederaTransferTinybars,
 } from '@/lib/hedera/payments';
 import {
@@ -488,7 +489,9 @@ export default function ReceiveScreen() {
     network === 'solana' || network === 'usdc'
       ? solanaRequest || ''
       : network === 'hedera'
-        ? hederaRequest || ''
+        ? hederaRequest && hederaAccount
+          ? buildHederaWalletQrValue(hederaAccount.accountId)
+          : ''
         : invoice || '';
 
   const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
@@ -765,10 +768,17 @@ export default function ReceiveScreen() {
             <View style={styles.qrCard}>
               <QRCode value={qrValue} size={210} />
             </View>
+            {network === 'hedera' && (
+              <Text style={[styles.subtitle, styles.centerText]}>
+                Works with HashPack and other Hedera wallets. Confirm the amount in the sending wallet.
+              </Text>
+            )}
             <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => void copy(qrValue)}>
               <View style={styles.buttonContent}>
                 <Ionicons name="copy-outline" size={18} color="#fff" />
-                <Text style={[styles.buttonText, styles.secondaryButtonText]}>Copy payment link</Text>
+                <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+                  {network === 'hedera' ? 'Copy account ID' : 'Copy payment link'}
+                </Text>
               </View>
             </TouchableOpacity>
           </View>

@@ -26,6 +26,7 @@ const {
 } = require('../lib/hedera/config.ts');
 const {
   buildHederaReceiveRequest,
+  buildHederaWalletQrValue,
   findNewConfirmedIncomingHederaTransaction,
   findHederaTestnetAccount,
   formatTinybars,
@@ -227,6 +228,11 @@ test('builds and validates explicit Hedera testnet receive requests', () => {
     () => parseHederaPaymentRequest('hedera:0.0.123456?amount=0.1&amount=0.2'),
     /duplicate/i,
   );
+});
+
+test('builds a third-party-wallet-compatible Hedera QR value', () => {
+  assert.equal(buildHederaWalletQrValue(' 0.0.123456 '), '0.0.123456');
+  assert.throws(() => buildHederaWalletQrValue('hedera:0.0.123456'), /account ID/i);
 });
 
 test('preserves Mirror Node int64 values and derives exact HBAR history', async t => {

@@ -47,7 +47,7 @@ The implemented scope and remaining physical-device visual checks are tracked in
 
 **Planned window: 10-15 August 2026. Status: complete and physically verified.**
 
-- HBAR balance, numeric account ID, receive request, send flow, transaction status, history, and HashScan links are integrated.
+- HBAR balance, numeric account ID, HashPack-compatible receive QR, send flow, transaction status, history, and HashScan links are integrated.
 - Dashboard, Send, and Receive expose HBAR as a first-class asset with prominent `HEDERA TESTNET` labels.
 - Every HBAR payment has a dedicated review screen before signing and a success screen containing its transaction ID.
 - Recovery from the same BIP39 phrase derives the same Hedera key and rediscovers the matching testnet account.
@@ -743,7 +743,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `111/111` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, consumer-safe identifier and status presentation, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `113/113` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar, lamport, and token-base-unit handling, persisted pending/confirmed/failed Hedera and Solana states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, third-party-wallet-compatible Hedera QR values, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, consumer-safe identifier and status presentation, strict Solana Pay parsing, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 
