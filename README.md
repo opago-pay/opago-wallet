@@ -10,7 +10,7 @@ The default mobile build is intended for development and test networks. The veri
 | --- | --- | --- |
 | HBAR balance, send, receive, history, and recovery | Hedera testnet | Phase 2 complete; physical-device acceptance verified |
 | Contract-bound HBAR checkout and merchant QR demo | Hedera testnet | Phase 3 complete; deployed, source-verified, and physically accepted |
-| HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; physical Android canary accepted |
+| HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; physical Android canary and Thrive submission completed |
 | Native SOL send, receive, balance, and history | Solana devnet | Implemented |
 | SPL USDC balance and transfer | Solana devnet | Implemented; requires an explicit devnet mint |
 | Lightning send and receive | Spark regtest | Implemented; mainnet validation pending |
@@ -36,7 +36,7 @@ The implemented scope and remaining physical-device visual checks are tracked in
 
 **Planned window: 8-10 August 2026. Status: complete and physically verified.**
 
-- `@hiero-ledger/sdk` is pinned to the Expo-compatible version `2.84.0`.
+- `@hiero-ledger/sdk` is pinned to the tested Expo-compatible version `2.88.0`.
 - Hedera is restricted to testnet.
 - The Ed25519 key is deterministically derived from the existing recovery phrase at `m/44'/3030'/0'/0'`.
 - The app discovers the matching account through the Mirror Node.
@@ -88,19 +88,13 @@ The complete physical-device matrix, public transaction links, fail-closed state
 
 ### Phase 5 - milestone evidence
 
-**Planned window: 22-24 August 2026. Status: release-candidate evidence in progress.**
+**Planned window: 22-24 August 2026. Status: complete.**
 
 The repository contains the Hedera testnet setup, architecture, reproducible quality command, deployment manifest, contract and transaction links, source-verification record, physical-device transaction evidence, release notes, and a submission-ready video sequence. The complete evidence index and clean-room procedure are in [PHASE5_MILESTONE.md](PHASE5_MILESTONE.md); the milestone changes are summarized in [RELEASE_NOTES.md](RELEASE_NOTES.md), and the one-to-five-minute recording plan is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
 Dashboard refreshes bound and parallelize optional Lightning and Solana requests, so either service can fail without leaving Android pull-to-refresh running indefinitely or blocking already available Hedera data.
 
-Remaining milestone gates:
-
-- verify a clean clone with `npm ci`, all quality gates, a fresh Android development-client build, installation, and launch;
-- record the final one-to-five-minute video showing balance, merchant QR scan, payment review, confirmation, success, and HashScan verification;
-- package the exact commit, lockfile, compiler metadata, deployment manifest, links, and release notes used for submission.
-
-25 August 2026 remains the submission and contingency day.
+The clean dependency install, quality gates, fresh Android build, installation, launch, physical-device payment evidence, video, and exact submission package were completed. Historical Testnet evidence remains below; the later Mainnet grant evidence is maintained separately in [THRIVE_MILESTONE2_MAINNET.md](THRIVE_MILESTONE2_MAINNET.md).
 
 | Public testnet evidence | Link |
 | --- | --- |
@@ -118,7 +112,8 @@ Remaining milestone gates:
 | Contract `0.0.10850063` | [View on HashScan](https://hashscan.io/mainnet/contract/0.0.10850063) |
 | Deployment transaction | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10848889%401788856737.537500943) |
 | Physical-device direct transfer | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789477423.490632405) |
-| Physical-device contract checkout | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872) |
+| Initial physical-device contract checkout | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872) |
+| Submitted-video contract checkout | [View on HashScan](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764) |
 | Android canary acceptance | [`HEDERA_MAINNET_CANARY_ACCEPTANCE.md`](HEDERA_MAINNET_CANARY_ACCEPTANCE.md) |
 | Versioned deployment manifest | [`deployments/hedera-mainnet.json`](deployments/hedera-mainnet.json) |
 
@@ -204,7 +199,7 @@ Mainnet private keys must never be sent through chat, committed to Git, stored i
 
 ### Mainnet Milestone 0 - scope and launch policy
 
-**Estimate: 1-3 days. Status: technical package complete; human confirmations pending.**
+**Estimate: 1-3 days. Status: grant scope and product decisions recorded; external audit and public-launch approvals remain deferred.**
 
 Codex delivery:
 
@@ -243,13 +238,13 @@ Human/Opago delivery:
 
 - choose the final Mainnet transfer and aggregate pilot caps;
 - approve the Mainnet merchant identity, Android package/version policy, and pilot allowlist policy;
-- configure public production metadata only after the audited contract deployment.
+- configure public production metadata only after the source-verified contract deployment and required independent review.
 
-Acceptance gate: complete. A Hedera testnet profile cannot submit to Hedera Mainnet, a Hedera Mainnet profile cannot accept Hedera testnet requests or infrastructure, and no Hedera Mainnet profile succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 106 application tests, and 9 contract tests.
+Acceptance gate: complete. A Hedera testnet profile cannot submit to Hedera Mainnet, a Hedera Mainnet profile cannot accept Hedera testnet requests or infrastructure, and no Hedera Mainnet profile succeeds without the complete release evidence tuple. The repository gates pass with TypeScript, ESLint, 113 application tests, and 9 contract tests.
 
 ### Mainnet Milestone 2 - account lifecycle and recovery
 
-**Estimate: 5-10 days. Status: device-independent foundation implemented; user-funded activation selected; sender interoperability and physical acceptance pending.**
+**Estimate: 5-10 days. Status: user-funded activation implemented and internally accepted; clean-device Mainnet recovery and broad third-party sender interoperability remain pending.**
 
 Codex delivery:
 
@@ -278,7 +273,7 @@ Acceptance gate: a fresh wallet can obtain or connect to a Mainnet account, rece
 
 ### Mainnet Milestone 3 - contract hardening and independent review
 
-**Engineering estimate: 5-8 days. External lead time: typically 2-4 weeks. Status: planned.**
+**Engineering estimate: 5-8 days. External lead time: typically 2-4 weeks. Status: automated hardening implemented; independent review not completed and remains a public-release blocker.**
 
 Codex delivery:
 
@@ -350,7 +345,7 @@ Acceptance gate: operational ownership and failure handling are documented, test
 Codex delivery:
 
 - finalize guarded Mainnet deployment and verification scripts;
-- validate network, operator ID, audited artifact, compiler metadata, fee caps, transaction, runtime, Sourcify status, and HashScan evidence;
+- validate network, operator ID, exact approved artifact, compiler metadata, fee caps, transaction, runtime, Sourcify status, and HashScan evidence;
 - populate `deployments/hedera-mainnet.json` only from verified public results and bind the release build to that exact contract.
 
 The keyless preflight passed against deployment account `0.0.10848889`. `npm run contract:deploy:mainnet` then deployed the approved runtime as contract `0.0.10850063`, and `npm run contract:verify:mainnet` validated chain ID `295`, Mirror Node identity and runtime, consensus evidence, and Sourcify status. The versioned manifest contains the exact public evidence; no operator key was written to the repository.
@@ -359,13 +354,13 @@ Human/Opago delivery:
 
 - fund and control the deployment account, approve the exact deployment, enter the key locally, authorize real fees, and approve the resulting contract identity.
 
-Acceptance gate: the Mainnet contract is source-verified, its runtime matches the audited artifact, and the signed app is pinned to it.
+Acceptance gate: the Mainnet contract is source-verified, its runtime matches the exact approved artifact, and the standalone candidate is pinned to it. This is not an independent audit claim.
 
-The internal candidate pinned to source commit `d2501899cf30850a8f15c30771be49907f4a7605` completed a real `0.01 HBAR` checkout from consumer account `0.0.10861984` to merchant account `0.0.10848889`. Contract `0.0.10850063`, the official Mirror Node, HashScan, the success screen, and refreshed wallet history all reported the same successful transaction. Full public evidence and remaining release limitations are recorded in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md).
+The initial internal candidate pinned to source commit `d2501899cf30850a8f15c30771be49907f4a7605` completed a real `0.01 HBAR` checkout from consumer account `0.0.10861984` to merchant account `0.0.10848889`. The later submission-video candidate at `b955c7529d36f10464d07182ec960460b794a73d` repeated the checkout successfully in [transaction `0.0.10861984@1789541018.595289764`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764). Contract `0.0.10850063`, the official Mirror Node, HashScan, the success screen, and refreshed wallet history reported the same result. Full public evidence and remaining release limitations are recorded in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md).
 
 ### Mainnet Milestone 8 - real-user pilot
 
-**Estimate: 4-6 days. Status: in progress; single-device real-fund canary passed, wider pilot and negative-path acceptance pending.**
+**Estimate: 4-6 days. Status: internal single-device real-fund acceptance passed; no external public pilot is claimed.**
 
 Codex delivery:
 
@@ -381,7 +376,7 @@ Acceptance gate: at least one real-user Mainnet checkout succeeds; every negativ
 
 ### Mainnet Milestone 9 - submission evidence
 
-**Estimate: 2-3 days. Status: planned.**
+**Estimate: 2-3 days. Status: submitted through Thrive on 16 September 2026.**
 
 Codex delivery:
 
@@ -391,7 +386,7 @@ Human/Opago delivery:
 
 - grant repository access, record and host the 1-5 minute video, approve user feedback, submit the milestone form, and answer Guardian questions.
 
-The video must show the signed app, visible Mainnet status, real balance, public merchant page, QR request, final review, signing, confirmed success, HashScan transaction and contract, and wallet history.
+The submitted video shows the standalone internal app, visible Mainnet status, real balance, local merchant reference page, QR request, final review, signing, confirmed success, HashScan transaction and contract, and wallet history.
 
 ### Proposed schedule
 
@@ -407,9 +402,9 @@ The video must show the signed app, visible Mainnet status, real balance, public
 | 8 | User pilot, video, and evidence | Record and submit |
 | 9 | Contingency | Guardian follow-up |
 
-### Absolute Mainnet go/no-go gates
+### Absolute public-production go/no-go gates
 
-No Mainnet deployment or real-user release is allowed while any of the following remains true:
+No unrestricted real-user or app-store release is allowed while any of the following remains true. The completed internal grant canary is not such a release:
 
 - grant classification or required-service scope is unresolved;
 - account and recovery architecture is not approved;
@@ -425,7 +420,7 @@ No Mainnet deployment or real-user release is allowed while any of the following
 
 ## Hedera implementation
 
-The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.84.0` directly in the React Native client. Private keys remain in runtime memory while account data and transaction history come from the official Mirror Node selected and locked by the build profile. Testnet remains the safe default; Mainnet requires the complete release evidence tuple described above.
+The Hedera integration uses [`@hiero-ledger/sdk`](https://github.com/hiero-ledger/hiero-sdk-js) `2.88.0` directly in the React Native client. Private keys remain in runtime memory while account data and transaction history come from the official Mirror Node selected and locked by the build profile. Testnet remains the safe default; Mainnet requires the complete release evidence tuple described above.
 
 The app enforces an app-level limit of at most `1 HBAR` per test transaction by default. Account provisioning remains isolated from the app so no operator credential enters the client bundle.
 

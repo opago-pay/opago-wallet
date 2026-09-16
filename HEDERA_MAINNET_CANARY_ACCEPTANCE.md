@@ -22,6 +22,20 @@
 
 The candidate enables real funds only for Hedera. Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. The APK uses a local debug certificate and is not the final store artifact.
 
+## Submission-video candidate
+
+The grant video was recorded on 16 September 2026 after the consumer UI and interoperable receive QR were finalized. This later standalone candidate preserves the same Mainnet network, contract, runtime hash, package ID, transfer cap, and real-fund isolation as the accepted canary.
+
+| Item | Value |
+| --- | --- |
+| Source commit | [`b955c7529d36f10464d07182ec960460b794a73d`](https://github.com/opago-pay/opago-wallet/tree/b955c7529d36f10464d07182ec960460b794a73d) |
+| APK SHA-256 | `19a0ea2c9da565d2f02b7321a14f001dad85a20210f9267b23db65d542e3b738` |
+| Signing | Local debug certificate; standalone internal candidate, not a store release |
+| Recorded checkout | [`0.0.10861984@1789541018.595289764`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764) |
+| Result | `SUCCESS`; contract `0.0.10850063`; exactly `0.01 HBAR` forwarded; `0.18342030 HBAR` charged fee |
+
+The official Mainnet Mirror Node reports `CONTRACTCALL`, `SUCCESS`, contract `0.0.10850063`, and an exact `1,000,000` tinybar transfer to merchant account `0.0.10848889`. This is the transaction shown in the submitted video.
+
 ## Accounts and public transactions
 
 | Role | Account |
@@ -42,7 +56,7 @@ An independent public Mirror Node lookup returned `CONTRACTCALL`, transaction re
 
 ## Finding and correction during acceptance
 
-The first direct transfer reached consensus successfully while the SDK returned an ambiguous `UNKNOWN` response after bounded receipt attempts. The app did not falsely report success, and the user did not retry. The payment flow was then hardened to persist the transaction ID before submission, reconcile ambiguous outcomes through the official Mirror Node, retain unresolved submissions as durable pending records, and prevent immediate duplicate retries. The corrected candidate was rebuilt, installed, and used for the successful contract checkout above. Automated application tests pass `110/110` and include explicit success, failure, and still-pending reconciliation cases.
+The first direct transfer reached consensus successfully while the SDK returned an ambiguous `UNKNOWN` response after bounded receipt attempts. The app did not falsely report success, and the user did not retry. The payment flow was then hardened to persist the transaction ID before submission, reconcile ambiguous outcomes through the official Mirror Node, retain unresolved submissions as durable pending records, and prevent immediate duplicate retries. The corrected candidate was rebuilt, installed, and used for the successful contract checkouts above. Automated application tests pass `113/113` and include explicit success, failure, still-pending reconciliation, and third-party-wallet-compatible Hedera receive QR cases.
 
 ## Acceptance result
 
@@ -55,6 +69,6 @@ The first direct transfer reached consensus successfully while the SDK returned 
 - [ ] Independent security review is complete.
 - [ ] Mainnet invalid/expired/replay cases have been physically exercised with real funds.
 - [ ] Final store-signed build starts without development tooling and has completed store distribution checks.
-- [ ] The one-to-five-minute submission video is recorded and publicly hosted.
+- [x] The one-to-five-minute Mainnet demonstration is recorded and was submitted through the Thrive portal.
 
 Only the checked items are established by this record.

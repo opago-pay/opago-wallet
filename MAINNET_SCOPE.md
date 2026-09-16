@@ -1,70 +1,74 @@
 # Hedera Mainnet scope and ownership
 
-**Milestone 0 status:** the technical scope package is complete. Human approvals and external confirmations listed below remain open. This document does not claim that Mainnet is enabled or that the product is ready for real funds.
+**Last updated:** 16 September 2026
+
+**Milestone status:** the Hedera Mainnet grant candidate was submitted to Thrive. This scope records what was actually delivered and separates it from a future public consumer-wallet launch.
 
 ## Product classification
 
-Opago Wallet is currently scoped as a non-custodial payment wallet and merchant checkout application. It is not designed as an AI product, an RWA tokenization platform, or a DeFi liquidity protocol. This classification must be confirmed in writing with the milestone reviewer before implementation expands into unrelated HTS, HCS, or liquidity features.
+Opago Wallet is a non-custodial **consumer wallet** for people who want to pay with crypto. It is not the Opago merchant POS, does not receive or settle customer payments on behalf of merchants, and does not bundle the separate merchant software, APIs, or webshop plugins.
 
-## Required Hedera capabilities
+The repository is not an AI product, RWA tokenization platform, or DeFi liquidity protocol. The Hedera milestone therefore uses native HBAR, Hedera Smart Contract Service, consensus receipts, Mirror Node data, and public explorer evidence. It does not add HTS, HCS, or liquidity solely to inflate the integration claim.
 
-| Capability | Hedera surface | Required for Mainnet pilot | Current state |
-| --- | --- | --- | --- |
-| HBAR send and receive | Cryptocurrency Service / `CryptoTransfer` | Yes | Implemented on testnet |
-| Contract-bound checkout | Hedera Smart Contract Service | Yes | Implemented and verified on testnet |
-| Account, balance, history, receipt, and runtime lookup | Mirror Node REST API | Yes | Implemented on testnet; network binding added in Milestone 1 |
-| Public transaction and contract evidence | HashScan and Sourcify | Yes | Implemented on testnet |
-| Hedera Token Service | HTS | No current product requirement | Out of scope unless Thrive explicitly requires it |
-| Hedera Consensus Service | HCS | No current product requirement | Out of scope unless a product requirement is approved |
-| DeFi liquidity | External liquidity protocol | No current product requirement | Out of scope unless Opago is formally classified as DeFi |
+## Delivered Hedera capabilities
 
-## Controlled Mainnet pilot scope
+| Capability | Hedera surface | Mainnet evidence |
+| --- | --- | --- |
+| HBAR balance, receive, direct send, and history | Cryptocurrency Service plus Mirror Node REST API | Accepted on the physical Android candidate |
+| Contract-bound checkout | Hedera Smart Contract Service | Contract [`0.0.10850063`](https://hashscan.io/mainnet/contract/0.0.10850063) is deployed and source-verified |
+| Account discovery and transaction reconciliation | Official Mainnet Mirror Node | Implemented with network binding and fail-closed pending states |
+| Public deployment and payment evidence | HashScan and Sourcify | Versioned manifest and submitted-video transaction are public |
+| Hedera Token Service | HTS | No current consumer-wallet requirement; not claimed |
+| Hedera Consensus Service | HCS | No current consumer-wallet requirement; not claimed |
 
-The initial production target is a controlled Android beta with a small, human-approved HBAR cap and a limited pilot cohort. The pilot includes:
+## Current grant candidate
 
-- a signed Android release that runs without Metro, ADB, or a development client;
-- an audited and source-verified Mainnet checkout contract;
-- a public HTTPS merchant checkout service;
-- Mainnet HBAR balance, receive, direct send, checkout, history, and recovery;
-- strict build-time network and contract binding;
-- operational monitoring, incident ownership, and support contact;
-- three to five pilot users and documented feedback;
-- reproducible submission evidence tied to one commit and one signed build.
+The grant candidate is a standalone internal Android build with a `1 HBAR` per-payment cap. It enables real funds only for Hedera Mainnet, while Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. One Opago-controlled consumer account completed direct and contract payments to a separate Opago-controlled merchant/deployment account.
 
-The pilot excludes token issuance, liquidity, custody, fiat conversion, automated treasury management, and unbounded public onboarding unless separately approved.
+The candidate is locally signed, not published through an app store, not independently audited, and not offered as unrestricted public production software. The merchant QR page is a local reference service. It binds payment data to the contract but does not authenticate an official Opago merchant identity.
+
+## Future production consumer wallet
+
+The intended later product is a separate production-focused fork with HBAR and Lightning. The current direction is:
+
+- non-custodial: users control and fund their own wallet; Opago does not advance activation funds;
+- no separate Opago payment fee in the initial MVP; users pay the relevant network fee;
+- distribution through Google Play and the Apple App Store;
+- initial availability limited to countries covered by the MiCAR launch decision and legal review;
+- a separate merchant system and public APIs/plugins outside the consumer app;
+- signed or registry-backed verified-merchant requests as a later feature, not a claim of the current MVP.
+
+This future release requires store signing, public infrastructure, independent security review, legal/privacy approval, monitoring, support, incident ownership, and external-user recovery testing.
 
 ## Responsibility boundary
 
-### Codex technical delivery
+### Repository-level technical delivery
 
-- implement network isolation, Mainnet clients, UI labels, tests, and release checks;
-- prepare account-lifecycle, contract, merchant service, Android release, and evidence changes;
-- produce threat models, runbooks, acceptance scripts, and submission drafts;
-- inspect public deployment evidence and fail closed when it does not match the pinned build.
+- network isolation, Mainnet clients, UI labels, exact-amount handling, tests, and release checks;
+- account lifecycle, contract, local merchant reference, Android candidate, and evidence scripts;
+- threat models, runbooks, acceptance records, and public submission evidence;
+- fail-closed validation when public deployment evidence does not match the pinned build.
 
-### Fabian / Opago authority and external delivery
+### Fabian / Opago external authority
 
-- obtain written grant-scope confirmation;
-- approve user count, HBAR limits, onboarding model, and release channel;
-- acquire and fund Mainnet accounts while retaining all private keys;
-- commission an independent contract and mobile security review;
-- provide hosting, domain, app-store identity, legal review, support, and incident ownership;
-- authorize real-fund actions, recruit users, collect feedback, record the video, and submit the milestone.
+- product, legal, financial, geographic, app-store, and real-user decisions;
+- Mainnet accounts, balances, keys, and every real-fund authorization;
+- independent auditors, production hosting/domain, support, monitoring, and incident ownership;
+- user consent, external feedback, video hosting, milestone submission, and Guardian follow-up.
 
 No Mainnet private key may be sent through chat, committed to Git, placed in an `EXPO_PUBLIC_*` variable, or embedded in an app build.
 
-## Human decisions still required
+## Decision record
 
-| ID | Decision | Owner | Blocks |
-| --- | --- | --- | --- |
-| M0-D1 | Written confirmation that Opago is not subject to AI, RWA, or DeFi-liquidity requirements | Fabian / Thrive | Final scope |
-| M0-D2 | Confirmation that HSCS, HBAR transfer, and Mirror Node satisfy the required-service scope | Fabian / Thrive | Final scope |
-| M0-D3 | Controlled beta versus unrestricted public launch | Fabian | Account and operations design |
-| M0-D4 | Pilot user count and per-payment/aggregate HBAR limits | Fabian | Mainnet release configuration |
-| M0-D5 | Android distribution channel | Fabian | Release workflow |
-| M0-D6 | Approved 2026-09-07: user-funded first HBAR deposit via Ed25519 key alias; pilot users already hold HBAR in a compatible wallet; no Opago sponsorship | Fabian | Sender compatibility and physical acceptance pending |
-| M0-D7 | Security reviewer, legal reviewer, support owner, and incident owner | Fabian | Go-live |
-
-## Milestone 0 acceptance
-
-Technical acceptance is complete when this scope, the threat model, and the Thrive clarification request are versioned and linked from the README. Full Milestone 0 acceptance additionally requires written resolution of M0-D1 through M0-D7.
+| Decision | Recorded outcome |
+| --- | --- |
+| Product type | Non-custodial consumer payment wallet; not AI, RWA, DeFi liquidity, or merchant POS |
+| Account funding | User-funded Ed25519 alias activation; no Opago-sponsored customer balance |
+| Candidate payment cap | `1 HBAR` per app-initiated Mainnet payment |
+| Candidate users | Internal grant acceptance only; no external public pilot claimed |
+| App fee | No separate Opago fee in the initial MVP |
+| Production networks | Future fork targets HBAR and Lightning; experimental chains stay in this hackathon repository |
+| Distribution | Future Google Play and Apple App Store release |
+| Geography | Future initial launch limited to MiCAR countries, subject to legal approval |
+| Merchant verification | Desirable later feature; not claimed by the current local QR demo |
+| Independent audit | Not completed; remains a production-release blocker |

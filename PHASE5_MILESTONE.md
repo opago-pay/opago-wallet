@@ -47,7 +47,7 @@ The versioned deployment manifest is the machine-readable source of truth for ne
 2. The app deterministically derives a dedicated Hedera Ed25519 key at `m/44'/3030'/0'/0'`. Private material is retained only in runtime memory while needed.
 3. A trusted local provisioning script uses a disposable testnet operator to create or find the public-key account. The operator ID and key are never compiled into the app.
 4. The app discovers account ID, balance, history, transaction state, merchant aliases, and deployed bytecode through bounded Hedera testnet Mirror Node requests.
-5. Direct transfers and checkout contract calls are built and signed on the Android device with `@hiero-ledger/sdk` `2.84.0`.
+5. Direct transfers and checkout contract calls are built and signed on the Android device with `@hiero-ledger/sdk` `2.88.0`.
 6. HBAR amounts remain `bigint` tinybars from parsing through review, signing, storage, and display.
 7. The app persists a non-secret transaction journal. Only explicit Hedera `SUCCESS` promotes a payment to `confirmed`; failed results remain failed, and unknown or unavailable results remain pending.
 8. Checkout requests bind chain, contract, nonce, merchant, exact amount, and expiry into a single-use payment ID. The wallet verifies the pinned runtime hash before signing, and the contract atomically forwards the exact value or reverts.

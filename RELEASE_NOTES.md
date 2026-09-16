@@ -1,63 +1,66 @@
-# Hedera testnet milestone release notes
+# Opago Wallet release notes
 
-Release-candidate date: 2026-08-14
+Current candidate date: 16 September 2026
 
 ## Scope
 
-This milestone adds a complete Hedera testnet asset and merchant-checkout path to the existing Expo 54 Android wallet. It is testnet-only and does not enable Hedera mainnet or claim production readiness.
+This public repository remains the multi-chain Opago hackathon project. The current grant candidate adds a guarded Hedera Mainnet wallet and contract-checkout path to the earlier accepted Hedera Testnet integration. It does not claim that the complete repository is an audited public-production wallet.
+
+The standalone Android candidate enables real funds only for Hedera Mainnet. Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. The candidate uses a local debug certificate and is not a Play Store artifact.
 
 ## Included
 
-- Expo-compatible Hiero SDK `2.84.0`, deterministic Hedera Ed25519 recovery derivation, Mirror Node account discovery, and local-only testnet provisioning.
+- Expo-compatible Hiero SDK `2.88.0`, deterministic Hedera Ed25519 recovery derivation, network-separated account discovery, and local-only provisioning or deployment scripts.
 - Exact `bigint` tinybar balance, send, receive, history, status, HashScan, review, and success flows on Android.
-- `OpagoHbarCheckout`, a non-custodial testnet contract that binds each single-use payment to chain, contract, nonce, merchant, exact amount, and expiry.
-- A merchant QR demo, pinned deployed runtime verification, on-device contract signing, and public HashScan/Sourcify evidence.
-- A persistent non-secret payment journal with fail-closed pending, confirmed, and failed states across offline operation, timeouts, and process restarts.
-- Bounded parallel refreshes for optional Lightning and Solana dashboard data, so an unavailable service cannot leave Android pull-to-refresh spinning indefinitely.
-- A consistent asset identity and network-badge system across Portfolio, Send, Receive, activity, and checkout selection, with scalable icons and improved small-screen accessibility.
-- Recovery and deletion safeguards, exact incoming-payment matching, replay rejection, testnet/mainnet separation, and redacted physical-device security acceptance.
-- A reproducible `npm run phase5:verify` quality gate, clean-clone/build instructions, evidence index, and a one-to-five-minute demo script.
-- Native SOL and explicitly configured SPL USDC send/receive paths with exact `bigint` amounts, strict Solana Pay validation, fee/rent and simulation checks, review and Explorer screens, confirmed receive matching, and a restart-safe non-secret payment journal. These paths are independent of the experimental Atomiq swap integration.
+- `OpagoHbarCheckout`, a non-custodial immutable contract that binds each single-use payment to chain, contract, nonce, merchant, exact amount, and expiry.
+- Verified Testnet and Mainnet deployment manifests, pinned runtime-bytecode verification, Sourcify evidence, and contract calls signed on the Android device.
+- A persistent non-secret payment journal with fail-closed pending, confirmed, and failed states across offline operation, ambiguous SDK results, timeouts, and process restarts.
+- HashPack-compatible plain account-ID receive QR values alongside strict Opago checkout request parsing.
+- A consistent consumer-oriented asset, Send, Request, activity, and receipt interface with scalable asset icons and explicit network labels.
+- Opago-owned launcher, adaptive, monochrome, splash, and web icons replace the remaining Expo template and obsolete prototype artwork.
+- The generated Android application requests camera access only for QR scanning; transitive audio-recording, storage, and overlay permissions are explicitly removed.
+- Native SOL and configured SPL USDC development-network flows plus the existing experimental Lightning and swap code, isolated from the real-HBAR candidate.
+- A reproducible `npm run phase5:verify` gate covering TypeScript, ESLint, application tests, contract compilation/tests, and service/script syntax checks.
 
-## Public deployment
+## Public Hedera evidence
 
-| Item | Value |
-| --- | --- |
-| Network | Hedera testnet, chain ID `296` |
-| Contract ID | [`0.0.9972670`](https://hashscan.io/testnet/contract/0.0.9972670) |
-| EVM address | `0x0000000000000000000000000000000000982bbe` |
-| Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
-| Source verification | [Sourcify exact runtime match](https://sourcify.dev/server/v2/contract/296/0x0000000000000000000000000000000000982bbe) |
+| Item | Testnet | Mainnet |
+| --- | --- | --- |
+| Chain ID | `296` | `295` |
+| Contract | [`0.0.9972670`](https://hashscan.io/testnet/contract/0.0.9972670) | [`0.0.10850063`](https://hashscan.io/mainnet/contract/0.0.10850063) |
+| EVM address | `0x0000000000000000000000000000000000982bbe` | `0x0000000000000000000000000000000000a58f0f` |
+| Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` | same locked runtime |
+| Deployment manifest | [`deployments/hedera-testnet.json`](deployments/hedera-testnet.json) | [`deployments/hedera-mainnet.json`](deployments/hedera-mainnet.json) |
+| Physical-device checkout | [Testnet transaction](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) | [Submitted-video Mainnet transaction](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764) |
 
-The full deployment metadata and verification timestamps are versioned in [`deployments/hedera-testnet.json`](deployments/hedera-testnet.json).
+The exact Mainnet candidate, transaction, and remaining limitations are recorded in [`HEDERA_MAINNET_CANARY_ACCEPTANCE.md`](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). The Thrive evidence index is [`THRIVE_MILESTONE2_MAINNET.md`](THRIVE_MILESTONE2_MAINNET.md).
 
 ## Verification baseline
 
-On Windows, `npm run phase5:android` performs the clean dependency install, repository quality gates, fresh arm64 Android build, installation, launch, and local non-secret evidence capture for the exact checked-out commit.
-
-- TypeScript: pass.
-- ESLint: pass.
-- Application tests: 77/77 pass.
-- Contract tests: 9/9 pass.
-- Locked runtime bytecode: matches Hedera testnet Mirror Node.
-- Sourcify: verified.
-- Physical Android direct transfer, exact receive, checkout, pending/restart reconciliation, recovery, tamper rejection, and replay rejection: accepted and documented.
-
-Run the complete deterministic local gate with:
+Run the deterministic local gate with:
 
 ```powershell
 npm ci
 npm run phase5:verify
 ```
 
+- TypeScript: pass.
+- ESLint: pass.
+- Application tests: `113/113` pass.
+- Contract tests: `9/9` pass.
+- Mainnet runtime bytecode: matches the locked artifact and versioned deployment evidence.
+- Mainnet source verification: verified.
+- Expo dependency and native-module compatibility: all Expo Doctor checks pass.
+- Physical Android balance, receive, direct transfer, checkout, pending reconciliation, and HashScan evidence: accepted for the internal candidate.
+
 ## Compatibility and operator notes
 
 - Node.js `20.19` or newer and the committed `package-lock.json` are required.
-- Generated `android/` and `ios/` projects are intentionally excluded; use `npm run android` for a fresh Android development build.
-- Existing wallets keep their deterministic recovery phrase and asset derivations. Never migrate or copy private material into an environment variable.
-- A Hedera operator/faucet key is needed only by the trusted local provisioning or deployment scripts. It must never enter the app bundle or any `EXPO_PUBLIC_*` variable.
-- The merchant demo, eID, OCP, and Travel Rule services remain local reference implementations.
+- Generated `android/` and `ios/` projects are intentionally excluded.
+- A Hedera operator key is used only by trusted local provisioning or deployment scripts. It must never enter the app bundle, Git, chat, screenshots, or an `EXPO_PUBLIC_*` variable.
+- The merchant, eID, OCP, and Travel Rule services are local reference implementations, not hosted production services.
+- The Mainnet contract is already deployed. The deployment command must not be run again.
 
 ## Known limits
 
-The wallet, native integration, dependencies, and Solidity contract have not received an independent security audit. The dependency tree contains unresolved transitive advisories. iOS is not accepted in this milestone. Mainnet remains out of scope, and all testnet assets have no monetary value. See [`SECURITY.md`](SECURITY.md) for the current risk statement and [`PHASE5_MILESTONE.md`](PHASE5_MILESTONE.md) for the exact submission checklist.
+The wallet, native integration, dependencies, and Solidity contract have not received an independent security audit. The dependency tree retains documented transitive advisories. The merchant demo does not authenticate an Opago merchant identity. iOS, store signing/distribution, public hosting, external-user recovery, production monitoring, and broad Mainnet failure-path acceptance remain outside this internal grant candidate. See [`SECURITY.md`](SECURITY.md) for the current risk statement.

@@ -7,7 +7,7 @@ This plan covers interface quality only. It does not claim that the complete mul
 - Use one presentation model for Lightning, Solana, USDC, and Hedera.
 - Show recognizable, scalable asset icons in Portfolio, Send, Receive, activity, and checkout selection.
 - Show the active network next to every asset so a logo can never hide a testnet, devnet, or regtest context.
-- Keep Hedera visibly restricted to `TESTNET` even if another network is enabled for mainnet.
+- Keep every asset's actual build-time network visible; the guarded Hedera candidate shows `MAINNET`, while Solana and Lightning remain visibly restricted to development networks.
 
 ## 2. Information hierarchy - complete
 
@@ -40,16 +40,16 @@ This plan covers interface quality only. It does not claim that the complete mul
 - Use consumer-safe error copy for insufficient funds, expired requests, mismatched amounts, unavailable networks, and unresolved submissions while preserving the no-retry safety rule.
 - Keep Mainnet and development modes visible through compact status rows instead of dominant technical warning cards.
 
-## 6. Physical-device visual acceptance - pending
+## 6. Physical-device visual acceptance - grant flow complete
 
-Run this after the UI commit is available in the clean acceptance checkout:
+The English Hedera Mainnet happy path was inspected on the physical UMIDIGI Android device and recorded for the Thrive submission on 16 September 2026. The accepted path covered Home, Hedera selection, QR scan, payment review, confirmation, graphical success, HashScan, and refreshed activity.
 
-1. Build and install a fresh arm64 standalone Hedera Mainnet candidate APK.
-2. Inspect Home with long balances and a populated activity list.
-3. Inspect Send with each asset selected, the keyboard open, and a scanned Hedera checkout request.
-4. Inspect Receive for Lightning, Solana, and Hedera, including a generated QR and copy action.
-5. Use a non-payable Mainnet review fixture to inspect review and details without sending another payment; reuse the already accepted Mainnet transaction for receipt evidence.
-6. Check small-screen clipping, touch targets, contrast, dynamic text, and German/English string overflow before recording the milestone video.
+The following broader app-store checks remain deliberately open:
+
+1. dynamic text and screen-reader coverage beyond the recorded path;
+2. German and other localized string overflow;
+3. the complete Lightning, Solana, and USDC visual matrix on multiple screen sizes;
+4. iOS layout and app-store screenshot acceptance.
 
 ## Deliberately deferred
 

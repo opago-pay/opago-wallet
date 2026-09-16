@@ -1,12 +1,12 @@
 # Thrive Mainnet milestone clarification request
 
-The text below is ready for Fabian to send to Thrive or the assigned Guardian. The response should be archived with the milestone evidence.
+This is the clarification template prepared before implementation. No completed response record is stored below, so it must not be cited as reviewer confirmation. The actual milestone was submitted on 16 September 2026 with the narrower evidence in [THRIVE_MILESTONE2_MAINNET.md](THRIVE_MILESTONE2_MAINNET.md).
 
 ---
 
 Hello,
 
-Opago Wallet is a non-custodial Android payment wallet and merchant checkout application. Our current Hedera integration uses native HBAR transfers, Hedera Smart Contract Service for contract-bound checkout payments, Mirror Node REST APIs for account/balance/history/receipt/runtime verification, and HashScan/Sourcify for public evidence.
+Opago Wallet is a non-custodial Android consumer payment wallet. The merchant POS, APIs, and webshop plugins are separate products; this repository contains only a local merchant reference page for demonstrating wallet checkout. Our Hedera integration uses native HBAR transfers, Hedera Smart Contract Service for contract-bound checkout payments, Mirror Node REST APIs for account/balance/history/receipt/runtime verification, and HashScan/Sourcify for public evidence.
 
 Before finalizing our Mainnet scope, could you please confirm the following:
 
@@ -15,7 +15,7 @@ Before finalizing our Mainnet scope, could you please confirm the following:
 3. Does a publicly accessible signed Android beta with a public HTTPS merchant flow and a limited real-user Mainnet pilot satisfy “accessible to real users,” or is a fully public Play Store production listing required?
 4. Is an independent security review acceptable evidence for the pilot, and are there any prescribed audit, user-count, transaction-volume, or feedback requirements?
 
-We will provide a verified Mainnet contract, public transaction evidence, the exact Git commit and deployment metadata, a signed Android build, a Mainnet demo video, and anonymized pilot feedback.
+We will provide a verified Mainnet contract, public transaction evidence, the exact Git commit and deployment metadata, a standalone internal Android candidate, and a Mainnet demo video. We will claim external pilot feedback only if it was actually collected with consent.
 
 Thank you.
 

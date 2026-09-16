@@ -65,4 +65,4 @@ The following physical-device gates passed:
 - post-payment balance and history reconciliation;
 - absence of fatal runtime errors during the test.
 
-Mainnet remains blocked until the human decisions, account-onboarding implementation, independent review, verified Mainnet deployment, signed release, and real-user pilot gates in the README are complete.
+Historical note: this 31 August record was a Testnet regression baseline. The Mainnet contract was subsequently deployed and an internal standalone Android canary was accepted in September. Independent review, store signing/distribution, and an external public pilot remain blockers for an unrestricted production release; see [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md).

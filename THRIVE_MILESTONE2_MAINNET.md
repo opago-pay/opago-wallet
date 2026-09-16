@@ -2,19 +2,19 @@
 
 **Due:** 10 October 2026
 
-**Status:** Mainnet contract deployed and source-verified; physical Android canary accepted; video and submission pending
+**Status:** submitted through the Thrive portal on 16 September 2026
 
 **Scope:** the Hedera Mainnet wallet and checkout path in the public multi-chain Opago hackathon repository
 
-This document remains intentionally incomplete until the video and final submission evidence exist. Never replace a missing value with a Testnet link, an intended transaction, or a manually invented identifier.
+This record distinguishes public, independently inspectable evidence from information retained only in the Thrive submission. It never substitutes a Testnet link, intended transaction, or manually invented identifier for Mainnet evidence.
 
 ## Submission fields
 
-### Written summary - final draft after successful canary
+### Written summary
 
-> Opago deployed its non-custodial HBAR checkout contract on Hedera Mainnet and integrated the verified deployment into the Android consumer wallet. The app protects the user's Hedera key locally, discovers the account through the official Mirror Node, loads balance and history, creates receive requests, and signs direct HBAR or contract checkout payments only after review and device authentication. Checkout requests bind chain ID, contract, merchant, exact tinybar amount, nonce, and expiry. Failed, expired, duplicate, replayed, or unknown transactions never appear as successful. The runtime is pinned by SHA-256 and matched against Mainnet Mirror Node bytecode and Sourcify. The demo records a real-HBAR payment, consensus result, history, and public HashScan evidence. Other multi-chain hackathon features are outside this milestone.
+> Opago deployed its non-custodial HBAR checkout contract on Hedera Mainnet and integrated the verified deployment into the Android consumer wallet. The app protects the user's Hedera key locally, discovers the account through the official Mirror Node, loads balance and history, creates interoperable receive requests, and signs direct HBAR or contract checkout payments only after explicit on-device review and confirmation. Checkout requests bind chain ID, contract, merchant, exact tinybar amount, nonce, and expiry. Failed, expired, duplicate, replayed, or unknown transactions never appear as successful. The runtime is pinned by SHA-256 and matched against Mainnet Mirror Node bytecode and Sourcify. The submitted demo records a real-HBAR payment, consensus result, history, and public HashScan evidence. Other multi-chain hackathon features are outside this milestone.
 
-Use this draft only after every claim is backed by the evidence below. It is below the form's 1,000-character limit.
+This text is below the form's 1,000-character limit and every technical claim is bounded by the evidence below.
 
 ### Mainnet contract address
 
@@ -22,13 +22,11 @@ Use this draft only after every claim is backed by the evidence below. It is bel
 
 ### GitHub repository
 
-https://github.com/Opago-Pay/opago-wallet
-
-Submit the exact public commit used for the signed Android build and video, not merely the moving `main` branch.
+[Public repository at submitted commit `b955c7529d36f10464d07182ec960460b794a73d`](https://github.com/opago-pay/opago-wallet/tree/b955c7529d36f10464d07182ec960460b794a73d)
 
 ### Demo video
 
-Pending recording. Required sequence:
+The submitted recording shows this sequence:
 
 1. Show the exact app version/commit and visible `Hedera Mainnet` / `REAL HBAR` state.
 2. Show the consumer wallet's real balance without exposing recovery material.
@@ -39,11 +37,11 @@ Pending recording. Required sequence:
 7. Refresh wallet history and show the same confirmed transaction.
 8. Briefly show that an expired or altered request is rejected, if this fits within five minutes.
 
-Video URL: pending.
+The externally hosted video URL was supplied in the Thrive form. It is not duplicated in this repository because it is not required to reproduce or verify the public on-chain evidence.
 
 ### Initial user feedback
 
-Optional and pending. Record only consented, non-sensitive pilot feedback. Include date, build/commit, device class, completed task, result, and a short paraphrased comment. Do not include private keys, recovery phrases, personal wallet balances, or unnecessary personal data.
+No external public-pilot feedback is claimed for this milestone. The recorded acceptance was performed by the project team on a physical Android device. Future feedback must be consented, non-sensitive, and tied to an exact build without exposing private keys, recovery phrases, personal balances, or unnecessary personal data.
 
 ### Additional context
 
@@ -51,7 +49,7 @@ Optional and pending. Record only consented, non-sensitive pilot feedback. Inclu
 
 ## Evidence checklist
 
-- [ ] `npm run phase5:verify` passes on a clean checkout of the submission commit.
+- [x] `npm run phase5:verify` passes for the submitted source: TypeScript, ESLint, `113/113` application tests, and `9/9` contract tests.
 - [ ] An independent contract/security review is complete and blocking findings are resolved.
 - [x] The deployment account had at least the documented 30 HBAR safety reserve.
 - [x] `npm run contract:preflight:mainnet` passed immediately before deployment.
@@ -60,13 +58,14 @@ Optional and pending. Record only consented, non-sensitive pilot feedback. Inclu
 - [x] `npm run contract:verify:mainnet` confirmed Mirror Node bytecode and Sourcify status.
 - [x] `deployments/hedera-mainnet.json` contains only script-derived public evidence.
 - [x] The Mainnet Android build is pinned to that contract ID and runtime hash.
-- [ ] The signed release starts without Metro, ADB, or development tooling.
+- [x] The standalone internal candidate starts without Metro or a development server.
+- [ ] A final store-signed release has completed Play distribution checks.
 - [x] One small real-HBAR checkout succeeds from a separate consumer wallet to the merchant.
 - [ ] One expired or invalid request remains failed and never appears successful.
 - [x] App history, Mirror Node, and HashScan agree on the transaction and amount.
-- [ ] The video is 1-5 minutes and shows all required evidence without secrets.
-- [ ] The repository URL resolves publicly and the submitted commit hash is recorded.
-- [ ] The final written summary contains no claim that exceeds the recorded evidence.
+- [x] The submitted video is 1-5 minutes and shows the real Mainnet checkout and HashScan evidence without secrets.
+- [x] The repository URL resolves publicly and the submitted commit hash is recorded.
+- [x] The final written summary contains no claim that exceeds the recorded evidence.
 
 ## Immutable submission record
 
@@ -75,17 +74,17 @@ Fill this table only from verified build and deployment output:
 | Evidence | Value |
 | --- | --- |
 | Deployment source commit | `bd68e8f68498dd825c51bdbf2bb43a38c600c513` |
-| Final submission commit | pending |
-| Android version/build | `1.0.0`; internal candidate `d2501899cf30850a8f15c30771be49907f4a7605`; APK SHA-256 `491b62a9afe80f0539846c6a16be424c4dc7528a3b8bf64be5067afc487f190b` |
+| Final submission commit | [`b955c7529d36f10464d07182ec960460b794a73d`](https://github.com/opago-pay/opago-wallet/tree/b955c7529d36f10464d07182ec960460b794a73d) |
+| Android version/build | `1.0.0`; standalone internal candidate from `b955c7529d36f10464d07182ec960460b794a73d`; APK SHA-256 `19a0ea2c9da565d2f02b7321a14f001dad85a20210f9267b23db65d542e3b738`; local debug certificate, not a store artifact |
 | Contract ID | `0.0.10850063` |
 | Contract EVM address | `0x0000000000000000000000000000000000a58f0f` |
 | Deployment transaction | `0.0.10848889@1788856737.537500943` |
 | Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
 | Sourcify status | `verified` (`d7f91325-8b0d-4fa5-9e8d-95a8a06402da`) |
-| Canary payment transaction | [`0.0.10861984@1789478514.756946872`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872) |
+| Submission-video payment transaction | [`0.0.10861984@1789541018.595289764`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764) |
 | Merchant account | `0.0.10848889` |
 | Consumer account | `0.0.10861984` |
-| Video URL | pending |
-| Submission timestamp | pending |
+| Video URL | Supplied directly in the Thrive portal; not stored in this repository |
+| Submission timestamp | 16 September 2026; exact portal timestamp retained by Thrive |
 
 The complete public transaction and physical-device record is in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). Deployment procedure and secret-handling rules are defined in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).

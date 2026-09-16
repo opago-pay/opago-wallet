@@ -1,0 +1,3 @@
+# Preserve the repository's existing npm lockfile line endings on Windows.
+package.json -text
+package-lock.json -text
