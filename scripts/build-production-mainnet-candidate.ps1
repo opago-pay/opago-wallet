@@ -7,8 +7,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$outputDirectory = Join-Path $repoRoot '.codex-local-evidence\mainnet-candidate'
-$packageId = 'com.opago.wallet.mainnetcandidate'
+$outputDirectory = Join-Path $repoRoot '.codex-local-evidence\production-candidate'
+$packageId = 'com.opago.wallet.productioncandidate'
 $expectedContractId = '0.0.10850063'
 $expectedRuntimeSha256 = '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8'
 
@@ -25,17 +25,7 @@ function Invoke-CheckedCommand {
 
 function Get-Sha256Hex {
   param([Parameter(Mandatory)] [string]$Path)
-  $stream = [System.IO.File]::OpenRead($Path)
-  try {
-    $sha256 = [System.Security.Cryptography.SHA256]::Create()
-    try {
-      return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
-    } finally {
-      $sha256.Dispose()
-    }
-  } finally {
-    $stream.Dispose()
-  }
+  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 Set-Location -LiteralPath $repoRoot
@@ -48,27 +38,15 @@ foreach ($requiredCommand in @('git.exe', 'node.exe', 'npm.cmd', 'npx.cmd', 'adb
 $dirty = @(& git.exe status --porcelain=v1 --untracked-files=all)
 if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the Git worktree.' }
 if ($dirty.Count -gt 0) {
-  throw "The worktree must be clean before building the Mainnet candidate:`n$($dirty -join "`n")"
-}
-
-$manifest = Get-Content -LiteralPath 'deployments\hedera-mainnet.json' -Raw | ConvertFrom-Json
-if (
-  $manifest.network -ne 'mainnet' -or
-  [int]$manifest.chainId -ne 295 -or
-  $manifest.status -ne 'deployed' -or
-  $manifest.contractId -ne $expectedContractId -or
-  $manifest.runtimeBytecodeSha256 -ne $expectedRuntimeSha256 -or
-  $manifest.sourceVerification.status -ne 'verified'
-) {
-  throw 'The Mainnet deployment manifest does not match the verified release evidence.'
+  throw "The worktree must be clean before building a production candidate:`n$($dirty -join "`n")"
 }
 
 $secretVariables = @(Get-ChildItem Env: | Where-Object {
-  $_.Name -match '^HEDERA_.*(?:KEY|MNEMONIC|SECRET)$' -and
+  $_.Name -match '(?:PRIVATE|MNEMONIC|SEED|SECRET|PREIMAGE|OPERATOR_KEY)$' -and
   -not [string]::IsNullOrWhiteSpace($_.Value)
 })
 if ($secretVariables.Count -gt 0) {
-  throw 'Clear Hedera key, mnemonic, and secret environment variables before building the client.'
+  throw 'Clear private keys, recovery phrases, seeds, preimages, and secrets before building the client.'
 }
 
 Invoke-CheckedCommand -Label 'Start Android Debug Bridge' -FilePath 'adb.exe' -ArgumentList @('start-server')
@@ -76,7 +54,7 @@ $deviceLines = @(& adb.exe devices -l)
 if ($LASTEXITCODE -ne 0) { throw 'adb devices failed.' }
 $authorized = @($deviceLines | Where-Object { $_ -match '^\S+\s+device(?:\s|$)' })
 $unauthorized = @($deviceLines | Where-Object { $_ -match '^\S+\s+unauthorized(?:\s|$)' })
-if ($unauthorized.Count -gt 0) { throw 'Accept the USB-debugging fingerprint on the Android device.' }
+if ($unauthorized.Count -gt 0) { throw 'Accept the debugging fingerprint on the Android device.' }
 if ([string]::IsNullOrWhiteSpace($DeviceSerial)) {
   if ($authorized.Count -ne 1) {
     throw "Exactly one authorized Android device is required; found $($authorized.Count)."
@@ -90,7 +68,7 @@ $deviceAbi = (& adb.exe -s $DeviceSerial shell getprop ro.product.cpu.abi).Trim(
 $deviceModel = (& adb.exe -s $DeviceSerial shell getprop ro.product.model).Trim()
 $androidRelease = (& adb.exe -s $DeviceSerial shell getprop ro.build.version.release).Trim()
 if ($deviceAbi -ne 'arm64-v8a') {
-  throw "The Mainnet candidate targets arm64-v8a; the device reports $deviceAbi."
+  throw "The candidate targets arm64-v8a; the device reports $deviceAbi."
 }
 
 $commit = (& git.exe rev-parse HEAD).Trim()
@@ -104,6 +82,8 @@ $qualitySettings = @{
   EXPO_NO_TELEMETRY = '1'
   NODE_ENV = 'test'
   EXPO_PUBLIC_ENABLE_MAINNET = 'false'
+  EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET = 'false'
+  EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE = 'regtest'
   EXPO_PUBLIC_ENABLE_HEDERA_MAINNET = 'false'
   EXPO_PUBLIC_HEDERA_NETWORK = 'testnet'
   EXPO_PUBLIC_HEDERA_BUILD_PROFILE = 'testnet'
@@ -111,6 +91,7 @@ $qualitySettings = @{
   EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR = '1'
   EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID = '0.0.9972670'
   EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
+  EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS = '100'
   EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
 }
 $buildSettings = @{
@@ -119,6 +100,8 @@ $buildSettings = @{
   EXPO_NO_TELEMETRY = '1'
   NODE_ENV = 'production'
   EXPO_PUBLIC_ENABLE_MAINNET = 'false'
+  EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET = 'true'
+  EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE = 'mainnet'
   EXPO_PUBLIC_ENABLE_HEDERA_MAINNET = 'true'
   EXPO_PUBLIC_HEDERA_NETWORK = 'mainnet'
   EXPO_PUBLIC_HEDERA_BUILD_PROFILE = 'mainnet'
@@ -126,6 +109,7 @@ $buildSettings = @{
   EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR = '1'
   EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID = $expectedContractId
   EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
+  EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS = '100'
   EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
 }
 $savedEnvironment = @{}
@@ -137,11 +121,11 @@ foreach ($name in $managedNames) {
 }
 
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-$initScript = Join-Path $outputDirectory 'mainnet-candidate.init.gradle'
+$initScript = Join-Path $outputDirectory 'production-candidate.init.gradle'
 @'
 gradle.afterProject { project, state ->
     if (project.path == ':app' && state.failure == null) {
-        project.android.defaultConfig.applicationId = 'com.opago.wallet.mainnetcandidate'
+        project.android.defaultConfig.applicationId = 'com.opago.wallet.productioncandidate'
         project.android.buildTypes.release.applicationIdSuffix = null
     }
 }
@@ -151,15 +135,15 @@ try {
   foreach ($name in $qualitySettings.Keys) {
     [Environment]::SetEnvironmentVariable($name, $qualitySettings[$name], 'Process')
   }
-
-  Invoke-CheckedCommand -Label 'Mainnet candidate quality gates' -FilePath 'npm.cmd' -ArgumentList @(
+  Invoke-CheckedCommand -Label 'Production candidate quality gates' -FilePath 'npm.cmd' -ArgumentList @(
     'run', 'phase5:verify'
   )
+
   foreach ($name in $buildSettings.Keys) {
     [Environment]::SetEnvironmentVariable($name, $buildSettings[$name], 'Process')
   }
-  Invoke-CheckedCommand -Label 'Verify isolated Mainnet build configuration' -FilePath 'npm.cmd' -ArgumentList @(
-    'run', 'mainnet:config:verify'
+  Invoke-CheckedCommand -Label 'Verify production Mainnet configuration' -FilePath 'npm.cmd' -ArgumentList @(
+    'run', 'production:config:verify'
   )
   Invoke-CheckedCommand -Label 'Generate fresh Android project' -FilePath 'npx.cmd' -ArgumentList @(
     'expo', 'prebuild', '--platform', 'android', '--clean', '--no-install'
@@ -167,7 +151,7 @@ try {
 
   Push-Location -LiteralPath (Join-Path $repoRoot 'android')
   try {
-    Invoke-CheckedCommand -Label 'Build standalone arm64 Mainnet candidate' -FilePath '.\gradlew.bat' -ArgumentList @(
+    Invoke-CheckedCommand -Label 'Build standalone arm64 production candidate' -FilePath '.\gradlew.bat' -ArgumentList @(
       ':app:assembleRelease',
       '--no-daemon',
       '--console=plain',
@@ -184,15 +168,15 @@ try {
   if (-not (Test-Path -LiteralPath $sourceApk)) {
     throw "Gradle completed without producing $sourceApk."
   }
-  $targetApk = Join-Path $outputDirectory 'opago-wallet-hedera-mainnet-candidate.apk'
+  $targetApk = Join-Path $outputDirectory 'opago-wallet-production-mainnet-candidate.apk'
   Copy-Item -LiteralPath $sourceApk -Destination $targetApk -Force
   $apkHash = Get-Sha256Hex -Path $targetApk
 
-  Invoke-CheckedCommand -Label 'Install Mainnet candidate' -FilePath 'adb.exe' -ArgumentList @(
+  Invoke-CheckedCommand -Label 'Install production candidate' -FilePath 'adb.exe' -ArgumentList @(
     '-s', $DeviceSerial, 'install', '-r', $targetApk
   )
   & adb.exe -s $DeviceSerial shell am force-stop $packageId | Out-Null
-  Invoke-CheckedCommand -Label 'Launch Mainnet candidate' -FilePath 'adb.exe' -ArgumentList @(
+  Invoke-CheckedCommand -Label 'Launch production candidate' -FilePath 'adb.exe' -ArgumentList @(
     '-s', $DeviceSerial, 'shell', 'monkey', '-p', $packageId,
     '-c', 'android.intent.category.LAUNCHER', '1'
   )
@@ -206,15 +190,14 @@ try {
     builtAtUtc = [DateTime]::UtcNow.ToString('o')
     commit = $commit
     packageId = $packageId
-    signing = 'local debug certificate; internal Mainnet candidate, not store release'
+    signing = 'local release candidate certificate; not an app-store artifact'
     standalone = $true
     hederaNetwork = 'mainnet'
-    hederaMaximumTransferHbar = '1'
-    hederaDirectTransferFeeCeilingHbar = '0.1'
-    hederaCheckoutFeeCeilingHbar = '0.75'
+    lightningNetwork = 'mainnet'
+    sparkSdkVersion = '0.7.12'
+    lightningMaximumFeeSats = 100
     checkoutContractId = $expectedContractId
     runtimeBytecodeSha256 = $expectedRuntimeSha256
-    lightningNetwork = 'regtest'
     apkSha256 = $apkHash
     apkBytes = (Get-Item -LiteralPath $targetApk).Length
     deviceSerial = $DeviceSerial
@@ -222,14 +205,15 @@ try {
     deviceAbi = $deviceAbi
     androidRelease = $androidRelease
     appProcessRunning = $true
+    realFundsAcceptance = 'pending manual approval and LIGHTNING_MAINNET_ACCEPTANCE.md'
   }
   $record | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $outputDirectory 'build.json') -Encoding UTF8
 
-  Write-Host "`nHedera Mainnet candidate is installed and running." -ForegroundColor Green
+  Write-Host "`nProduction Mainnet candidate is installed and running." -ForegroundColor Green
   Write-Host "APK: $targetApk"
   Write-Host "APK SHA-256: $apkHash"
   Write-Host "Package: $packageId"
-  Write-Host 'Hedera uses Mainnet and Lightning remains on regtest.'
+  Write-Host 'No real-fund payment was initiated. Continue with LIGHTNING_MAINNET_ACCEPTANCE.md.'
 } finally {
   foreach ($name in $managedNames) {
     [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')

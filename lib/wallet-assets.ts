@@ -1,12 +1,12 @@
-export type WalletAssetKey = 'lightning' | 'solana' | 'usdc' | 'hedera';
+export type WalletAssetKey = 'lightning' | 'hedera';
 
 export interface WalletAssetPresentation {
   name: string;
-  symbol: 'SAT' | 'SOL' | 'USDC' | 'HBAR';
+  symbol: 'SAT' | 'HBAR';
   accent: string;
   description: string;
   networkLabel: string;
-  networkBadge: 'MAINNET' | 'REGTEST' | 'DEVNET' | 'TESTNET';
+  networkBadge: 'MAINNET' | 'REGTEST' | 'TESTNET';
 }
 
 const BASE_ASSETS = {
@@ -15,18 +15,6 @@ const BASE_ASSETS = {
     symbol: 'SAT',
     accent: '#f7931a',
     description: 'Fast payments with Lightning',
-  },
-  solana: {
-    name: 'Solana',
-    symbol: 'SOL',
-    accent: '#14f195',
-    description: 'SOL on the Solana network',
-  },
-  usdc: {
-    name: 'USDC',
-    symbol: 'USDC',
-    accent: '#2775ca',
-    description: 'Digital dollars on Solana',
   },
   hedera: {
     name: 'HBAR',
@@ -56,16 +44,10 @@ export function getWalletAssetPresentation(
       networkBadge: mainnetEnabled ? 'MAINNET' : 'REGTEST',
     };
   }
-  return {
-    ...base,
-    networkLabel: mainnetEnabled ? 'Solana mainnet' : 'Solana devnet',
-    networkBadge: mainnetEnabled ? 'MAINNET' : 'DEVNET',
-  };
+  throw new Error('Unsupported wallet asset.');
 }
 
 export function walletAssetKeyFromSymbol(symbol: string): WalletAssetKey {
-  if (symbol === 'SOL') return 'solana';
-  if (symbol === 'USDC') return 'usdc';
   if (symbol === 'HBAR') return 'hedera';
   return 'lightning';
 }

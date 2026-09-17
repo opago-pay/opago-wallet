@@ -8,7 +8,33 @@ require('./register-typescript.cjs');
 const {
   resolveHederaBuildPolicy,
   resolveHederaMainnetEnabled,
+  resolveLightningBuildPolicy,
 } = require('../lib/config.ts');
+
+test('keeps Lightning on regtest unless a matching explicit Mainnet profile is enabled', () => {
+  assert.deepEqual(resolveLightningBuildPolicy('false', 'false', 'regtest'), {
+    mainnetEnabled: false,
+    profile: 'regtest',
+    network: 'REGTEST',
+  });
+  assert.deepEqual(resolveLightningBuildPolicy('false', 'true', 'mainnet'), {
+    mainnetEnabled: true,
+    profile: 'mainnet',
+    network: 'MAINNET',
+  });
+  assert.throws(
+    () => resolveLightningBuildPolicy('false', 'true', 'regtest'),
+    /requires.*profile=mainnet/i,
+  );
+  assert.throws(
+    () => resolveLightningBuildPolicy('false', 'false', 'mainnet'),
+    /requires.*profile=mainnet/i,
+  );
+  assert.throws(
+    () => resolveLightningBuildPolicy('false', 'yes', 'mainnet'),
+    /must be true or false/i,
+  );
+});
 const {
   assertHederaMirrorNodeMatchesNetwork,
   getHederaChainId,

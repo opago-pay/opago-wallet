@@ -20,7 +20,7 @@
 | Checkout contract | [`0.0.10850063`](https://hashscan.io/mainnet/contract/0.0.10850063) |
 | Runtime SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
 
-The candidate enables real funds only for Hedera. Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. The APK uses a local debug certificate and is not the final store artifact.
+The candidate enables real funds only for Hedera. Lightning remains on regtest. The APK uses a local debug certificate and is not the final store artifact.
 
 ## Submission-video candidate
 

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { walletAssetKeyFromSymbol } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
-import type { BridgeQuote, OcpOption, OcpState } from './types';
+import type { OcpOption, OcpState } from './types';
 
 export function ScannerView(props: { onScanned(value: string): void; onCancel(): void }) {
   return (
@@ -91,37 +91,6 @@ export function IdentityRequiredView(props: {
       )}
       <TouchableOpacity style={[styles.button, { width: '100%' }]} onPress={props.onBegin} disabled={props.loading}>
         {props.loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Open AusweisApp</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={props.onCancel}>
-        <Text style={[styles.buttonText, styles.secondaryButtonText]}>Cancel</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-export function BridgeQuoteView(props: {
-  quote: BridgeQuote;
-  loading: boolean;
-  onConfirm(): void;
-  onCancel(): void;
-}) {
-  return (
-    <View style={[styles.container, styles.centered]}>
-      <Text style={styles.quoteTitle}>Review bridge quote</Text>
-      <View style={styles.quoteBox}>
-        <View style={styles.quoteRow}>
-          <Text style={styles.quoteLabel}>Lightning</Text>
-          <Text style={styles.quoteValue}>{props.quote.amountSats} SAT</Text>
-        </View>
-        <View style={styles.quoteRow}>
-          <Text style={styles.quoteLabel}>Source cost</Text>
-          <Text style={styles.quoteValue}>
-            {props.quote.sourceCost.toFixed(6)} {props.quote.sourceAsset}
-          </Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.button} onPress={props.onConfirm} disabled={props.loading}>
-        {props.loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Confirm bridge</Text>}
       </TouchableOpacity>
       <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={props.onCancel}>
         <Text style={[styles.buttonText, styles.secondaryButtonText]}>Cancel</Text>

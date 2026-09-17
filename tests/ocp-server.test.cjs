@@ -2,11 +2,8 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { Keypair } = require('@solana/web3.js');
-
-process.env.OCP_DEMO_SOLANA_DESTINATION = Keypair.generate().publicKey.toBase58();
 process.env.OCP_DEMO_QUOTE_TTL_MS = '60000';
-delete process.env.OCP_DEMO_LIGHTNING_INVOICE;
+process.env.OCP_DEMO_LIGHTNING_INVOICE = 'lnbcrt1opagodemoinvoice';
 
 const { server } = require('../demo/ocp-server.js');
 
@@ -28,12 +25,12 @@ test('OCP execution is quote-bound, expiring, and single-use', async t => {
   assert.ok(quote.expiresAt > Date.now());
   assert.deepEqual(
     quote.transferAmounts.map(option => option.asset).sort(),
-    ['SOL', 'USDC'],
+    ['SAT'],
   );
 
-  const option = quote.transferAmounts.find(item => item.asset === 'USDC');
+  const option = quote.transferAmounts.find(item => item.asset === 'SAT');
   const invalid = await fetch(
-    baseUrl + '?quoteId=' + encodeURIComponent(quote.quoteId) + '&method=lightning&asset=USDC',
+    baseUrl + '?quoteId=' + encodeURIComponent(quote.quoteId) + '&method=lightning&asset=HBAR',
   );
   assert.equal(invalid.status, 400);
 
@@ -48,7 +45,7 @@ test('OCP execution is quote-bound, expiring, and single-use', async t => {
   assert.equal(payload.type, option.method);
   assert.equal(payload.asset, option.asset);
   assert.equal(payload.amount, option.amount);
-  assert.equal(payload.destination, process.env.OCP_DEMO_SOLANA_DESTINATION);
+  assert.equal(payload.pr, process.env.OCP_DEMO_LIGHTNING_INVOICE);
 
   const replay = await fetch(
     baseUrl + '?quoteId=' + encodeURIComponent(quote.quoteId) +

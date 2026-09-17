@@ -2,8 +2,8 @@ import { decodeLNURL } from './lnurl-safe';
 import { assertSafeRemoteUrl } from './config';
 import { fetchJson } from './http';
 
-export type OcpAsset = 'SAT' | 'SOL' | 'USDC';
-export type OcpMethod = 'lightning' | 'solana';
+export type OcpAsset = 'SAT';
+export type OcpMethod = 'lightning';
 
 export interface OcpOption {
   asset: OcpAsset;
@@ -22,12 +22,16 @@ export interface OcpResponse {
   transferAmounts: OcpOption[];
 }
 
-export type OcpExecutionPayload =
-  | { type: 'lightning'; quoteId: string; asset: 'SAT'; amount: number; pr: string }
-  | { type: 'solana'; quoteId: string; asset: 'SOL' | 'USDC'; amount: number; destination: string };
+export type OcpExecutionPayload = {
+  type: 'lightning';
+  quoteId: string;
+  asset: 'SAT';
+  amount: number;
+  pr: string;
+};
 
 function isAsset(value: unknown): value is OcpAsset {
-  return value === 'SAT' || value === 'SOL' || value === 'USDC';
+  return value === 'SAT';
 }
 
 function validateOption(value: unknown): OcpOption {
@@ -35,18 +39,15 @@ function validateOption(value: unknown): OcpOption {
   const option = value as Partial<OcpOption>;
   if (
     !isAsset(option.asset) ||
-    (option.method !== 'lightning' && option.method !== 'solana') ||
+    option.method !== 'lightning' ||
     typeof option.chain !== 'string' ||
     !Number.isFinite(option.amount) ||
     Number(option.amount) <= 0 ||
     !Number.isFinite(option.fee) ||
     Number(option.fee) < 0
   ) throw new Error('OCP option contains invalid fields.');
-  if (option.method === 'lightning' && option.asset !== 'SAT') {
+  if (option.asset !== 'SAT') {
     throw new Error('Lightning OCP options must use SAT.');
-  }
-  if (option.method === 'solana' && option.asset === 'SAT') {
-    throw new Error('Solana OCP options must use SOL or USDC.');
   }
   return option as OcpOption;
 }
@@ -115,6 +116,5 @@ export async function fetchOcpExecutionPayload(
   ) throw new Error('OCP execution payload does not match the reviewed quote.');
 
   if (data.type === 'lightning' && typeof data.pr === 'string') return data as OcpExecutionPayload;
-  if (data.type === 'solana' && typeof data.destination === 'string') return data as OcpExecutionPayload;
   throw new Error('OCP execution payload is incomplete.');
 }

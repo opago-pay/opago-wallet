@@ -53,6 +53,12 @@
           "faceIDPermission": "Allow Opago to unlock your protected recovery phrase."
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Opago to confirm payments securely."
+        }
+      ],
       "expo-sqlite",
       [
         "expo-camera",

@@ -6,16 +6,16 @@ This repository is a public hackathon and grant codebase. It has not received an
 
 ## Dependency audit
 
-The lockfile contains targeted same-major overrides for previously remediated `brace-expansion`, `postcss`, and supported `ws` lines. On 16 September 2026, the Hiero SDK was updated from `2.84.0` to `2.88.0` and npm's non-breaking audit fixes were applied. No forced or major-version `npm audit fix` was applied.
+The lockfile contains targeted same-major overrides for previously remediated `brace-expansion`, `postcss`, and supported `ws` lines. On 16 September 2026, the Hiero SDK was updated from `2.84.0` to `2.88.0`, Spark was pinned exactly to `0.7.12`, and npm's non-breaking audit fixes were applied where compatible. No forced or major-version `npm audit fix` was applied.
 
 The npm advisory report captured from the resulting 2026-09-16 lockfile is:
 
 | Scope | Critical | High | Moderate | Low | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Production dependency tree | 0 | 14 | 25 | 0 | 39 |
-| Complete tree including development tools | 0 | 19 | 27 | 11 | 57 |
+| Production dependency tree | 0 | 8 | 16 | 0 | 24 |
+| Complete tree including development tools | 0 | 14 | 17 | 11 | 42 |
 
-These numbers count affected packages and dependency paths, not independent exploitable defects. The previous direct Hiero advisory is removed by `2.88.0`. The remaining production report is dominated by unresolved transitive findings propagated through Expo/React Native, Privy, Solana, Atomiq, and Spark. Some npm suggestions would downgrade Expo or force incompatible major versions; those were deliberately rejected rather than presenting a broken dependency tree as a security fix.
+These counts are the result of `npm audit` against the current lockfile. `npx expo install --check` reports that all SDK 54 packages are on their supported versions, while npm marks the available audit remediations as dependency transitions outside that supported set. The high-severity production-tree entries currently descend through Expo's CLI/Metro build toolchain, including `image-size`; npm labels them production because `expo` is a direct application dependency even though those tools are not mobile payment code. Moderate entries also include Expo modules and the router's `query-string` chain, so they are not dismissed as harmless. They remain an explicit release-review gate. These counts are not a substitute for source review, native-bundle analysis, runtime hardening, or an independent security audit.
 
 `npm ci` succeeds with the pinned lockfile. Hiero SDK `2.88.0` currently emits upstream peer-metadata warnings for the exact `ansi-styles` and `protobufjs` versions requested by its proto package; the application tests and Android bundle pass without overriding those dependencies to older versions.
 
@@ -47,10 +47,6 @@ The checkout contract cryptographically binds the network, contract, merchant ad
 
 Hedera SDK operations use bounded request/deadline/attempt settings. Once the SDK returns a transaction ID, the app persists a non-secret journal record as `pending` before waiting for the receipt. Only an explicit `SUCCESS` receipt or Mirror Node result promotes it to `confirmed`; known non-success results become `failed`, and unavailable or unknown results remain `pending`. This state survives process death and prevents an unresolved payment from being shown as successful.
 
-Native Solana payments use exact `bigint` lamports or token base units throughout validation, construction, balance checks, history, and display formatting. The app verifies the RPC genesis hash, validates the selected USDC mint and associated token accounts, obtains the current blockhash and fee, simulates the signed transaction, and persists its public signature as `pending` before broadcast. A payment is shown as confirmed only after authoritative Solana RPC confirmation; ambiguous timeout, offline, or restart states remain pending and are reconciled later. Explorer links are restricted to the configured cluster. The journal contains public payment metadata only and never stores a recovery phrase, private key, or serialized signed transaction.
-
-Devnet SOL and USDC have no monetary value and are excluded from the dashboard's fiat total. Development builds enforce configurable per-transfer ceilings. Mainnet enablement remains a separate build-time decision and requires reviewed RPC infrastructure plus independent mobile, dependency, and key-management audits.
-
 Physical Phase 4 acceptance on 12 August 2026 covered offline operation, timeout, force-stop after submission, restart reconciliation, expired and altered checkout data, wrong amounts, and an on-chain replay rejection. The redacted app-process Logcat review found no recovery/private-key labels, complete signed-transaction payloads, or fatal exceptions. Public transaction links and aggregate counts are recorded in [PHASE4_ACCEPTANCE.md](PHASE4_ACCEPTANCE.md); raw device logs are intentionally not retained.
 
 ## Wallet recovery and provisioning safeguards
@@ -63,7 +59,9 @@ The testnet provisioning script derives the submitted operator public key and co
 
 ## Remaining wallet-key limitations
 
-The recovery phrase is stored with Expo SecureStore using device-only, when-unlocked storage. Biometric access control is requested when the platform reports it is available. Derived signing keys necessarily exist in JavaScript runtime memory while the wallet is open, and the current payment confirmation screen does not constitute a separate hardware-backed transaction signature. The same recovery phrase also derives the experimental Hedera, Solana, and Lightning identities in this hackathon repository. These are explicit reasons why the internal candidate is not a public app-store release and why a production fork requires an independent mobile/key-lifecycle review, transaction-time authentication decision, and clean-device recovery acceptance.
+The recovery phrase is stored with Expo SecureStore using device-only, when-unlocked storage. Biometric access control is requested when the platform reports it is available. Lightning Mainnet payments require a separate review screen and biometric/device authentication immediately before submission. This is a local authorization gate, not a hardware-backed transaction signature: derived signing keys necessarily exist in JavaScript runtime memory while the wallet is open. The same recovery phrase derives the Hedera and Lightning identities. A public app-store release still requires an independent mobile/key-lifecycle review and clean-device recovery acceptance.
+
+Lightning payments use a non-secret local journal before submission. Unknown SDK outcomes remain pending across process death and are reconciled through the opaque Spark request ID or paginated outgoing history. Confirmation requires a returned preimage whose SHA-256 equals the invoice payment hash. Privacy-sensitive incoming invoice state uses device-protected SecureStore and persists only until completion, expiry, replacement, or wallet deletion. Local service health stores aggregate timestamps, failure counts, and broad categories only.
 
 ## Reporting
 

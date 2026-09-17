@@ -18,7 +18,7 @@ const {
   normalizeLightningInput,
   resolveInvoiceAmount,
 } = require('../lib/lightning.ts');
-const { assertSafeRemoteUrl } = require('../lib/config.ts');
+const { assertSafeRemoteUrl, resolveMaxLightningFeeSats } = require('../lib/config.ts');
 const {
   payDecodedSparkInvoice,
   sparkTransferMatchesInvoice,
@@ -62,6 +62,7 @@ test('binds selected amounts to fixed and amountless invoices', () => {
   assert.throws(() => resolveInvoiceAmount(invoice(21), 22), /mismatch/i);
   assert.equal(resolveInvoiceAmount(invoice(null), 42), 42);
   assert.throws(() => resolveInvoiceAmount(invoice(null)), /requires a positive amount/i);
+  assert.throws(() => resolveInvoiceAmount(invoice(null), 1.5), /whole number/i);
 });
 
 test('caps Lightning fees and fails closed on insufficient balance', () => {
@@ -69,19 +70,30 @@ test('caps Lightning fees and fails closed on insufficient balance', () => {
   assert.equal(calculateMaxLightningFee(100_000, 100_100), 100);
   assert.throws(() => calculateMaxLightningFee(1_000, 1_004), /maximum fee/i);
   assert.throws(() => calculateMaxLightningFee(-1, 100), /invalid payment amount/i);
+  assert.throws(() => calculateMaxLightningFee(1, 1.5), /insufficient Lightning balance/i);
+  assert.equal(resolveMaxLightningFeeSats(undefined), 100);
+  assert.equal(resolveMaxLightningFeeSats('250'), 250);
+  assert.throws(() => resolveMaxLightningFeeSats('1.5'), /positive whole number/i);
+  assert.throws(() => resolveMaxLightningFeeSats('100001'), /must not exceed/i);
 });
 
 test('matches incoming Spark transfers by direction, state, hash, and exact amount', () => {
+  const preimage = '00'.repeat(32);
+  const paymentHash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
   const transfer = {
     id: 'transfer-1',
     transferDirection: 'INCOMING',
     status: 'COMPLETED',
     totalValue: 50,
-    userRequest: { invoice: { paymentHash: 'B'.repeat(64) } },
+    userRequest: { invoice: { paymentHash }, paymentPreimage: preimage },
   };
-  assert.equal(sparkTransferMatchesInvoice(transfer, 'b'.repeat(64), 50), true);
-  assert.equal(sparkTransferMatchesInvoice({ ...transfer, totalValue: 51 }, 'b'.repeat(64), 50), false);
-  assert.equal(sparkTransferMatchesInvoice({ ...transfer, transferDirection: 'OUTGOING' }, 'b'.repeat(64), 50), false);
+  assert.equal(sparkTransferMatchesInvoice(transfer, paymentHash, 50), true);
+  assert.equal(sparkTransferMatchesInvoice({ ...transfer, totalValue: 51 }, paymentHash, 50), false);
+  assert.equal(sparkTransferMatchesInvoice({ ...transfer, transferDirection: 'OUTGOING' }, paymentHash, 50), false);
+  assert.equal(sparkTransferMatchesInvoice({
+    ...transfer,
+    userRequest: { ...transfer.userRequest, paymentPreimage: '01'.repeat(32) },
+  }, paymentHash, 50), false);
 });
 
 test('verifies that a returned Lightning preimage hashes to the invoice payment hash', () => {
@@ -141,6 +153,7 @@ test('records a Spark payment only after a matching proof and propagates failure
     paymentHash,
     proof: preimage,
     reference: 'ln:' + paymentHash,
+    requestId: null,
   });
   assert.deepEqual(paymentRequest, {
     invoice: details.invoice,
@@ -163,4 +176,28 @@ test('records a Spark payment only after a matching proof and propagates failure
     }, details),
     /proof does not match/i,
   );
+});
+
+test('keeps a proof-backed Spark success authoritative when local indexing fails', async () => {
+  const preimage = '00'.repeat(32);
+  const paymentHash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
+  const result = await payDecodedSparkInvoice({
+    async getBalance() { return { balance: 100 }; },
+    async payLightningInvoice() {
+      return { id: 'spark/request+=1', status: 'PREIMAGE_PROVIDED', preimage };
+    },
+  }, {
+    invoice: 'lnbcrt1validated-test-invoice',
+    amountSats: 50,
+    paymentHash,
+    expiresAt: Date.now() + 60_000,
+  }, undefined, {
+    async onPending() {},
+    async onRequestIdentified() { throw new Error('local index unavailable'); },
+    async onResolved() { throw new Error('local index unavailable'); },
+  });
+
+  assert.equal(result.paymentHash, paymentHash);
+  assert.equal(result.proof, preimage);
+  assert.equal(result.requestId, 'spark/request+=1');
 });

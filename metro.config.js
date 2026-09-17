@@ -6,7 +6,7 @@ const config = getDefaultConfig(__dirname);
 // Force Metro to resolve the 'browser' exports in package.json to fix 'jose' Node polyfill errors
 config.resolver.unstable_conditionNames = ['react-native', 'browser', 'require'];
 
-// Add 'mjs' to handle the uuid ESM resolution issue in the Privy SDK on Web
+// Resolve packages that publish modern ESM or CommonJS entry points.
 config.resolver.sourceExts.push('mjs', 'cjs');
 
 // Polyfill the Node stream modules used by ed25519-hd-key's browser build.

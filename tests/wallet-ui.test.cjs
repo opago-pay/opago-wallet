@@ -24,32 +24,24 @@ function readSource(...segments) {
 
 test('defines presentation metadata for every wallet asset and development network', () => {
   assert.deepEqual(
-    ['lightning', 'solana', 'usdc', 'hedera'].map(asset =>
+    ['lightning', 'hedera'].map(asset =>
       getWalletAssetPresentation(asset, false).networkBadge,
     ),
-    ['REGTEST', 'DEVNET', 'DEVNET', 'TESTNET'],
+    ['REGTEST', 'TESTNET'],
   );
   assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'MAINNET');
-  assert.equal(getWalletAssetPresentation('solana', true).networkBadge, 'MAINNET');
   assert.equal(getWalletAssetPresentation('hedera', true).networkBadge, 'TESTNET');
   assert.equal(
     getWalletAssetPresentation('hedera', true, 'mainnet').networkBadge,
     'MAINNET',
   );
-  assert.equal(getWalletAssetPresentation('usdc', false).name, 'USDC');
   assert.equal(getWalletAssetPresentation('hedera', false).name, 'HBAR');
   assert.equal(getWalletAssetPresentation('lightning', false).name, 'Bitcoin');
-  assert.equal(
-    getWalletAssetPresentation('usdc', false).description,
-    'Digital dollars on Solana',
-  );
 });
 
 test('maps transaction symbols to the same icons used by asset cards', () => {
   assert.equal(walletAssetKeyFromSymbol('SAT'), 'lightning');
   assert.equal(walletAssetKeyFromSymbol('BTC'), 'lightning');
-  assert.equal(walletAssetKeyFromSymbol('SOL'), 'solana');
-  assert.equal(walletAssetKeyFromSymbol('USDC'), 'usdc');
   assert.equal(walletAssetKeyFromSymbol('HBAR'), 'hedera');
 });
 
@@ -61,16 +53,14 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
 
   assert.match(icon, /accessibilityRole="image"/);
   assert.match(icon, /props\.asset === 'lightning'/);
-  assert.match(icon, /props\.asset === 'solana'/);
-  assert.match(icon, /props\.asset === 'usdc'/);
   assert.match(icon, /props\.asset === 'hedera'/);
   assert.match(icon, /hedera-logo\.png/);
   assert.doesNotMatch(icon, /\\u210f/);
-  for (const asset of ['lightning', 'solana', 'usdc', 'hedera']) {
+  for (const asset of ['lightning', 'hedera']) {
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
   assert.match(portfolio, /HBAR payments are live/);
-  assert.match(portfolio, /Bitcoin, Solana and USDC are still for testing/);
+  assert.match(portfolio, /Bitcoin is still in test mode/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
@@ -86,9 +76,23 @@ test('keeps technical wallet data behind friendly display labels', () => {
   assert.match(formatEurValue(12.5), /12\.50/);
 
   const review = readSource('components', 'send', 'hedera-payment-views.tsx');
+  const lightningReview = readSource('components', 'send', 'lightning-payment-views.tsx');
   assert.match(review, /Show payment details/);
   assert.match(review, /Send \{props\.payment\.amountHbar\} HBAR/);
   assert.match(review, /View receipt/);
+  assert.match(lightningReview, /Show payment details/);
+  assert.match(lightningReview, /Network fee/);
+  assert.match(lightningReview, /Send \{props\.payment\.amountSats\.toLocaleString\(\)\} SAT/);
+});
+
+test('requires an explicit Lightning review and device authorization before submission', () => {
+  const send = readSource('app', '(tabs)', 'send.tsx');
+  const authorization = readSource('lib', 'payment-authorization.ts');
+  assert.match(send, /setPendingLightning/);
+  assert.match(send, /<LightningReviewView/);
+  assert.ok(send.indexOf('await authorizePayment()') < send.indexOf('await payPreparedSparkPayment('));
+  assert.match(authorization, /authenticateAsync/);
+  assert.match(authorization, /disableDeviceFallback: false/);
 });
 
 test('shows a clearly labelled estimate for development-network balances', () => {
@@ -96,18 +100,14 @@ test('shows a clearly labelled estimate for development-network balances', () =>
     calculatePortfolioEur(
       {
         sparkSats: 100_000_000,
-        solLamports: 2_000_000_000n,
-        usdcBaseUnits: 3_000_000n,
         hbarTinybars: 4_000_000_000n,
       },
       {
         btcToEur: 50_000,
-        solToEur: 100,
-        usdcToEur: 0.9,
         hbarToEur: 0.2,
       },
     ),
-    50_210.7,
+    50_008,
   );
 
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
@@ -119,6 +119,7 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
   const sources = [
     readSource('app', '(tabs)', 'receive.tsx'),
     readSource('components', 'send', 'hedera-payment-views.tsx'),
+    readSource('components', 'send', 'lightning-payment-views.tsx'),
     readSource('components', 'send', 'payment-state-views.tsx'),
   ];
 
@@ -135,8 +136,6 @@ test('keeps send and request focused on the first consumer decision', () => {
     inferPaymentSourceFromRequest('opagowallet://hedera-checkout?paymentId=abc'),
     'hedera',
   );
-  assert.equal(inferPaymentSourceFromRequest('solana:abc'), 'solana');
-  assert.equal(inferPaymentSourceFromRequest('solana:abc?spl-token=mint'), 'usdc');
   assert.equal(inferPaymentSourceFromRequest('lnbc123', 'spark'), 'spark');
 
   const send = readSource('components', 'send', 'payment-form.tsx');
@@ -152,10 +151,7 @@ test('keeps send and request focused on the first consumer decision', () => {
 });
 
 test('bundles native explorer links statically', () => {
-  const sources = [
-    readSource('lib', 'hedera', 'explorer-native.ts'),
-    readSource('lib', 'solana', 'explorer-native.ts'),
-  ];
+  const sources = [readSource('lib', 'hedera', 'explorer-native.ts')];
 
   for (const source of sources) {
     assert.match(source, /import \* as Linking from 'expo-linking';/);

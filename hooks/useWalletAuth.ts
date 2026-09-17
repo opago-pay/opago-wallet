@@ -7,12 +7,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateMnemonic } from 'bip39';
-import { Keypair } from '@solana/web3.js';
-import bs58 from 'bs58';
 import type { PrivateKey } from '@hiero-ledger/sdk';
-import { usePrivy } from '@privy-io/expo';
 import * as Crypto from 'expo-crypto';
 import { initializeSparkWallet } from '../lib/spark';
 import {
@@ -22,8 +18,7 @@ import {
   setSecureItem,
 } from '../lib/storage';
 import { wipeTransactions } from '../lib/database';
-import { appConfig } from '../lib/config';
-import { deriveHederaPrivateKey, deriveSolanaKeypair } from '../lib/wallet-keys';
+import { deriveHederaPrivateKey } from '../lib/wallet-keys';
 import {
   loadHederaAccount,
   type HederaAccountSnapshot,
@@ -45,23 +40,19 @@ import {
   type HederaTransferResult,
 } from '../lib/hedera/payments';
 import { hederaPaymentJournal } from '../lib/hedera/payment-journal-native';
-import type { SolanaAsset } from '../lib/solana/amounts';
-import {
-  sendSolanaTransfer,
-  type SolanaTransferResult,
-} from '../lib/solana/payments';
-import { solanaPaymentJournal } from '../lib/solana/payment-journal-native';
+import { lightningPaymentJournal } from '../lib/lightning/payment-journal-native';
+import { lightningReceiveStore } from '../lib/lightning/receive-store-native';
+import { reconcileLightningPayments } from '../lib/lightning/reconcile-native';
+import { operationalHealth } from '../lib/operational-health-native';
+import { retryWithBackoff } from '../lib/retry';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
-type PrivyClient = ReturnType<typeof usePrivy>;
 
 interface WalletContextValue {
   isInitializing: boolean;
   initStatus: string;
   walletReady: boolean;
   sparkWallet: SparkWalletInstance | null;
-  solanaAddress: string | null;
-  solanaKeypair: Keypair | null;
   hederaPublicKey: string | null;
   hederaAccount: HederaAccountSnapshot | null;
   error: string | null;
@@ -73,25 +64,12 @@ interface WalletContextValue {
     amountTinybars: bigint;
     checkoutRequest?: HederaCheckoutRequest;
   }): Promise<HederaTransferResult>;
-  sendSolanaPayment(input: {
-    recipientAddress: string;
-    amountBaseUnits: bigint;
-    asset: SolanaAsset;
-    reference?: string | null;
-    memo?: string | null;
-  }): Promise<SolanaTransferResult>;
   wipeWallet(): Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
-function WalletProviderCore({
-  children,
-  privy,
-}: {
-  children?: ReactNode;
-  privy: PrivyClient | null;
-}) {
+function WalletProviderCore({ children }: { children?: ReactNode }) {
   const initializationRef = useRef<Promise<void> | null>(null);
   const initializationGenerationRef = useRef(0);
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
@@ -99,7 +77,6 @@ function WalletProviderCore({
   const [initStatus, setInitStatus] = useState('');
   const [walletReady, setWalletReady] = useState(false);
   const [sparkWallet, setSparkWallet] = useState<SparkWalletInstance | null>(null);
-  const [solanaKeypair, setSolanaKeypair] = useState<Keypair | null>(null);
   const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
   const [hederaAccount, setHederaAccount] = useState<HederaAccountSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +84,6 @@ function WalletProviderCore({
   const clearRuntimeState = useCallback(() => {
     initializationGenerationRef.current += 1;
     setSparkWallet(null);
-    setSolanaKeypair(null);
     hederaPrivateKeyRef.current = null;
     setWalletReady(false);
     setInitStatus('');
@@ -120,25 +96,10 @@ function WalletProviderCore({
     async (mnemonic: string) => {
       const generation = ++initializationGenerationRef.current;
       setInitStatus('Deriving wallet keys...');
-      const keypair = deriveSolanaKeypair(mnemonic);
       const hederaPrivateKey = deriveHederaPrivateKey(mnemonic);
-
-      if (appConfig.importSolanaKeyToPrivy) {
-        if (!privy) throw new Error('Privy wallet import is enabled but unavailable.');
-        setInitStatus('Linking the explicitly enabled identity wallet...');
-        const importer = (privy as unknown as {
-          importWallet?: (input: { privateKey: string; chainType: 'solana' }) => Promise<unknown>;
-        }).importWallet;
-        if (!importer) throw new Error('Privy wallet import is enabled but unavailable.');
-        await importer({
-          privateKey: bs58.encode(keypair.secretKey),
-          chainType: 'solana',
-        });
-      }
 
       if (initializationGenerationRef.current !== generation) return;
       hederaPrivateKeyRef.current = hederaPrivateKey;
-      setSolanaKeypair(keypair);
       setHederaPublicKey(hederaPrivateKey.publicKey.toStringRaw().toLowerCase());
       setHederaAccount(null);
       setSparkWallet(null);
@@ -146,11 +107,19 @@ function WalletProviderCore({
       setInitStatus('Ready');
 
       // Lightning is an optional asset. Its network startup must never block
-      // the already-derived Hedera and Solana wallets from becoming usable.
-      void initializeSparkWallet(mnemonic)
-        .then(spark => {
+      // the already-derived Hedera wallet from becoming usable.
+      void retryWithBackoff(
+        () => initializeSparkWallet(mnemonic),
+        { maxAttempts: 3, baseDelayMs: 750, maxDelayMs: 3_000 },
+      )
+        .then(async spark => {
           if (initializationGenerationRef.current !== generation) return;
           setSparkWallet(spark);
+          try {
+            await reconcileLightningPayments(spark);
+          } catch {
+            // A temporary status lookup failure must not make the wallet unusable.
+          }
         })
         .catch(cause => {
           if (initializationGenerationRef.current !== generation) return;
@@ -159,7 +128,7 @@ function WalletProviderCore({
           setError('Lightning wallet unavailable: ' + message);
         });
     },
-    [privy],
+    [],
   );
 
   const runExclusive = useCallback(async (operation: () => Promise<void>) => {
@@ -287,52 +256,19 @@ function WalletProviderCore({
     [walletReady],
   );
 
-  const sendSolanaPayment = useCallback(
-    async (input: {
-      recipientAddress: string;
-      amountBaseUnits: bigint;
-      asset: SolanaAsset;
-      reference?: string | null;
-      memo?: string | null;
-    }) => {
-      if (!walletReady || !solanaKeypair) {
-        throw new Error('Wallet keys are not ready for Solana.');
-      }
-      return sendSolanaTransfer({
-        keypair: solanaKeypair,
-        ...input,
-        lifecycle: {
-          onSubmitted: submission => solanaPaymentJournal.recordSubmitted(submission),
-          onResolved: resolution => solanaPaymentJournal.recordResolved(resolution),
-        },
-      });
-    },
-    [solanaKeypair, walletReady],
-  );
-
   const wipeWallet = useCallback(async () => {
     if (initializationRef.current) await initializationRef.current.catch(() => undefined);
-    const atomiqKeys = (await AsyncStorage.getAllKeys()).filter(key =>
-      key.startsWith('atomiq_sdk_'),
-    );
     await Promise.all([
       deleteSecureItem(MNEMONIC_STORE_KEY),
       wipeTransactions(),
       clearHederaAccountBindings(),
       hederaPaymentJournal.clear(),
-      solanaPaymentJournal.clear(),
-      atomiqKeys.length ? AsyncStorage.multiRemove(atomiqKeys) : Promise.resolve(),
+      lightningPaymentJournal.clear(),
+      lightningReceiveStore.clear(),
+      operationalHealth.clear(),
     ]);
-    if (privy?.logout) {
-      await Promise.race([
-        privy.logout(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Privy logout timed out.')), 5_000),
-        ),
-      ]).catch(() => undefined);
-    }
     clearRuntimeState();
-  }, [clearRuntimeState, privy]);
+  }, [clearRuntimeState]);
 
   const value = useMemo<WalletContextValue>(
     () => ({
@@ -340,8 +276,6 @@ function WalletProviderCore({
       initStatus,
       walletReady,
       sparkWallet,
-      solanaAddress: solanaKeypair?.publicKey.toBase58() || null,
-      solanaKeypair,
       hederaPublicKey,
       hederaAccount,
       error,
@@ -349,7 +283,6 @@ function WalletProviderCore({
       restoreWallet,
       refreshHederaAccount,
       sendHederaPayment,
-      sendSolanaPayment,
       wipeWallet,
     }),
     [
@@ -362,8 +295,6 @@ function WalletProviderCore({
       refreshHederaAccount,
       restoreWallet,
       sendHederaPayment,
-      sendSolanaPayment,
-      solanaKeypair,
       sparkWallet,
       walletReady,
       wipeWallet,
@@ -373,16 +304,8 @@ function WalletProviderCore({
   return React.createElement(WalletContext.Provider, { value }, children);
 }
 
-function PrivyWalletProvider({ children }: { children?: ReactNode }) {
-  const privy = usePrivy();
-  return React.createElement(WalletProviderCore, { privy }, children);
-}
-
 export function WalletProvider({ children }: { children: ReactNode }) {
-  if (appConfig.importSolanaKeyToPrivy) {
-    return React.createElement(PrivyWalletProvider, null, children);
-  }
-  return React.createElement(WalletProviderCore, { privy: null }, children);
+  return React.createElement(WalletProviderCore, null, children);
 }
 
 export function useWalletAuth(): WalletContextValue {

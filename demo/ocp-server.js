@@ -8,7 +8,6 @@ const { bech32 } = require('bech32');
 const PORT = Number(process.env.OCP_DEMO_PORT || 3333);
 const BIND_HOST = process.env.OCP_DEMO_BIND_HOST || '127.0.0.1';
 const QUOTE_TTL_MS = Math.max(5_000, Number(process.env.OCP_DEMO_QUOTE_TTL_MS || 60_000));
-const SOLANA_DESTINATION = process.env.OCP_DEMO_SOLANA_DESTINATION || '';
 const LIGHTNING_INVOICE = process.env.OCP_DEMO_LIGHTNING_INVOICE || '';
 const quotes = new Map();
 
@@ -21,8 +20,6 @@ function positiveNumber(name, fallback) {
 const amounts = Object.freeze({
   fiat: positiveNumber('OCP_DEMO_FIAT_AMOUNT', 0.35),
   sat: positiveNumber('OCP_DEMO_SAT_AMOUNT', 550),
-  sol: positiveNumber('OCP_DEMO_SOL_AMOUNT', 0.003),
-  usdc: positiveNumber('OCP_DEMO_USDC_AMOUNT', 0.38),
 });
 
 function encodeUrlToLNURL(url) {
@@ -50,16 +47,8 @@ function createQuote() {
       fee: 0,
     });
   }
-  if (SOLANA_DESTINATION) {
-    transferAmounts.push(
-      { method: 'solana', asset: 'SOL', chain: 'Solana', amount: amounts.sol, fee: 0.000005 },
-      { method: 'solana', asset: 'USDC', chain: 'Solana', amount: amounts.usdc, fee: 0.000005 },
-    );
-  }
   if (transferAmounts.length === 0) {
-    throw new Error(
-      'Configure OCP_DEMO_SOLANA_DESTINATION and/or OCP_DEMO_LIGHTNING_INVOICE before requesting a quote.',
-    );
+    throw new Error('Configure OCP_DEMO_LIGHTNING_INVOICE before requesting a quote.');
   }
 
   const quote = {
@@ -106,26 +95,14 @@ function executionPayload(url) {
   }
 
   quote.consumed = true;
-  if (option.method === 'lightning') {
-    return {
-      status: 200,
-      body: {
-        type: 'lightning',
-        quoteId,
-        asset: 'SAT',
-        amount: option.amount,
-        pr: LIGHTNING_INVOICE,
-      },
-    };
-  }
   return {
     status: 200,
     body: {
-      type: 'solana',
+      type: 'lightning',
       quoteId,
-      asset: option.asset,
+      asset: 'SAT',
       amount: option.amount,
-      destination: SOLANA_DESTINATION,
+      pr: LIGHTNING_INVOICE,
     },
   };
 }

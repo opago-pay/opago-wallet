@@ -41,11 +41,6 @@ const gates = [
     args: ['--check', 'demo/hedera-checkout-merchant.cjs'],
   },
   {
-    label: 'Solana devnet funding syntax',
-    command: process.execPath,
-    args: ['--check', 'scripts/solana-fund-devnet.cjs'],
-  },
-  {
     label: 'Hedera provisioning syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-provision-testnet.cjs'],
@@ -64,6 +59,16 @@ const gates = [
     label: 'Hedera verification syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-verify-checkout.cjs'],
+  },
+  {
+    label: 'Lightning Mainnet configuration verifier syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/verify-lightning-mainnet-build-config.cjs'],
+  },
+  {
+    label: 'Production Mainnet configuration verifier syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/verify-production-mainnet-build-config.cjs'],
   },
 ];
 

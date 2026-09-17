@@ -76,12 +76,27 @@ export function decodeLightningInvoice(invoiceInput: string): LightningInvoiceDe
   return { invoice, amountSats, paymentHash: paymentHash.toLowerCase(), expiresAt };
 }
 
+export function extractLightningPaymentHash(invoiceInput: string): string {
+  const invoice = normalizeLightningInput(invoiceInput);
+  if (!isBolt11Invoice(invoice)) throw new Error('The destination is not a valid BOLT11 invoice.');
+  const decoded = decode(invoice);
+  const paymentHashSection = decoded.sections.find(section => section.name === 'payment_hash');
+  const paymentHash =
+    paymentHashSection && 'value' in paymentHashSection ? String(paymentHashSection.value) : '';
+  if (!/^[a-f0-9]{64}$/i.test(paymentHash)) {
+    throw new Error('The Lightning invoice has no valid payment hash.');
+  }
+  return paymentHash.toLowerCase();
+}
+
 export function resolveInvoiceAmount(
   invoice: LightningInvoiceDetails,
   requestedAmountSats?: number,
 ): number {
-  const requested =
-    requestedAmountSats && requestedAmountSats > 0 ? Math.floor(requestedAmountSats) : null;
+  const requested = requestedAmountSats === undefined ? null : requestedAmountSats;
+  if (requested !== null && (!Number.isSafeInteger(requested) || requested <= 0)) {
+    throw new Error('The selected Lightning amount must be a positive whole number of satoshis.');
+  }
 
   if (invoice.amountSats !== null) {
     if (requested !== null && requested !== invoice.amountSats) {
@@ -103,11 +118,11 @@ export function calculateMaxLightningFee(amountSats: number, balanceSats: number
   if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
     throw new Error('Invalid payment amount.');
   }
-  if (!Number.isFinite(balanceSats) || balanceSats < amountSats) {
+  if (!Number.isSafeInteger(balanceSats) || balanceSats < amountSats) {
     throw new Error('Insufficient Lightning balance.');
   }
 
-  const percentageCap = Math.max(1, Math.ceil(amountSats * 0.005));
+  const percentageCap = Math.max(1, Number((BigInt(amountSats) + 199n) / 200n));
   const fee = Math.min(appConfig.maxLightningFeeSats, percentageCap);
   if (amountSats + fee > balanceSats) {
     throw new Error('Insufficient balance for the payment and maximum fee of ' + fee + ' SAT.');

@@ -6,7 +6,7 @@ Current candidate date: 16 September 2026
 
 This public repository remains the multi-chain Opago hackathon project. The current grant candidate adds a guarded Hedera Mainnet wallet and contract-checkout path to the earlier accepted Hedera Testnet integration. It does not claim that the complete repository is an audited public-production wallet.
 
-The standalone Android candidate enables real funds only for Hedera Mainnet. Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. The candidate uses a local debug certificate and is not a Play Store artifact.
+The standalone Android candidate enables real funds only for Hedera Mainnet. Lightning remains on regtest. The candidate uses a local debug certificate and is not a Play Store artifact.
 
 ## Included
 
@@ -19,7 +19,7 @@ The standalone Android candidate enables real funds only for Hedera Mainnet. Sol
 - A consistent consumer-oriented asset, Send, Request, activity, and receipt interface with scalable asset icons and explicit network labels.
 - Opago-owned launcher, adaptive, monochrome, splash, and web icons replace the remaining Expo template and obsolete prototype artwork.
 - The generated Android application requests camera access only for QR scanning; transitive audio-recording, storage, and overlay permissions are explicitly removed.
-- Native SOL and configured SPL USDC development-network flows plus the existing experimental Lightning and swap code, isolated from the real-HBAR candidate.
+- Bitcoin Lightning development-network flows remain isolated from the real-HBAR candidate.
 - A reproducible `npm run phase5:verify` gate covering TypeScript, ESLint, application tests, contract compilation/tests, and service/script syntax checks.
 
 ## Public Hedera evidence

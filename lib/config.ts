@@ -1,6 +1,5 @@
-import { clusterApiUrl } from '@solana/web3.js';
-
 type SparkNetwork = 'MAINNET' | 'REGTEST';
+export type LightningBuildProfile = 'regtest' | 'mainnet';
 export type HederaNetwork = 'testnet' | 'mainnet';
 export type HederaBuildProfile = 'testnet' | 'mainnet';
 
@@ -42,6 +41,48 @@ export function resolveHederaMainnetEnabled(
     }
   }
   return legacyGlobalValue === 'true' || hederaValue === 'true';
+}
+
+export function resolveLightningBuildPolicy(
+  legacyGlobalValue?: string,
+  lightningValue?: string,
+  profileValue?: string,
+): { mainnetEnabled: boolean; profile: LightningBuildProfile; network: SparkNetwork } {
+  for (const [name, value] of [
+    ['EXPO_PUBLIC_ENABLE_MAINNET', legacyGlobalValue],
+    ['EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET', lightningValue],
+  ] as const) {
+    if (value !== undefined && value !== '' && value !== 'true' && value !== 'false') {
+      throw new Error(name + ' must be true or false.');
+    }
+  }
+  const mainnetEnabled = legacyGlobalValue === 'true' || lightningValue === 'true';
+  const profile = profileValue || 'regtest';
+  if (profile !== 'regtest' && profile !== 'mainnet') {
+    throw new Error('EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE must be regtest or mainnet.');
+  }
+  if (mainnetEnabled !== (profile === 'mainnet')) {
+    throw new Error(
+      'Lightning Mainnet requires EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET=true and EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE=mainnet.',
+    );
+  }
+  return {
+    mainnetEnabled,
+    profile,
+    network: mainnetEnabled ? 'MAINNET' : 'REGTEST',
+  };
+}
+
+export function resolveMaxLightningFeeSats(value?: string): number {
+  const normalized = value === undefined || value === '' ? '100' : value;
+  if (!/^[1-9]\d*$/.test(normalized)) {
+    throw new Error('EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS must be a positive whole number.');
+  }
+  const amount = Number(normalized);
+  if (!Number.isSafeInteger(amount) || amount > 100_000) {
+    throw new Error('EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS must not exceed 100000 SAT.');
+  }
+  return amount;
 }
 
 export function resolveHederaBuildPolicy(
@@ -135,13 +176,12 @@ export function resolveHederaBuildPolicy(
   });
 }
 
-const SOLANA_USDC_MINTS = Object.freeze({
-  mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  devnet: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-});
-
 const isDevelopment = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
-const mainnetEnabled = process.env.EXPO_PUBLIC_ENABLE_MAINNET === 'true';
+const lightningBuildPolicy = resolveLightningBuildPolicy(
+  process.env.EXPO_PUBLIC_ENABLE_MAINNET,
+  process.env.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET,
+  process.env.EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE,
+);
 const hederaMainnetEnabled = resolveHederaMainnetEnabled(
   process.env.EXPO_PUBLIC_ENABLE_MAINNET,
   process.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET,
@@ -157,28 +197,13 @@ const hederaBuildPolicy = resolveHederaBuildPolicy({
   checkoutContractId: process.env.EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID,
   checkoutRuntimeSha256: process.env.EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256,
 });
-const expectedSolanaUsdcMint = mainnetEnabled
-  ? SOLANA_USDC_MINTS.mainnet
-  : SOLANA_USDC_MINTS.devnet;
-const configuredSolanaUsdcMint = process.env.EXPO_PUBLIC_USDC_MINT || expectedSolanaUsdcMint;
-
-if (configuredSolanaUsdcMint !== expectedSolanaUsdcMint) {
-  throw new Error(
-    'EXPO_PUBLIC_USDC_MINT must match the official Circle USDC mint for the selected Solana network.',
-  );
-}
-
 export const appConfig = Object.freeze({
   isDevelopment,
-  isMainnet: mainnetEnabled,
+  isMainnet: lightningBuildPolicy.mainnetEnabled,
   isHederaMainnet: hederaMainnetEnabled,
   allowInsecureHttp: insecureHttpEnabled,
-  solanaRpcUrl:
-    process.env.EXPO_PUBLIC_SOLANA_RPC_URL ||
-    clusterApiUrl(mainnetEnabled ? 'mainnet-beta' : 'devnet'),
-  solanaMaxTestTransferSol: process.env.EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_SOL || '1',
-  solanaMaxTestTransferUsdc: process.env.EXPO_PUBLIC_SOLANA_MAX_TEST_TRANSFER_USDC || '100',
-  sparkNetwork: (mainnetEnabled ? 'MAINNET' : 'REGTEST') as SparkNetwork,
+  sparkNetwork: lightningBuildPolicy.network,
+  lightningBuildProfile: lightningBuildPolicy.profile,
   eIdBackendUrl: process.env.EXPO_PUBLIC_EID_BACKEND_URL || '',
   hederaNetwork: hederaBuildPolicy.network,
   hederaBuildProfile: hederaBuildPolicy.buildProfile,
@@ -186,12 +211,9 @@ export const appConfig = Object.freeze({
   hederaMaxTransferHbar: hederaBuildPolicy.maxTransferHbar,
   hederaCheckoutContractId: hederaBuildPolicy.checkoutContractId,
   hederaCheckoutRuntimeSha256: hederaBuildPolicy.checkoutRuntimeSha256,
-  importSolanaKeyToPrivy: process.env.EXPO_PUBLIC_IMPORT_SOLANA_TO_PRIVY === 'true',
-  maxLightningFeeSats: Math.max(
-    1,
-    Number.parseInt(process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS || '100', 10) || 100,
+  maxLightningFeeSats: resolveMaxLightningFeeSats(
+    process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS,
   ),
-  usdcMint: configuredSolanaUsdcMint,
 });
 
 function isPrivateDevelopmentHost(hostname: string): boolean {
@@ -232,15 +254,6 @@ export function assertSafeRemoteUrl(rawUrl: string, purpose: string): URL {
   if (url.protocol === 'https:') return url;
 
   throw new Error(purpose + ' must use HTTPS. Local HTTP requires the explicit development flag.');
-}
-
-export function assertMainnetPaymentsEnabled(action: string): void {
-  if (!appConfig.isMainnet) {
-    throw new Error(
-      action +
-        ' is disabled outside an explicitly enabled mainnet build. Set EXPO_PUBLIC_ENABLE_MAINNET=true only when real-fund execution is intended.',
-    );
-  }
 }
 
 export function requireEIdBackendUrl(): string {

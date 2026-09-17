@@ -8,8 +8,6 @@ import { useCameraPermissions } from 'expo-camera';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
-import { addTransaction } from '@/lib/database';
-import { AtomiqExecutionError, getAtomiqQuote, executeAtomiqQuote } from '@/lib/atomiq';
 import { fetchInvoiceFromLNURLP, resolveLightningAddress, resolveLNURL } from '@/lib/lnurl-safe';
 import { fetchOcpExecutionPayload, fetchOcpOptions, resolveOcpUrl } from '@/lib/ocp-safe';
 import { normalizeLightningInput, isBolt11Invoice } from '@/lib/lightning';
@@ -18,16 +16,14 @@ import {
   parsePaymentAmount,
   resolveLnurlAmount,
 } from '@/lib/payment-input';
-import { paySparkInvoice } from '@/lib/payments';
 import {
-  formatSolanaAssetAmount,
-  loadSolanaAccount,
-  parseSolanaAssetAmount,
-  parseSolanaPaymentRequest,
-  sendSolanaAsset,
-  SolanaPaymentPendingError,
-} from '@/lib/solana';
-import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
+  LightningPaymentPendingError,
+  payPreparedSparkPayment,
+  prepareSparkPayment,
+  type SparkPaymentResult,
+} from '@/lib/payments';
+import { authorizePayment } from '@/lib/payment-authorization';
+import { lightningPaymentLifecycle } from '@/lib/lightning/reconcile-native';
 import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
 import { PaymentForm } from '@/components/send/payment-form';
 import {
@@ -35,9 +31,9 @@ import {
   HederaSuccessView,
 } from '@/components/send/hedera-payment-views';
 import {
-  SolanaReviewView,
-  SolanaSuccessView,
-} from '@/components/send/solana-payment-views';
+  LightningReviewView,
+  LightningSuccessView,
+} from '@/components/send/lightning-payment-views';
 import {
   getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK_LABEL,
@@ -55,22 +51,18 @@ import {
   type HederaTransferResult,
 } from '@/lib/hedera/payments';
 import {
-  BridgeQuoteView,
   IdentityRequiredView,
   OcpQuoteView,
-  PaymentSuccessView,
   ScannerView,
 } from '@/components/send/payment-state-views';
 import type {
-  BridgeQuote,
   OcpOption,
   OcpState,
   PaymentCurrency,
   PaymentSource,
   PendingEId,
   PendingHederaPayment,
-  PendingSolanaPayment,
-  SolanaTransferResult,
+  PendingLightningPayment,
 } from '@/components/send/types';
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : 'Payment failed.';
@@ -93,17 +85,13 @@ function friendlyPaymentMessage(cause: unknown, asset = 'payment'): string {
   if (normalized.includes('contract_revert') || normalized.includes('rejected')) {
     return 'The payment was rejected. No successful payment was recorded.';
   }
+  if (normalized.includes('cancelled') || normalized.includes('canceled')) {
+    return 'Payment cancelled. Nothing was sent.';
+  }
   if (normalized.includes('unavailable') || normalized.includes('timeout')) {
     return 'The payment network is taking too long to respond. Please try again in a moment.';
   }
   return 'We could not prepare this payment. Check the recipient and amount, then try again.';
-}
-
-function confirmPayment(message: string): Promise<boolean> {
-  return new Promise(resolve => Alert.alert('Confirm payment', message, [
-    { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-    { text: 'Sign and send', onPress: () => resolve(true) },
-  ]));
 }
 
 function isExpectedEIdDeepLink(value: string): boolean {
@@ -124,18 +112,16 @@ export default function SendScreen() {
   const rates = useExchangeRates();
   const {
     sparkWallet,
-    solanaKeypair,
     walletReady,
+    hederaPublicKey,
     hederaAccount,
     loadOrGenerateWallet,
     refreshHederaAccount,
     sendHederaPayment,
-    sendSolanaPayment,
   } = useWalletAuth();
   const { balances, balanceError } = useWalletBalances({
     walletReady,
     sparkWallet,
-    solanaPublicKey: solanaKeypair?.publicKey || null,
     refreshHederaAccount,
   });
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -146,21 +132,18 @@ export default function SendScreen() {
   const [sourceSelected, setSourceSelected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [successProof, setSuccessProof] = useState<string | null>(null);
+  const [lightningResult, setLightningResult] = useState<SparkPaymentResult | null>(null);
+  const [pendingLightning, setPendingLightning] = useState<PendingLightningPayment | null>(null);
   const [pendingHedera, setPendingHedera] = useState<PendingHederaPayment | null>(null);
   const [hederaResult, setHederaResult] = useState<HederaTransferResult | null>(null);
-  const [pendingSolana, setPendingSolana] = useState<PendingSolanaPayment | null>(null);
-  const [solanaResult, setSolanaResult] = useState<SolanaTransferResult | null>(null);
   const [ocpState, setOcpState] = useState<OcpState | null>(null);
   const [selectedOcpOption, setSelectedOcpOption] = useState<OcpOption | null>(null);
-  const [bridgeQuote, setBridgeQuote] = useState<BridgeQuote | null>(null);
   const [pendingEId, setPendingEId] = useState<PendingEId | null>(null);
   const [eIdSessionId, setEIdSessionId] = useState<string | null>(null);
   const [eIdDemo, setEIdDemo] = useState(false);
   const waitingForEId = useRef(false);
   const completingEId = useRef(false);
   const consumedHederaRequestKey = useRef<string | null>(null);
-  const solanaSubmissionInFlight = useRef(false);
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
@@ -183,33 +166,15 @@ export default function SendScreen() {
     setHederaResult(null);
   }, [hederaRequest, hederaRequestKey]);
 
-  const executeInvoice = useCallback(async (invoice: string, requestedAmount?: number) => {
-    if (source === 'spark') {
-      if (!sparkWallet) throw new Error('Spark wallet is not ready.');
-      const payment = await paySparkInvoice(sparkWallet, invoice, requestedAmount);
-      await addTransaction('outgoing', payment.amountSats, 'SAT', {
-        txId: payment.reference,
-        reference: payment.reference,
-        status: 'confirmed',
-      });
-      setSuccessProof(payment.proof);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
-    }
-    if (!solanaKeypair) throw new Error('Solana signer is not ready.');
-    const sourceAsset = source === 'usdc' ? 'USDC' : 'SOL';
-    const amountSats = requestedAmount || 0;
-    const { swap, solanaSigner } = await getAtomiqQuote(solanaKeypair, invoice, amountSats, sourceAsset);
-    const sourceCost = Number(swap.getInput()?.amount);
-    if (!Number.isFinite(sourceCost) || sourceCost <= 0) {
-      throw new Error('Atomiq returned an invalid source amount.');
-    }
-    const expiresAt = Number(swap.getQuoteExpiry?.());
-    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-      throw new Error('Atomiq quote is already expired.');
-    }
-    setBridgeQuote({ swap, signer: solanaSigner, amountSats, sourceAsset, sourceCost, expiresAt });
-  }, [solanaKeypair, source, sparkWallet]);
+  const prepareLightningInvoice = useCallback(async (
+    invoice: string,
+    requestedAmount?: number,
+    recipientLabel = 'Lightning payment request',
+  ) => {
+    if (!sparkWallet) throw new Error('Spark wallet is not ready.');
+    const payment = await prepareSparkPayment(sparkWallet, invoice, requestedAmount);
+    setPendingLightning({ ...payment, recipientLabel });
+  }, [sparkWallet]);
 
   const finishEIdPayment = useCallback(async () => {
     if (!pendingEId || !eIdSessionId || completingEId.current) return;
@@ -223,7 +188,7 @@ export default function SendScreen() {
         pendingEId.amountSats,
         payerData,
       );
-      await executeInvoice(invoice, pendingEId.amountSats);
+      await prepareLightningInvoice(invoice, pendingEId.amountSats, 'Verified payment request');
       setPendingEId(null);
       setEIdSessionId(null);
     } catch (cause) {
@@ -233,7 +198,7 @@ export default function SendScreen() {
       completingEId.current = false;
       setLoading(false);
     }
-  }, [eIdSessionId, executeInvoice, pendingEId]);
+  }, [eIdSessionId, pendingEId, prepareLightningInvoice]);
 
   useEffect(() => {
     const appSub = AppState.addEventListener('change', state => {
@@ -253,7 +218,7 @@ export default function SendScreen() {
     setLoading(true);
     try {
       const session = await startEIdSession({
-        walletIdentifier: solanaKeypair?.publicKey.toBase58() || 'spark-wallet',
+        walletIdentifier: hederaAccount?.accountId || hederaPublicKey || 'local-wallet',
         transactionReference: 'lnurl:' + new URL(pendingEId.lnurl.callback).origin,
       });
       setEIdSessionId(session.sessionId);
@@ -292,46 +257,6 @@ export default function SendScreen() {
     }
     setLoading(true);
     try {
-      if (activeSource === 'solana' || activeSource === 'usdc') {
-        if (!solanaKeypair) throw new Error('Solana signer is not ready.');
-        const asset = activeSource === 'usdc' ? 'USDC' as const : 'SOL' as const;
-        const request = parseSolanaPaymentRequest(raw, asset);
-        const enteredAmount = amountInput.trim() && (!sourceOverride || sourceOverride === source)
-          ? parseSolanaAssetAmount(amountInput, asset)
-          : null;
-        if (
-          request.amountBaseUnits !== null &&
-          enteredAmount !== null &&
-          request.amountBaseUnits !== enteredAmount
-        ) {
-          throw new Error('The entered amount does not match the scanned Solana payment request.');
-        }
-        const amountBaseUnits = request.amountBaseUnits ?? enteredAmount;
-        if (amountBaseUnits === null) {
-          throw new Error('Enter an amount or scan a Solana request that includes one.');
-        }
-        if (request.recipientAddress === solanaKeypair.publicKey.toBase58()) {
-          throw new Error('Source and recipient Solana addresses must be different.');
-        }
-        const account = await loadSolanaAccount(solanaKeypair.publicKey);
-        if (account.availability[asset] !== 'fresh') {
-          throw new Error(
-            'The current ' + asset + ' balance could not be verified. Please try again before paying.',
-          );
-        }
-        const available = asset === 'SOL' ? account.balanceLamports : account.usdcBaseUnits;
-        if (amountBaseUnits > available) {
-          throw new Error('Insufficient ' + asset + ' balance.');
-        }
-        setPendingSolana({
-          recipientAddress: request.recipientAddress,
-          asset,
-          amountBaseUnits,
-          amountDisplay: formatSolanaAssetAmount(amountBaseUnits, asset),
-          request,
-        });
-        return;
-      }
       if (activeSource === 'hedera') {
         const checkoutRequest = parseHederaCheckoutRequest(raw);
         const directRequest = checkoutRequest ? null : parseHederaPaymentRequest(raw);
@@ -405,19 +330,17 @@ export default function SendScreen() {
       } else if (!isBolt11Invoice(normalized)) {
         throw new Error('Unsupported payment destination.');
       }
-      await executeInvoice(invoice, effectiveAmount > 0 ? effectiveAmount : undefined);
+      await prepareLightningInvoice(
+        invoice,
+        effectiveAmount > 0 ? effectiveAmount : undefined,
+        normalized.includes('@') ? normalized : 'Lightning payment request',
+      );
     } catch (cause) {
       Alert.alert(
         'Check this payment',
         friendlyPaymentMessage(
           cause,
-          activeSource === 'hedera'
-            ? 'HBAR'
-            : activeSource === 'usdc'
-              ? 'USDC'
-              : activeSource === 'solana'
-                ? 'SOL'
-                : 'Bitcoin',
+          activeSource === 'hedera' ? 'HBAR' : 'Bitcoin',
         ),
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -453,72 +376,33 @@ export default function SendScreen() {
     }
   }
 
-  async function executeSolanaPayment() {
-    if (!pendingSolana || solanaSubmissionInFlight.current) return;
-    solanaSubmissionInFlight.current = true;
+  async function executeLightningPayment() {
+    if (!pendingLightning || !sparkWallet) return;
     setLoading(true);
     try {
-      const result = await sendSolanaPayment({
-        recipientAddress: pendingSolana.recipientAddress,
-        amountBaseUnits: pendingSolana.amountBaseUnits,
-        asset: pendingSolana.asset,
-        reference: pendingSolana.request?.reference,
-        memo: pendingSolana.request?.memo,
-      });
-      setPendingSolana(null);
-      setSolanaResult(result);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await authorizePayment();
+      const result = await payPreparedSparkPayment(
+        sparkWallet,
+        pendingLightning,
+        lightningPaymentLifecycle,
+      );
+      setPendingLightning(null);
+      setLightningResult(result);
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // Haptics are optional and cannot invalidate a proof-backed payment.
+      }
     } catch (cause) {
-      const isPending = cause instanceof SolanaPaymentPendingError;
-      if (isPending) setPendingSolana(null);
+      const isPending = cause instanceof LightningPaymentPendingError;
+      if (isPending) setPendingLightning(null);
       Alert.alert(
         isPending ? 'Payment is still processing' : 'Payment not completed',
         isPending
           ? 'Do not send it again. Open Home and refresh Recent activity to check the final result.'
-          : friendlyPaymentMessage(cause, pendingSolana.asset),
+          : friendlyPaymentMessage(cause, 'Bitcoin'),
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      solanaSubmissionInFlight.current = false;
-      setLoading(false);
-    }
-  }
-
-  async function confirmBridge() {
-    if (!bridgeQuote) return;
-    if (bridgeQuote.expiresAt <= Date.now()) {
-      setBridgeQuote(null);
-      Alert.alert('Quote expired', 'Request a new quote.');
-      return;
-    }
-    const approved = await confirmPayment(
-      'Spend ' + bridgeQuote.sourceCost.toFixed(6) + ' ' + bridgeQuote.sourceAsset +
-      ' to pay ' + bridgeQuote.amountSats + ' SAT?',
-    );
-    if (!approved) return;
-    setLoading(true);
-    try {
-      const result = await executeAtomiqQuote(bridgeQuote.swap, bridgeQuote.signer);
-      await addTransaction('outgoing', bridgeQuote.sourceCost, bridgeQuote.sourceAsset, {
-        txId: result.txId,
-        reference: result.sourceTxId || result.txId,
-        status: 'confirmed',
-      });
-      setBridgeQuote(null);
-      setSuccessProof(result.txId);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (cause) {
-      if (cause instanceof AtomiqExecutionError && cause.sourceTxId) {
-        setBridgeQuote(null);
-        Alert.alert('Swap requires attention', messageOf(cause));
-        await addTransaction('outgoing', bridgeQuote.sourceCost, bridgeQuote.sourceAsset, {
-          txId: cause.sourceTxId,
-          reference: cause.sourceTxId,
-          status: 'action_required',
-        });
-      } else {
-        Alert.alert('Bridge payment failed', messageOf(cause));
-      }
     } finally {
       setLoading(false);
     }
@@ -533,39 +417,15 @@ export default function SendScreen() {
         ocpState.quote,
         selectedOcpOption,
       );
-      if (payload.type === 'lightning') {
-        if (!sparkWallet) throw new Error('Spark wallet is not ready.');
-        const payment = await paySparkInvoice(sparkWallet, payload.pr, payload.amount);
-        await addTransaction('outgoing', payment.amountSats, 'SAT', {
-          txId: payment.reference,
-          reference: payment.reference,
-          status: 'confirmed',
-        });
-        setSuccessProof(payment.proof);
-      } else {
-        if (!solanaKeypair) throw new Error('Solana signer is not ready.');
-        const approved = await confirmPayment(
-          'Send ' + payload.amount + ' ' + payload.asset +
-          ' to ' + payload.destination.slice(0, 8) + '...?',
-        );
-        if (!approved) return;
-        const signature = await sendSolanaAsset({
-          keypair: solanaKeypair,
-          destination: payload.destination,
-          amount: payload.amount,
-          asset: payload.asset,
-        });
-        await addTransaction('outgoing', payload.amount, payload.asset, {
-          txId: signature,
-          reference: 'ocp:' + ocpState.quote.quoteId,
-          status: 'confirmed',
-        });
-        setSuccessProof(signature);
-      }
+      if (!sparkWallet) throw new Error('Spark wallet is not ready.');
+      await prepareLightningInvoice(
+        payload.pr,
+        payload.amount,
+        ocpState.quote.merchantName || 'Merchant payment',
+      );
       setOcpState(null);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
-      Alert.alert('OCP payment failed', messageOf(cause));
+      Alert.alert('Could not prepare payment', messageOf(cause));
     } finally {
       setLoading(false);
     }
@@ -583,14 +443,12 @@ export default function SendScreen() {
   const reset = useCallback(() => {
     setDestination('');
     setAmountInput('');
-    setSuccessProof(null);
+    setLightningResult(null);
+    setPendingLightning(null);
     setPendingHedera(null);
     setHederaResult(null);
-    setPendingSolana(null);
-    setSolanaResult(null);
     setOcpState(null);
     setSelectedOcpOption(null);
-    setBridgeQuote(null);
     setPendingEId(null);
     setEIdSessionId(null);
     setEIdDemo(false);
@@ -643,21 +501,6 @@ export default function SendScreen() {
     );
   }
 
-  if (solanaResult) {
-    return (
-      <SolanaSuccessView
-        result={solanaResult}
-        onOpenExplorer={() => {
-          void openSolanaExplorerUrl(solanaResult.explorerUrl).catch(cause =>
-            Alert.alert('Could not open Solana Explorer', messageOf(cause)),
-          );
-        }}
-        onDashboard={() => router.replace('/(tabs)')}
-        onReset={reset}
-      />
-    );
-  }
-
   if (pendingHedera && hederaAccount) {
     return (
       <HederaReviewView
@@ -670,22 +513,22 @@ export default function SendScreen() {
     );
   }
 
-  if (pendingSolana && solanaKeypair) {
+  if (pendingLightning) {
     return (
-      <SolanaReviewView
-        payment={pendingSolana}
-        sourceAddress={solanaKeypair.publicKey.toBase58()}
+      <LightningReviewView
+        payment={pendingLightning}
         loading={loading}
-        onConfirm={() => void executeSolanaPayment()}
-        onCancel={() => setPendingSolana(null)}
+        onConfirm={() => void executeLightningPayment()}
+        onCancel={() => setPendingLightning(null)}
       />
     );
   }
 
-  if (successProof) {
+  if (lightningResult) {
     return (
-      <PaymentSuccessView
-        proof={successProof}
+      <LightningSuccessView
+        amountSats={lightningResult.amountSats}
+        reference={lightningResult.reference}
         onDashboard={() => router.replace('/(tabs)')}
         onReset={reset}
       />
@@ -699,17 +542,6 @@ export default function SendScreen() {
         loading={loading}
         onBegin={() => void beginEIdVerification()}
         onCancel={reset}
-      />
-    );
-  }
-
-  if (bridgeQuote) {
-    return (
-      <BridgeQuoteView
-        quote={bridgeQuote}
-        loading={loading}
-        onConfirm={() => void confirmBridge()}
-        onCancel={() => setBridgeQuote(null)}
       />
     );
   }

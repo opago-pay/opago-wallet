@@ -14,7 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { AssetIcon } from '@/components/ui/asset-icon';
@@ -37,16 +37,9 @@ import {
   HEDERA_NETWORK_LABEL,
 } from '@/lib/hedera/config';
 import { decodeLightningInvoice } from '@/lib/lightning';
-import { sparkTransferMatchesInvoice } from '@/lib/payments';
-import {
-  buildSolanaReceiveRequest,
-  findNewConfirmedIncomingSolanaTransaction,
-  getSolanaReceiveSnapshot,
-  parseSolanaAssetAmount,
-  type SolanaAsset,
-  type SolanaReceiveSnapshot,
-} from '@/lib/solana';
-import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
+import { sparkTransferMatchesInvoice, verifyPaymentPreimage } from '@/lib/payments';
+import { lightningReceiveStore } from '@/lib/lightning/receive-store-native';
+import { loadSparkTransfersPaginated } from '@/lib/lightning/spark-history';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
@@ -54,7 +47,7 @@ import { compactWalletIdentifier } from '@/lib/wallet-display';
 import { exponentialBackoffDelay } from '@/lib/retry';
 import { buildHederaActivationAlias } from '@/lib/hedera/keys';
 
-type ReceiveNetwork = 'lightning' | 'solana' | 'usdc' | 'hedera';
+type ReceiveNetwork = 'lightning' | 'hedera';
 
 export default function ReceiveScreen() {
   const router = useRouter();
@@ -64,7 +57,6 @@ export default function ReceiveScreen() {
     sparkWallet,
     walletReady,
     loadOrGenerateWallet,
-    solanaKeypair,
     hederaAccount,
     hederaPublicKey,
     refreshHederaAccount,
@@ -72,18 +64,16 @@ export default function ReceiveScreen() {
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
   const [networkSelected, setNetworkSelected] = useState(false);
   const [invoice, setInvoice] = useState<string | null>(null);
+  const [invoiceRequestId, setInvoiceRequestId] = useState<string | null>(null);
   const [invoicePaymentHash, setInvoicePaymentHash] = useState<string | null>(null);
   const [invoiceAmountSats, setInvoiceAmountSats] = useState(0);
+  const [invoiceExpiresAt, setInvoiceExpiresAt] = useState<number | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [isEur, setIsEur] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [receivedDescription, setReceivedDescription] = useState('');
   const [receivedExplorerUrl, setReceivedExplorerUrl] = useState<string | null>(null);
-  const solanaSnapshot = useRef<SolanaReceiveSnapshot | null>(null);
-  const [solanaReady, setSolanaReady] = useState(false);
-  const solanaExpectedAmountBaseUnits = useRef<bigint | null>(null);
-  const [solanaRequest, setSolanaRequest] = useState<string | null>(null);
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
   const hederaExpectedAmountTinybars = useRef<bigint | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
@@ -92,6 +82,7 @@ export default function ReceiveScreen() {
   const [hederaRequest, setHederaRequest] = useState<string | null>(null);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const pollingEnabled = isFocused && appIsActive;
+  const restoredLightningRequest = useRef(false);
 
   useEffect(() => {
     hederaKnownTransactions.current = null;
@@ -105,6 +96,31 @@ export default function ReceiveScreen() {
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet();
   }, [loadOrGenerateWallet, walletReady]);
+
+  useEffect(() => {
+    if (!sparkWallet || restoredLightningRequest.current) return;
+    restoredLightningRequest.current = true;
+    let cancelled = false;
+    void lightningReceiveStore.load()
+      .then(saved => {
+        if (!saved || cancelled) return;
+        setNetwork('lightning');
+        setNetworkSelected(true);
+        setInvoice(saved.invoice);
+        setInvoiceRequestId(saved.requestId);
+        setInvoicePaymentHash(saved.paymentHash);
+        setInvoiceAmountSats(saved.amountSats);
+        setInvoiceExpiresAt(saved.expiresAt);
+        setIsPaid(false);
+      })
+      .catch(() => {
+        // A storage failure must not crash the receive screen. The user can
+        // still create a fresh request in the current session.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sparkWallet]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -124,13 +140,25 @@ export default function ReceiveScreen() {
       reference,
       status: 'confirmed',
     });
+    await lightningReceiveStore.clear();
     setReceivedDescription(amount + ' ' + asset + ' confirmed.');
     setIsPaid(true);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await Notifications.scheduleNotificationAsync({
-      content: { title: 'Payment received', body: amount + ' ' + asset + ' confirmed.' },
-      trigger: null,
-    });
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // Haptics are optional and cannot invalidate a confirmed payment.
+    }
+    try {
+      const permissions = await Notifications.getPermissionsAsync();
+      if (permissions.granted) {
+        await Notifications.scheduleNotificationAsync({
+          content: { title: 'Payment received', body: amount + ' ' + asset + ' confirmed.' },
+          trigger: null,
+        });
+      }
+    } catch {
+      // Notification availability cannot invalidate a confirmed payment.
+    }
   }, []);
 
   useEffect(() => {
@@ -146,8 +174,38 @@ export default function ReceiveScreen() {
 
     async function poll() {
       try {
-        const { transfers } = await sparkWallet.getTransfers(20, 0);
-        const matching = transfers?.find((transfer: unknown) =>
+        if (invoiceRequestId && typeof sparkWallet.getLightningReceiveRequest === 'function') {
+          const request = await sparkWallet.getLightningReceiveRequest(invoiceRequestId);
+          const status = String(request?.status || '').toUpperCase();
+          if (status.includes('FAILED')) {
+            await lightningReceiveStore.clear();
+            if (!cancelled) {
+              setInvoice(null);
+              setInvoiceRequestId(null);
+              setInvoicePaymentHash(null);
+              setInvoiceAmountSats(0);
+              setInvoiceExpiresAt(null);
+              setIsPaid(false);
+              Alert.alert('Request closed', 'This Lightning request could not be completed. Create a new one.');
+            }
+            return;
+          }
+          if (status === 'TRANSFER_COMPLETED') {
+            verifyPaymentPreimage(request?.paymentPreimage, invoicePaymentHash!);
+            if (!cancelled) {
+              await markPaid(
+                invoiceAmountSats,
+                'SAT',
+                'ln:' + invoicePaymentHash!.toLowerCase(),
+                invoiceRequestId,
+              );
+            }
+            return;
+          }
+        }
+
+        const transfers = await loadSparkTransfersPaginated(sparkWallet, 200, 50);
+        const matching = transfers.find((transfer: unknown) =>
           sparkTransferMatchesInvoice(transfer, invoicePaymentHash!, invoiceAmountSats),
         );
         if (matching && !cancelled) {
@@ -171,75 +229,7 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [invoice, invoiceAmountSats, invoicePaymentHash, isPaid, markPaid, pollingEnabled, sparkWallet]);
-
-  useEffect(() => {
-    if (
-      !pollingEnabled ||
-      (network !== 'solana' && network !== 'usdc') ||
-      !solanaKeypair ||
-      isPaid
-    ) return;
-    const activeKeypair = solanaKeypair;
-    const activeAsset: SolanaAsset = network === 'usdc' ? 'USDC' : 'SOL';
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let consecutiveFailures = 0;
-
-    function scheduleNextPoll(delayMs: number) {
-      if (cancelled) return;
-      timer = setTimeout(runPoll, delayMs);
-    }
-
-    function runPoll() {
-      void initializeAndPoll().catch(() => {
-        consecutiveFailures += 1;
-        scheduleNextPoll(exponentialBackoffDelay(12_000, consecutiveFailures));
-      });
-    }
-
-    async function initializeAndPoll() {
-      if (!solanaSnapshot.current) {
-        solanaSnapshot.current = await getSolanaReceiveSnapshot(activeKeypair.publicKey);
-      }
-      if (!cancelled) setSolanaReady(true);
-      if (!solanaRequest) return;
-      const incoming = await findNewConfirmedIncomingSolanaTransaction({
-        address: activeKeypair.publicKey,
-        sinceSignature: solanaSnapshot.current.latestSignature,
-        asset: activeAsset,
-        expectedAmountBaseUnits: solanaExpectedAmountBaseUnits.current,
-      });
-      if (incoming && !cancelled) {
-        const description = incoming.amountDisplay + ' ' + incoming.asset + ' confirmed on ' +
-          (appConfig.isMainnet ? 'mainnet.' : 'devnet.');
-        setReceivedDescription(description);
-        setReceivedExplorerUrl(incoming.explorerUrl);
-        setIsPaid(true);
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        try {
-          const permissions = await Notifications.getPermissionsAsync();
-          if (permissions.granted) {
-            await Notifications.scheduleNotificationAsync({
-              content: { title: 'Solana payment received', body: description },
-              trigger: null,
-            });
-          }
-        } catch {
-          // Notification availability must not change a confirmed payment state.
-        }
-        return;
-      }
-      consecutiveFailures = 0;
-      scheduleNextPoll(12_000);
-    }
-
-    runPoll();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [isPaid, network, pollingEnabled, solanaKeypair, solanaRequest]);
+  }, [invoice, invoiceAmountSats, invoicePaymentHash, invoiceRequestId, isPaid, markPaid, pollingEnabled, sparkWallet]);
 
   useEffect(() => {
     if (!pollingEnabled || network !== 'hedera' || !walletReady || isPaid) return;
@@ -350,9 +340,23 @@ export default function ReceiveScreen() {
         typeof result.invoice === 'string' ? result.invoice : result.invoice.encodedInvoice;
       const details = decodeLightningInvoice(rawInvoice);
       if (details.amountSats !== amountSats) throw new Error('Spark returned an invoice with the wrong amount.');
-      setInvoice('lightning:' + details.invoice);
+      if (typeof result.id !== 'string' || !result.id) {
+        throw new Error('Spark returned no request identifier.');
+      }
+      const encodedRequest = 'lightning:' + details.invoice;
+      await lightningReceiveStore.save({
+        requestId: result.id,
+        invoice: encodedRequest,
+        paymentHash: details.paymentHash,
+        amountSats,
+        expiresAt: details.expiresAt || Date.now() + 600_000,
+        createdAt: new Date().toISOString(),
+      });
+      setInvoice(encodedRequest);
+      setInvoiceRequestId(result.id);
       setInvoicePaymentHash(details.paymentHash);
       setInvoiceAmountSats(amountSats);
+      setInvoiceExpiresAt(details.expiresAt || Date.now() + 600_000);
       setIsPaid(false);
     } catch (cause) {
       Alert.alert('Could not create request', cause instanceof Error ? cause.message : 'Bitcoin payments are unavailable.');
@@ -381,41 +385,15 @@ export default function ReceiveScreen() {
     }
   }
 
-  async function prepareSolanaRequest() {
-    if (!solanaKeypair || (network !== 'solana' && network !== 'usdc')) return;
-    setLoading(true);
-    try {
-      const asset: SolanaAsset = network === 'usdc' ? 'USDC' : 'SOL';
-      const amountBaseUnits = amountInput.trim()
-        ? parseSolanaAssetAmount(amountInput, asset)
-        : null;
-      solanaExpectedAmountBaseUnits.current = amountBaseUnits;
-      setSolanaRequest(buildSolanaReceiveRequest({
-        recipientAddress: solanaKeypair.publicKey.toBase58(),
-        asset,
-        amountBaseUnits,
-      }));
-    } catch (cause) {
-      Alert.alert(
-        'Could not create Solana request',
-        cause instanceof Error ? cause.message : 'Solana is unavailable.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const reset = useCallback(() => {
     setInvoice(null);
+    setInvoiceRequestId(null);
     setInvoicePaymentHash(null);
     setInvoiceAmountSats(0);
+    setInvoiceExpiresAt(null);
     setIsPaid(false);
     setReceivedDescription('');
     setReceivedExplorerUrl(null);
-    solanaSnapshot.current = null;
-    setSolanaReady(false);
-    solanaExpectedAmountBaseUnits.current = null;
-    setSolanaRequest(null);
     hederaKnownTransactions.current = null;
     hederaExpectedAmountTinybars.current = null;
     setHederaReady(false);
@@ -424,13 +402,21 @@ export default function ReceiveScreen() {
     setHederaRequest(null);
   }, []);
 
-  useFocusEffect(useCallback(() => {
+  const clearAndReset = useCallback(async () => {
+    await lightningReceiveStore.clear();
     reset();
-    setNetwork('lightning');
-    setNetworkSelected(false);
-    setAmountInput('');
-    setIsEur(true);
-  }, [reset]));
+  }, [reset]);
+
+  useEffect(() => {
+    if (!invoiceExpiresAt || isPaid) return;
+    const remaining = invoiceExpiresAt - Date.now();
+    if (remaining <= 0) {
+      void clearAndReset();
+      return;
+    }
+    const timer = setTimeout(() => void clearAndReset(), remaining);
+    return () => clearTimeout(timer);
+  }, [clearAndReset, invoiceExpiresAt, isPaid]);
 
   async function copy(value: string) {
     await Clipboard.setStringAsync(value);
@@ -440,11 +426,7 @@ export default function ReceiveScreen() {
   async function openReceivedTransaction() {
     if (!receivedExplorerUrl) return;
     try {
-      if (network === 'hedera') {
-        await openHederaExplorerUrl(receivedExplorerUrl);
-      } else {
-        await openSolanaExplorerUrl(receivedExplorerUrl);
-      }
+      await openHederaExplorerUrl(receivedExplorerUrl);
     } catch (cause) {
       Alert.alert(
         'Could not open receipt',
@@ -478,17 +460,14 @@ export default function ReceiveScreen() {
           <Text style={[styles.buttonText, styles.secondaryButtonText]}>View receipt</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={styles.textButton} onPress={reset}>
+      <TouchableOpacity style={styles.textButton} onPress={() => void clearAndReset()}>
         <Text style={styles.textButtonText}>Request another payment</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const solanaAddress = solanaKeypair?.publicKey.toBase58() || '';
   const qrValue =
-    network === 'solana' || network === 'usdc'
-      ? solanaRequest || ''
-      : network === 'hedera'
+    network === 'hedera'
         ? hederaRequest && hederaAccount
           ? buildHederaWalletQrValue(hederaAccount.accountId)
           : ''
@@ -496,8 +475,6 @@ export default function ReceiveScreen() {
 
   const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
     { network: 'lightning', asset: 'lightning' },
-    { network: 'solana', asset: 'solana' },
-    { network: 'usdc', asset: 'usdc' },
     { network: 'hedera', asset: 'hedera' },
   ];
   const selectedReceiveNetwork = receiveNetworks.find(item => item.network === network)!;
@@ -539,19 +516,6 @@ export default function ReceiveScreen() {
           </View>
         </View>
       )}
-      {networkSelected && (network === 'solana' || network === 'usdc') && !appConfig.isMainnet && (
-        <View style={styles.modeNotice}>
-          <View style={styles.modeNoticeIcon}>
-            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
-          </View>
-          <View style={styles.modeNoticeCopy}>
-            <Text style={styles.modeNoticeTitle}>
-              {network === 'usdc' ? 'USDC' : 'Solana'} · DEVNET
-            </Text>
-            <Text style={styles.modeNoticeText}>Test payments only — no real value.</Text>
-          </View>
-        </View>
-      )}
       <View style={styles.card}>
         {!networkSelected ? (
           <>
@@ -568,7 +532,7 @@ export default function ReceiveScreen() {
                     key={item.network}
                     style={styles.receiveNetworkSelector}
                     onPress={() => {
-                      reset();
+                      void clearAndReset();
                       setNetwork(item.network);
                       setNetworkSelected(true);
                       setAmountInput('');
@@ -596,7 +560,7 @@ export default function ReceiveScreen() {
               <TouchableOpacity
                 style={styles.changeAssetButton}
                 onPress={() => {
-                  reset();
+                  void clearAndReset();
                   setNetworkSelected(false);
                   setAmountInput('');
                   setIsEur(true);
@@ -711,58 +675,6 @@ export default function ReceiveScreen() {
           </>
         )}
 
-        {(network === 'solana' || network === 'usdc') && (
-          <>
-            {!solanaReady ? (
-              <ActivityIndicator color="#ffb000" />
-            ) : solanaAddress ? (
-              <>
-                <Text style={styles.label}>Your payment address</Text>
-                <TouchableOpacity
-                  style={styles.proofBox}
-                  onPress={() => void copy(solanaAddress)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy Solana wallet address"
-                >
-                  <Text style={styles.accountDisplay}>{compactWalletIdentifier(solanaAddress)}</Text>
-                  <View style={styles.copyHint}>
-                    <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
-                    <Text style={styles.copyHintText}>Tap to copy</Text>
-                  </View>
-                </TouchableOpacity>
-                {!solanaRequest && (
-                  <>
-                    <Text style={styles.label}>
-                      Amount (optional)
-                    </Text>
-                    <TextInput
-                      style={styles.input}
-                      value={amountInput}
-                      onChangeText={setAmountInput}
-                      keyboardType="decimal-pad"
-                      placeholder="Leave empty for an open request"
-                      placeholderTextColor="#666"
-                    />
-                    <TouchableOpacity
-                      style={styles.button}
-                      onPress={() => void prepareSolanaRequest()}
-                      disabled={loading}
-                    >
-                      {loading
-                        ? <ActivityIndicator color="#111" />
-                        : <Text style={styles.buttonText}>
-                            Create payment QR
-                          </Text>}
-                    </TouchableOpacity>
-                  </>
-                )}
-              </>
-            ) : (
-              <Text style={styles.errorText}>Solana wallet is not ready.</Text>
-            )}
-          </>
-        )}
-
         {qrValue && (
           <View style={styles.qrSection}>
             <View style={styles.qrCard}>
@@ -784,12 +696,6 @@ export default function ReceiveScreen() {
           </View>
         )}
 
-        {(network === 'solana' || network === 'usdc') && !solanaAddress && (
-          <Text style={styles.errorText}>Solana wallet is not ready.</Text>
-        )}
-        {(network === 'solana' || network === 'usdc') && solanaAddress && !solanaReady && (
-          <ActivityIndicator color="#ffb000" />
-        )}
           </>
         )}
       </View>

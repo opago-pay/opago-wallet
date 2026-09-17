@@ -12,16 +12,58 @@ export interface SparkPaymentResult {
   paymentHash: string;
   proof: string;
   reference: string;
+  requestId: string | null;
+}
+
+export interface PreparedSparkPayment {
+  invoice: LightningInvoiceDetails;
+  amountSats: number;
+  maxFeeSats: number;
+  estimatedFeeSats: number | null;
+}
+
+export interface LightningPaymentLifecycle {
+  onPending?(payment: PreparedSparkPayment): Promise<void>;
+  onRequestIdentified?(paymentHash: string, requestId: string): Promise<void>;
+  onResolved?(
+    paymentHash: string,
+    state: 'confirmed' | 'failed',
+    result: string,
+    requestId: string | null,
+  ): Promise<void>;
+}
+
+export class LightningPaymentPendingError extends Error {
+  readonly paymentHash: string;
+
+  constructor(paymentHash: string, cause?: unknown) {
+    super(
+      cause instanceof Error && /already (?:being processed|paid)/i.test(cause.message)
+        ? cause.message
+        : 'Lightning payment status is not final yet. Do not send it again.',
+    );
+    this.name = 'LightningPaymentPendingError';
+    this.paymentHash = paymentHash;
+  }
 }
 
 export interface SparkWalletLike {
   getBalance(): Promise<{ balance?: unknown; satsBalance?: { incoming?: unknown } }>;
+  getLightningSendFeeEstimate?(input: {
+    encodedInvoice: string;
+    amountSats?: number;
+  }): Promise<number>;
   payLightningInvoice(input: {
     invoice: string;
     maxFeeSats: number;
     amountSatsToSend?: number;
     idempotencyKey?: string;
-  }): Promise<{ preimage?: string; paymentPreimage?: string }>;
+  }): Promise<{
+    id?: string;
+    status?: string;
+    preimage?: string;
+    paymentPreimage?: string;
+  }>;
 }
 
 export function verifyPaymentPreimage(preimage: unknown, paymentHash: string): string {
@@ -41,42 +83,161 @@ export function verifyPaymentPreimage(preimage: unknown, paymentHash: string): s
   }
   return normalized;
 }
-export async function payDecodedSparkInvoice(
+export async function prepareDecodedSparkPayment(
   wallet: SparkWalletLike,
   invoice: LightningInvoiceDetails,
   requestedAmountSats?: number,
-): Promise<SparkPaymentResult> {
+): Promise<PreparedSparkPayment> {
   const amountSats = resolveInvoiceAmount(invoice, requestedAmountSats);
   const balanceData = await wallet.getBalance();
-  const balanceSats =
-    (Number(balanceData.balance) || 0) + (Number(balanceData.satsBalance?.incoming) || 0);
+  const settledBalance = Number(balanceData.balance ?? 0);
+  const incomingBalance = Number(balanceData.satsBalance?.incoming ?? 0);
+  if (
+    !Number.isSafeInteger(settledBalance) || settledBalance < 0 ||
+    !Number.isSafeInteger(incomingBalance) || incomingBalance < 0 ||
+    !Number.isSafeInteger(settledBalance + incomingBalance)
+  ) {
+    throw new Error('Spark returned an invalid Lightning balance.');
+  }
+  const balanceSats = settledBalance + incomingBalance;
   const maxFeeSats = calculateMaxLightningFee(amountSats, balanceSats);
+  let estimatedFeeSats: number | null = null;
+  if (wallet.getLightningSendFeeEstimate) {
+    estimatedFeeSats = await wallet.getLightningSendFeeEstimate({
+      encodedInvoice: invoice.invoice,
+      amountSats: invoice.amountSats === null ? amountSats : undefined,
+    });
+    if (!Number.isSafeInteger(estimatedFeeSats) || estimatedFeeSats < 0) {
+      throw new Error('Spark returned an invalid Lightning fee estimate.');
+    }
+    if (estimatedFeeSats > maxFeeSats) {
+      throw new Error(
+        'The Lightning fee estimate of ' + estimatedFeeSats +
+          ' SAT exceeds your maximum fee of ' + maxFeeSats + ' SAT.',
+      );
+    }
+  }
 
-  const result = await wallet.payLightningInvoice({
-    invoice: invoice.invoice,
-    maxFeeSats,
-    amountSatsToSend: invoice.amountSats === null ? amountSats : undefined,
-    idempotencyKey: 'opago-' + invoice.paymentHash,
-  });
-  const proof = verifyPaymentPreimage(
-    result.preimage || result.paymentPreimage,
-    invoice.paymentHash,
-  );
+  return { invoice, amountSats, maxFeeSats, estimatedFeeSats };
+}
+
+export async function prepareSparkPayment(
+  wallet: SparkWalletLike,
+  invoiceInput: string,
+  requestedAmountSats?: number,
+): Promise<PreparedSparkPayment> {
+  return prepareDecodedSparkPayment(wallet, decodeLightningInvoice(invoiceInput), requestedAmountSats);
+}
+
+export async function payPreparedSparkPayment(
+  wallet: SparkWalletLike,
+  payment: PreparedSparkPayment,
+  lifecycle?: LightningPaymentLifecycle,
+): Promise<SparkPaymentResult> {
+  const { invoice, amountSats, maxFeeSats } = payment;
+  if (invoice.expiresAt !== null && invoice.expiresAt <= Date.now()) {
+    throw new Error('The Lightning invoice has expired.');
+  }
+
+  if (lifecycle?.onPending) {
+    try {
+      await lifecycle.onPending(payment);
+    } catch (cause) {
+      if (cause instanceof Error && /already (?:being processed|paid)/i.test(cause.message)) {
+        throw new LightningPaymentPendingError(invoice.paymentHash, cause);
+      }
+      throw cause;
+    }
+  }
+
+  let result: Awaited<ReturnType<SparkWalletLike['payLightningInvoice']>>;
+  try {
+    result = await wallet.payLightningInvoice({
+      invoice: invoice.invoice,
+      maxFeeSats,
+      amountSatsToSend: invoice.amountSats === null ? amountSats : undefined,
+      idempotencyKey: 'opago-' + invoice.paymentHash,
+    });
+  } catch (cause) {
+    if (lifecycle) throw new LightningPaymentPendingError(invoice.paymentHash, cause);
+    throw cause;
+  }
+
+  const requestId = typeof result.id === 'string' && result.id ? result.id : null;
+  if (requestId) {
+    try {
+      await lifecycle?.onRequestIdentified?.(invoice.paymentHash, requestId);
+    } catch {
+      // The payment has already reached Spark. A local indexing failure must
+      // not stop proof validation or turn a successful payment into an error.
+    }
+  }
+  const status = String(result.status || '').toUpperCase();
+  if (status.includes('FAILED')) {
+    try {
+      await lifecycle?.onResolved?.(
+        invoice.paymentHash,
+        'failed',
+        status || 'LIGHTNING_PAYMENT_FAILED',
+        requestId,
+      );
+    } catch {
+      // Spark's explicit failure remains authoritative even if local activity
+      // indexing is temporarily unavailable.
+    }
+    throw new Error('The Lightning network reported that this payment failed.');
+  }
+
+  let proof: string;
+  try {
+    proof = verifyPaymentPreimage(
+      result.preimage || result.paymentPreimage,
+      invoice.paymentHash,
+    );
+  } catch (cause) {
+    if (lifecycle) throw new LightningPaymentPendingError(invoice.paymentHash, cause);
+    throw cause;
+  }
+
+  try {
+    await lifecycle?.onResolved?.(
+      invoice.paymentHash,
+      'confirmed',
+      status || 'PREIMAGE_VERIFIED',
+      requestId,
+    );
+  } catch {
+    // A matching preimage is authoritative. The persisted pending record can
+    // be reconciled later if the local resolved-state write failed.
+  }
 
   return {
     amountSats,
     paymentHash: invoice.paymentHash,
     proof,
     reference: createPaymentReference(invoice.paymentHash),
+    requestId,
   };
+}
+
+export async function payDecodedSparkInvoice(
+  wallet: SparkWalletLike,
+  invoice: LightningInvoiceDetails,
+  requestedAmountSats?: number,
+  lifecycle?: LightningPaymentLifecycle,
+): Promise<SparkPaymentResult> {
+  const prepared = await prepareDecodedSparkPayment(wallet, invoice, requestedAmountSats);
+  return payPreparedSparkPayment(wallet, prepared, lifecycle);
 }
 
 export async function paySparkInvoice(
   wallet: SparkWalletLike,
   invoiceInput: string,
   requestedAmountSats?: number,
+  lifecycle?: LightningPaymentLifecycle,
 ): Promise<SparkPaymentResult> {
-  return payDecodedSparkInvoice(wallet, decodeLightningInvoice(invoiceInput), requestedAmountSats);
+  const prepared = await prepareSparkPayment(wallet, invoiceInput, requestedAmountSats);
+  return payPreparedSparkPayment(wallet, prepared, lifecycle);
 }
 
 export function sparkTransferMatchesInvoice(
@@ -90,12 +251,16 @@ export function sparkTransferMatchesInvoice(
     transferDirection?: unknown;
     status?: unknown;
     totalValue?: unknown;
-    userRequest?: { invoice?: { paymentHash?: unknown }; status?: unknown };
+    userRequest?: {
+      invoice?: { paymentHash?: unknown };
+      status?: unknown;
+      paymentPreimage?: unknown;
+    };
   };
   const transferHash = item.userRequest?.invoice?.paymentHash;
   const isCompleted = String(item.status || '').toUpperCase().includes('COMPLETED');
   const isReceiveCompleted = String(item.userRequest?.status || '').toUpperCase().includes('PAID');
-  return (
+  const metadataMatches = (
     typeof item.id === 'string' &&
     String(item.transferDirection).toUpperCase() === 'INCOMING' &&
     (isCompleted || isReceiveCompleted) &&
@@ -103,4 +268,11 @@ export function sparkTransferMatchesInvoice(
     transferHash.toLowerCase() === paymentHash.toLowerCase() &&
     Number(item.totalValue) === amountSats
   );
+  if (!metadataMatches) return false;
+  try {
+    verifyPaymentPreimage(item.userRequest?.paymentPreimage, paymentHash);
+    return true;
+  } catch {
+    return false;
+  }
 }

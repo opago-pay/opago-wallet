@@ -25,25 +25,23 @@ import {
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { normalizeHederaTransactionIdForMirror } from '@/lib/hedera/mirror';
 import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
-import { formatTinybars } from '@/lib/hedera/payments';
+import { lightningPaymentJournal } from '@/lib/lightning/payment-journal-native';
+import { reconcileLightningPayments } from '@/lib/lightning/reconcile-native';
 import {
-  formatSolanaAssetAmount,
-  getSolanaTransactionExplorerUrl,
-  loadSolanaHistory,
-  loadSolanaTransactionStatus,
-} from '@/lib/solana';
-import { loadResilientSolanaAccount } from '@/lib/solana/account-native';
-import { openSolanaExplorerUrl } from '@/lib/solana/explorer-native';
-import { solanaPaymentJournal } from '@/lib/solana/payment-journal-native';
+  loadSparkTransfersPaginated,
+  sparkUserRequestPaymentHash,
+  type SparkTransferLike,
+} from '@/lib/lightning/spark-history';
+import { formatTinybars } from '@/lib/hedera/payments';
 import { appConfig } from '@/lib/config';
 import { calculatePortfolioEur } from '@/lib/portfolio-valuation';
 import { withTimeout } from '@/lib/promise-timeout';
+import { operationalHealth } from '@/lib/operational-health-native';
 import {
   getWalletAssetPresentation,
   walletAssetKeyFromSymbol,
   type WalletAssetKey,
 } from '@/lib/wallet-assets';
-import type { BalanceAvailability } from '@/components/send/types';
 import {
   compactWalletIdentifier,
   formatEurValue,
@@ -61,7 +59,7 @@ interface DisplayTransaction {
   timestamp: string;
   txId: string | null;
   explorerUrl?: string;
-  explorerLabel?: 'HashScan' | 'Solana Explorer';
+  explorerLabel?: 'HashScan';
 }
 
 interface SparkBalanceResult {
@@ -69,34 +67,11 @@ interface SparkBalanceResult {
   satsBalance?: { incoming?: unknown };
 }
 
-interface SparkTransferResult {
-  transfers?: {
-    id?: unknown;
-    status?: unknown;
-    totalValue?: unknown;
-    transferDirection?: unknown;
-    createdTime?: string | number;
-    userRequest?: { invoice?: { paymentHash?: unknown } };
-  }[];
-}
-
-function formatDashboardSolanaBalance(
-  amount: bigint,
-  asset: 'SOL' | 'USDC',
-  availability: BalanceAvailability,
-): string {
-  if (availability === 'loading') return 'Loading...';
-  if (availability === 'unavailable') return 'Unavailable';
-  const value = formatSolanaAssetAmount(amount, asset) + ' ' + asset;
-  return availability === 'stale' ? value + ' · last known' : value;
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const {
     walletReady,
     sparkWallet,
-    solanaKeypair,
     hederaAccount,
     loadOrGenerateWallet,
     refreshHederaAccount,
@@ -106,20 +81,15 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [balances, setBalances] = useState({
     spark: 0,
-    solLamports: 0n,
-    usdcBaseUnits: 0n,
     hbarTinybars: 0n,
   });
-  const [solanaAvailability, setSolanaAvailability] = useState<{
-    SOL: BalanceAvailability;
-    USDC: BalanceAvailability;
-  }>({ SOL: 'loading', USDC: 'loading' });
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+  const [activityDisplayLimit, setActivityDisplayLimit] = useState(20);
   const [loadError, setLoadError] = useState<string | null>(null);
   const refreshAfterInitializationRef = useRef(false);
   const refreshInProgressRef = useRef(false);
 
-  const refresh = useCallback(async (forceNetwork = false) => {
+  const refresh = useCallback(async () => {
     if (!walletReady) {
       refreshAfterInitializationRef.current = true;
       try {
@@ -160,28 +130,6 @@ export default function HomeScreen() {
         );
       }
 
-      const appendSolanaJournal = (
-        records: Awaited<ReturnType<typeof solanaPaymentJournal.list>>,
-      ) => remote.push(...records.map(item => ({
-          key: 'solana:' + item.signature,
-          txId: item.signature,
-          type: 'outgoing' as const,
-          amountDisplay: formatSolanaAssetAmount(BigInt(item.amountBaseUnits), item.asset),
-          asset: item.asset,
-          status: item.state,
-          timestamp: item.createdAt,
-          explorerUrl: getSolanaTransactionExplorerUrl(item.signature),
-          explorerLabel: 'Solana Explorer' as const,
-        })));
-      try {
-        appendSolanaJournal(await solanaPaymentJournal.list());
-      } catch (cause) {
-        remoteErrors.push(
-          'Solana journal: ' +
-            (cause instanceof Error ? cause.message : 'Local payment state could not be loaded.'),
-        );
-      }
-
       try {
         const account = await refreshHederaAccount();
         setBalances(current => ({
@@ -213,16 +161,22 @@ export default function HomeScreen() {
 
       const refreshLightning = async () => {
         if (!sparkWallet) return;
-        const [balanceResult, transferResult] = await Promise.allSettled([
+        const lightningHistory = loadSparkTransfersPaginated(sparkWallet, 500, 50);
+        const [balanceResult, transferResult, journalResult] = await Promise.allSettled([
           withTimeout(
             sparkWallet.getBalance() as Promise<SparkBalanceResult>,
             OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
             'Lightning balance refresh timed out.',
           ),
           withTimeout(
-            sparkWallet.getTransfers(20, 0) as Promise<SparkTransferResult>,
+            lightningHistory,
             OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
             'Lightning history refresh timed out.',
+          ),
+          withTimeout(
+            reconcileLightningPayments(sparkWallet, lightningHistory),
+            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Lightning payment reconciliation timed out.',
           ),
         ]);
         if (balanceResult.status === 'fulfilled') {
@@ -239,15 +193,51 @@ export default function HomeScreen() {
                 : 'Wallet balance could not be loaded.'),
           );
         }
+        if (journalResult.status === 'fulfilled') {
+          for (const item of journalResult.value) {
+            remote.push({
+              key: 'ln:' + item.paymentHash,
+              txId: 'ln:' + item.paymentHash,
+              type: 'outgoing',
+              amountDisplay: item.amountSats.toLocaleString(),
+              asset: 'SAT',
+              status: item.state,
+              timestamp: item.createdAt,
+            });
+          }
+        } else {
+          try {
+            const records = await lightningPaymentJournal.list();
+            for (const item of records) {
+              remote.push({
+                key: 'ln:' + item.paymentHash,
+                txId: 'ln:' + item.paymentHash,
+                type: 'outgoing',
+                amountDisplay: item.amountSats.toLocaleString(),
+                asset: 'SAT',
+                status: item.state,
+                timestamp: item.createdAt,
+              });
+            }
+          } catch {
+            // The journal error below remains visible without hiding other wallet data.
+          }
+          remoteErrors.push(
+            'Lightning payments: ' +
+              (journalResult.reason instanceof Error
+                ? journalResult.reason.message
+                : 'Payment status could not be reconciled.'),
+          );
+        }
         if (transferResult.status === 'fulfilled') {
-          for (const transfer of transferResult.value.transfers || []) {
+          for (const transfer of transferResult.value as SparkTransferLike[]) {
             const status = String(transfer.status || '').toUpperCase();
             if (!status.includes('COMPLETED')) continue;
             const amount = Math.abs(Number(transfer.totalValue) || 0);
             if (amount <= 0) continue;
-            const paymentHash = String(transfer.userRequest?.invoice?.paymentHash || '');
-            const key = /^[a-f0-9]{64}$/i.test(paymentHash)
-              ? 'ln:' + paymentHash.toLowerCase()
+            const paymentHash = sparkUserRequestPaymentHash(transfer.userRequest);
+            const key = paymentHash
+              ? 'ln:' + paymentHash
               : 'spark:' + String(transfer.id || 'unknown');
             remote.push({
               key,
@@ -269,97 +259,33 @@ export default function HomeScreen() {
                 : 'Wallet history could not be loaded.'),
           );
         }
-      };
 
-      const refreshSolana = async () => {
-        if (!solanaKeypair) return;
-        const [accountResult, historyResult, journalResult] = await Promise.allSettled([
-          withTimeout(
-            loadResilientSolanaAccount(solanaKeypair.publicKey, {
-              forceRefresh: forceNetwork,
-            }),
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Solana balance refresh timed out.',
-          ),
-          withTimeout(
-            loadSolanaHistory(solanaKeypair.publicKey),
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Solana history refresh timed out.',
-          ),
-          withTimeout(
-            solanaPaymentJournal.reconcile(loadSolanaTransactionStatus),
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Solana payment reconciliation timed out.',
-          ),
-        ]);
-        if (accountResult.status === 'fulfilled') {
-          const solanaAccount = accountResult.value;
-          setSolanaAvailability(solanaAccount.availability);
-          setBalances(current => ({
-            ...current,
-            solLamports: solanaAccount.availability.SOL === 'unavailable'
-              ? current.solLamports
-              : solanaAccount.balanceLamports,
-            usdcBaseUnits: solanaAccount.availability.USDC === 'unavailable'
-              ? current.usdcBaseUnits
-              : solanaAccount.usdcBaseUnits,
-          }));
-          remoteErrors.push(...solanaAccount.warnings);
-        } else {
-          setSolanaAvailability(current => ({
-            SOL: current.SOL === 'loading' ? 'unavailable' : current.SOL,
-            USDC: current.USDC === 'loading' ? 'unavailable' : current.USDC,
-          }));
-          remoteErrors.push(
-            'Solana balance: ' +
-              (accountResult.reason instanceof Error
-                ? accountResult.reason.message
-                : 'Wallet balance could not be loaded.'),
-          );
-        }
-        if (journalResult.status === 'fulfilled') {
-          appendSolanaJournal(journalResult.value);
-        } else {
-          remoteErrors.push(
-            'Solana payment state: ' +
-              (journalResult.reason instanceof Error
-                ? journalResult.reason.message
-                : 'Payment state could not be reconciled.'),
-          );
-        }
-        if (historyResult.status === 'fulfilled') {
-          remote.push(...historyResult.value.map(item => ({
-            key: 'solana:' + item.signature,
-            txId: item.signature,
-            type: item.type,
-            amountDisplay: item.amountDisplay,
-            asset: item.asset,
-            status: item.status,
-            timestamp: item.occurredAt,
-            explorerUrl: item.explorerUrl,
-            explorerLabel: 'Solana Explorer' as const,
-          })));
-        } else {
-          remoteErrors.push(
-            'Solana history: ' +
-              (historyResult.reason instanceof Error
-                ? historyResult.reason.message
-                : 'Wallet history could not be loaded.'),
-          );
+        const lightningFailures = [balanceResult, transferResult, journalResult]
+          .filter(result => result.status === 'rejected') as PromiseRejectedResult[];
+        try {
+          if (lightningFailures.length > 0) {
+            await operationalHealth.recordFailure('lightning', lightningFailures[0].reason);
+          } else {
+            await operationalHealth.recordSuccess('lightning');
+          }
+        } catch {
+          // Diagnostics are best-effort and must not break wallet refresh.
         }
       };
 
-      await Promise.all([refreshLightning(), refreshSolana()]);
+      await refreshLightning();
 
-      const localDisplay = local.map((item: LocalTransaction): DisplayTransaction => ({
-        key: item.txId || 'local:' + item.id,
-        txId: item.txId,
-        type: item.type,
-        amountDisplay: item.amount.toLocaleString(),
-        asset: item.asset,
-        status: item.status,
-        timestamp: item.timestamp,
-      }));
+      const localDisplay = local
+        .filter(item => item.asset === 'SAT' || item.asset === 'HBAR')
+        .map((item: LocalTransaction): DisplayTransaction => ({
+          key: item.txId || 'local:' + item.id,
+          txId: item.txId,
+          type: item.type,
+          amountDisplay: item.amount.toLocaleString(),
+          asset: item.asset,
+          status: item.status,
+          timestamp: item.timestamp,
+        }));
       setTransactions(current => {
         const byId = new Map<string, DisplayTransaction>();
         if (remoteErrors.length) {
@@ -372,7 +298,7 @@ export default function HomeScreen() {
         }
         return Array.from(byId.values()).sort(
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-        ).slice(0, 100);
+        ).slice(0, 500);
       });
       setLoadError(remoteErrors.length ? remoteErrors.join(' ') : null);
     } catch (cause) {
@@ -384,7 +310,6 @@ export default function HomeScreen() {
   }, [
     loadOrGenerateWallet,
     refreshHederaAccount,
-    solanaKeypair,
     sparkWallet,
     walletReady,
   ]);
@@ -409,7 +334,7 @@ export default function HomeScreen() {
       } catch {
         // Refresh must remain available if haptics are unavailable on a device.
       }
-      await refresh(true);
+      await refresh();
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
@@ -423,20 +348,10 @@ export default function HomeScreen() {
     Alert.alert('Copied', 'Hedera ' + appConfig.hederaNetwork + ' account ID copied.');
   }
 
-  async function copySolanaAddress() {
-    if (!solanaKeypair) return;
-    await Clipboard.setStringAsync(solanaKeypair.publicKey.toBase58());
-    Alert.alert('Copied', 'Solana wallet address copied.');
-  }
-
   async function openTransaction(transaction: DisplayTransaction) {
     if (!transaction.explorerUrl) return;
     try {
-      if (transaction.explorerLabel === 'Solana Explorer') {
-        await openSolanaExplorerUrl(transaction.explorerUrl);
-      } else {
-        await openHederaExplorerUrl(transaction.explorerUrl);
-      }
+      await openHederaExplorerUrl(transaction.explorerUrl);
     } catch (cause) {
       Alert.alert(
         'Could not open explorer',
@@ -445,21 +360,13 @@ export default function HomeScreen() {
     }
   }
 
-  const totalEur =
-    solanaAvailability.SOL !== 'loading' &&
-    solanaAvailability.SOL !== 'unavailable' &&
-    solanaAvailability.USDC !== 'loading' &&
-    solanaAvailability.USDC !== 'unavailable'
-      ? calculatePortfolioEur(
-          {
-            sparkSats: balances.spark,
-            solLamports: balances.solLamports,
-            usdcBaseUnits: balances.usdcBaseUnits,
-            hbarTinybars: balances.hbarTinybars,
-          },
-          rates,
-        )
-      : null;
+  const totalEur = calculatePortfolioEur(
+    {
+      sparkSats: balances.spark,
+      hbarTinybars: balances.hbarTinybars,
+    },
+    rates,
+  );
 
   return (
     <ScrollView
@@ -488,7 +395,7 @@ export default function HomeScreen() {
           {appConfig.isMainnet
             ? 'Based on current market prices.'
             : appConfig.isHederaMainnet
-              ? 'Your HBAR is live. Demo assets are marked below.'
+              ? 'Your HBAR is live. Bitcoin remains in test mode.'
               : 'Demo balance based on current market prices.'}
         </Text>
       </View>
@@ -517,7 +424,7 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.statusText}>
               {appConfig.isHederaMainnet
-                ? 'Bitcoin, Solana and USDC are still for testing.'
+                 ? 'Bitcoin is still in test mode.'
                 : 'All assets are for testing only.'}
             </Text>
           </View>
@@ -531,26 +438,6 @@ export default function HomeScreen() {
 
       <View style={styles.assetList}>
         <BalanceCard asset="lightning" value={balances.spark.toLocaleString() + ' SAT'} />
-        <BalanceCard
-          asset="solana"
-          value={formatDashboardSolanaBalance(
-            balances.solLamports,
-            'SOL',
-            solanaAvailability.SOL,
-          )}
-          identifier={solanaKeypair?.publicKey.toBase58()}
-          onCopy={solanaKeypair ? () => void copySolanaAddress() : undefined}
-        />
-        <BalanceCard
-          asset="usdc"
-          value={formatDashboardSolanaBalance(
-            balances.usdcBaseUnits,
-            'USDC',
-            solanaAvailability.USDC,
-          )}
-          identifier={solanaKeypair?.publicKey.toBase58()}
-          onCopy={solanaKeypair ? () => void copySolanaAddress() : undefined}
-        />
         <BalanceCard
           asset="hedera"
           value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
@@ -570,7 +457,15 @@ export default function HomeScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent activity</Text>
-        {transactions.length > 0 && <Text style={styles.sectionMeta}>See all</Text>}
+        {transactions.length > activityDisplayLimit && (
+          <TouchableOpacity
+            onPress={() => setActivityDisplayLimit(limit => Math.min(limit + 20, 500))}
+            accessibilityRole="button"
+            accessibilityLabel="Load earlier payments"
+          >
+            <Text style={styles.sectionMeta}>Load earlier</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {loading && transactions.length === 0 ? (
         <ActivityIndicator color="#ffb000" />
@@ -581,7 +476,7 @@ export default function HomeScreen() {
           <Text style={styles.emptyText}>Payments you send or receive will appear here.</Text>
         </View>
       ) : (
-        transactions.map(transaction => {
+        transactions.slice(0, activityDisplayLimit).map(transaction => {
           const friendlyStatus = friendlyPaymentStatus(transaction.status);
           return (
           <TouchableOpacity

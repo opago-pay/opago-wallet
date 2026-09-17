@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -18,10 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Text as SvgText } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
+import { operationalHealth } from '@/lib/operational-health-native';
+import type { ServiceHealthRecord } from '@/lib/operational-health';
 
 function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
   usePreventScreenCapture('opago-recovery-phrase');
@@ -79,8 +81,8 @@ function selectBackupChallengePositions(wordCount: number): number[] {
   if (wordCount < 3) throw new Error('Recovery phrase is incomplete.');
   const available = Array.from({ length: wordCount }, (_, index) => index);
   for (let index = available.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [available[index], available[swapIndex]] = [available[swapIndex], available[index]];
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [available[index], available[randomIndex]] = [available[randomIndex], available[index]];
   }
   return available.slice(0, 3).sort((left, right) => left - right);
 }
@@ -99,6 +101,21 @@ export default function SettingsScreen() {
   const [backupWordInput, setBackupWordInput] = useState('');
   const [backupChallengeError, setBackupChallengeError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [lightningHealth, setLightningHealth] = useState<ServiceHealthRecord | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void operationalHealth.get('lightning')
+      .then(record => {
+        if (active) setLightningHealth(record);
+      })
+      .catch(() => {
+        if (active) setLightningHealth(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []));
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -241,7 +258,7 @@ export default function SettingsScreen() {
     }
     Alert.alert(
       'Delete wallet from this device?',
-      'Make sure the recovery phrase is backed up. This removes local keys, history and swap caches.',
+      'Make sure the recovery phrase is backed up. This removes local keys and payment history.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -278,7 +295,7 @@ export default function SettingsScreen() {
           {appConfig.isMainnet
             ? 'This wallet can send real funds. Always check every payment before confirming.'
             : appConfig.isHederaMainnet
-              ? 'HBAR uses Mainnet. Bitcoin, Solana and USDC are clearly marked as demo assets.'
+              ? 'HBAR uses Mainnet. Bitcoin is clearly marked as a demo asset.'
               : 'All assets in this version are for testing only.'}
         </Text>
       </View>
@@ -298,6 +315,14 @@ export default function SettingsScreen() {
 
       {showAdvanced && (
         <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>Lightning service status</Text>
+          <Text style={styles.sectionSubtitle}>
+            {!lightningHealth?.lastSuccessAt && !lightningHealth?.lastFailureAt
+              ? 'No local health check has run yet.'
+              : lightningHealth.consecutiveFailures > 0
+                ? `Needs attention · ${lightningHealth.lastErrorCategory || 'unknown'} connection issue`
+                : 'Available · last wallet refresh succeeded'}
+          </Text>
           <Text style={styles.sectionTitle}>
             Hedera {appConfig.hederaNetwork} public key
           </Text>

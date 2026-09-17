@@ -15,8 +15,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
-import { appConfig } from '@/lib/config';
-import { useLoginWithOAuth } from '@privy-io/expo';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { Image } from 'expo-image';
 import { validateMnemonic } from 'bip39';
@@ -26,27 +24,6 @@ const { width, height } = Dimensions.get('window');
 function RecoveryInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-input');
   return null;
-}
-
-function OAuthLoginButton({
-  disabled,
-  onSuccess,
-}: {
-  disabled: boolean;
-  onSuccess: () => Promise<void>;
-}) {
-  const { login } = useLoginWithOAuth({ onSuccess });
-
-  return (
-    <TouchableOpacity
-      style={styles.button}
-      onPress={() => login({ provider: 'google' })}
-      disabled={disabled}
-    >
-      <Text style={styles.providerIcon}>G</Text>
-      <Text style={styles.darkButtonText}>Continue with Google</Text>
-    </TouchableOpacity>
-  );
 }
 
 export default function LoginScreen() {
@@ -187,12 +164,6 @@ export default function LoginScreen() {
                   <Text style={styles.cardDesc}>
                     Create a secure wallet on this device or restore one you already have.
                   </Text>
-                  {appConfig.importSolanaKeyToPrivy && (
-                    <OAuthLoginButton
-                      disabled={loading}
-                      onSuccess={() => runWalletAction(loadOrGenerateWallet)}
-                    />
-                  )}
                   <TouchableOpacity
                     style={[styles.button, styles.localButton]}
                     onPress={() => void runWalletAction(loadOrGenerateWallet)}
@@ -319,8 +290,6 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#333' },
   localButton: { backgroundColor: '#6b5cc3' },
   buttonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  darkButtonText: { fontSize: 17, fontWeight: '700', color: '#111' },
-  providerIcon: { position: 'absolute', left: 20, fontSize: 20, fontWeight: '800' },
   restoreLink: { marginTop: 12, alignItems: 'center' },
   restoreText: { color: '#8f7de8', fontWeight: 'bold' },
   loading: { marginTop: 24, alignItems: 'center' },

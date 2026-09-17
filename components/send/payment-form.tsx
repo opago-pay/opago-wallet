@@ -5,23 +5,11 @@ import { AssetIcon } from '@/components/ui/asset-icon';
 import { appConfig } from '@/lib/config';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { HEDERA_NETWORK, HEDERA_NETWORK_BADGE } from '@/lib/hedera/config';
-import { formatSolanaAssetAmount } from '@/lib/solana/amounts';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];
-
-function solanaBalanceLabel(
-  amount: bigint,
-  asset: 'SOL' | 'USDC',
-  availability: WalletBalances['solAvailability'],
-): string {
-  if (availability === 'loading') return 'Loading...';
-  if (availability === 'unavailable') return 'Unavailable';
-  const value = formatSolanaAssetAmount(amount, asset) + ' ' + asset;
-  return availability === 'stale' ? value + ' · last known' : value;
-}
 
 export function PaymentForm(props: {
   destination: string;
@@ -42,27 +30,8 @@ export function PaymentForm(props: {
   onReview(): void;
 }) {
   const isHedera = props.source === 'hedera';
-  const isNativeSolana = props.source === 'solana' || props.source === 'usdc';
   const sources: { source: PaymentSource; asset: WalletAssetKey; balance: string }[] = [
     { source: 'spark', asset: 'lightning', balance: props.balances.spark + ' SAT' },
-    {
-      source: 'solana',
-      asset: 'solana',
-      balance: solanaBalanceLabel(
-        props.balances.solLamports,
-        'SOL',
-        props.balances.solAvailability,
-      ),
-    },
-    {
-      source: 'usdc',
-      asset: 'usdc',
-      balance: solanaBalanceLabel(
-        props.balances.usdcBaseUnits,
-        'USDC',
-        props.balances.usdcAvailability,
-      ),
-    },
     { source: 'hedera', asset: 'hedera', balance: formatTinybars(props.balances.hbarTinybars) + ' HBAR' },
   ];
   const selectedSource = sources.find(item => item.source === props.source)!;
@@ -85,7 +54,7 @@ export function PaymentForm(props: {
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
-      {props.sourceSelected && !appConfig.isMainnet && !isHedera && !isNativeSolana && (
+      {props.sourceSelected && !appConfig.isMainnet && !isHedera && (
         <View style={styles.modeNotice}>
           <View style={styles.modeNoticeIcon}>
             <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
@@ -120,19 +89,6 @@ export function PaymentForm(props: {
       {props.balanceError && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>Some balances may be out of date. Please try again.</Text>
-        </View>
-      )}
-      {props.sourceSelected && isNativeSolana && !appConfig.isMainnet && (
-        <View style={styles.modeNotice}>
-          <View style={styles.modeNoticeIcon}>
-            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
-          </View>
-          <View style={styles.modeNoticeCopy}>
-            <Text style={styles.modeNoticeTitle}>
-              {props.source === 'usdc' ? 'USDC' : 'Solana'} · DEVNET
-            </Text>
-            <Text style={styles.modeNoticeText}>Test payments only — no real value.</Text>
-          </View>
         </View>
       )}
       <View style={styles.card}>
@@ -207,9 +163,7 @@ export function PaymentForm(props: {
                 placeholder={
                   isHedera
                     ? 'Scan a payment code or enter an account'
-                    : isNativeSolana
-                      ? 'Scan a payment code or enter an address'
-                      : 'Scan or paste a Lightning request'
+                  : 'Scan or paste a Lightning request'
                 }
                 placeholderTextColor="#666"
                 value={props.destination}
@@ -232,20 +186,14 @@ export function PaymentForm(props: {
             <TextInput
               style={styles.input}
               placeholder={
-                isHedera
-                  ? 'HBAR'
-                  : props.source === 'solana'
-                    ? 'SOL'
-                    : props.source === 'usdc'
-                      ? 'USDC'
-                      : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
+                isHedera ? 'HBAR' : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
               }
               placeholderTextColor="#666"
               value={props.amountInput}
               onChangeText={props.onAmountChange}
               keyboardType="decimal-pad"
             />
-            {!isHedera && !isNativeSolana && (
+            {!isHedera && (
               <View style={styles.row}>
                 {CURRENCIES.map(item => (
                   <TouchableOpacity

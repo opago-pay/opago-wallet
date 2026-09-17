@@ -4,49 +4,20 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { PublicKey } = require('@solana/web3.js');
 require('./register-typescript.cjs');
 
 const {
   deriveHederaPrivateKey,
-  deriveSolanaKeypair,
   HEDERA_DERIVATION_PATH,
   HEDERA_KEY_ALGORITHM,
   HEDERA_KEY_DERIVATION,
   HEDERA_KEY_DERIVATION_VERSION,
   recoveryPhraseMatchesHederaPublicKey,
-  SOLANA_DERIVATION_PATH,
 } = require('../lib/wallet-keys.ts');
-const {
-  getNativeTransferDeltaLamports,
-  SOLANA_GENESIS_HASHES,
-} = require('../lib/solana.ts');
 
 const MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
-const EXPECTED_ADDRESS = 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk';
 const EXPECTED_HEDERA_PUBLIC_KEY =
   '793af21fd5a0a7cc1076195263717fab12600496dfc7ad49e902acdd0bf22331';
-
-test('pins the complete Solana mainnet and devnet genesis hashes', () => {
-  assert.equal(
-    SOLANA_GENESIS_HASHES.mainnet,
-    '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
-  );
-  assert.equal(
-    SOLANA_GENESIS_HASHES.devnet,
-    'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
-  );
-});
-
-test('derives the documented Solana account deterministically from BIP39', () => {
-  assert.equal(SOLANA_DERIVATION_PATH, "m/44'/501'/0'/0'");
-  assert.equal(deriveSolanaKeypair(MNEMONIC).publicKey.toBase58(), EXPECTED_ADDRESS);
-  assert.equal(
-    deriveSolanaKeypair('  ' + MNEMONIC.toUpperCase().replaceAll(' ', '   ') + '  ').publicKey.toBase58(),
-    EXPECTED_ADDRESS,
-  );
-  assert.throws(() => deriveSolanaKeypair('not a recovery phrase'), /valid BIP39/i);
-});
 
 test('derives the documented Hedera Ed25519 account deterministically from BIP39', () => {
   assert.equal(HEDERA_DERIVATION_PATH, "m/44'/3030'/0'/0'");
@@ -132,13 +103,13 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     'utf8',
   );
   const walletReadyIndex = source.indexOf('setWalletReady(true);');
-  const sparkStartupIndex = source.indexOf('void initializeSparkWallet(mnemonic)');
+  const sparkStartupIndex = source.indexOf('void retryWithBackoff(');
 
   assert.ok(walletReadyIndex >= 0, 'wallet readiness assignment is missing');
   assert.ok(sparkStartupIndex >= 0, 'background Spark startup is missing');
   assert.ok(
     walletReadyIndex < sparkStartupIndex,
-    'optional Spark startup must happen after Hedera and Solana are ready',
+    'optional Spark startup must happen after Hedera is ready',
   );
   assert.match(source, /const initializationGenerationRef = useRef\(0\)/);
   assert.match(
@@ -146,25 +117,17 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     /if \(initializationGenerationRef\.current !== generation\) return;/,
   );
   assert.match(source, /Lightning wallet unavailable:/);
+  assert.match(source, /maxAttempts: 3/);
 });
 
-test('does not mount the Privy OAuth hook in a local-wallet build', () => {
+test('keeps wallet creation local and free of external identity providers', () => {
   const source = readFileSync(
     path.join(__dirname, '..', 'app', '(auth)', 'login.tsx'),
     'utf8',
   );
-  const loginScreen = source.slice(
-    source.indexOf('export default function LoginScreen'),
-    source.indexOf('const styles = StyleSheet.create'),
-  );
-
-  assert.match(source, /function OAuthLoginButton/);
-  assert.match(source, /const \{ login \} = useLoginWithOAuth\(\{ onSuccess \}\)/);
-  assert.doesNotMatch(loginScreen, /useLoginWithOAuth\(/);
-  assert.match(
-    loginScreen,
-    /appConfig\.importSolanaKeyToPrivy && \(\s*<OAuthLoginButton/,
-  );
+  assert.doesNotMatch(source, /OAuth|external identity provider|Google/);
+  assert.match(source, /Create a new wallet/);
+  assert.match(source, /I already have a wallet/);
 });
 
 test('keeps recovery entry visible above the keyboard and blocks capture', () => {
@@ -192,7 +155,6 @@ test('pauses receive polling off-screen and backs off after transient failures',
   assert.match(source, /AppState\.addEventListener\('change'/);
   assert.match(source, /const pollingEnabled = isFocused && appIsActive/);
   assert.match(source, /exponentialBackoffDelay\(/);
-  assert.match(source, /if \(!solanaRequest\) return;/);
   assert.match(source, /hederaKnownTransactions\.current !== null && !hederaRequest/);
 });
 
@@ -203,39 +165,11 @@ test('bounds optional dashboard services and always releases pull-to-refresh', (
   );
 
   assert.match(source, /OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000/);
-  assert.match(source, /await Promise\.all\(\[refreshLightning\(\), refreshSolana\(\)\]\)/);
+  assert.match(source, /await refreshLightning\(\)/);
   assert.match(source, /Promise\.allSettled\(/);
-  assert.match(source, /loadResilientSolanaAccount/);
   assert.match(source, /refreshInProgressRef/);
   assert.match(
     source,
-    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(true\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
   );
-});
-
-test('counts only parsed system transfers involving the wallet', () => {
-  const wallet = new PublicKey(EXPECTED_ADDRESS);
-  const other = '11111111111111111111111111111111';
-  const transaction = {
-    transaction: {
-      message: {
-        instructions: [
-          { program: 'system', parsed: { type: 'transfer', info: { source: other, destination: EXPECTED_ADDRESS, lamports: 1_000_000 } } },
-          { program: 'system', parsed: { type: 'transfer', info: { source: EXPECTED_ADDRESS, destination: other, lamports: 250_000 } } },
-          { program: 'spl-token', parsed: { type: 'transfer', info: { source: other, destination: EXPECTED_ADDRESS, lamports: 9_000_000 } } },
-        ],
-      },
-    },
-    meta: {
-      innerInstructions: [{
-        instructions: [
-          { program: 'system', parsed: { type: 'transferChecked', info: { source: other, destination: EXPECTED_ADDRESS, lamports: 500_000 } } },
-          { program: 'system', parsed: { type: 'transfer', info: { source: other, destination: EXPECTED_ADDRESS, lamports: -1 } } },
-        ],
-      }],
-    },
-  };
-
-  assert.equal(getNativeTransferDeltaLamports(transaction, wallet), 1_250_000n);
-  assert.equal(getNativeTransferDeltaLamports({ transaction: {} }, wallet), 0n);
 });
