@@ -119,7 +119,7 @@ test('rejects a Mirror Node endpoint for the wrong Hedera network', () => {
   );
 });
 
-test('requires a human-approved cap and pinned contract evidence for Mainnet', () => {
+test('requires an explicit transfer policy and pinned contract evidence for Mainnet', () => {
   const base = {
     network: 'mainnet',
     buildProfile: 'mainnet',

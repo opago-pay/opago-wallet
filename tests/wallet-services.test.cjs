@@ -60,20 +60,15 @@ test('verifies a recovery phrase against the exact Hedera public key', () => {
   assert.equal(recoveryPhraseMatchesHederaPublicKey(MNEMONIC, 'not-a-public-key'), false);
 });
 
-test('keeps a revealed recovery phrase out of the accessibility tree', () => {
-  const source = readFileSync(
-    path.join(__dirname, '..', 'app', '(tabs)', 'settings.tsx'),
-    'utf8',
-  );
-  assert.equal(
-    source.match(/importantForAccessibility="no-hide-descendants"/g)?.length,
-    2,
-  );
-  assert.match(source, /collapsable=\{false\}/);
-  assert.match(source, /accessibilityElementsHidden/);
-  assert.match(source, /<SvgText/);
-  assert.doesNotMatch(source, /<Text[^>]*>\s*\{phrase\}/);
-  assert.match(source, /Recovery phrase revealed\. Tap to hide\./);
+test('reveals readable recovery words individually to accessibility only after explicit reveal', () => {
+  const source = readFileSync(path.join(__dirname, '..', 'app', '(tabs)', 'settings.tsx'), 'utf8');
+  const phrase = readFileSync(path.join(__dirname, '..', 'components', 'security', 'recovery-phrase.tsx'), 'utf8');
+  assert.match(source, /isRevealed && mnemonic &&/);
+  assert.match(source, /walletSession.capture\(\)/);
+  assert.match(phrase, /usePreventScreenCapture\('opago-recovery-phrase'\)/);
+  assert.match(phrase, /accessibilityLabel=\{t\('Word \{number\}, \{word\}', \{ number: index \+ 1, word \}\)\}/);
+  assert.match(phrase, /fontScale > 1\.2/);
+  assert.doesNotMatch(phrase, /SvgText|no-hide-descendants|allowFontScaling=\{false\}/);
   assert.doesNotMatch(source, /accessibilityLabel=\{(?:mnemonic|phrase)\}/);
 });
 
@@ -92,9 +87,11 @@ test('requires local recovery verification before deleting wallet keys', () => {
   assert.match(source, /setBackupWordInput\(''\)/);
   assert.match(source, /KeyboardAvoidingView/);
   assert.match(source, /Check my backup/);
-  assert.match(source, /disabled=\{isDeleting \|\| !backupVerified\}/);
-  assert.match(source, /if \(!backupVerified\)/);
-  assert.match(source, /Deletion is unlocked only for this app session\./);
+  assert.doesNotMatch(source, /disabled=\{isDeleting \|\| !backupVerified\}/);
+  assert.match(source, /if \(!deletionVerified\)/);
+  assert.match(source, /const backupChecked = backupStatus === 'verified'/);
+  assert.doesNotMatch(source, /Deletion is unlocked only|restore your old wallet/);
+  assert.match(source, /performReset\(assertAuthorized\)/);
 });
 
 test('does not block Hedera wallet readiness on optional Spark startup', () => {
@@ -103,7 +100,7 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     'utf8',
   );
   const walletReadyIndex = source.indexOf('setWalletReady(true);');
-  const sparkStartupIndex = source.indexOf('void retryWithBackoff(');
+  const sparkStartupIndex = source.indexOf('void sparkResource.current.initialize(');
 
   assert.ok(walletReadyIndex >= 0, 'wallet readiness assignment is missing');
   assert.ok(sparkStartupIndex >= 0, 'background Spark startup is missing');
@@ -140,9 +137,14 @@ test('keeps recovery entry visible above the keyboard and blocks capture', () =>
   assert.match(source, /isRestoring && <RecoveryInputScreenCaptureGuard/);
   assert.match(source, /<KeyboardAvoidingView/);
   assert.match(source, /keyboardShouldPersistTaps="handled"/);
-  assert.match(source, /textAlignVertical="top"/);
-  assert.match(source, /\{recoveryWordCount\} words entered/);
-  assert.match(source, /setMnemonicInput\(''\);\s*setIsRestoring\(false\);/);
+  assert.match(source, /isRestoring \? \(\s*<RecoveryForm/);
+  assert.match(source, /AppState\.addEventListener\('change'/);
+  assert.match(source, /setIsRestoring\(false\)/);
+  const form = readFileSync(path.join(__dirname, '..', 'components', 'onboarding', 'recovery-form.tsx'), 'utf8');
+  assert.match(form, /autoCorrect=\{false\}/);
+  assert.match(form, /importantForAutofill="no"/);
+  assert.match(form, /'visible-password'/);
+  assert.match(form, /submitBehavior="submit"/);
 });
 
 test('pauses receive polling off-screen and backs off after transient failures', () => {
@@ -165,11 +167,11 @@ test('bounds optional dashboard services and always releases pull-to-refresh', (
   );
 
   assert.match(source, /OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000/);
-  assert.match(source, /await refreshLightning\(\)/);
-  assert.match(source, /Promise\.allSettled\(/);
+  assert.match(source, /refreshProgressively<DisplayTransaction>/);
+  assert.match(source, /generation !== refreshGenerationRef.current/);
   assert.match(source, /refreshInProgressRef/);
   assert.match(
     source,
-    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refreshBalances\(\);\s*await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
   );
 });

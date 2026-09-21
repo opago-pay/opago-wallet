@@ -1,6 +1,7 @@
 import { bech32 } from 'bech32';
 import { fetchJson } from './http';
 import { assertSafeRemoteUrl } from './config';
+import { requireIdentityPayments } from './product-capabilities';
 
 export interface LNURLPResponse {
   callback: string;
@@ -13,12 +14,16 @@ export interface LNURLPResponse {
 }
 
 function validateLNURLResponse(data: LNURLPResponse): LNURLPResponse {
+  if (data.compliance?.isSubjectToTravelRule || Object.values(data.payerData || {}).some(field => field?.mandatory)) {
+    requireIdentityPayments();
+  }
   if (
     data.tag !== 'payRequest' ||
-    !Number.isFinite(data.minSendable) ||
-    !Number.isFinite(data.maxSendable) ||
+    !Number.isSafeInteger(data.minSendable) ||
+    !Number.isSafeInteger(data.maxSendable) ||
     data.minSendable <= 0 ||
-    data.maxSendable < data.minSendable
+    data.maxSendable < data.minSendable ||
+    Math.floor(data.maxSendable / 1000) < Math.ceil(data.minSendable / 1000)
   ) {
     throw new Error('LNURL endpoint returned invalid payment limits.');
   }
@@ -58,13 +63,14 @@ export async function fetchInvoiceFromLNURLP(
   amountSat: number,
   payerData?: Record<string, unknown>,
 ): Promise<string> {
-  if (!Number.isSafeInteger(amountSat) || amountSat <= 0) {
+  if (payerData) requireIdentityPayments();
+  if (!Number.isSafeInteger(amountSat) || amountSat <= 0 || !Number.isSafeInteger(amountSat * 1000)) {
     throw new Error('LNURL amount must be a positive whole number of satoshis.');
   }
   const callback = assertSafeRemoteUrl(callbackUrl, 'LNURL callback');
   callback.searchParams.set('amount', String(amountSat * 1000));
   callback.searchParams.set('nonce', String(Date.now()));
-  if (payerData) callback.searchParams.set('payerdata', JSON.stringify(payerData));
+  if (callback.searchParams.has('payerdata')) throw new Error('Identity data in payment URLs is not supported.');
 
   const data = await fetchJson<{ pr?: string }>(
     callback.toString(),

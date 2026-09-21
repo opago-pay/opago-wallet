@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
@@ -16,7 +17,7 @@ function mnemonicOptions(): SecureStore.SecureStoreOptions {
     keychainService: KEYCHAIN_SERVICE,
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     requireAuthentication: SecureStore.canUseBiometricAuthentication(),
-    authenticationPrompt: 'Unlock your Opago recovery phrase',
+    authenticationPrompt: t('Unlock your Opago recovery phrase'),
   };
 }
 

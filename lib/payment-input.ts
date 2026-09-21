@@ -35,6 +35,12 @@ export function parsePaymentAmount(
 export function resolveLnurlAmount(minSendableMsat: number, maxSendableMsat: number, requested: number): number {
   const min = Math.ceil(minSendableMsat / 1000);
   const max = Math.floor(maxSendableMsat / 1000);
+  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min < 1 || max < min) {
+    throw new Error('LNURL endpoint returned invalid payment limits.');
+  }
+  if (!Number.isSafeInteger(requested) || requested < 0) {
+    throw new Error('Satoshi amounts must be whole numbers.');
+  }
   const amount = requested > 0 ? requested : min === max ? min : 0;
   if (amount <= 0) throw new Error('This LNURL requires an amount.');
   if (amount < min || amount > max) throw new Error('Amount must be between ' + min + ' and ' + max + ' SAT.');

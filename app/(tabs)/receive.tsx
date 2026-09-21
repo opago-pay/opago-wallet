@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -5,20 +7,23 @@ import {
   AppState,
   ScrollView,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { TextInput, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { notifyPaymentHaptics } from '@/lib/optional-haptics';
 import * as Notifications from 'expo-notifications';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+import { AdvancedOptions } from '@/components/ui/advanced-options';
+import { PaymentBackButton } from '@/components/send/payment-back-button';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
+import { BackupReminder, BackupStatusNotice } from '@/components/security/backup-prompt';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { appConfig } from '@/lib/config';
 import { addTransaction } from '@/lib/database';
@@ -45,11 +50,12 @@ import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { compactWalletIdentifier } from '@/lib/wallet-display';
 import { exponentialBackoffDelay } from '@/lib/retry';
-import { buildHederaActivationAlias } from '@/lib/hedera/keys';
+import { HederaActivation } from '@/components/receive/hedera-activation';
 
 type ReceiveNetwork = 'lightning' | 'hedera';
 
 export default function ReceiveScreen() {
+  useLanguage();
   const router = useRouter();
   const isFocused = useIsFocused();
   const rates = useExchangeRates();
@@ -60,8 +66,11 @@ export default function ReceiveScreen() {
     hederaAccount,
     hederaPublicKey,
     refreshHederaAccount,
+    backupStatus,
+    beginBackup,
   } = useWalletAuth();
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [networkSelected, setNetworkSelected] = useState(false);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [invoiceRequestId, setInvoiceRequestId] = useState<string | null>(null);
@@ -94,7 +103,7 @@ export default function ReceiveScreen() {
   }, [hederaPublicKey]);
 
   useEffect(() => {
-    if (!walletReady) void loadOrGenerateWallet();
+    if (!walletReady) void loadOrGenerateWallet().catch(() => undefined); // Provider retains the error.
   }, [loadOrGenerateWallet, walletReady]);
 
   useEffect(() => {
@@ -141,10 +150,10 @@ export default function ReceiveScreen() {
       status: 'confirmed',
     });
     await lightningReceiveStore.clear();
-    setReceivedDescription(amount + ' ' + asset + ' confirmed.');
+    setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
     setIsPaid(true);
     try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
     } catch {
       // Haptics are optional and cannot invalidate a confirmed payment.
     }
@@ -152,7 +161,7 @@ export default function ReceiveScreen() {
       const permissions = await Notifications.getPermissionsAsync();
       if (permissions.granted) {
         await Notifications.scheduleNotificationAsync({
-          content: { title: 'Payment received', body: amount + ' ' + asset + ' confirmed.' },
+          content: { title: t('Payment received'), body: t('{amount} SAT confirmed.', { amount }) },
           trigger: null,
         });
       }
@@ -186,7 +195,7 @@ export default function ReceiveScreen() {
               setInvoiceAmountSats(0);
               setInvoiceExpiresAt(null);
               setIsPaid(false);
-              Alert.alert('Request closed', 'This Lightning request could not be completed. Create a new one.');
+              Alert.alert(t('Request closed'), t('This Lightning request could not be completed. Create a new one.'));
             }
             return;
           }
@@ -232,7 +241,7 @@ export default function ReceiveScreen() {
   }, [invoice, invoiceAmountSats, invoicePaymentHash, invoiceRequestId, isPaid, markPaid, pollingEnabled, sparkWallet]);
 
   useEffect(() => {
-    if (!pollingEnabled || network !== 'hedera' || !walletReady || isPaid) return;
+    if (!pollingEnabled || !networkSelected || network !== 'hedera' || !walletReady || isPaid) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let consecutiveFailures = 0;
@@ -245,7 +254,7 @@ export default function ReceiveScreen() {
     function runPoll() {
       void initializeAndPoll().catch(cause => {
         if (cancelled) return;
-        setHederaLookupError(cause instanceof Error ? cause.message : 'Account lookup unavailable.');
+        setHederaLookupError(cause instanceof Error ? cause.message : t('Account lookup unavailable.'));
         setHederaMissing(false);
         consecutiveFailures += 1;
         scheduleNextPoll(exponentialBackoffDelay(8_000, consecutiveFailures));
@@ -280,16 +289,16 @@ export default function ReceiveScreen() {
           hederaKnownTransactions.current.add(item.transactionId);
         }
         if (incoming && !cancelled) {
-          const description = incoming.amountHbar + ' HBAR confirmed on ' + HEDERA_NETWORK + '.';
+          const description = t('{amount} HBAR confirmed on {network}.', { amount: incoming.amountHbar, network: HEDERA_NETWORK });
           setReceivedDescription(description);
           setReceivedExplorerUrl(incoming.hashscanUrl);
           setIsPaid(true);
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
           try {
             const permissions = await Notifications.getPermissionsAsync();
             if (permissions.granted) {
               await Notifications.scheduleNotificationAsync({
-                content: { title: HEDERA_NETWORK_BADGE + ' HBAR received', body: description },
+                content: { title: t('Payment received'), body: description },
                 trigger: null,
               });
             }
@@ -309,7 +318,7 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [hederaPublicKey, hederaRequest, isPaid, network, pollingEnabled, refreshHederaAccount, walletReady]);
+  }, [hederaPublicKey, hederaRequest, isPaid, network, networkSelected, pollingEnabled, refreshHederaAccount, walletReady]);
 
   function parseInvoiceAmount(): number {
     const value = Number(amountInput.replace(',', '.'));
@@ -359,7 +368,7 @@ export default function ReceiveScreen() {
       setInvoiceExpiresAt(details.expiresAt || Date.now() + 600_000);
       setIsPaid(false);
     } catch (cause) {
-      Alert.alert('Could not create request', cause instanceof Error ? cause.message : 'Bitcoin payments are unavailable.');
+      Alert.alert(t('Could not create request'), t(cause instanceof Error ? cause.message : t('Bitcoin payments are unavailable.')));
     } finally {
       setLoading(false);
     }
@@ -377,8 +386,8 @@ export default function ReceiveScreen() {
       setHederaRequest(buildHederaReceiveRequest(account.accountId, amountTinybars));
     } catch (cause) {
       Alert.alert(
-        'Could not create HBAR request',
-        cause instanceof Error ? cause.message : HEDERA_NETWORK_LABEL + ' is unavailable.',
+        t('Could not create HBAR request'),
+        t(cause instanceof Error ? cause.message : HEDERA_NETWORK_LABEL + ' is unavailable.'),
       );
     } finally {
       setLoading(false);
@@ -407,6 +416,21 @@ export default function ReceiveScreen() {
     reset();
   }, [reset]);
 
+  const finishReceiving = useCallback(() => {
+    reset();
+    setNetworkSelected(false);
+    setNetwork('lightning');
+    setAdvancedExpanded(false);
+    setAmountInput('');
+    setIsEur(true);
+  }, [reset]);
+
+  useEffect(() => {
+    if (!isPaid) return;
+    const timer = setTimeout(finishReceiving, 3_000);
+    return () => clearTimeout(timer);
+  }, [finishReceiving, isPaid]);
+
   useEffect(() => {
     if (!invoiceExpiresAt || isPaid) return;
     const remaining = invoiceExpiresAt - Date.now();
@@ -420,7 +444,7 @@ export default function ReceiveScreen() {
 
   async function copy(value: string) {
     await Clipboard.setStringAsync(value);
-    Alert.alert('Copied', 'Payment information copied to your clipboard.');
+    Alert.alert(t('Copied'), t('Payment information copied to your clipboard.'));
   }
 
   async function openReceivedTransaction() {
@@ -429,39 +453,54 @@ export default function ReceiveScreen() {
       await openHederaExplorerUrl(receivedExplorerUrl);
     } catch (cause) {
       Alert.alert(
-        'Could not open receipt',
-        cause instanceof Error ? cause.message : 'The explorer link is invalid.',
+        t('Could not open receipt'),
+        t(cause instanceof Error ? cause.message : t('The explorer link is invalid.')),
       );
     }
   }
 
+  if (backupStatus === 'loading') return <View style={[styles.container, styles.centered]}><BackupStatusNotice /></View>;
+
+  if (backupStatus !== 'verified' && backupStatus !== 'deferred') return (
+    <View style={[styles.container, styles.centered]}>
+      <Text style={styles.successTitle}>{t("Back up before adding money")}</Text>
+      <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Security.")}</Text>
+      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push('/(tabs)/settings'); }}>
+        <Text style={styles.buttonText}>{t("Back up my wallet")}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (isPaid) return (
     <View style={[styles.container, styles.centered]}>
       <View style={styles.successCircle}>
-        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel="Confirmed" />
+        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel={t("Confirmed")} />
       </View>
-      <Text style={styles.successTitle}>Payment received</Text>
+      <Text style={styles.successTitle}>{t("Payment received")}</Text>
       <Text style={[styles.subtitle, styles.centerText]}>
-        {receivedDescription || 'The payment is complete and saved in your activity.'}
+        {receivedDescription || t('The payment is complete and saved in your activity.')}
       </Text>
       <TouchableOpacity
         style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
-        onPress={() => router.replace('/(tabs)')}
+        onPress={() => {
+          finishReceiving();
+          router.replace('/(tabs)');
+        }}
       >
-        <Text style={styles.buttonText}>Done</Text>
+        <Text style={styles.buttonText}>{t("Done")}</Text>
       </TouchableOpacity>
       {receivedExplorerUrl && (
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton, styles.fullWidthButton]}
           onPress={() => void openReceivedTransaction()}
           accessibilityRole="link"
-          accessibilityLabel="View payment receipt"
+          accessibilityLabel={t("View payment receipt")}
         >
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>View receipt</Text>
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("View receipt")}</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={styles.textButton} onPress={() => void clearAndReset()}>
-        <Text style={styles.textButtonText}>Request another payment</Text>
+      <TouchableOpacity style={styles.textButton} onPress={finishReceiving}>
+        <Text style={styles.textButtonText}>{t("Request another payment")}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -484,19 +523,69 @@ export default function ReceiveScreen() {
     appConfig.hederaNetwork,
   );
 
+  async function selectNetwork(next: ReceiveNetwork) {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await clearAndReset();
+      setNetwork(next);
+      setNetworkSelected(true);
+      setAdvancedExpanded(false);
+      setAmountInput('');
+      setIsEur(true);
+    } catch {
+      Alert.alert(t('Please try again.'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function backToNetworks() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await clearAndReset();
+      finishReceiving();
+    } catch {
+      Alert.alert(t('Please try again.'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const renderNetwork = (item: typeof receiveNetworks[number]) => {
+    const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet, appConfig.hederaNetwork);
+    return (
+      <TouchableOpacity
+        key={item.network}
+        style={styles.receiveNetworkSelector}
+        onPress={() => void selectNetwork(item.network)}
+        disabled={loading}
+        accessibilityRole="button"
+        accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
+      >
+        <AssetIcon asset={item.asset} size={34} />
+        <Text style={styles.receiveNetworkText}>{presentation.name}</Text>
+        <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <ScrollView
       style={styles.scrollContainer}
       contentContainerStyle={styles.formContent}
       keyboardShouldPersistTaps="handled"
     >
+      {networkSelected && <PaymentBackButton onPress={() => void backToNetworks()} disabled={loading} label={t('Back to payment methods')} />}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Request money</Text>
-          <Text style={styles.screenSubtitle}>Choose how you want to get paid.</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.title}>{t('Receive {asset}', { asset: networkSelected ? selectedReceivePresentation.name : 'Bitcoin' })}</Text>
+          <Text style={styles.screenSubtitle}>{t('Create a payment request to get paid.')}</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
+      <BackupReminder />
       {networkSelected && network === 'hedera' && (
         <View style={styles.modeNotice}>
           <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
@@ -510,8 +599,8 @@ export default function ReceiveScreen() {
               <Text style={styles.modeNoticeTitle}>HBAR · {HEDERA_NETWORK_BADGE}</Text>
               <Text style={styles.modeNoticeText}>
                 {HEDERA_NETWORK === 'mainnet'
-                  ? 'Real payments are active.'
-                  : 'Test payments only — no real value.'}
+                  ? t('Real payments are active.')
+                  : t('Test payments only — no real value.')}
               </Text>
           </View>
         </View>
@@ -519,35 +608,12 @@ export default function ReceiveScreen() {
       <View style={styles.card}>
         {!networkSelected ? (
           <>
-            <Text style={styles.choiceTitle}>What would you like to receive?</Text>
             <View style={styles.receiveNetworkRow}>
-              {receiveNetworks.map(item => {
-                const presentation = getWalletAssetPresentation(
-                  item.asset,
-                  appConfig.isMainnet,
-                  appConfig.hederaNetwork,
-                );
-                return (
-                  <TouchableOpacity
-                    key={item.network}
-                    style={styles.receiveNetworkSelector}
-                    onPress={() => {
-                      void clearAndReset();
-                      setNetwork(item.network);
-                      setNetworkSelected(true);
-                      setAmountInput('');
-                      setIsEur(true);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
-                  >
-                    <AssetIcon asset={item.asset} size={34} />
-                    <Text style={styles.receiveNetworkText}>{presentation.name}</Text>
-                    <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {receiveNetworks.filter(item => item.network === 'lightning').map(renderNetwork)}
             </View>
+            <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} disabled={loading}>
+              <View style={styles.receiveNetworkRow}>{receiveNetworks.filter(item => item.network !== 'lightning').map(renderNetwork)}</View>
+            </AdvancedOptions>
           </>
         ) : (
           <>
@@ -557,29 +623,18 @@ export default function ReceiveScreen() {
                 <Text style={styles.selectedAssetTitle}>{selectedReceivePresentation.name}</Text>
                 <Text style={styles.selectedAssetMeta}>{selectedReceivePresentation.networkBadge}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.changeAssetButton}
-                onPress={() => {
-                  void clearAndReset();
-                  setNetworkSelected(false);
-                  setAmountInput('');
-                  setIsEur(true);
-                }}
-                accessibilityRole="button"
-              >
-                <Text style={styles.changeAssetText}>Change</Text>
-              </TouchableOpacity>
+
             </View>
 
         {network === 'lightning' && !invoice && (
           <>
-            <Text style={styles.label}>Amount</Text>
+            <Text style={styles.label}>{t("Amount")}</Text>
             <TextInput
               style={styles.input}
               value={amountInput}
               onChangeText={setAmountInput}
               keyboardType="decimal-pad"
-              placeholder={isEur ? '0.00 EUR' : 'Satoshis'}
+              placeholder={isEur ? '0.00 EUR' : t('Satoshis')}
               placeholderTextColor="#666"
             />
             <View style={styles.row}>
@@ -599,7 +654,7 @@ export default function ReceiveScreen() {
               })}
             </View>
             <TouchableOpacity style={styles.button} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
-              {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create request</Text>}
+              {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Create request")}</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -608,69 +663,45 @@ export default function ReceiveScreen() {
           <>
             {hederaLookupError ? (
               <Text style={styles.errorText}>
-                Account verification unavailable: {hederaLookupError} Retrying automatically. If you already deposited, wait for verification before sending again.
-              </Text>
+                {t("Account verification unavailable:")} {t(hederaLookupError)} {t("Retrying automatically. If you already deposited, wait for verification before sending again.")}</Text>
             ) : hederaMissing && hederaPublicKey ? (
-              <>
-                <Text style={styles.label}>Add HBAR to get started</Text>
-                <Text style={styles.subtitle}>
-                  Send HBAR to the QR code below from a compatible Hedera wallet. Your Opago wallet will become ready automatically after the first deposit.
-                </Text>
-                <View style={{ backgroundColor: '#fff', padding: 16, alignSelf: 'center', marginVertical: 16 }}>
-                  <QRCode value={buildHederaActivationAlias(hederaPublicKey)} size={220} />
-                </View>
-                <TouchableOpacity
-                  style={styles.proofBox}
-                  onPress={() => void copy(buildHederaActivationAlias(hederaPublicKey))}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy Hedera activation alias"
-                >
-                  <Text style={styles.proofText} selectable>{buildHederaActivationAlias(hederaPublicKey)}</Text>
-                    <Text style={styles.copyHintText}>Tap to copy deposit address</Text>
-                </TouchableOpacity>
-                <Text style={styles.subtitle}>
-                  Choose Hedera {HEDERA_NETWORK_BADGE} in the sending wallet. Keep this screen open while Opago checks for the deposit.
-                </Text>
-                <Text style={styles.subtitle}>
-                  Already sent it? We are checking automatically. This can take a short moment.
-                </Text>
-              </>
+              <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} />
             ) : !hederaReady ? (
               <ActivityIndicator color="#ffb000" />
             ) : hederaAccount ? (
               <>
-                <Text style={styles.label}>Your HBAR account</Text>
+                <Text style={styles.label}>{t("Your HBAR account")}</Text>
                 <TouchableOpacity
                   style={styles.proofBox}
                   onPress={() => void copy(hederaAccount.accountId)}
                   accessibilityRole="button"
-                  accessibilityLabel="Copy Hedera account ID"
+                  accessibilityLabel={t("Copy Hedera account ID")}
                 >
                   <Text style={styles.accountDisplay}>{compactWalletIdentifier(hederaAccount.accountId)}</Text>
                   <View style={styles.copyHint}>
                     <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
-                    <Text style={styles.copyHintText}>Tap to copy</Text>
+                    <Text style={styles.copyHintText}>{t("Tap to copy")}</Text>
                   </View>
                 </TouchableOpacity>
                 {!hederaRequest && (
                   <>
-                    <Text style={styles.label}>Amount (optional)</Text>
+                    <Text style={styles.label}>{t("Amount (optional)")}</Text>
                     <TextInput
                       style={styles.input}
                       value={amountInput}
                       onChangeText={setAmountInput}
                       keyboardType="decimal-pad"
-                      placeholder="Leave empty for an open request"
+                      placeholder={t("Leave empty for an open request")}
                       placeholderTextColor="#666"
                     />
                     <TouchableOpacity style={styles.button} onPress={() => void prepareHederaRequest()} disabled={loading}>
-                      {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>Create payment QR</Text>}
+                      {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Create payment QR")}</Text>}
                     </TouchableOpacity>
                   </>
                 )}
               </>
             ) : (
-              <Text style={styles.errorText}>No {HEDERA_NETWORK_LABEL} account was found.</Text>
+              <Text style={styles.errorText}>{t('No {network} account was found.', { network: HEDERA_NETWORK_LABEL })}</Text>
             )}
           </>
         )}
@@ -682,14 +713,13 @@ export default function ReceiveScreen() {
             </View>
             {network === 'hedera' && (
               <Text style={[styles.subtitle, styles.centerText]}>
-                Works with HashPack and other Hedera wallets. Confirm the amount in the sending wallet.
-              </Text>
+                {t("Works with HashPack and other Hedera wallets. Confirm the amount in the sending wallet.")}</Text>
             )}
             <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => void copy(qrValue)}>
               <View style={styles.buttonContent}>
                 <Ionicons name="copy-outline" size={18} color="#fff" />
                 <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                  {network === 'hedera' ? 'Copy account ID' : 'Copy payment link'}
+                  {network === 'hedera' ? t('Copy account ID') : t('Copy payment link')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -699,6 +729,9 @@ export default function ReceiveScreen() {
           </>
         )}
       </View>
+      {networkSelected && network === 'lightning' && !invoice && <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} disabled={loading}>
+        <View style={styles.receiveNetworkRow}>{receiveNetworks.filter(item => item.network !== 'lightning').map(renderNetwork)}</View>
+      </AdvancedOptions>}
     </ScrollView>
   );
 }

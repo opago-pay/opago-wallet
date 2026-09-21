@@ -1,3 +1,5 @@
+import { appLocale, t } from './i18n';
+
 export type FriendlyPaymentStatus = 'Completed' | 'Processing' | 'Needs attention';
 
 export function compactWalletIdentifier(value: string): string {
@@ -5,7 +7,7 @@ export function compactWalletIdentifier(value: string): string {
   const hederaAccount = /^0\.0\.(\d+)$/.exec(normalized);
   if (hederaAccount) {
     const number = hederaAccount[1];
-    return 'Account ••• ' + number.slice(-5);
+    return t('Account ••• {number}', { number: number.slice(-5) });
   }
   if (normalized.length <= 12) return normalized;
   return normalized.slice(0, 5) + '…' + normalized.slice(-5);
@@ -31,7 +33,7 @@ export function friendlyPaymentStatus(status: string): FriendlyPaymentStatus {
 }
 
 export function formatEurValue(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(appLocale(), {
     style: 'currency',
     currency: 'EUR',
     minimumFractionDigits: 2,

@@ -18,7 +18,7 @@ assert.equal(appConfig.isHederaMainnet, true, 'Hedera Mainnet must be explicitly
 assert.equal(appConfig.hederaNetwork, 'mainnet');
 assert.equal(appConfig.hederaBuildProfile, 'mainnet');
 assert.equal(appConfig.hederaMirrorNodeUrl, 'https://mainnet.mirrornode.hedera.com');
-assert.equal(appConfig.hederaMaxTransferHbar, '1');
+assert.equal(appConfig.hederaMaxTransferHbar, 'balance');
 assert.equal(appConfig.hederaCheckoutContractId, '0.0.10850063');
 assert.equal(
   appConfig.hederaCheckoutRuntimeSha256,

@@ -9,6 +9,7 @@ import {
 } from './account-binding';
 import { HEDERA_NETWORK } from './config';
 import { normalizeHederaPublicKey } from './keys';
+import { isTransientNetworkError } from '../retry';
 
 async function removeCurrentBinding(): Promise<void> {
   await AsyncStorage.removeItem(getHederaAccountBindingStorageKey(HEDERA_NETWORK));
@@ -42,7 +43,10 @@ export async function resolveHederaWalletAccount(
       );
       const verified = await loadHederaAccount(binding.accountId, normalizedPublicKey);
       if (verified) return verified;
-    } catch {
+    } catch (cause) {
+      // A connection failure does not invalidate the binding. Rediscovery would
+      // repeat the same failing network request and delay the balance again.
+      if (isTransientNetworkError(cause)) throw cause;
       // Cached account metadata is never trusted for signing. A malformed,
       // stale, or mismatched binding is discarded and rediscovered on-chain.
     }

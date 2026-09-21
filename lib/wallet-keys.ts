@@ -1,5 +1,6 @@
 import {
   deriveHederaPrivateKey,
+  deriveHederaPrivateKeyFromSeed,
   HEDERA_DERIVATION_PATH,
   HEDERA_KEY_ALGORITHM,
   HEDERA_KEY_DERIVATION,
@@ -8,6 +9,7 @@ import {
 
 export {
   deriveHederaPrivateKey,
+  deriveHederaPrivateKeyFromSeed,
   HEDERA_DERIVATION_PATH,
   HEDERA_KEY_ALGORITHM,
   HEDERA_KEY_DERIVATION,

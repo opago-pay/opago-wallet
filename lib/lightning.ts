@@ -114,7 +114,11 @@ export function resolveInvoiceAmount(
   return requested;
 }
 
-export function calculateMaxLightningFee(amountSats: number, balanceSats: number): number {
+export function calculateMaxLightningFee(
+  amountSats: number,
+  balanceSats: number,
+  estimatedFeeSats: number | null = null,
+): number {
   if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
     throw new Error('Invalid payment amount.');
   }
@@ -122,9 +126,25 @@ export function calculateMaxLightningFee(amountSats: number, balanceSats: number
     throw new Error('Insufficient Lightning balance.');
   }
 
-  const percentageCap = Math.max(1, Number((BigInt(amountSats) + 199n) / 200n));
-  const fee = Math.min(appConfig.maxLightningFeeSats, percentageCap);
-  if (amountSats + fee > balanceSats) {
+  let fee: number;
+  if (estimatedFeeSats !== null) {
+    if (!Number.isSafeInteger(estimatedFeeSats) || estimatedFeeSats < 0) {
+      throw new Error('Spark returned an invalid Lightning fee estimate.');
+    }
+    if (estimatedFeeSats > appConfig.maxLightningFeeSats) {
+      throw new Error(
+        'The Lightning fee estimate of ' + estimatedFeeSats +
+          ' SAT exceeds your maximum fee of ' + appConfig.maxLightningFeeSats + ' SAT.',
+      );
+    }
+    // The review screen presents this exact ceiling. Submission must retain it,
+    // even if a later network quote increases; never silently use the build cap.
+    fee = estimatedFeeSats;
+  } else {
+    const percentageCap = Math.max(1, Number((BigInt(amountSats) + 199n) / 200n));
+    fee = Math.min(appConfig.maxLightningFeeSats, percentageCap);
+  }
+  if (fee > balanceSats - amountSats) {
     throw new Error('Insufficient balance for the payment and maximum fee of ' + fee + ' SAT.');
   }
   return fee;

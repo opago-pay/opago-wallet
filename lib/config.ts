@@ -117,12 +117,12 @@ export function resolveHederaBuildPolicy(
       'EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR is required for Hedera mainnet builds.',
     );
   }
-  if (
+  if (maxTransferHbar !== 'balance' && (
     !/^(0|[1-9]\d*)(?:\.(\d{1,8}))?$/.test(maxTransferHbar) ||
     /^0(?:\.0+)?$/.test(maxTransferHbar)
-  ) {
+  )) {
     throw new Error(
-      'EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR must be a positive HBAR amount with at most 8 decimals.',
+      'EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR must be a positive HBAR amount with at most 8 decimals, or balance.',
     );
   }
 

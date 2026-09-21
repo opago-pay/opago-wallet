@@ -9,6 +9,7 @@ import {
   assertHederaNetwork,
   createHederaClient,
   configuredHederaMaxTransferHbar,
+  getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK,
   HEDERA_NETWORK_LABEL,
   HEDERA_SDK_GRPC_DEADLINE_MS,
@@ -69,6 +70,11 @@ export function formatTinybars(tinybars: bigint): string {
 
 export function assertHederaTransferAmount(tinybars: bigint): bigint {
   if (tinybars <= 0n) throw new Error('HBAR amount must be greater than zero.');
+  // The SDK serializes transfer amounts as signed int64 tinybars.
+  if (tinybars > 9_223_372_036_854_775_807n) {
+    throw new Error('HBAR amount exceeds the supported transfer range.');
+  }
+  if (configuredHederaMaxTransferHbar === 'balance') return tinybars;
   const maximum = parseHbarToTinybars(
     configuredHederaMaxTransferHbar,
     'Configured Hedera transfer limit',
@@ -85,6 +91,18 @@ export function assertHederaTransferAmount(tinybars: bigint): bigint {
 
 export function parseHederaTransferTinybars(rawAmount: string): bigint {
   return assertHederaTransferAmount(parseHbarToTinybars(rawAmount));
+}
+
+// Used both before showing the review and after refreshing the account for signing.
+export function assertHederaPaymentBalance(
+  amountTinybars: bigint,
+  balanceTinybars: bigint,
+  mode: 'direct' | 'checkout',
+): void {
+  assertHederaTransferAmount(amountTinybars);
+  if (amountTinybars + getHederaPaymentFeeCeilingTinybars(mode) > balanceTinybars) {
+    throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
+  }
 }
 
 export class HederaPaymentPendingError extends Error {
@@ -227,6 +245,7 @@ export async function sendHederaTransfer(input: {
   amountTinybars: bigint;
   privateKey: PrivateKey;
   lifecycle?: HederaPaymentLifecycle;
+  assertAuthorized?: () => void;
 }): Promise<HederaTransferResult> {
   assertHederaNetwork();
   const sourceAccountId = parseHederaAccountId(input.sourceAccountId, 'Source account ID');
@@ -264,6 +283,12 @@ export async function sendHederaTransfer(input: {
       recipientAccountId,
       amountTinybars: tinybars,
     });
+    try {
+      input.assertAuthorized?.();
+    } catch (cause) {
+      await input.lifecycle?.onResolved?.({ transactionId: transactionIdString, state: 'failed', result: 'CANCELLED_BEFORE_SUBMISSION' });
+      throw cause;
+    }
     let response;
     try {
       response = await transaction.execute(client);

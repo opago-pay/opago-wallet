@@ -359,6 +359,7 @@ export async function sendHederaCheckoutPayment(input: {
   request: HederaCheckoutRequest;
   privateKey: PrivateKey;
   lifecycle?: HederaPaymentLifecycle;
+  assertAuthorized?: () => void;
 }): Promise<HederaTransferResult> {
   await verifyHederaCheckoutRequest(input.request);
   const sourceAccountId = parseHederaAccountId(input.sourceAccountId, 'Source account ID');
@@ -387,6 +388,12 @@ export async function sendHederaCheckoutPayment(input: {
       amountTinybars,
       paymentId: input.request.paymentId,
     });
+    try {
+      input.assertAuthorized?.();
+    } catch (cause) {
+      await input.lifecycle?.onResolved?.({ transactionId: transactionIdString, state: 'failed', result: 'CANCELLED_BEFORE_SUBMISSION' });
+      throw cause;
+    }
     let response;
     try {
       response = await transaction.execute(client);

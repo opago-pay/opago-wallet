@@ -100,23 +100,23 @@ export async function prepareDecodedSparkPayment(
     throw new Error('Spark returned an invalid Lightning balance.');
   }
   const balanceSats = settledBalance + incomingBalance;
-  const maxFeeSats = calculateMaxLightningFee(amountSats, balanceSats);
+  if (balanceSats < amountSats) throw new Error('Insufficient Lightning balance.');
   let estimatedFeeSats: number | null = null;
   if (wallet.getLightningSendFeeEstimate) {
-    estimatedFeeSats = await wallet.getLightningSendFeeEstimate({
-      encodedInvoice: invoice.invoice,
-      amountSats: invoice.amountSats === null ? amountSats : undefined,
-    });
+    try {
+      estimatedFeeSats = await wallet.getLightningSendFeeEstimate({
+        encodedInvoice: invoice.invoice,
+        amountSats: invoice.amountSats === null ? amountSats : undefined,
+      });
+    } catch {
+      // Do not expose SDK responses containing invoices or recipient data.
+      throw new Error('The Lightning fee estimate is unavailable.');
+    }
     if (!Number.isSafeInteger(estimatedFeeSats) || estimatedFeeSats < 0) {
       throw new Error('Spark returned an invalid Lightning fee estimate.');
     }
-    if (estimatedFeeSats > maxFeeSats) {
-      throw new Error(
-        'The Lightning fee estimate of ' + estimatedFeeSats +
-          ' SAT exceeds your maximum fee of ' + maxFeeSats + ' SAT.',
-      );
-    }
   }
+  const maxFeeSats = calculateMaxLightningFee(amountSats, balanceSats, estimatedFeeSats);
 
   return { invoice, amountSats, maxFeeSats, estimatedFeeSats };
 }
@@ -133,6 +133,7 @@ export async function payPreparedSparkPayment(
   wallet: SparkWalletLike,
   payment: PreparedSparkPayment,
   lifecycle?: LightningPaymentLifecycle,
+  assertAuthorized?: () => void,
 ): Promise<SparkPaymentResult> {
   const { invoice, amountSats, maxFeeSats } = payment;
   if (invoice.expiresAt !== null && invoice.expiresAt <= Date.now()) {
@@ -151,6 +152,12 @@ export async function payPreparedSparkPayment(
   }
 
   let result: Awaited<ReturnType<SparkWalletLike['payLightningInvoice']>>;
+  try {
+    assertAuthorized?.();
+  } catch (cause) {
+    await lifecycle?.onResolved?.(invoice.paymentHash, 'failed', 'CANCELLED_BEFORE_SUBMISSION', null);
+    throw cause;
+  }
   try {
     result = await wallet.payLightningInvoice({
       invoice: invoice.invoice,

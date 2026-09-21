@@ -1,6 +1,6 @@
 # Opago Wallet
 
-Opago Wallet is a mobile wallet built with Expo and React Native. It uses one protected recovery phrase for Hedera and Bitcoin Lightning while keeping network selection, transaction validation, and test provisioning explicit.
+Opago Wallet is a Bitcoin-first mobile wallet built with Expo and React Native. Bitcoin Lightning is the default on Home, Send and Request. HBAR remains available through collapsed **Advanced options**, using the same existing protected recovery phrase and keys.
 
 The default mobile build is intended for development and test networks. The verified Hedera Mainnet contract does not by itself make the Android app an audited production wallet, a licensed financial service, or evidence of regulatory compliance. See [SECURITY.md](SECURITY.md) before using the code with identities or funds.
 
@@ -13,13 +13,19 @@ The default mobile build is intended for development and test networks. The veri
 | HBAR checkout contract and release isolation | Hedera mainnet | Contract `0.0.10850063` deployed and source-verified; physical Android canary and Thrive submission completed |
 | Lightning send and receive | Spark regtest by default; explicit Mainnet release profile available | Review/authentication, crash-safe journal, receive recovery, paginated history, and local health diagnostics implemented; physical Mainnet acceptance pending |
 | Payment-method negotiation | OpenCryptoPay-style local reference service | Prototype |
-| eID and Travel Rule hand-off | Local reference services | Demo only; not legal identity verification |
+| eID and Travel Rule hand-off | Local reference services | Disabled in the first-release wallet; reference code only |
 
-Mainnet payments remain disabled in the default build. Hedera Mainnet code paths require the Hedera-specific real-fund flag, a matching build profile, a human-approved transfer cap, and the pinned verified contract `0.0.10850063`. The grant candidate enables real HBAR while Lightning remains on regtest.
+Mainnet payments remain disabled in the default build. Hedera Mainnet code paths require the Hedera-specific real-fund flag, a matching build profile, an explicit transfer policy, and the pinned verified contract `0.0.10850063`. The grant candidate enables real HBAR while Lightning remains on regtest.
 
 ## Interface readiness
 
-Home, Send, Request, activity, and checkout selection share one asset identity system for Bitcoin Lightning and HBAR. The consumer flow leads with recipient, amount, balance, and clear actions; long addresses, transaction signatures, payment IDs, and contract details stay available behind explicit copy or details controls. Scalable asset icons and compact network badges make regtest, testnet, and mainnet unambiguous. Long forms remain scrollable on smaller Android screens, and selection, copy, scan, success, and receipt actions expose accessible roles or labels.
+The app supports English, French, Spanish and German. Choose a language under **Security → Language**; the selection applies immediately and survives app restarts. On first use, a supported device language is selected, with English as the fallback. Recovery words, addresses, payment identifiers and signing data are never translated.
+
+Unknown balances show a loading indicator and a placeholder instead of zero. Refreshes keep the last known amounts, and failures are labeled explicitly. On Home, Bitcoin balance loading takes priority over an early expansion of HBAR or the shared history. Optional reads wait for that balance attempt, yield a UI frame, and only run for sections the user opened. A failed balance attempt or a 20-second stalled-startup deadline releases optional data without marking Bitcoin ready. Toggling HBAR does not refetch Bitcoin. Pull-to-refresh follows the same priority. The Home QR action opens a dedicated camera screen; an already granted camera permission is read without requesting it again.
+
+Authenticated startup derives the BIP39 seed once for both assets. Android uses a local Expo module and background system PBKDF2; iOS/web retain asynchronous JavaScript derivation. Spark receives seed bytes through its supported API, with the same network and account defaults. Native builds must include `modules/opago-wallet-crypto`; an Android build missing the module fails explicitly. The performance target is a current Bitcoin balance under 7.5 seconds, preferably 5 seconds, measured after authentication on actual devices; a cached preview does not count toward that target.
+
+Home’s main EUR value covers Bitcoin only. HBAR has its own balance and EUR estimate under Advanced options. Directly below those options, one shared transaction history shows Bitcoin and HBAR payments in date order. It starts collapsed and loads both assets only when opened, independently of the advanced asset list; ordinary Bitcoin balance startup does not query HBAR. Send and Request hide the HBAR choice until Advanced options is opened. Explicit HBAR QR codes still lead to clearly labeled HBAR forms and reviews. Security uses the same disclosure for network/key details. Both assets retain one consistent identity system. The consumer flow leads with recipient, amount, balance, and clear actions; long addresses, transaction signatures, payment IDs, and contract details stay available behind explicit copy or details controls. Scalable asset icons and compact network badges make regtest, testnet, and mainnet unambiguous. Long forms remain scrollable on smaller Android screens, and selection, copy, scan, success, and receipt actions expose accessible roles or labels.
 
 The implemented scope and remaining physical-device visual checks are tracked in [UI_PRODUCTION_READINESS.md](UI_PRODUCTION_READINESS.md). This is an interface-quality milestone, not a claim that the wallet is audited or ready for real funds.
 
@@ -122,7 +128,7 @@ npm run phase5:verify
 
 This single cross-platform gate runs TypeScript, ESLint, all application tests, deterministic contract compilation and tests, and syntax checks for the local reference services and Hedera scripts. It disables the interactive Hardhat telemetry prompt so a clean-room verification cannot block waiting for input.
 
-The Solidity compiler is pinned through `package-lock.json` and Hardhat uses that local compiler with the `paris` EVM target. Compiler input is normalized to the CRLF line endings used by the verified deployment, so Linux, macOS, and Windows builds reproduce the versioned creation and runtime bytecode hashes.
+The Solidity compiler is pinned through `package-lock.json`; `scripts/compile-contracts.cjs` invokes that local compiler with the `paris` EVM target. Hardhat 3 runs the isolated contract tests. Compiler input is normalized to the CRLF line endings used by the verified deployment, so Linux, macOS, and Windows builds reproduce the versioned creation and runtime bytecode hashes.
 
 #### Hedera testnet deployment and source verification
 
@@ -182,7 +188,7 @@ The output contains valid/replay, expired, altered-nonce, and wrong-amount deep 
 
 The immediate target is Thrive Milestone 2 by 10 October 2026: a verified Hedera Mainnet deployment, an operational Mainnet UI/payment path, public repository evidence, and a recorded real-HBAR demonstration. A contract deployment alone is not sufficient, and this grant target is narrower than making the entire multi-chain hackathon application production-ready.
 
-Current production-branch scope is deliberately limited to HBAR and Bitcoin Lightning. Thrive Milestone 2 makes the **Hedera Mainnet integration and checkout path** grant-ready; it does not claim that the Lightning path or the complete app is already ready for unrestricted public production. Mainnet deployment commands and evidence gates are documented in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).
+Current production-branch scope is deliberately limited to Bitcoin Lightning by default, with HBAR under Advanced options (product decision, 21 September 2026). Thrive Milestone 2 makes the **Hedera Mainnet integration and checkout path** grant-ready; it does not claim that the Lightning path or the complete app is already ready for unrestricted public production. Mainnet deployment commands and evidence gates are documented in [HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md).
 
 The critical path is:
 
@@ -623,12 +629,12 @@ Relevant implementation files:
 | `EXPO_PUBLIC_HEDERA_BUILD_PROFILE` | `testnet` | Must match the Hedera network; separates safe test builds from Mainnet releases |
 | `EXPO_PUBLIC_HEDERA_NETWORK` | `testnet` | Selects `testnet` or `mainnet` at build time; no in-app switch exists |
 | `EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL` | Official Mirror Node for selected network | Resolves accounts, balances, history, receipts, and contract runtime; wrong-network hosts are rejected |
-| `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR` | `1` on testnet; required on Mainnet | Human-approved upper bound for one app-initiated HBAR transfer |
+| `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR` | `1` on testnet; required on Mainnet | Explicit policy: `balance` for available funds minus maximum fees, or a positive HBAR cap for limited test builds |
 | `EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID` | `0.0.9972670` in `.env.example` | Enables only the deployed, verified Phase 3 testnet checkout contract |
 | `EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256` | verified hash in `.env.example` | Pins the exact deployed Phase 3 runtime bytecode in the app build |
 | `EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS` | `100` | Additional ceiling used by Lightning fee validation |
 | `EXPO_PUBLIC_ALLOW_INSECURE_HTTP` | `false` | Allows private/local HTTP only in development |
-| `EXPO_PUBLIC_EID_BACKEND_URL` | empty | Enables the optional eID reference flow |
+| `EXPO_PUBLIC_EID_BACKEND_URL` | empty | Reference configuration only; identity payments are disabled in the first-release scope |
 
 See [`.env.example`](.env.example) for the complete development configuration.
 
@@ -644,12 +650,12 @@ EXPO_PUBLIC_ENABLE_HEDERA_MAINNET=true
 EXPO_PUBLIC_HEDERA_BUILD_PROFILE=mainnet
 EXPO_PUBLIC_HEDERA_NETWORK=mainnet
 EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL=https://mainnet.mirrornode.hedera.com
-EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=1
+EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=balance
 EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID=0.0.10850063
 EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256=18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8
 ```
 
-Hedera Mainnet requires every listed Hedera value. Lightning Mainnet independently requires its explicit enable flag and matching `mainnet` profile. Partial activation, a mismatched profile, a wrong-network Mirror Node, a missing transfer cap, or missing contract evidence fails during application configuration. The grant-specific `mainnet-candidate` EAS profile deliberately keeps Lightning on regtest; the `production` profile enables both reviewed Mainnet paths while leaving the legacy global switch disabled.
+Hedera Mainnet requires every listed Hedera value. Lightning Mainnet independently requires its explicit enable flag and matching `mainnet` profile. Partial activation, a mismatched profile, a wrong-network Mirror Node, a missing transfer policy, or missing contract evidence fails during application configuration. The grant-specific `mainnet-candidate` EAS profile deliberately keeps Lightning on regtest; the `production` profile enables both reviewed Mainnet paths while leaving the legacy global switch disabled.
 
 On Windows, an authorized arm64 Android device can receive a standalone, locally signed internal candidate without Metro:
 
@@ -705,7 +711,7 @@ These services are not production backends. The eID service requires an explicit
 npm run phase5:verify
 ```
 
-The application suite passes `109/109` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar handling, persisted pending/confirmed/failed Hedera and Lightning states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, paginated Spark history, resumable Lightning invoices, local privacy-preserving health state, third-party-wallet-compatible Hedera QR values, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, consumer-safe identifier and status presentation, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
+The application suite passes `130/130` tests and the checkout contract passes `9/9` Hardhat tests. The suites cover deterministic wallet derivation, recovery/deletion safeguards, exact `bigint` tinybar handling, persisted pending/confirmed/failed Hedera and Lightning states, offline and restart reconciliation, ambiguous-submission recovery, account/history/status parsing, exact receive-request matching, paginated Spark history, resumable Lightning invoices, local privacy-preserving health state, third-party-wallet-compatible Hedera QR values, handled polling retries, operator-key/account validation before provisioning, transaction construction, secret boundaries, consumer-safe identifier and status presentation, Lightning invoice and preimage validation, payment amount binding, OCP quote integrity, eID proof verification, replay protection, remote URL policy, and checkout success and failure paths.
 
 ## Security reporting
 

@@ -8,7 +8,7 @@ The app stores a non-secret Lightning journal before submission. Records contain
 
 ## Local health check
 
-Home refresh checks Spark balance, paginated history, and unresolved payment status with bounded timeouts. Settings > Advanced wallet details shows a privacy-preserving local Lightning status. It stores only success/failure timestamps, a consecutive-failure count, and a broad error category. It never stores invoices, payment hashes, preimages, keys, or recovery words.
+Home starts with transaction history collapsed and refreshes balances independently. Opening Recent activity loads paginated history and reconciles unresolved payment status with bounded timeouts. Opening Send also reconciles unresolved Lightning payments; the pending journal continues to block resubmission until resolved. Settings > Advanced wallet details shows a privacy-preserving local Lightning status. It stores only success/failure timestamps, a consecutive-failure count, and a broad error category. It never stores invoices, payment hashes, preimages, keys, or recovery words.
 
 Because no external monitoring provider is configured, centralized alerting is not claimed. During a canary or public rollout, the release owner must actively monitor support reports and the Spark service status. Adding remote telemetry requires a separate privacy, consent, retention, and data-processing review.
 
@@ -21,12 +21,12 @@ Because no external monitoring provider is configured, centralized alerting is n
 5. Promote only after send, receive, restart reconciliation, recovery, timeout, and negative scenarios pass.
 6. App-store signing, Play Integrity/App Attest policy, staged rollout, privacy documents, and support ownership remain mandatory distribution gates.
 
-The current dependency baseline and unresolved advisory counts are recorded in `SECURITY.md`. Do not use `npm audit fix --force` to silence the report: a release owner must either move the complete Expo stack to a supported patched SDK and repeat Android acceptance, or document why a finding cannot reach the signed mobile artifact and obtain security-review approval.
+The current dependency baseline is recorded in `SECURITY.md` (both audit scopes: zero on 17 September 2026). Run fresh audits before release. Do not use `npm audit fix --force` to silence findings; apply reviewed compatible updates and repeat native acceptance.
 
 ## User-facing incident rules
 
 - Never tell a user to resend an unknown payment.
-- Ask the user to reopen Home and refresh. The journal must reconcile first.
+- Ask the user to open Recent activity on Home and refresh, or open Send. The journal must reconcile first.
 - Never request a recovery phrase, private key, complete invoice, or preimage.
 - Use only the payment time, amount, direction, broad status, and approved opaque request reference for support.
 - Treat repeated `configuration` errors as a bad release, `authentication` errors as a device setup issue, and repeated `network`/`timeout` errors as a Spark connectivity incident.
@@ -44,7 +44,7 @@ The current dependency baseline and unresolved advisory counts are recorded in `
 
 - Stop the staged app-store rollout or withdraw the candidate artifact.
 - Return to the last signed, accepted release; do not delete local wallet or journal data during rollback.
-- If Lightning alone is unsafe, ship a reviewed build with `EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET=false` and `EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE=regtest` while preserving Hedera configuration independently.
+- Never switch an existing Mainnet user's wallet to regtest as a rollback. This changes the network and can make funds and history appear missing. Pause distribution first; any emergency build must preserve Mainnet identity, recovery and reconciliation while explicitly disabling new payment submission through a reviewed change.
 - Pending records must remain readable by the rollback release or be migrated explicitly.
 - Repeat recovery and unresolved-payment reconciliation before re-enabling Mainnet.
 

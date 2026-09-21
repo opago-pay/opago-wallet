@@ -7,8 +7,8 @@ export type PaymentSource = 'spark' | 'hedera';
 export type PaymentCurrency = 'SAT' | 'EUR';
 
 export interface WalletBalances {
-  spark: number;
-  hbarTinybars: bigint;
+  spark: number | null;
+  hbarTinybars: bigint | null;
 }
 
 export interface PendingHederaPayment {

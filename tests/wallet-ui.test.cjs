@@ -29,7 +29,7 @@ test('defines presentation metadata for every wallet asset and development netwo
     ),
     ['REGTEST', 'TESTNET'],
   );
-  assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'MAINNET');
+  assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'LIGHTNING');
   assert.equal(getWalletAssetPresentation('hedera', true).networkBadge, 'TESTNET');
   assert.equal(
     getWalletAssetPresentation('hedera', true, 'mainnet').networkBadge,
@@ -59,8 +59,8 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   for (const asset of ['lightning', 'hedera']) {
     assert.match(portfolio, new RegExp(`asset="${asset}"`));
   }
-  assert.match(portfolio, /HBAR payments are live/);
-  assert.match(portfolio, /Bitcoin is still in test mode/);
+  assert.doesNotMatch(portfolio, /HBAR payments are live/);
+  assert.doesNotMatch(portfolio, /Your HBAR is live/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
   assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
@@ -78,11 +78,11 @@ test('keeps technical wallet data behind friendly display labels', () => {
   const review = readSource('components', 'send', 'hedera-payment-views.tsx');
   const lightningReview = readSource('components', 'send', 'lightning-payment-views.tsx');
   assert.match(review, /Show payment details/);
-  assert.match(review, /Send \{props\.payment\.amountHbar\} HBAR/);
+  assert.match(review, /t\('Send \{amount\} HBAR', \{ amount: props\.payment\.amountHbar \}\)/);
   assert.match(review, /View receipt/);
   assert.match(lightningReview, /Show payment details/);
-  assert.match(lightningReview, /Network fee/);
-  assert.match(lightningReview, /Send \{props\.payment\.amountSats\.toLocaleString\(\)\} SAT/);
+  assert.match(lightningReview, /Maximum network fee/);
+  assert.match(lightningReview, /t\('Send \{amount\} satoshis', \{ amount: props\.payment\.amountSats\.toLocaleString\(appLocale\(\)\) \}\)/);
 });
 
 test('requires an explicit Lightning review and device authorization before submission', () => {
@@ -91,8 +91,10 @@ test('requires an explicit Lightning review and device authorization before subm
   assert.match(send, /setPendingLightning/);
   assert.match(send, /<LightningReviewView/);
   assert.ok(send.indexOf('await authorizePayment()') < send.indexOf('await payPreparedSparkPayment('));
-  assert.match(authorization, /authenticateAsync/);
-  assert.match(authorization, /disableDeviceFallback: false/);
+  assert.match(authorization, /authorizeWalletAction/);
+  const deviceAuth = readSource('lib', 'device-authentication.ts');
+  assert.match(deviceAuth, /authenticateAsync/);
+  assert.match(deviceAuth, /disableDeviceFallback: !allowDeviceCredential/);
 });
 
 test('shows a clearly labelled estimate for development-network balances', () => {
@@ -141,9 +143,9 @@ test('keeps send and request focused on the first consumer decision', () => {
   const send = readSource('components', 'send', 'payment-form.tsx');
   const receive = readSource('app', '(tabs)', 'receive.tsx');
   assert.match(send, /Scan to pay/);
-  assert.match(send, /or choose what to send/);
+  assert.match(send, /or enter a payment request/);
   assert.match(send, /sourceSelected/);
-  assert.match(receive, /What would you like to receive\?/);
+  assert.match(receive, /Receive \{asset\}/);
   assert.match(receive, /useState\(true\)/);
   assert.match(receive, /Create request/);
   assert.doesNotMatch(receive, />Invoice amount</);

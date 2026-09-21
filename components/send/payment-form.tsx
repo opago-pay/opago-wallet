@@ -1,24 +1,36 @@
-import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { appLocale, t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useEffect, useRef } from 'react';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { TextInput, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { AssetIcon } from '@/components/ui/asset-icon';
+import { PaymentBackButton } from './payment-back-button';
+import { AdvancedOptions } from '@/components/ui/advanced-options';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { appConfig } from '@/lib/config';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { HEDERA_NETWORK, HEDERA_NETWORK_BADGE } from '@/lib/hedera/config';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
+import type { LightningAmountRequirement } from '@/lib/lightning-destination';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];
 
 export function PaymentForm(props: {
   destination: string;
   amountInput: string;
+  amountRequirement?: LightningAmountRequirement | null;
   currency: PaymentCurrency;
   source: PaymentSource;
   sourceSelected: boolean;
+  advancedExpanded: boolean;
+  onAdvancedChange(expanded: boolean): void;
   balances: WalletBalances;
   balanceError: string | null;
+  balanceLoading: { spark: boolean; hedera: boolean };
   loading: boolean;
   walletReady: boolean;
   onDestinationChange(value: string): void;
@@ -29,10 +41,18 @@ export function PaymentForm(props: {
   onScan(): void;
   onReview(): void;
 }) {
+  useLanguage();
+  const insets = useSafeAreaInsets();
+  const amountRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const amountMissing = Boolean(props.amountRequirement && !props.amountInput.trim());
+  const reviewDisabled = props.loading || !props.walletReady || amountMissing;
+  useEffect(() => {
+    if (props.amountRequirement && !props.loading) amountRef.current?.focus();
+  }, [props.amountRequirement, props.loading]);
   const isHedera = props.source === 'hedera';
   const sources: { source: PaymentSource; asset: WalletAssetKey; balance: string }[] = [
-    { source: 'spark', asset: 'lightning', balance: props.balances.spark + ' SAT' },
-    { source: 'hedera', asset: 'hedera', balance: formatTinybars(props.balances.hbarTinybars) + ' HBAR' },
+    { source: 'spark', asset: 'lightning', balance: props.balances.spark === null ? (props.balanceLoading.spark ? t('Loading…') : t('Unavailable')) : props.balances.spark.toLocaleString(appLocale()) + ' SAT' },
+    { source: 'hedera', asset: 'hedera', balance: props.balances.hbarTinybars === null ? (props.balanceLoading.hedera ? t('Loading…') : t('Unavailable')) : formatTinybars(props.balances.hbarTinybars) + ' HBAR' },
   ];
   const selectedSource = sources.find(item => item.source === props.source)!;
   const selectedPresentation = getWalletAssetPresentation(
@@ -40,17 +60,35 @@ export function PaymentForm(props: {
     appConfig.isMainnet,
     appConfig.hederaNetwork,
   );
+  const renderSource = (item: typeof sources[number]) => {
+    const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet, appConfig.hederaNetwork);
+    return (
+      <TouchableOpacity key={item.source} style={styles.assetSelector}
+        onPress={() => props.onSourceChange(item.source)} accessibilityRole="button"
+        accessibilityLabel={t('{asset}, {network}, balance {balance}', { asset: presentation.name, network: presentation.networkLabel, balance: item.balance })}>
+        <View style={styles.assetSelectorHeader}>
+          <AssetIcon asset={item.asset} size={34} />
+          <Ionicons name="chevron-forward" size={18} color="#696974" />
+        </View>
+        <Text style={styles.assetSelectorTitle}>{presentation.name}</Text>
+        <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
+        {props.balanceLoading[item.source] && <ActivityIndicator color="#ffb000" size="small" accessibilityLabel={t('Updating balance')} />}
+        <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <ScrollView
       style={styles.scrollContainer}
-      contentContainerStyle={styles.formContent}
+      contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12 }]}
       keyboardShouldPersistTaps="handled"
     >
+      {props.sourceSelected && <PaymentBackButton onPress={props.onChangeSource} disabled={props.loading} label={t('Back to payment methods')} />}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Send money</Text>
-          <Text style={styles.screenSubtitle}>Choose how you want to pay.</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.title}>{t('Send {asset}', { asset: props.sourceSelected ? selectedPresentation.name : 'Bitcoin' })}</Text>
+          <Text style={styles.screenSubtitle}>{props.sourceSelected ? t('Enter the recipient and amount.') : t('Scan a code or enter a Bitcoin payment request.')}</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
@@ -60,12 +98,12 @@ export function PaymentForm(props: {
             <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
           </View>
           <View style={styles.modeNoticeCopy}>
-            <Text style={styles.modeNoticeTitle}>Bitcoin demo mode</Text>
-            <Text style={styles.modeNoticeText}>Test payments only — no real Bitcoin.</Text>
+            <Text style={styles.modeNoticeTitle}>{t("Bitcoin demo mode")}</Text>
+            <Text style={styles.modeNoticeText}>{t("Test payments only — no real Bitcoin.")}</Text>
           </View>
         </View>
       )}
-      {props.sourceSelected && isHedera && (
+      {props.sourceSelected && isHedera && !appConfig.isHederaMainnet && (
         <View style={styles.modeNotice}>
           <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
             <Ionicons
@@ -80,15 +118,15 @@ export function PaymentForm(props: {
             </Text>
             <Text style={styles.modeNoticeText}>
             {HEDERA_NETWORK === 'mainnet'
-              ? 'Real payments are active.'
-              : 'Test payments only — no real value.'}
+              ? t('Real payments are active.')
+              : t('Test payments only — no real value.')}
             </Text>
           </View>
         </View>
       )}
       {props.balanceError && (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Some balances may be out of date. Please try again.</Text>
+          <Text style={styles.bannerText}>{t("Some balances may be out of date. Please try again.")}</Text>
         </View>
       )}
       <View style={styles.card}>
@@ -98,44 +136,24 @@ export function PaymentForm(props: {
               style={[styles.button, styles.primaryChoiceButton]}
               onPress={props.onScan}
               accessibilityRole="button"
-              accessibilityLabel="Scan a payment QR code"
+              accessibilityLabel={t("Scan a payment QR code")}
             >
               <View style={styles.buttonContent}>
                 <Ionicons name="qr-code-outline" size={22} color="#111" />
-                <Text style={styles.buttonText}>Scan to pay</Text>
+                <Text style={styles.buttonText}>{t("Scan to pay")}</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.choiceDivider}>
               <View style={styles.choiceDividerLine} />
-              <Text style={styles.choiceDividerText}>or choose what to send</Text>
+              <Text style={styles.choiceDividerText}>{t('or enter a payment request')}</Text>
               <View style={styles.choiceDividerLine} />
             </View>
             <View style={styles.assetGrid}>
-              {sources.map(item => {
-                const presentation = getWalletAssetPresentation(
-                  item.asset,
-                  appConfig.isMainnet,
-                  appConfig.hederaNetwork,
-                );
-                return (
-                  <TouchableOpacity
-                    key={item.source}
-                    style={styles.assetSelector}
-                    onPress={() => props.onSourceChange(item.source)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}, balance ${item.balance}`}
-                  >
-                    <View style={styles.assetSelectorHeader}>
-                      <AssetIcon asset={item.asset} size={34} />
-                      <Ionicons name="chevron-forward" size={18} color="#696974" />
-                    </View>
-                    <Text style={styles.assetSelectorTitle}>{presentation.name}</Text>
-                    <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
-                    <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {sources.filter(item => item.source === 'spark').map(renderSource)}
             </View>
+            <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+              <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
+            </AdvancedOptions>
           </>
         ) : (
           <>
@@ -146,51 +164,64 @@ export function PaymentForm(props: {
                 <Text style={styles.selectedAssetMeta}>
                   {selectedSource.balance} · {selectedPresentation.networkBadge}
                 </Text>
+                {props.balanceLoading[props.source] && <ActivityIndicator color="#ffb000" size="small" accessibilityLabel={t("Updating balance")} />}
               </View>
-              <TouchableOpacity
-                style={styles.changeAssetButton}
-                onPress={props.onChangeSource}
-                accessibilityRole="button"
-              >
-                <Text style={styles.changeAssetText}>Change</Text>
-              </TouchableOpacity>
             </View>
 
-            <Text style={styles.label}>Who are you paying?</Text>
-            <View style={[styles.row, { alignItems: 'center' }]}>
+            <View style={[styles.row, { alignItems: 'center', marginBottom: 8 }]}>
+              <Text style={[styles.label, { flex: 1, marginBottom: 0 }]}>{t("Recipient")}</Text>
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={props.onScan}
+                disabled={props.loading}
+                accessibilityRole="button"
+                accessibilityLabel={t("Scan payment QR code")}
+              >
+                <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
+                <Text style={styles.scanText}>{t("Scan QR")}</Text>
+              </TouchableOpacity>
+            </View>
               <TextInput
-                style={[styles.input, styles.destinationInput, { flex: 1 }]}
+                style={[styles.input, styles.destinationInput]}
                 placeholder={
                   isHedera
-                    ? 'Scan a payment code or enter an account'
-                  : 'Scan or paste a Lightning request'
+                    ? t('Scan a payment code or enter an account')
+                  : t('Scan or paste a Lightning request')
                 }
                 placeholderTextColor="#666"
                 value={props.destination}
                 onChangeText={props.onDestinationChange}
+                editable={!props.loading}
+                accessibilityLabel={t('Who are you paying?')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 multiline
               />
-              <TouchableOpacity
-                style={styles.scanButton}
-                onPress={props.onScan}
-                accessibilityRole="button"
-                accessibilityLabel="Scan payment QR code"
-              >
-                <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
-                <Text style={styles.scanText}>Scan QR</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.label}>Amount</Text>
+            <Text style={styles.label}>{t("Amount")}</Text>
+            {props.amountRequirement && (
+              <View style={styles.amountGuidance} accessibilityLiveRegion="polite">
+                <Text style={styles.amountGuidanceTitle}>{t('Enter the amount you want to send.')}</Text>
+                <Text style={styles.amountGuidanceText}>
+                  {props.amountRequirement.maxSats === null
+                    ? t('This payment request has no fixed amount.')
+                    : t('The recipient accepts {min}–{max} SAT.', {
+                        min: props.amountRequirement.minSats.toLocaleString(appLocale()),
+                        max: props.amountRequirement.maxSats.toLocaleString(appLocale()),
+                      })}
+                </Text>
+              </View>
+            )}
             <TextInput
+              ref={amountRef}
               style={styles.input}
               placeholder={
-                isHedera ? 'HBAR' : props.currency === 'SAT' ? 'Satoshis' : 'Euro'
+                isHedera ? 'HBAR' : props.currency === 'SAT' ? t('Satoshis') : t('Euro')
               }
               placeholderTextColor="#666"
               value={props.amountInput}
               onChangeText={props.onAmountChange}
+              editable={!props.loading}
+              accessibilityLabel={t('Amount')}
               keyboardType="decimal-pad"
             />
             {!isHedera && (
@@ -209,16 +240,16 @@ export function PaymentForm(props: {
               </View>
             )}
             <TouchableOpacity
-              style={[styles.button, (props.loading || !props.walletReady) && styles.buttonDisabled]}
+              style={[styles.button, reviewDisabled && styles.buttonDisabled]}
               onPress={props.onReview}
-              disabled={props.loading || !props.walletReady}
+              disabled={reviewDisabled}
               accessibilityRole="button"
             >
               {props.loading ? (
                 <ActivityIndicator color="#111" />
               ) : (
                 <View style={styles.buttonContent}>
-                  <Text style={styles.buttonText}>Continue</Text>
+                  <Text style={styles.buttonText}>{t("Continue")}</Text>
                   <Ionicons name="arrow-forward" size={19} color="#111" />
                 </View>
               )}
@@ -226,6 +257,9 @@ export function PaymentForm(props: {
           </>
         )}
       </View>
+      {props.sourceSelected && !isHedera && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+        <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
+      </AdvancedOptions>}
     </ScrollView>
   );
 }

@@ -2,6 +2,14 @@ const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
 const config = getDefaultConfig(__dirname);
+const queryStringBridge = path.join(__dirname, 'lib/router-query-string.cjs');
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'query-string' && path.normalize(context.originModulePath) !== path.normalize(queryStringBridge)) {
+    return { type: 'sourceFile', filePath: queryStringBridge };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 // Force Metro to resolve the 'browser' exports in package.json to fix 'jose' Node polyfill errors
 config.resolver.unstable_conditionNames = ['react-native', 'browser', 'require'];

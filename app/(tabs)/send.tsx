@@ -1,20 +1,22 @@
+import { t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Platform } from 'react-native';
+import { Alert, AppState, BackHandler, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCameraPermissions } from 'expo-camera';
+import { paymentScanInbox } from '@/lib/payment-scan';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
-import { fetchInvoiceFromLNURLP, resolveLightningAddress, resolveLNURL } from '@/lib/lnurl-safe';
+import { fetchInvoiceFromLNURLP } from '@/lib/lnurl-safe';
 import { fetchOcpExecutionPayload, fetchOcpOptions, resolveOcpUrl } from '@/lib/ocp-safe';
-import { normalizeLightningInput, isBolt11Invoice } from '@/lib/lightning';
+import { resolveLightningDestination, type LightningAmountRequirement } from '@/lib/lightning-destination';
+import { friendlyPaymentMessage } from '@/lib/payment-errors';
 import {
   inferPaymentSourceFromRequest,
   parsePaymentAmount,
-  resolveLnurlAmount,
 } from '@/lib/payment-input';
 import {
   LightningPaymentPendingError,
@@ -23,7 +25,8 @@ import {
   type SparkPaymentResult,
 } from '@/lib/payments';
 import { authorizePayment } from '@/lib/payment-authorization';
-import { lightningPaymentLifecycle } from '@/lib/lightning/reconcile-native';
+import { notifyPaymentHaptics } from '@/lib/optional-haptics';
+import { lightningPaymentLifecycle, reconcileLightningPayments } from '@/lib/lightning/reconcile-native';
 import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
 import { PaymentForm } from '@/components/send/payment-form';
 import {
@@ -35,7 +38,6 @@ import {
   LightningSuccessView,
 } from '@/components/send/lightning-payment-views';
 import {
-  getHederaPaymentFeeCeilingTinybars,
   HEDERA_NETWORK_LABEL,
 } from '@/lib/hedera/config';
 import {
@@ -44,6 +46,7 @@ import {
 } from '@/lib/hedera/checkout';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import {
+  assertHederaPaymentBalance,
   formatTinybars,
   HederaPaymentPendingError,
   parseHederaPaymentRequest,
@@ -53,7 +56,6 @@ import {
 import {
   IdentityRequiredView,
   OcpQuoteView,
-  ScannerView,
 } from '@/components/send/payment-state-views';
 import type {
   OcpOption,
@@ -65,34 +67,7 @@ import type {
   PendingLightningPayment,
 } from '@/components/send/types';
 
-const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : 'Payment failed.';
-
-function friendlyPaymentMessage(cause: unknown, asset = 'payment'): string {
-  const message = messageOf(cause);
-  const normalized = message.toLowerCase();
-  if (normalized.includes('insufficient') || normalized.includes('not enough')) {
-    return `There is not enough ${asset} to cover this payment and its network fee.`;
-  }
-  if (normalized.includes('expired')) {
-    return 'This payment request has expired. Ask for a new QR code.';
-  }
-  if (normalized.includes('does not match') || normalized.includes('wrong amount')) {
-    return 'The entered amount is different from the payment request. Check it and try again.';
-  }
-  if (normalized.includes('no ') && normalized.includes('account')) {
-    return `Your ${asset} account is not ready yet. Open Request to finish setting it up.`;
-  }
-  if (normalized.includes('contract_revert') || normalized.includes('rejected')) {
-    return 'The payment was rejected. No successful payment was recorded.';
-  }
-  if (normalized.includes('cancelled') || normalized.includes('canceled')) {
-    return 'Payment cancelled. Nothing was sent.';
-  }
-  if (normalized.includes('unavailable') || normalized.includes('timeout')) {
-    return 'The payment network is taking too long to respond. Please try again in a moment.';
-  }
-  return 'We could not prepare this payment. Check the recipient and amount, then try again.';
-}
+const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : t('Payment failed.');
 
 function isExpectedEIdDeepLink(value: string): boolean {
   try {
@@ -104,12 +79,16 @@ function isExpectedEIdDeepLink(value: string): boolean {
 }
 
 export default function SendScreen() {
+  useLanguage();
   const router = useRouter();
-  const { hederaRequest, hederaRequestKey } = useLocalSearchParams<{
+  const { hederaRequest, hederaRequestKey, scanResultKey } = useLocalSearchParams<{
     hederaRequest?: string | string[];
     hederaRequestKey?: string | string[];
+    scanResultKey?: string | string[];
   }>();
   const rates = useExchangeRates();
+  const [source, setSource] = useState<PaymentSource>('spark');
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const {
     sparkWallet,
     walletReady,
@@ -118,20 +97,21 @@ export default function SendScreen() {
     loadOrGenerateWallet,
     refreshHederaAccount,
     sendHederaPayment,
+    error: walletError,
   } = useWalletAuth();
-  const { balances, balanceError } = useWalletBalances({
+  const { balances, balanceStates, balanceError } = useWalletBalances({
     walletReady,
     sparkWallet,
     refreshHederaAccount,
+    initializationError: walletError,
+    enableHedera: advancedExpanded || source === 'hedera',
   });
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [destination, setDestination] = useState('');
   const [amountInput, setAmountInput] = useState('');
+  const [amountRequirement, setAmountRequirement] = useState<LightningAmountRequirement | null>(null);
   const [currency, setCurrency] = useState<PaymentCurrency>('SAT');
-  const [source, setSource] = useState<PaymentSource>('spark');
   const [sourceSelected, setSourceSelected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
   const [lightningResult, setLightningResult] = useState<SparkPaymentResult | null>(null);
   const [pendingLightning, setPendingLightning] = useState<PendingLightningPayment | null>(null);
   const [pendingHedera, setPendingHedera] = useState<PendingHederaPayment | null>(null);
@@ -143,10 +123,18 @@ export default function SendScreen() {
   const [eIdDemo, setEIdDemo] = useState(false);
   const waitingForEId = useRef(false);
   const completingEId = useRef(false);
+  const paymentInFlight = useRef(false);
   const consumedHederaRequestKey = useRef<string | null>(null);
+  const consumedScanRequest = useRef<string | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    // Resolve ambiguous earlier submissions when the user opens Send (or Home
+    // history), without scanning transaction history during balance startup.
+    if (sparkWallet) void reconcileLightningPayments(sparkWallet).catch(() => undefined);
+  }, [sparkWallet]));
 
   useEffect(() => {
-    if (!walletReady) void loadOrGenerateWallet();
+    if (!walletReady) void loadOrGenerateWallet().catch(() => undefined); // Provider retains the error.
   }, [loadOrGenerateWallet, walletReady]);
 
   useEffect(() => {
@@ -162,6 +150,7 @@ export default function SendScreen() {
     setSourceSelected(true);
     setDestination(hederaRequest);
     setAmountInput('');
+    setAmountRequirement(null);
     setPendingHedera(null);
     setHederaResult(null);
   }, [hederaRequest, hederaRequestKey]);
@@ -169,7 +158,7 @@ export default function SendScreen() {
   const prepareLightningInvoice = useCallback(async (
     invoice: string,
     requestedAmount?: number,
-    recipientLabel = 'Lightning payment request',
+    recipientLabel = t('Lightning payment request'),
   ) => {
     if (!sparkWallet) throw new Error('Spark wallet is not ready.');
     const payment = await prepareSparkPayment(sparkWallet, invoice, requestedAmount);
@@ -188,12 +177,12 @@ export default function SendScreen() {
         pendingEId.amountSats,
         payerData,
       );
-      await prepareLightningInvoice(invoice, pendingEId.amountSats, 'Verified payment request');
+      await prepareLightningInvoice(invoice, pendingEId.amountSats, t('Verified payment request'));
       setPendingEId(null);
       setEIdSessionId(null);
     } catch (cause) {
-      Alert.alert('Identity verification failed', messageOf(cause));
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('Identity verification failed'), t(messageOf(cause)));
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Error);
     } finally {
       completingEId.current = false;
       setLoading(false);
@@ -225,7 +214,7 @@ export default function SendScreen() {
       setEIdDemo(session.demo);
       waitingForEId.current = true;
       if (session.demo) {
-        Alert.alert('Demo identity session', 'This is explicitly not a legal eID verification.');
+        Alert.alert(t('Demo identity session'), t('This is explicitly not a legal eID verification.'));
       }
       const clientUrl =
         'eid://127.0.0.1:24727/eID-Client?tcTokenURL=' + encodeURIComponent(session.tcTokenURL);
@@ -239,20 +228,21 @@ export default function SendScreen() {
       }
     } catch (cause) {
       waitingForEId.current = false;
-      Alert.alert('Could not start AusweisApp', messageOf(cause));
+      Alert.alert(t('Could not start AusweisApp'), t(messageOf(cause)));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDestination(
+  const handleDestination = useCallback(async (
     scannedValue?: string,
     sourceOverride?: PaymentSource,
-  ) {
+  ) => {
+    const enteredAmountInput = scannedValue === undefined ? amountInput : '';
     const raw = (scannedValue ?? destination).trim();
     const activeSource = sourceOverride || source;
     if (!raw) {
-      Alert.alert('Who are you paying?', 'Scan a payment QR code or enter the recipient.');
+      Alert.alert(t('Who are you paying?'), t('Scan a payment QR code or enter the recipient.'));
       return;
     }
     setLoading(true);
@@ -260,8 +250,8 @@ export default function SendScreen() {
       if (activeSource === 'hedera') {
         const checkoutRequest = parseHederaCheckoutRequest(raw);
         const directRequest = checkoutRequest ? null : parseHederaPaymentRequest(raw);
-        const enteredAmount = amountInput.trim()
-          ? parseHederaTransferTinybars(amountInput)
+        const enteredAmount = enteredAmountInput.trim()
+          ? parseHederaTransferTinybars(enteredAmountInput)
           : null;
         const requestedAmount = checkoutRequest?.amountTinybars ?? directRequest?.amountTinybars;
         if (
@@ -274,18 +264,18 @@ export default function SendScreen() {
         }
         const amountTinybars = requestedAmount ?? enteredAmount;
         if (amountTinybars === null) {
+          if (scannedValue !== undefined) return; // Let the user enter the requested amount.
           throw new Error('Enter an HBAR amount or scan a request that includes one.');
         }
         const sourceAccount = hederaAccount || await refreshHederaAccount();
         if (!sourceAccount) {
           throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this recovery phrase.');
         }
-        const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
+        assertHederaPaymentBalance(
+          amountTinybars,
+          sourceAccount.balanceTinybars,
           checkoutRequest ? 'checkout' : 'direct',
         );
-        if (amountTinybars + feeCeilingTinybars > sourceAccount.balanceTinybars) {
-          throw new Error('Insufficient HBAR balance including the maximum transaction fee.');
-        }
         if (checkoutRequest) await verifyHederaCheckoutRequest(checkoutRequest);
         setPendingHedera({
           recipientAccountId:
@@ -307,50 +297,35 @@ export default function SendScreen() {
           // Standard LNURL-pay endpoints intentionally fall through.
         }
       }
-      const normalized = normalizeLightningInput(raw);
-      const requested = parsePaymentAmount(amountInput, currency, rates.btcToEur);
-      let effectiveAmount = requested;
-      let invoice = normalized;
-      if (normalized.includes('@')) {
-        const info = await resolveLightningAddress(normalized);
-        effectiveAmount = resolveLnurlAmount(info.minSendable, info.maxSendable, requested);
-        if (info.compliance?.isSubjectToTravelRule && info.payerData?.compliance?.mandatory) {
-          setPendingEId({ lnurl: info, amountSats: effectiveAmount });
-          return;
-        }
-        invoice = await fetchInvoiceFromLNURLP(info.callback, effectiveAmount);
-      } else if (/^lnurl1/i.test(normalized)) {
-        const info = await resolveLNURL(normalized);
-        effectiveAmount = resolveLnurlAmount(info.minSendable, info.maxSendable, requested);
-        if (info.compliance?.isSubjectToTravelRule && info.payerData?.compliance?.mandatory) {
-          setPendingEId({ lnurl: info, amountSats: effectiveAmount });
-          return;
-        }
-        invoice = await fetchInvoiceFromLNURLP(info.callback, effectiveAmount);
-      } else if (!isBolt11Invoice(normalized)) {
-        throw new Error('Unsupported payment destination.');
+      const requested = parsePaymentAmount(enteredAmountInput, currency, rates.btcToEur);
+      const resolved = await resolveLightningDestination(raw, requested);
+      if (resolved.kind === 'amount-required') {
+        setAmountRequirement(resolved.limits);
+        return;
       }
+      setAmountRequirement(null);
       await prepareLightningInvoice(
-        invoice,
-        effectiveAmount > 0 ? effectiveAmount : undefined,
-        normalized.includes('@') ? normalized : 'Lightning payment request',
+        resolved.invoice,
+        resolved.amountSats,
+        resolved.recipientLabel ?? t('Lightning payment request'),
       );
     } catch (cause) {
       Alert.alert(
-        'Check this payment',
-        friendlyPaymentMessage(
+        t('Check this payment'),
+        t(friendlyPaymentMessage(
           cause,
           activeSource === 'hedera' ? 'HBAR' : 'Bitcoin',
-        ),
+        )),
       );
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
-  }
+  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, refreshHederaAccount, source]);
 
   async function executeHederaPayment() {
-    if (!pendingHedera) return;
+    if (!pendingHedera || paymentInFlight.current) return;
+    paymentInFlight.current = true;
     setLoading(true);
     try {
       const result = await sendHederaPayment({
@@ -360,36 +335,39 @@ export default function SendScreen() {
       });
       setPendingHedera(null);
       setHederaResult(result);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
       const isPending = cause instanceof HederaPaymentPendingError;
       if (isPending) setPendingHedera(null);
       Alert.alert(
-        isPending ? 'Payment is still processing' : 'Payment not completed',
-        isPending
-          ? 'Do not send it again. Open Home and refresh Recent activity to check the final result.'
-          : friendlyPaymentMessage(cause, 'HBAR'),
+        t(isPending ? t('Payment is still processing') : t('Payment not completed')),
+        t(isPending
+          ? t('Do not send it again. Open Home and refresh Recent activity to check the final result.')
+          : friendlyPaymentMessage(cause, 'HBAR')),
       );
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Error);
     } finally {
+      paymentInFlight.current = false;
       setLoading(false);
     }
   }
 
   async function executeLightningPayment() {
-    if (!pendingLightning || !sparkWallet) return;
+    if (!pendingLightning || !sparkWallet || paymentInFlight.current) return;
+    paymentInFlight.current = true;
     setLoading(true);
     try {
-      await authorizePayment();
+      const assertAuthorized = await authorizePayment();
       const result = await payPreparedSparkPayment(
         sparkWallet,
         pendingLightning,
         lightningPaymentLifecycle,
+        assertAuthorized,
       );
       setPendingLightning(null);
       setLightningResult(result);
       try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
       } catch {
         // Haptics are optional and cannot invalidate a proof-backed payment.
       }
@@ -397,13 +375,14 @@ export default function SendScreen() {
       const isPending = cause instanceof LightningPaymentPendingError;
       if (isPending) setPendingLightning(null);
       Alert.alert(
-        isPending ? 'Payment is still processing' : 'Payment not completed',
-        isPending
-          ? 'Do not send it again. Open Home and refresh Recent activity to check the final result.'
-          : friendlyPaymentMessage(cause, 'Bitcoin'),
+        t(isPending ? t('Payment is still processing') : t('Payment not completed')),
+        t(isPending
+          ? t('Do not send it again. Open Home and refresh Recent activity to check the final result.')
+          : friendlyPaymentMessage(cause, 'Bitcoin')),
       );
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Error);
     } finally {
+      paymentInFlight.current = false;
       setLoading(false);
     }
   }
@@ -421,28 +400,20 @@ export default function SendScreen() {
       await prepareLightningInvoice(
         payload.pr,
         payload.amount,
-        ocpState.quote.merchantName || 'Merchant payment',
+        ocpState.quote.merchantName || t('Merchant payment'),
       );
       setOcpState(null);
     } catch (cause) {
-      Alert.alert('Could not prepare payment', messageOf(cause));
+      Alert.alert(t('Could not prepare payment'), t(messageOf(cause)));
     } finally {
       setLoading(false);
     }
   }
 
-  async function openScanner() {
-    if (Platform.OS === 'web') {
-      Alert.alert('Camera unavailable', 'Use a native build.');
-      return;
-    }
-    if (!cameraPermission?.granted && !(await requestCameraPermission()).granted) return;
-    setIsScanning(true);
-  }
-
   const reset = useCallback(() => {
     setDestination('');
     setAmountInput('');
+    setAmountRequirement(null);
     setLightningResult(null);
     setPendingLightning(null);
     setPendingHedera(null);
@@ -453,29 +424,41 @@ export default function SendScreen() {
     setEIdSessionId(null);
     setEIdDemo(false);
     setSourceSelected(false);
+    setSource('spark');
+    setAdvancedExpanded(false);
     waitingForEId.current = false;
   }, []);
 
   useFocusEffect(useCallback(() => reset, [reset]));
 
-  if (isScanning) {
-    return (
-      <ScannerView
-        onScanned={value => {
-          setIsScanning(false);
-          setDestination(value);
-          const scannedSource = inferPaymentSourceFromRequest(value, source);
-          setSourceSelected(true);
-          if (scannedSource !== source) {
-            setSource(scannedSource);
-            setAmountInput('');
-          }
-          void handleDestination(value, scannedSource);
-        }}
-        onCancel={() => setIsScanning(false)}
-      />
-    );
-  }
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      // A submitted payment must finish or become pending before leaving its review.
+      if (loading || paymentInFlight.current) return true;
+      if (pendingHedera) { setPendingHedera(null); return true; }
+      if (pendingLightning) { setPendingLightning(null); return true; }
+      if (ocpState || pendingEId || hederaResult || lightningResult || sourceSelected) {
+        reset();
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [loading, pendingHedera, pendingLightning, ocpState, pendingEId, hederaResult, lightningResult, sourceSelected, reset]));
+
+  useFocusEffect(useCallback(() => {
+    if (!walletReady || typeof scanResultKey !== 'string' || consumedScanRequest.current === scanResultKey) return;
+    consumedScanRequest.current = scanResultKey;
+    const value = paymentScanInbox.take(scanResultKey);
+    if (!value) return;
+    const scannedSource = inferPaymentSourceFromRequest(value, 'spark');
+    setDestination(value);
+    setSource(scannedSource);
+    setSourceSelected(true);
+    setAmountInput('');
+    setAmountRequirement(null);
+    if (scannedSource === 'hedera' || sparkWallet) void handleDestination(value, scannedSource);
+  }, [handleDestination, scanResultKey, sparkWallet, walletReady]));
 
   if (hederaResult) {
     return (
@@ -483,14 +466,14 @@ export default function SendScreen() {
         result={hederaResult}
         onOpenHashscan={() => {
           void openHederaExplorerUrl(hederaResult.hashscanUrl).catch(cause =>
-            Alert.alert('Could not open HashScan', messageOf(cause)),
+            Alert.alert(t('Could not open HashScan'), t(messageOf(cause))),
           );
         }}
         onOpenContract={
           hederaResult.contractHashscanUrl
             ? () => {
                 void openHederaExplorerUrl(hederaResult.contractHashscanUrl!).catch(cause =>
-                  Alert.alert('Could not open HashScan', messageOf(cause)),
+                  Alert.alert(t('Could not open HashScan'), t(messageOf(cause))),
                 );
               }
             : undefined
@@ -566,28 +549,40 @@ export default function SendScreen() {
     <PaymentForm
       destination={destination}
       amountInput={amountInput}
+      amountRequirement={amountRequirement}
       currency={currency}
       source={source}
       sourceSelected={sourceSelected}
+      advancedExpanded={advancedExpanded}
+      onAdvancedChange={setAdvancedExpanded}
       balances={balances}
       balanceError={balanceError}
+      balanceLoading={{ spark: balanceStates.spark.status === 'loading', hedera: balanceStates.hedera.status === 'loading' }}
       loading={loading}
       walletReady={walletReady}
-      onDestinationChange={setDestination}
+      onDestinationChange={value => {
+        setDestination(value);
+        setAmountRequirement(null);
+      }}
       onAmountChange={setAmountInput}
       onCurrencyChange={setCurrency}
       onSourceChange={nextSource => {
         setSource(nextSource);
+        setAdvancedExpanded(false);
         setSourceSelected(true);
         setDestination('');
         setAmountInput('');
+        setAmountRequirement(null);
       }}
       onChangeSource={() => {
         setSourceSelected(false);
+        setSource('spark');
+        setAdvancedExpanded(false);
         setDestination('');
         setAmountInput('');
+        setAmountRequirement(null);
       }}
-      onScan={() => void openScanner()}
+      onScan={() => router.push('/scan')}
       onReview={() => void handleDestination()}
     />
   );

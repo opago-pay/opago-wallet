@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchJson } from '@/lib/http';
 
 const CACHE_EXPIRY = 60_000;
@@ -20,8 +20,8 @@ interface CoinGeckoResponse {
   'hedera-hashgraph'?: { eur?: number };
 }
 
-function hasCompleteRates(rates: ExchangeRates): boolean {
-  return Object.values(rates).every(rate => Number.isFinite(rate) && rate > 0);
+function hasBitcoinRate(rates: ExchangeRates): boolean {
+  return Number.isFinite(rates.btcToEur) && rates.btcToEur > 0;
 }
 
 async function requestRates(): Promise<ExchangeRates> {
@@ -34,8 +34,9 @@ async function requestRates(): Promise<ExchangeRates> {
     );
     const btcToEur = Number(data.bitcoin?.eur);
     const hbarToEur = Number(data['hedera-hashgraph']?.eur);
-    const nextRates = { btcToEur, hbarToEur };
-    if (!hasCompleteRates(nextRates)) {
+    // A missing optional-asset price must not hide the Bitcoin estimate.
+    const nextRates = { btcToEur, hbarToEur: Number.isFinite(hbarToEur) && hbarToEur > 0 ? hbarToEur : 0 };
+    if (!hasBitcoinRate(nextRates)) {
       throw new Error('Exchange-rate service returned invalid rates.');
     }
     cachedRates = nextRates;
@@ -51,20 +52,26 @@ async function requestRates(): Promise<ExchangeRates> {
 
 export function useExchangeRates() {
   const [rates, setRates] = useState(cachedRates);
+  const [updatedAt, setUpdatedAt] = useState(lastFetch);
+  const [isLoading, setIsLoading] = useState(() => Date.now() - lastFetch >= CACHE_EXPIRY || !hasBitcoinRate(cachedRates));
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadRates() {
-      if (Date.now() - lastFetch < CACHE_EXPIRY && hasCompleteRates(cachedRates)) {
+      if (Date.now() - lastFetch < CACHE_EXPIRY && hasBitcoinRate(cachedRates)) {
         setRates(cachedRates);
+        setUpdatedAt(lastFetch);
+        setIsLoading(false);
         return;
       }
       try {
         const nextRates = await requestRates();
-        if (!cancelled) setRates(nextRates);
+        if (!cancelled) { setRates(nextRates); setUpdatedAt(lastFetch); }
       } catch {
         if (!cancelled) setRates(cachedRates);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     }
 
@@ -74,5 +81,5 @@ export function useExchangeRates() {
     };
   }, []);
 
-  return rates;
+  return useMemo(() => ({ ...rates, isLoading, updatedAt }), [rates, isLoading, updatedAt]);
 }

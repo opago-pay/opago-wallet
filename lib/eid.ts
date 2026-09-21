@@ -1,5 +1,6 @@
 import { assertSafeRemoteUrl, requireEIdBackendUrl } from './config';
 import { fetchJson } from './http';
+import { requireIdentityPayments } from './product-capabilities';
 
 export interface EIdSession {
   sessionId: string;
@@ -17,6 +18,7 @@ export async function startEIdSession(input: {
   walletIdentifier: string;
   transactionReference: string;
 }): Promise<EIdSession> {
+  requireIdentityPayments();
   const backendUrl = requireEIdBackendUrl();
   const response = await fetchJson<EIdSession>(
     backendUrl + '/api/eid/session',
@@ -37,6 +39,7 @@ export async function waitForVerifiedEId(
   sessionId: string,
   timeoutMs = 120_000,
 ): Promise<Record<string, unknown>> {
+  requireIdentityPayments();
   if (!/^[a-f0-9-]{20,}$/i.test(sessionId)) throw new Error('Invalid eID session identifier.');
   const backendUrl = requireEIdBackendUrl();
   const deadline = Date.now() + timeoutMs;

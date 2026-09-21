@@ -6,7 +6,7 @@ export interface WalletAssetPresentation {
   accent: string;
   description: string;
   networkLabel: string;
-  networkBadge: 'MAINNET' | 'REGTEST' | 'TESTNET';
+  networkBadge: 'LIGHTNING' | 'MAINNET' | 'REGTEST' | 'TESTNET';
 }
 
 const BASE_ASSETS = {
@@ -41,7 +41,7 @@ export function getWalletAssetPresentation(
     return {
       ...base,
       networkLabel: mainnetEnabled ? 'Bitcoin Lightning' : 'Bitcoin regtest',
-      networkBadge: mainnetEnabled ? 'MAINNET' : 'REGTEST',
+      networkBadge: mainnetEnabled ? 'LIGHTNING' : 'REGTEST',
     };
   }
   throw new Error('Unsupported wallet asset.');

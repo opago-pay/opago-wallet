@@ -1,57 +1,65 @@
+import { t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWindowDimensions } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { WalletTabIcon } from '@/components/navigation/wallet-tab-icon';
 
 export default function TabLayout() {
+  useLanguage();
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#ffb000',
-        tabBarInactiveTintColor: '#a0a0ab', // Lightened inactive color for visibility
+        tabBarInactiveTintColor: '#969987',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#0a0a0c',
+          backgroundColor: '#0c0e09',
           borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.1)',
+          borderTopColor: '#292d23',
           elevation: 0,
-          minHeight: 62,
-          paddingTop: 6,
-          paddingBottom: 6,
+          height: 66 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 14,
+          paddingTop: 10,
+          paddingBottom: Math.max(insets.bottom, 8),
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '700',
+          fontWeight: '500',
+          marginTop: 3,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="wallet.pass.fill" color={color} />,
+          title: t('Home'),
+          tabBarIcon: ({ color }) => <WalletTabIcon name="home" color={color} />,
         }}
       />
       <Tabs.Screen
         name="send"
         options={{
-          title: 'Send',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: t('Send'),
+          tabBarIcon: ({ color }) => <WalletTabIcon name="send" color={color} />,
         }}
       />
       <Tabs.Screen
         name="receive"
         options={{
-          title: 'Request',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
+          title: t('Request'),
+          tabBarIcon: ({ color }) => <WalletTabIcon name="request" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Security',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
+          title: t('Security'),
+          tabBarIcon: ({ color }) => <WalletTabIcon name="security" color={color} />,
         }}
       />
     </Tabs>

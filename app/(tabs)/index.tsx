@@ -1,3 +1,5 @@
+import { appLocale, t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -6,16 +8,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { TouchableOpacity } from '@/components/ui/wallet-interaction';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AdvancedOptions } from '@/components/ui/advanced-options';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
+import { useWalletBalances } from '@/hooks/useWalletBalances';
+import { useHomeBalancePreview } from '@/hooks/useHomeBalancePreview';
+import { recordWalletStartupStage } from '@/lib/startup-timing';
+import { BackupReminder } from '@/components/security/backup-prompt';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { getTransactions, Transaction as LocalTransaction } from '@/lib/database';
 import { loadHederaHistory, loadHederaTransactionStatus } from '@/lib/hedera/account';
@@ -34,9 +42,11 @@ import {
 } from '@/lib/lightning/spark-history';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { appConfig } from '@/lib/config';
-import { calculatePortfolioEur } from '@/lib/portfolio-valuation';
+import { calculateBitcoinEur, calculateHederaEur } from '@/lib/portfolio-valuation';
 import { withTimeout } from '@/lib/promise-timeout';
+import { refreshProgressively } from '@/lib/progressive-refresh';
 import { operationalHealth } from '@/lib/operational-health-native';
+import { yieldToUi } from '@/lib/ui-ready';
 import {
   getWalletAssetPresentation,
   walletAssetKeyFromSymbol,
@@ -62,269 +72,164 @@ interface DisplayTransaction {
   explorerLabel?: 'HashScan';
 }
 
-interface SparkBalanceResult {
-  balance?: unknown;
-  satsBalance?: { incoming?: unknown };
-}
-
 export default function HomeScreen() {
+  useLanguage();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     walletReady,
     sparkWallet,
     hederaAccount,
+    hederaPublicKey,
     loadOrGenerateWallet,
     refreshHederaAccount,
+    error: walletError,
   } = useWalletAuth();
   const rates = useExchangeRates();
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [balances, setBalances] = useState({
-    spark: 0,
-    hbarTinybars: 0n,
+  const { balances, balanceStates, secondaryDataReady, sparkPriorityTimedOut, refreshBalances } = useWalletBalances({
+    walletReady, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: advancedExpanded, prioritizeSpark: true,
   });
+  const preview = useHomeBalancePreview({
+    publicKey: hederaPublicKey, spark: balances.spark, hedera: balances.hbarTinybars,
+    sparkAt: balanceStates.spark.updatedAt, hederaAt: balanceStates.hedera.updatedAt,
+    btcToEur: rates.btcToEur, hbarToEur: rates.hbarToEur, ratesAt: rates.updatedAt,
+  });
+  const displayBalances = {
+    spark: balances.spark ?? preview?.spark?.value ?? null,
+    hbarTinybars: balances.hbarTinybars ?? (preview?.hedera ? BigInt(preview.hedera.value) : null),
+  };
+  const previewRates = !(rates.btcToEur > 0) && !!preview?.rates;
+  const displayRates = {
+    btcToEur: rates.btcToEur > 0 ? rates.btcToEur : preview?.rates?.btcToEur ?? 0,
+    hbarToEur: rates.hbarToEur > 0 ? rates.hbarToEur : preview?.rates?.hbarToEur ?? 0,
+  };
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
-  const [activityDisplayLimit, setActivityDisplayLimit] = useState(20);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const refreshAfterInitializationRef = useRef(false);
-  const refreshInProgressRef = useRef(false);
+  const refreshGenerationRef = useRef(0);
+  const refreshInProgressRef = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {
     if (!walletReady) {
-      refreshAfterInitializationRef.current = true;
-      try {
-        await loadOrGenerateWallet();
-      } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : 'Wallet initialization failed.');
-      }
+      try { await loadOrGenerateWallet(); }
+      catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Wallet initialization failed.')); }
       return;
     }
-    if (refreshInProgressRef.current) return;
-    refreshInProgressRef.current = true;
+    // History is opt-in. Startup and pull-to-refresh of a collapsed Home load
+    // balances only; no database, journal or remote history reads start here.
+    if (!activityExpanded || !secondaryDataReady) return;
+    if (refreshInProgressRef.current) return refreshInProgressRef.current;
+    const generation = ++refreshGenerationRef.current;
     setLoading(true);
     setLoadError(null);
-    try {
-      const local = await getTransactions();
-      const remote: DisplayTransaction[] = [];
-      const remoteErrors: string[] = [];
+    let lightningHistory: Promise<SparkTransferLike[]> | null = null;
+    const getLightningHistory = () => lightningHistory ||= sparkWallet
+      ? loadSparkTransfersPaginated(sparkWallet, 500, 50)
+      : Promise.resolve([]);
 
-      try {
-        const journalRecords = await hederaPaymentJournal.reconcile(
-          loadHederaTransactionStatus,
-        );
-        remote.push(...journalRecords.map(item => ({
-          key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
-          txId: item.transactionId,
-          type: 'outgoing' as const,
-          amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
-          asset: 'HBAR',
-          status: item.state,
-          timestamp: item.createdAt,
-          explorerUrl: getHederaTransactionExplorerUrl(item.transactionId),
-          explorerLabel: 'HashScan' as const,
-        })));
-      } catch (cause) {
-        remoteErrors.push(
-          'Hedera journal: ' +
-            (cause instanceof Error ? cause.message : 'Local payment state could not be loaded.'),
-        );
-      }
-
-      try {
-        const account = await refreshHederaAccount();
-        setBalances(current => ({
-          ...current,
-          hbarTinybars: account?.balanceTinybars || 0n,
-        }));
-        if (account) {
-          const history = await loadHederaHistory(account.accountId, 20);
-          remote.push(...history.map(item => ({
+    const operation = yieldToUi().then(() => {
+      if (generation !== refreshGenerationRef.current) return;
+      recordWalletStartupStage('history_refresh_started');
+      return refreshProgressively<DisplayTransaction>([
+        { label: 'Local activity', load: async () => (await getTransactions())
+          .filter(item => item.asset === 'SAT' || item.asset === 'HBAR')
+          .map((item: LocalTransaction) => ({
+            key: item.txId || 'local:' + item.id, txId: item.txId, type: item.type,
+            amountDisplay: item.amount.toLocaleString(appLocale()), asset: item.asset,
+            status: item.status, timestamp: item.timestamp,
+          })) },
+        { label: 'Hedera journal', load: async () => {
+          const records = await hederaPaymentJournal.reconcile(id => withTimeout(
+            loadHederaTransactionStatus(id), OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
+            'Hedera payment status timed out.',
+          ));
+          return records.map(item => ({
+            key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
+            txId: item.transactionId, type: 'outgoing' as const,
+            amountDisplay: formatTinybars(BigInt(item.amountTinybars)), asset: 'HBAR',
+            status: item.state, timestamp: item.createdAt,
+            explorerUrl: getHederaTransactionExplorerUrl(item.transactionId),
+            explorerLabel: 'HashScan' as const,
+          }));
+        } },
+        { label: 'Hedera history', load: async () => {
+          const account = await refreshHederaAccount();
+          if (!account) return [];
+          return (await loadHederaHistory(account.accountId, 20)).map(item => ({
             key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
             txId: item.transactionId,
             type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
-            amountDisplay: item.amountHbar,
-            asset: 'HBAR',
-            status: item.result.toLowerCase(),
-            timestamp: item.occurredAt,
-            explorerUrl: item.hashscanUrl,
-            explorerLabel: 'HashScan' as const,
-          })));
-        }
-      } catch (cause) {
-        remoteErrors.push(
-          'Hedera: ' +
-            (cause instanceof Error
-              ? cause.message
-              : 'Hedera ' + appConfig.hederaNetwork + ' data could not be loaded.'),
-        );
-      }
-
-      const refreshLightning = async () => {
-        if (!sparkWallet) return;
-        const lightningHistory = loadSparkTransfersPaginated(sparkWallet, 500, 50);
-        const [balanceResult, transferResult, journalResult] = await Promise.allSettled([
-          withTimeout(
-            sparkWallet.getBalance() as Promise<SparkBalanceResult>,
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Lightning balance refresh timed out.',
-          ),
-          withTimeout(
-            lightningHistory,
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Lightning history refresh timed out.',
-          ),
-          withTimeout(
-            reconcileLightningPayments(sparkWallet, lightningHistory),
-            OPTIONAL_ASSET_REFRESH_TIMEOUT_MS,
-            'Lightning payment reconciliation timed out.',
-          ),
-        ]);
-        if (balanceResult.status === 'fulfilled') {
-          const balance = balanceResult.value;
-          setBalances(current => ({
-            ...current,
-            spark: (Number(balance.balance) || 0) + (Number(balance.satsBalance?.incoming) || 0),
+            amountDisplay: item.amountHbar, asset: 'HBAR', status: item.result.toLowerCase(),
+            timestamp: item.occurredAt, explorerUrl: item.hashscanUrl, explorerLabel: 'HashScan' as const,
           }));
-        } else {
-          remoteErrors.push(
-            'Lightning balance: ' +
-              (balanceResult.reason instanceof Error
-                ? balanceResult.reason.message
-                : 'Wallet balance could not be loaded.'),
-          );
-        }
-        if (journalResult.status === 'fulfilled') {
-          for (const item of journalResult.value) {
-            remote.push({
-              key: 'ln:' + item.paymentHash,
-              txId: 'ln:' + item.paymentHash,
-              type: 'outgoing',
-              amountDisplay: item.amountSats.toLocaleString(),
-              asset: 'SAT',
-              status: item.state,
-              timestamp: item.createdAt,
-            });
-          }
-        } else {
+        } },
+        { label: 'Lightning journal', load: async () => {
+          const records = sparkWallet
+            ? await reconcileLightningPayments(sparkWallet, getLightningHistory())
+            : await lightningPaymentJournal.list();
+          return records.map(item => ({
+            key: 'ln:' + item.paymentHash, txId: 'ln:' + item.paymentHash,
+            type: 'outgoing' as const, amountDisplay: item.amountSats.toLocaleString(appLocale()),
+            asset: 'SAT', status: item.state, timestamp: item.createdAt,
+          }));
+        } },
+        { label: 'Lightning history', load: async () => {
+          if (!sparkWallet) return [];
           try {
-            const records = await lightningPaymentJournal.list();
-            for (const item of records) {
-              remote.push({
-                key: 'ln:' + item.paymentHash,
-                txId: 'ln:' + item.paymentHash,
-                type: 'outgoing',
-                amountDisplay: item.amountSats.toLocaleString(),
-                asset: 'SAT',
-                status: item.state,
-                timestamp: item.createdAt,
-              });
-            }
-          } catch {
-            // The journal error below remains visible without hiding other wallet data.
-          }
-          remoteErrors.push(
-            'Lightning payments: ' +
-              (journalResult.reason instanceof Error
-                ? journalResult.reason.message
-                : 'Payment status could not be reconciled.'),
-          );
-        }
-        if (transferResult.status === 'fulfilled') {
-          for (const transfer of transferResult.value as SparkTransferLike[]) {
-            const status = String(transfer.status || '').toUpperCase();
-            if (!status.includes('COMPLETED')) continue;
-            const amount = Math.abs(Number(transfer.totalValue) || 0);
-            if (amount <= 0) continue;
-            const paymentHash = sparkUserRequestPaymentHash(transfer.userRequest);
-            const key = paymentHash
-              ? 'ln:' + paymentHash
-              : 'spark:' + String(transfer.id || 'unknown');
-            remote.push({
-              key,
-              txId: key,
-              type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' : 'outgoing',
-              amountDisplay: amount.toLocaleString(),
-              asset: 'SAT',
-              status: 'confirmed',
-              timestamp: transfer.createdTime
-                ? new Date(transfer.createdTime).toISOString()
-                : new Date().toISOString(),
+            const transfers = await withTimeout(getLightningHistory(), OPTIONAL_ASSET_REFRESH_TIMEOUT_MS, 'Lightning history refresh timed out.');
+            void operationalHealth.recordSuccess('lightning').catch(() => undefined);
+            return transfers.flatMap(transfer => {
+              if (!String(transfer.status || '').toUpperCase().includes('COMPLETED')) return [];
+              const amount = Math.abs(Number(transfer.totalValue) || 0);
+              if (amount <= 0) return [];
+              const hash = sparkUserRequestPaymentHash(transfer.userRequest);
+              const key = hash ? 'ln:' + hash : 'spark:' + String(transfer.id || 'unknown');
+              return [{
+                key, txId: key,
+                type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' as const : 'outgoing' as const,
+                amountDisplay: amount.toLocaleString(appLocale()), asset: 'SAT', status: 'confirmed',
+                timestamp: transfer.createdTime ? new Date(transfer.createdTime).toISOString() : new Date().toISOString(),
+              }];
             });
+          } catch (cause) {
+            void operationalHealth.recordFailure('lightning', cause).catch(() => undefined);
+            throw cause;
           }
-        } else {
-          remoteErrors.push(
-            'Lightning history: ' +
-              (transferResult.reason instanceof Error
-                ? transferResult.reason.message
-                : 'Wallet history could not be loaded.'),
-          );
-        }
-
-        const lightningFailures = [balanceResult, transferResult, journalResult]
-          .filter(result => result.status === 'rejected') as PromiseRejectedResult[];
-        try {
-          if (lightningFailures.length > 0) {
-            await operationalHealth.recordFailure('lightning', lightningFailures[0].reason);
-          } else {
-            await operationalHealth.recordSuccess('lightning');
+        } },
+      ], ({ batches, errors, pending }) => {
+        if (generation !== refreshGenerationRef.current) return;
+        setTransactions(current => {
+          const byId = new Map<string, DisplayTransaction>();
+          // Keep already visible activity until all sources have refreshed successfully.
+          if (pending || errors.length) for (const item of current) byId.set(item.key, item);
+          for (const batch of batches) for (const item of batch) {
+            if (byId.get(item.key)?.status !== 'action_required') byId.set(item.key, item);
           }
-        } catch {
-          // Diagnostics are best-effort and must not break wallet refresh.
-        }
-      };
-
-      await refreshLightning();
-
-      const localDisplay = local
-        .filter(item => item.asset === 'SAT' || item.asset === 'HBAR')
-        .map((item: LocalTransaction): DisplayTransaction => ({
-          key: item.txId || 'local:' + item.id,
-          txId: item.txId,
-          type: item.type,
-          amountDisplay: item.amount.toLocaleString(),
-          asset: item.asset,
-          status: item.status,
-          timestamp: item.timestamp,
-        }));
-      setTransactions(current => {
-        const byId = new Map<string, DisplayTransaction>();
-        if (remoteErrors.length) {
-          for (const item of current) byId.set(item.key, item);
-        }
-        for (const item of localDisplay) byId.set(item.key, item);
-        for (const item of remote) {
-          const localItem = byId.get(item.key);
-          if (localItem?.status !== 'action_required') byId.set(item.key, item);
-        }
-        return Array.from(byId.values()).sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-        ).slice(0, 500);
-      });
-      setLoadError(remoteErrors.length ? remoteErrors.join(' ') : null);
-    } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
-    } finally {
-      refreshInProgressRef.current = false;
+          return Array.from(byId.values()).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          ).slice(0, 500);
+        });
+        setLoadError(errors.join(' ') || null);
+      }, OPTIONAL_ASSET_REFRESH_TIMEOUT_MS);
+    }).finally(() => {
+      if (generation !== refreshGenerationRef.current) return;
+      refreshInProgressRef.current = null;
       setLoading(false);
-    }
-  }, [
-    loadOrGenerateWallet,
-    refreshHederaAccount,
-    sparkWallet,
-    walletReady,
-  ]);
+    });
+    refreshInProgressRef.current = operation;
+    return operation;
+  }, [activityExpanded, secondaryDataReady, loadOrGenerateWallet, refreshHederaAccount, sparkWallet, walletReady]);
 
-  useEffect(() => {
-    if (!walletReady || !refreshAfterInitializationRef.current) return;
-    refreshAfterInitializationRef.current = false;
+  useFocusEffect(useCallback(() => {
     void refresh();
-  }, [refresh, walletReady]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
+    return () => {
+      refreshGenerationRef.current += 1;
+      refreshInProgressRef.current = null;
+    };
+  }, [refresh]));
 
   async function onRefresh() {
     setRefreshing(true);
@@ -334,6 +239,7 @@ export default function HomeScreen() {
       } catch {
         // Refresh must remain available if haptics are unavailable on a device.
       }
+      await refreshBalances();
       await refresh();
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
@@ -345,7 +251,7 @@ export default function HomeScreen() {
   async function copyHederaAccountId() {
     if (!hederaAccount) return;
     await Clipboard.setStringAsync(hederaAccount.accountId);
-    Alert.alert('Copied', 'Hedera ' + appConfig.hederaNetwork + ' account ID copied.');
+    Alert.alert(t('Copied'), t('Hedera {network} account ID copied.', { network: appConfig.hederaNetwork }));
   }
 
   async function openTransaction(transaction: DisplayTransaction) {
@@ -354,126 +260,184 @@ export default function HomeScreen() {
       await openHederaExplorerUrl(transaction.explorerUrl);
     } catch (cause) {
       Alert.alert(
-        'Could not open explorer',
-        cause instanceof Error ? cause.message : 'The explorer link is invalid.',
+        t('Could not open explorer'),
+        t(cause instanceof Error ? cause.message : t('The explorer link is invalid.')),
       );
     }
   }
 
-  const totalEur = calculatePortfolioEur(
-    {
-      sparkSats: balances.spark,
-      hbarTinybars: balances.hbarTinybars,
-    },
-    rates,
-  );
+  const totalEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
+  const hbarEur = calculateHederaEur(displayBalances.hbarTinybars, displayRates.hbarToEur);
+  const balanceError = balanceStates.spark.error;
+  const balancesLoading = balanceStates.spark.status === 'loading';
+  useEffect(() => {
+    if (totalEur !== null) recordWalletStartupStage('home_value_rendered');
+  }, [totalEur]);
+  useEffect(() => {
+    if (balanceStates.spark.status === 'ready' && balances.spark !== null) recordWalletStartupStage('home_live_balance_rendered');
+  }, [balanceStates.spark.status, balances.spark]);
+  const balanceLabel = sparkPriorityTimedOut ? t('Bitcoin is taking longer to connect…') : balancesLoading
+    ? (totalEur === null ? t('Loading balances…') : t('Last known balance · updating…'))
+    : balanceError
+      ? (totalEur === null ? t('Balance unavailable. Pull down to retry.') : t('Last known balance · refresh unavailable'))
+      : previewRates ? t('Last known exchange rates')
+        : totalEur === null ? (rates.isLoading ? t('Loading exchange rates…') : t('EUR estimate unavailable')) : t('Bitcoin balance');
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#ffb000" />
       }
     >
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Your wallet</Text>
-          <Text style={styles.headerSubtitle}>Simple, secure crypto payments.</Text>
-        </View>
-        <View style={styles.brandMark}>
-          <Image source={require('@/assets/images/logo_new.svg')} style={styles.logo} />
-        </View>
+        <Image
+          source={require('@/assets/images/logo_new.svg')}
+          style={styles.logo}
+          contentFit="contain"
+          accessibilityLabel="Opago"
+          accessibilityRole="image"
+        />
+        <TouchableOpacity
+          style={styles.scannerButton}
+          onPress={() => router.push('/scan')}
+          accessibilityRole="button"
+          accessibilityLabel={t("Scan QR code")}
+        >
+          <Ionicons name="scan-outline" size={28} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>Estimated balance</Text>
-        <Text style={styles.total}>
+        <Text
+          style={styles.total}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
+          accessibilityLabel={t('Estimated Bitcoin balance: {amount}', { amount: totalEur === null ? balanceLabel : formatEurValue(totalEur) })}
+        >
           {totalEur === null ? '—' : formatEurValue(totalEur)}
         </Text>
+        <View style={styles.balanceStatusRow} accessibilityLiveRegion="polite">
+          {(balancesLoading || (rates.isLoading && totalEur === null && !balanceError)) && <ActivityIndicator size="small" color="#ffb000" />}
+          <Text style={styles.totalLabel}>{balanceLabel}</Text>
+        </View>
         <Text style={styles.valuationNote}>
-          {appConfig.isMainnet
-            ? 'Based on current market prices.'
-            : appConfig.isHederaMainnet
-              ? 'Your HBAR is live. Bitcoin remains in test mode.'
-              : 'Demo balance based on current market prices.'}
+          {previewRates ? t('The estimate will update when current prices are available.') : appConfig.isMainnet
+            ? t('Based on current market prices.')
+            : t('Demo balance based on current market prices.')}
         </Text>
       </View>
 
       <View style={styles.quickActions}>
         <QuickAction
-          icon="paper-plane"
-          label="Send"
+          icon="arrow-up-outline"
+          label={t("Send")}
           onPress={() => router.push('/(tabs)/send')}
         />
         <QuickAction
-          icon="qr-code-outline"
-          label="Request"
+          icon="swap-horizontal-outline"
+          label={t("Swap")}
+          accessibilityHint={t("Coming soon")}
+          onPress={() => Alert.alert(t("Swap"), t("Coming soon"))}
+        />
+        <QuickAction
+          icon="arrow-down-outline"
+          label={t("Request")}
           onPress={() => router.push('/(tabs)/receive')}
         />
       </View>
 
-      {!appConfig.isMainnet && (
-        <View style={styles.statusNotice} accessibilityRole="summary">
-          <View style={styles.statusIcon}>
-            <Ionicons name="shield-checkmark" size={18} color="#49d17d" />
-          </View>
-          <View style={styles.statusCopy}>
-            <Text style={styles.statusTitle}>
-              {appConfig.isHederaMainnet ? 'HBAR payments are live' : 'Demo mode'}
-            </Text>
-            <Text style={styles.statusText}>
-              {appConfig.isHederaMainnet
-                 ? 'Bitcoin is still in test mode.'
-                : 'All assets are for testing only.'}
-            </Text>
-          </View>
-          <Ionicons name="information-circle-outline" size={19} color="#747480" />
-        </View>
-      )}
-
+      <BackupReminder />
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Your money</Text>
+        <Text style={styles.sectionTitle}>{t('Bitcoin')}</Text>
       </View>
 
       <View style={styles.assetList}>
-        <BalanceCard asset="lightning" value={balances.spark.toLocaleString() + ' SAT'} />
+        <BalanceCard
+          asset="lightning"
+          value={displayBalances.spark === null ? '—' : displayBalances.spark.toLocaleString(appLocale()) + ' SAT'}
+          loading={balanceStates.spark.status === 'loading'}
+          statusText={balanceStates.spark.status === 'error' ? (displayBalances.spark === null ? t('Balance unavailable') : t('Last known balance')) : balanceStates.spark.status === 'loading' ? (displayBalances.spark === null ? t('Loading balance…') : t('Last known balance · updating…')) : undefined}
+        />
+
+      </View>
+
+      <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded}>
+        {!secondaryDataReady && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance first…')}</Text>}
         <BalanceCard
           asset="hedera"
-          value={formatTinybars(balances.hbarTinybars) + ' HBAR'}
+          value={displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR'}
+          fiatValue={hbarEur === null ? t('EUR estimate unavailable') : formatEurValue(hbarEur)}
+          loading={balanceStates.hedera.status === 'loading'}
           identifier={hederaAccount?.accountId}
           statusText={
-            !walletReady
-              ? 'Setting up your wallet…'
-              : loading && !hederaAccount
-                ? 'Finding your HBAR account…'
-                : hederaAccount
-                  ? undefined
-                  : 'Add HBAR to get started'
+            balanceStates.hedera.status === 'error'
+              ? displayBalances.hbarTinybars === null ? t('Balance unavailable') : t('Last known balance')
+              : balanceStates.hedera.status === 'loading'
+                ? (displayBalances.hbarTinybars === null ? t('Loading balance…') : t('Last known balance · updating…'))
+                : hederaAccount ? undefined : t('Add HBAR to get started')
           }
           onCopy={hederaAccount ? () => void copyHederaAccountId() : undefined}
         />
-      </View>
+      </AdvancedOptions>
+      <ActivitySection activityExpanded={activityExpanded}
+        onToggle={() => { if (!activityExpanded) setLoading(true); setActivityExpanded(value => !value); }}
+        transactions={transactions} loading={!walletReady || loading} waitingForSpark={!secondaryDataReady}
+        loadError={loadError} openTransaction={openTransaction} />
+      {!!balanceError && (
+        <View style={styles.errorNotice}>
+          <Ionicons name="cloud-offline-outline" size={18} color="#f2b45d" />
+          <Text style={styles.error}>{t("Some balances could not be refreshed. Pull down to try again.")}</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent activity</Text>
+function ActivitySection({ activityExpanded, onToggle, transactions, loading, waitingForSpark, loadError, openTransaction }: {
+  activityExpanded: boolean; onToggle(): void;
+  transactions: DisplayTransaction[]; loading: boolean; waitingForSpark: boolean; loadError: string | null;
+  openTransaction(transaction: DisplayTransaction): Promise<void>;
+}) {
+  useLanguage();
+  const [activityDisplayLimit, setActivityDisplayLimit] = useState(20);
+  return <>
+      <TouchableOpacity
+        style={styles.activityToggle}
+        onPress={() => {
+          onToggle();
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: activityExpanded }}
+        accessibilityLabel={activityExpanded ? t('Hide transaction history') : t('Show transaction history')}
+      >
+        <View style={styles.activityToggleText}>
+          <Text style={styles.sectionTitle}>{t('Transaction history')}</Text>
+          {!activityExpanded && <Text style={styles.balanceSubtitle}>{t('Tap to load your transactions')}</Text>}
+        </View>
+        <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={21} color="#a3a3ad" />
+      </TouchableOpacity>
+      {activityExpanded && <View>
+        {waitingForSpark && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance first…')}</Text>}
         {transactions.length > activityDisplayLimit && (
           <TouchableOpacity
+            style={styles.loadEarlier}
             onPress={() => setActivityDisplayLimit(limit => Math.min(limit + 20, 500))}
             accessibilityRole="button"
-            accessibilityLabel="Load earlier payments"
+            accessibilityLabel={t("Load earlier payments")}
           >
-            <Text style={styles.sectionMeta}>Load earlier</Text>
+            <Text style={styles.sectionMeta}>{t("Load earlier")}</Text>
           </TouchableOpacity>
         )}
-      </View>
-      {loading && transactions.length === 0 ? (
+      {(loading || waitingForSpark) && transactions.length === 0 ? (
         <ActivityIndicator color="#ffb000" />
       ) : transactions.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="receipt-outline" size={28} color="#5f5f6b" />
-          <Text style={styles.emptyTitle}>No payments yet</Text>
-          <Text style={styles.emptyText}>Payments you send or receive will appear here.</Text>
+          <Text style={styles.emptyTitle}>{t("No payments yet")}</Text>
+          <Text style={styles.emptyText}>{t("Payments you send or receive will appear here.")}</Text>
         </View>
       ) : (
         transactions.slice(0, activityDisplayLimit).map(transaction => {
@@ -485,16 +449,16 @@ export default function HomeScreen() {
             onPress={() => void openTransaction(transaction)}
             disabled={!transaction.explorerUrl}
             accessibilityRole={transaction.explorerUrl ? 'link' : 'summary'}
-            accessibilityLabel={`${transaction.type === 'incoming' ? 'Received' : 'Sent'} ${transaction.amountDisplay} ${transaction.asset}, ${friendlyStatus}`}
+            accessibilityLabel={`${transaction.type === 'incoming' ? t('Received') : t('Sent')} ${transaction.amountDisplay} ${transaction.asset}, ${t(friendlyStatus)}`}
           >
             <AssetIcon asset={walletAssetKeyFromSymbol(transaction.asset)} size={40} />
             <View style={styles.transactionBody}>
               <Text style={styles.transactionTitle}>
-                {transaction.type === 'incoming' ? 'Money received' : 'Payment sent'}
+                {transaction.type === 'incoming' ? t('Money received') : t('Payment sent')}
               </Text>
               <View style={styles.transactionMetaRow}>
                 <Text style={styles.transactionMeta}>
-                  {new Date(transaction.timestamp).toLocaleDateString(undefined, {
+                  {new Date(transaction.timestamp).toLocaleDateString(appLocale(), {
                     month: 'short',
                     day: 'numeric',
                   })}
@@ -507,7 +471,7 @@ export default function HomeScreen() {
                       ? styles.statusPillError
                       : styles.statusPillPending,
                 ]}>
-                  <Text style={styles.statusPillText}>{friendlyStatus}</Text>
+                  <Text style={styles.statusPillText}>{t(friendlyStatus)}</Text>
                 </View>
               </View>
             </View>
@@ -520,23 +484,21 @@ export default function HomeScreen() {
           </TouchableOpacity>
         );})
       )}
-      {loadError && (
-        <View style={styles.errorNotice}>
-          <Ionicons name="cloud-offline-outline" size={18} color="#f2b45d" />
-          <Text style={styles.error}>Some balances could not be refreshed. Pull down to try again.</Text>
-        </View>
-      )}
-    </ScrollView>
-  );
+      {!!loadError && <Text style={styles.error}>{t('Transaction history could not be fully loaded. Pull down to retry.')}</Text>}
+      </View>}
+  </>;
 }
 
 function BalanceCard(props: {
   asset: WalletAssetKey;
   value: string;
+  loading?: boolean;
   identifier?: string;
+  fiatValue?: string;
   statusText?: string;
   onCopy?: () => void;
 }) {
+  useLanguage();
   const presentation = getWalletAssetPresentation(
     props.asset,
     appConfig.isMainnet,
@@ -550,7 +512,7 @@ function BalanceCard(props: {
       disabled={!props.onCopy}
       activeOpacity={props.onCopy ? 0.72 : 1}
       accessibilityRole={props.onCopy ? 'button' : 'summary'}
-      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.identifier ? compactWalletIdentifier(props.identifier) : presentation.description}${props.onCopy ? ', tap to copy address' : ''}`}
+      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.statusText || ''}, ${props.identifier ? compactWalletIdentifier(props.identifier) : t(presentation.description)}${props.onCopy ? ', ' + t('Tap to copy address') : ''}`}
     >
       <AssetIcon asset={props.asset} size={44} />
       <View style={styles.balanceDetails}>
@@ -558,14 +520,16 @@ function BalanceCard(props: {
           <Text style={styles.balanceLabel}>{presentation.name}</Text>
           <NetworkBadge label={presentation.networkBadge} />
         </View>
-        <Text style={styles.balanceSubtitle} numberOfLines={1}>
+        <Text style={styles.balanceSubtitle} numberOfLines={props.statusText ? undefined : 1}>
           {props.statusText || (props.identifier
             ? compactWalletIdentifier(props.identifier)
-            : presentation.description)}
+            : t(presentation.description))}
         </Text>
       </View>
       <View style={styles.balanceTrailing}>
+        {props.loading && <ActivityIndicator color="#ffb000" size="small" />}
         <Text style={styles.balanceValue}>{props.value}</Text>
+        {props.fiatValue && <Text style={styles.balanceSubtitle}>{props.fiatValue}</Text>}
         {props.onCopy && <Ionicons name="copy-outline" size={16} color="#8f8f9d" />}
       </View>
     </TouchableOpacity>
@@ -575,17 +539,20 @@ function BalanceCard(props: {
 function QuickAction(props: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
+  accessibilityHint?: string;
   onPress(): void;
 }) {
+  useLanguage();
   return (
     <TouchableOpacity
       style={styles.quickAction}
       onPress={props.onPress}
       accessibilityRole="button"
       accessibilityLabel={props.label}
+      accessibilityHint={props.accessibilityHint}
     >
       <View style={styles.quickActionIcon}>
-        <Ionicons name={props.icon} size={22} color="#111" />
+        <Ionicons name={props.icon} size={28} color="#fff" />
       </View>
       <Text style={styles.quickActionText}>{props.label}</Text>
     </TouchableOpacity>
@@ -593,6 +560,7 @@ function QuickAction(props: {
 }
 
 function NetworkBadge({ label }: { label: string }) {
+  useLanguage();
   return (
     <View style={styles.networkBadge}>
       <Text style={styles.networkBadgeText}>{label}</Text>
@@ -602,70 +570,44 @@ function NetworkBadge({ label }: { label: string }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c' },
-  content: { paddingHorizontal: 16, paddingTop: 58, paddingBottom: 40 },
+  content: { paddingHorizontal: 20, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  headerSubtitle: { color: '#8f8f9d', fontSize: 13, marginTop: 4 },
-  brandMark: {
+  scannerButton: {
     width: 48,
     height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: { width: 32, height: 32 },
+  logo: { width: 44, height: 44 },
   totalCard: {
-    backgroundColor: '#141418',
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginTop: 20,
+    alignItems: 'center',
+    paddingVertical: 32,
+    marginTop: 30,
   },
-  totalLabel: { color: '#8f8f9d', fontSize: 13, fontWeight: '700' },
-  total: { color: '#fff', fontSize: 38, fontWeight: '800', marginTop: 6 },
-  valuationNote: { color: '#777783', fontSize: 12, marginTop: 6 },
+  balanceStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 },
+  totalLabel: { color: '#a3a3ad', fontSize: 15, fontWeight: '500', textAlign: 'center', flexShrink: 1 },
+  total: { color: '#fff', fontSize: 48, fontWeight: '600', textAlign: 'center', width: '100%', fontVariant: ['tabular-nums'] },
+  valuationNote: { color: '#777783', fontSize: 12, marginTop: 8, textAlign: 'center' },
   quickActions: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 52,
-    marginTop: 20,
+    justifyContent: 'space-evenly',
+    marginTop: 12,
+    marginBottom: 8,
   },
-  quickAction: { alignItems: 'center', minWidth: 68 },
+  quickAction: { flex: 1, alignItems: 'center', minWidth: 68 },
   quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ffb000',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#141416',
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 7,
+    marginBottom: 10,
   },
-  quickActionText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  statusNotice: {
-    backgroundColor: '#121216',
-    borderRadius: 16,
-    padding: 13,
-    marginTop: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-  },
-  statusIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(73,209,125,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusCopy: { flex: 1 },
-  statusTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  statusText: { color: '#777783', fontSize: 11, marginTop: 2 },
+  quickActionText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -675,6 +617,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: '#fff', fontSize: 19, fontWeight: '800' },
   sectionMeta: { color: '#777783', fontSize: 12, fontWeight: '600' },
+  activityToggle: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 22, paddingVertical: 16, minHeight: 64 },
+  activityToggleText: { flex: 1 },
+  loadEarlier: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginBottom: 8 },
+  waitingText: { color: '#a3a3ad', fontSize: 13, lineHeight: 20, marginBottom: 12 },
   assetList: { gap: 10 },
   balanceCard: {
     backgroundColor: '#121216',
@@ -687,7 +633,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   balanceDetails: { flex: 1, minWidth: 0 },
-  balanceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  balanceTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7 },
   balanceLabel: { color: '#fff', fontSize: 16, fontWeight: '800' },
   balanceSubtitle: { color: '#7f7f8b', fontSize: 12, marginTop: 4 },
   balanceTrailing: { alignItems: 'flex-end', gap: 5, maxWidth: '44%' },
@@ -729,7 +675,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 10 },
-  emptyText: { color: '#777783', fontSize: 12, marginTop: 4 },
+  emptyText: { color: '#777783', fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center', paddingHorizontal: 16 },
   errorNotice: {
     flexDirection: 'row',
     alignItems: 'center',

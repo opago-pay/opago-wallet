@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { t } from '@/lib/i18n';
+import { useLanguage } from '@/hooks/useLanguage';
 import { Image, StyleSheet, View } from 'react-native';
 import {
   getWalletAssetPresentation,
@@ -9,6 +11,7 @@ export function AssetIcon(props: {
   asset: WalletAssetKey;
   size?: number;
 }) {
+  useLanguage();
   const size = props.size ?? 44;
   const presentation = getWalletAssetPresentation(props.asset, false);
   const glyphSize = Math.round(size * 0.5);
@@ -16,7 +19,7 @@ export function AssetIcon(props: {
   return (
     <View
       accessible
-      accessibilityLabel={`${presentation.name} icon`}
+      accessibilityLabel={t('{asset} icon', { asset: presentation.name })}
       accessibilityRole="image"
       style={[
         styles.container,
