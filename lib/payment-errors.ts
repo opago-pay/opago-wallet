@@ -3,6 +3,14 @@ import { t } from './i18n';
 export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): string {
   const message = cause instanceof Error ? cause.message : '';
   const normalized = message.toLowerCase();
+  if (message === 'The EUR exchange rate is unavailable.') return t('EUR estimate unavailable');
+  if (message === 'The Bitcoin fee quote expired. Review this payment again.' || message === 'The Bitcoin fee changed. Review the deposit again.') return t(message);
+  if (/bitcoin.*still being checked/.test(normalized)) return t('Please do not send again. We are checking the payment automatically.');
+  if (/invalid bitcoin address or network/.test(normalized)) return t('Check the Bitcoin address and network. Its checksum must be valid and its network must match this wallet.');
+  if (/ambiguous bitcoin|conflicting amounts/.test(normalized)) return t('This Bitcoin request contains conflicting instructions. Ask the recipient for a new request.');
+  if (/unsupported feature|no supported payment route/.test(normalized)) return t('This Bitcoin request requires a payment feature this version does not support.');
+  if (/invalid bitcoin amount/.test(normalized)) return t('Enter a positive Bitcoin amount with no more than eight decimal places.');
+  if (message === 'The network fee changed. Nothing was sent. Review this payment again.') return t(message);
   const hederaLimit = message.match(/^HBAR amount exceeds the configured (?:mainnet|testnet) transfer limit of ([\d.]+) HBAR\.$/);
   if (hederaLimit) return t('This version allows up to {max} HBAR per payment. Enter a smaller amount.', { max: hederaLimit[1] });
   if (/^HBAR amount (?:must use at most 8 decimal places|must be greater than zero|exceeds the supported transfer range)\.$/.test(message)) {
@@ -24,6 +32,9 @@ export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): strin
   }
   if (normalized.includes('expired')) {
     return t('This payment request has expired. Ask for a new QR code.');
+  }
+  if (/invalid signature|invoice is invalid|invalid metadata|metadata commitment/.test(normalized)) {
+    return t('This payment request could not be verified. Ask the recipient for a new request.');
   }
   if (/does not match|wrong amount|amount mismatch/.test(normalized)) {
     return t('The entered amount is different from the payment request. Check it and try again.');

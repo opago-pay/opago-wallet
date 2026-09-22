@@ -2,7 +2,7 @@
 export interface HomeBalancePreview {
   version: 1;
   scope: string;
-  spark?: { value: number; at: number };
+  spark?: { value: number; at: number; definition?: 'available' };
   hedera?: { value: string; at: number };
   rates?: { btcToEur: number; hbarToEur: number; at: number };
 }
@@ -22,8 +22,8 @@ export function parseHomeBalancePreview(raw: string | null, scope: string, now =
     if (data?.version !== 1 || data.scope !== scope) return null;
     const recent = (at: number) => Number.isSafeInteger(at) && at > 0 && at <= now && now - at <= MAX_AGE_MS;
     const preview: HomeBalancePreview = { version: 1, scope };
-    if (data.spark && recent(data.spark.at) && Number.isSafeInteger(data.spark.value) && data.spark.value >= 0) {
-      preview.spark = { value: data.spark.value, at: data.spark.at };
+    if (data.spark?.definition === 'available' && recent(data.spark.at) && Number.isSafeInteger(data.spark.value) && data.spark.value >= 0) {
+      preview.spark = { value: data.spark.value, at: data.spark.at, definition: 'available' };
     }
     if (data.hedera && recent(data.hedera.at) && typeof data.hedera.value === 'string' && /^\d{1,19}$/.test(data.hedera.value) && BigInt(data.hedera.value) <= 9_223_372_036_854_775_807n) {
       preview.hedera = { value: data.hedera.value, at: data.hedera.at };

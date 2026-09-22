@@ -1,10 +1,12 @@
 import { decodeLightningInvoice, normalizeLightningInput, resolveInvoiceAmount } from './lightning';
-import { fetchInvoiceFromLNURLP, resolveLightningAddress, resolveLNURL } from './lnurl-safe';
+import { fetchInvoiceFromLNURLP, lnurlDescription, resolveLightningAddress, resolveLNURL } from './lnurl-safe';
 import { resolveLnurlAmount } from './payment-input';
 
 export interface LightningAmountRequirement {
   minSats: number;
   maxSats: number | null;
+  /** Address or endpoint domain for the amount sheet, never a merchant claim. */
+  recipient?: string;
 }
 
 export type LightningDestinationResult =
@@ -28,16 +30,17 @@ export async function resolveLightningDestination(
       maxSats: Math.floor(info.maxSendable / 1000),
     };
     if (requestedAmountSats === 0 && limits.minSats !== limits.maxSats) {
-      return { kind: 'amount-required', limits };
+      return { kind: 'amount-required', limits: { ...limits, recipient: isAddress ? normalized : info.recipientDomain } };
     }
     const amountSats = resolveLnurlAmount(info.minSendable, info.maxSendable, requestedAmountSats);
-    const invoice = await fetchInvoiceFromLNURLP(info.callback, amountSats);
+    const invoice = await fetchInvoiceFromLNURLP(info, amountSats);
     // The callback must issue an invoice for exactly the amount selected.
     const details = decodeLightningInvoice(invoice);
     if (details.amountSats !== amountSats) {
       throw new Error('The LNURL invoice amount does not match the selected amount.');
     }
-    return { kind: 'invoice', invoice, amountSats, recipientLabel: isAddress ? normalized : undefined };
+    const recipient = isAddress ? normalized : info.recipientDomain;
+    return { kind: 'invoice', invoice, amountSats, recipientLabel: [recipient, lnurlDescription(info.metadata)].filter(Boolean).join('\n') };
   }
 
   const details = decodeLightningInvoice(normalized);

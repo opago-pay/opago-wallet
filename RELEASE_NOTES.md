@@ -1,6 +1,164 @@
 # Opago Wallet release notes
 
-Latest internal wallet update: 21 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
+Latest internal wallet update: 22 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
+
+## Overlap independent Lightning preparation — 22 September 2026
+
+Installed on Android …8690 at 23:35:50 MESZ; verified APK `a59174b8d9e4bf58d247ed852fc3bca75d809629a33884fddd8e64938d1f9b3d`. Locked launch passed; owner payment/timing comparison remains pending.
+
+The owner's native-HTLC comparison took 5.692 seconds after device approval, still above the five-second requirement. Fresh operator commitments and local normal-refund signing now run alongside HTLC transfer-package preparation. The original SDK remains responsible for the outbound request; prepared data is bound to one package/transfer and consumed once. Cancellation, cleanup, changed transaction data or incomplete commitments prevent submission. No fees, authorization, journal or proof checks were removed.
+
+413 app tests, TypeScript and changed-file lint passed. Tests compare actual installed SDK request construction with synthetic RPC data and cover overlap, concurrency, replay, failure and cleanup. Real-device timing remains pending; no agent-operated payment.
+
+## Native HTLC output preparation and fresh balance during approval — 22 September 2026
+
+The owner comparison improved to 9.190 seconds after approval but still misses the required five-second target. Android now computes the public HTLC output once per hash/sender/receiver during refund preparation, using existing native Spark scalar multiplication. Transactions and sighashes match the pinned SDK byte-for-byte; the SDK still owns fresh nonces and FROST signatures. Unsupported platforms retain the original SDK path.
+
+Bounded, non-overlapping Bitcoin balance refreshes continue during a longer approval prompt. Cancellation stops refreshes, newer failures/insufficient balances are respected, and the original five-second freshness rule still applies before submission. No authorization, durable journal, fee or proof checks were removed. 404 app tests, TypeScript and changed-file lint passed. The owner comparison subsequently measured 5.692 seconds after approval; the five-second result remains unmet. No agent-operated payment.
+
+## Spark leaf selection and per-send derivation reuse — 22 September 2026
+
+The owner's anonymous trace located 15.519 seconds in leaf selection/swap and 5.447 seconds in transfer preparation. A bounded exact-fit search now avoids some unnecessary swaps; required swaps select the fewest inputs. The pinned SDK retains its mutex, reservation, submission and recovery state machine. Android reuses deterministic key derivations only during a send, clearing owned cache copies on completion, failure and wallet cleanup. Random keys and signing nonces remain fresh.
+
+390 app tests, TypeScript and changed-file lint passed, including synthetic installed-SDK reservation/swap/failure tests and cache lifecycle checks. The next internal build retains owner-approved anonymous timing for comparison. No real payment was performed by the agent; actual speed improvement and the five-second target remain unverified. Details: [Lightning send performance](LIGHTNING_SEND_PERFORMANCE.md).
+
+## Owner-approved anonymous send timing — 22 September 2026
+
+The native-signer candidate still took 25 seconds in the owner's test. Following explicit approval, an internal opt-in now captures relative durations of the next Send attempt, including SDK substeps, without payment or wallet contents. Observers retain original promises/results/errors; logging happens after the attempt. One capture per process, bounded to 512 spans. Normal builds keep the flag disabled. 375 app tests, TypeScript and changed-file lint passed. The owner performs the payment; diagnosis and the five-second goal remain open.
+
+## Android Spark native public-key operations — 22 September 2026
+
+The owner reports 23-second Opago sends versus under five seconds in Wallet of Satoshi on the same Android device/WLAN. The preceding scheduling and Bitcoin-preflight builds did not resolve that gap. A source/bundle audit confirms the production build uses the React Native SDK and native FROST, but SDK 0.7.12's default signer still performs public-key/nonce-commitment curve multiplications in JavaScript despite exposing matching Rust operations on Android.
+
+An Android-only DefaultSparkSigner extension delegates those two operations to the existing SparkFrostModule, batching each fresh nonce pair. SDK key derivation, randomness, nonce ownership, FROST signing, route selection, native authorization, fee limit, durable journal and proof verification are retained. Bridge outputs are checked including Kotlin signed-byte conversion; transient JS bridge copies are erased. Native failures abort with a sanitized error. Unsupported platforms retain the default signer; the pinned SDK's iOS public-key bridge methods log their inputs, so this adapter deliberately never calls them.
+
+370 app tests, TypeScript and changed-file lint passed. Correctness tests use synthetic keys and the original SDK/JavaScript arithmetic as the oracle, including deterministic key families, ECIES, random keys, nonce/FROST lookup and failure paths. They do not execute or benchmark an Android payment. Native device speed and the five-second goal remain unverified; network/leaf-swap work may still contribute. No new performance instrumentation or agent-operated payments.
+
+## Bitcoin-only send preparation alongside device approval — 22 September 2026
+
+The owner reported that the previous scheduling changes did not reduce the observed 15–20 second send time. Payment balance reads now use a narrow Spark-wallet extension: the pinned SDK 0.7.12 fresh AVAILABLE-leaf validation/recovery and cache refresh/eviction path, without Spark-token synchronization or token metadata. The full SDK balance API, key derivation and payment execution remain unchanged.
+
+When Send is pressed in an unlocked foreground wallet, the fresh Bitcoin balance check starts alongside the native authorization prompt. A result older than five seconds when approval completes is read again. This is an in-flight check, not the Home balance cache. The approved invoice/amount/fee are copied before the prompt; authorization, current-screen/session, balance and expiry checks still gate the durable pending record and SDK submission. Cancellation, lock, late errors and duplicate attempts cannot submit. Spark's fresh send fee check, leaf selection and preimage verification remain in place.
+
+363 app tests, TypeScript and changed-file lint passed. No new diagnostics or agent-operated payment measurements. Five-second device acceptance is not yet established and remains with the owner.
+
+## Shorter Lightning send path — 22 September 2026
+
+Review preparation now loads the fresh balance and fee quote in parallel. After authorization, the durable pending journal still precedes submission, but rebuildable SQLite history writes no longer delay submission or verified success. Terminal state and Spark request ID are persisted together; unresolved results and terminal-write failures retain the separate request-ID recovery path. The journal returns its saved record, removing an extra storage read.
+
+348 app tests, TypeScript and changed-file lint passed, including stalled/failed history indexing, durable-write ordering, restart duplicate protection and fallback after a failed terminal write. Fresh pre-submit balance, exact fee ceiling, authorization/expiry checks and proof verification remain intact. No new timing instrumentation or agent-operated payment measurements; real-device speed comparison remains with the owner.
+
+## Direct review for fixed-amount invoices — 22 September 2026
+
+Scanning a Lightning invoice with an amount now opens payment review preparation immediately, including while Spark or fee lookup is pending. The amount-entry keypad no longer flashes before review. The verified amount appears when resolved; no zero balance, placeholder fee or enabled Send action is shown before fee preparation completes. Amountless requests still lead to the keypad after resolution, and onchain signing preparation retains its explicit action.
+
+Read-only preparation can be cancelled. A cancelled or superseded lookup cannot overwrite or unblock a newer scan. 341 app tests, TypeScript and changed-file lint passed, including delayed invoice/fee responses through both scanner entry points and cancel/rescan races. Native visual acceptance remains with the owner.
+
+## Full-screen payment flow and live sending state — 22 September 2026
+
+Amount entry and review now use opaque full-screen views with safe-area spacing and a pinned action footer, replacing the scanner backdrop and bottom sheets. Large in-app digit keys and Cancel remain. The final action is simply Send in all supported languages.
+
+Send immediately opens an authorization state, followed by a rotating gold Bitcoin indicator while the real payment operation is pending. Confirmed Lightning success uses the same composition with a green checkmark, the amount, Done and optional receipt details. Reduced-motion preferences disable rotation. No simulated completion timer is used: authorization cancellation, failure and unresolved submissions preserve their existing error/pending handling. Onchain broadcast remains distinct from network confirmation. Camera lifecycle, fee limits, journals, device authorization and duplicate protection remain in place.
+
+337 app tests, TypeScript and changed-file lint passed. Added coverage checks authorization/progress/success sequencing, double tapping, PIN cancellation, unresolved/failing submissions, stale completion after navigation, onchain broadcast status and reduced motion. Device visual and payment acceptance remains with the owner.
+
+## Custom amount keypad and clear cancellation — 22 September 2026
+
+Bitcoin amount entry uses large in-app digit and delete keys, with a locale-specific decimal key for EUR and whole-number entry for SAT. The amount is displayed above the keypad; no native keyboard is opened. Fixed invoice amounts remain read-only. Existing precise amount parsing, quote preparation, fee limits and device authorization remain unchanged.
+
+Amount entry and review replace header back icons with a prominent Cancel action beside Continue/Confirm in a separate footer. Cancellation clears the draft and returns to scanning; it is blocked during submission. Native keyboard overlap handling remains available for manual address entry and accounts for Android's already-resized modal viewport.
+
+331 app tests, TypeScript and changed-file lint passed. New coverage checks localized digits/decimals/deletion, disabled editing, fixed invoices, cancellation and modal keyboard geometry. Native visual/accessibility acceptance remains with the owner.
+
+## Direct scan continuation and Buy label — 22 September 2026
+
+Home's middle action now says Buy (EN/DE/FR/ES) with a card icon; it remains a coming-soon placeholder. Validated scan, paste and manual-entry results immediately enter the existing payment flow without the redundant recognition confirmation: amountless requests ask for an amount, fixed Lightning requests proceed to cost review. Final payment confirmation and device authorization remain mandatory; onchain signing/fee preparation still requires its separate explicit action. Shared scanner-success background and duplicate/stale-session guards remain intact.
+
+40 affected tests, TypeScript and changed-file lint passed, including automatic one-time handoff, amountless entry followed by a single Continue, rejected late/locked results, handoff failure recovery and explicit onchain preparation. Device acceptance remains with the owner.
+
+## Keep the recognized-scanner background — 22 September 2026
+
+Recognition, Bitcoin amount entry and payment review now share the same scanner-success scene: original header, gradient, green corner frame and checkmark. Remove the separate Bitcoin-logo backdrop from the amount/review sheets. Camera capture/release behavior is unchanged. Inline scan handoff selects its destination/source together to avoid briefly rendering the legacy address form. Only the bottom-sheet content changes between these steps.
+
+33 affected regression tests, TypeScript and changed-file lint passed. Native visual acceptance remains with the owner.
+
+## Receive currency symbols and matching asset cards — 22 September 2026
+
+Receive's EUR/SAT selectors now include a euro symbol and the existing Bitcoin logo, with explicit accessible currency labels. Home's HBAR card matches the Bitcoin layout: asset name, unit exchange rate (`1 HBAR = … €`) and balance. Cached/missing rates retain their last-known/loading/unavailable states; no extra network request. The previous account-copy icon and separate fiat-total line are removed from this card. Remove the hidden-entry reveal/conceal toggle while preserving existing hidden records, reconciliation and duplicate-send protection.
+
+30 affected regression tests, TypeScript and changed-file lint passed. Device visual acceptance remains with the owner.
+
+## Compact Bitcoin payment sheets — 22 September 2026
+
+Bitcoin amount entry and review now continue in native bottom sheets matching the scanner. Amount entry shows a compact recipient, large amount field, SAT/EUR selector and one Continue action. Review prioritizes exact SAT amounts, maximum fee and maximum total; request strings, unverified descriptions and technical details expand from the recipient row. A short relative-fee notice replaces the incorrect suggestion to ask for Lightning when already paying over Lightning. The tab bar stays hidden through these steps. Back navigation, device authorization, quote preparation and duplicate-send protections remain; onchain preparation still requires separate explicit approval. Sheets hide on blur/background and cannot be dismissed during submission. English, German, French and Spanish supported.
+
+324 automatic tests, TypeScript and changed-file lint passed. The owner confirmed the previous scanner lifecycle correction works well; camera behavior is unchanged by this update. Native payment-sheet layout, keyboard and device authorization acceptance remain with the owner.
+
+## Scanner camera lifecycle restored — 22 September 2026
+
+Following the owner's report of unreliable QR detection after the redesign, restore the earlier scanner's simple camera lifecycle while retaining the full-screen design, torch, Paste/Type dock and review sheets. QR detection stays enabled for the lifetime of each mounted camera; capturing a code releases the camera and retrying mounts it afresh. Remove imperative preview pause/resume and barcode-handler enable/disable transitions. Session validation, duplicate-event protection and explicit payment review remain intact.
+
+320 automated tests, TypeScript and changed-file lint passed, including cancellation during Lightning-address recognition and returning from manual entry. The lifecycle race is a suspected cause, not a device-confirmed diagnosis; physical QR acceptance remains with the owner.
+
+## Full-screen scanner and recognized-payment step — 22 September 2026
+
+Implement the supplied scanner concept with a full-screen camera, soft dark overlays, open yellow corners, a hardware-gated torch and a shared Paste/Type action bar. Manual entry opens a native bottom sheet. Validated codes show a green confirmation and genuine request details, then require a separate Review payment action. Recognition cannot send, request a signing quote or create a Lightning invoice. Existing payment validation, fees, authentication and duplicate protection remain intact. The tab bar is hidden only during scanning and restored with the existing layout afterward. All copy is available in EN/DE/FR/ES.
+
+319 app tests, TypeScript, lint, native crypto tests and Android build passed. Verified regular wallet update installed at 16:17:18 on Android …8690 with the original first-install timestamp preserved. Further native interaction/camera tests are explicitly left to the owner. Final keyboard-focus corrections passed static checks but have no post-fix device acceptance. Artifact and test limitations are recorded in PUBLIC_RELEASE_READINESS.md and TEST_ACCEPTANCE_2026-09-22.md.
+
+## Scanner presentation refined — 22 September 2026
+
+Replace the two small scanner tiles with full-width actions: a yellow **Paste address** action with a clipboard explanation and a quiet **Enter address** action with a typing explanation. Use a compact camera preview with corner markers, a short scan instruction and a reminder that amount and fees are reviewed before sending. Manual entry now has a larger address field, an integrated paste action and a visible return to the scanner. Copy is translated into all four supported languages; text can wrap and controls grow with system text size.
+
+311 app tests, TypeScript, changed-file lint, native crypto unit tests and the Android build passed. Synthetic scanner layouts inspected at 360×740 and 320×568; manual entry and back navigation checked in the browser. Verified update installed at **15:42:48** on Android ending **8690**, with original first-install timestamp preserved. Locked startup succeeded without observed runtime errors. Live camera and native large-text acceptance remain owner checks; no payment was sent.
+
+## Scanner as the Send entry — 22 September 2026
+
+Send now opens the camera directly, with visible **Enter manually** and **Paste** actions. The Home scanner uses the same component and controls. Camera denial or failure leaves both alternatives available; the clipboard is read only after a tap. The camera unmounts on tab changes/backgrounding, duplicate detections are consumed once, and late clipboard reads cannot populate another screen or a locked session.
+
+Scanned and pasted requests enter the existing session-bound input queue; manual requests use the same asset detection. Lightning, Bitcoin onchain and numeric Hedera recipients retain their existing amount, fee, network, expiry and authorization checks. Onchain recognition never signs or sends; fee preparation and final payment still require their explicit approvals. Manual entry has a visible back-to-scanner action, including the HBAR form. Translations cover English, German, French and Spanish.
+
+311 app tests, TypeScript and changed-file lint passed. Synthetic browser views were inspected at 360×740 and 320×568; this does not replace a live-camera/real-payment device check. Verified Android update installed at 15:26:53 on device ending 8690 with wallet data preserved; locked startup succeeded without observed runtime errors. Live-camera acceptance remains with the owner. Artifact evidence: PUBLIC_RELEASE_READINESS.md.
+
+## Pending Lightning recovery — 22 September 2026
+
+After an interrupted send loses its provider request ID, reconciliation now also searches Spark's paginated payment-request index. Transfer history alone can miss a request that has not yet appeared there. Newly discovered request IDs remain persisted even if history is unavailable; absence never implies failure, and success still requires a matching payment proof. Request searches are shared per reconciliation pass and only run for pending payments after Bitcoin balances load.
+
+Home makes pending-payment status easier to see. Unresolved or failed history entries use neutral incoming/outgoing titles instead of claiming payment success, and display date and time. The update passed 287 app tests, TypeScript and changed-file lint and was installed without clearing wallet data. The real 20-SAT interruption case still awaits final device resolution; P05 remains yellow.
+
+The owner recheck still found no matching provider request or history entry. A further correction adds a read-only Spark-operator lookup by payment hash and sender role. It confirms only a verified payment preimage; missing data never marks an uncertain send as failed or permits a duplicate. Home and outgoing Lightning history now say the status is unknown rather than claiming active processing. 292 app tests, TypeScript and changed-file lint passed. The verified Android update was installed at 12:51 without clearing wallet data; real P05 resolution is still open.
+
+The operator follow-up also found no matching remote record. Final balance checks now run before an outgoing attempt is persisted; persistence and reauthorization still precede any SDK send. This prevents preparation-only failures from creating new unresolved records, without clearing older ambiguous attempts. Four additional regression cases bring the suite to 296 passing tests. The verified preparation fix was installed at 13:05:57 without clearing wallet data. The historical 20-SAT outcome remains a documented integration blocker; no repeated payment was sent.
+
+Pending Lightning entries can be hidden from normal history together with their persistent notice. This changes presentation only: the journal, status checks and same-invoice duplicate guard remain intact. Hidden entries can be shown again, and a final outcome automatically becomes visible. 301 app tests, TypeScript and lint passed. Verified Android update installed at 13:26:05 with wallet data preserved. Device acceptance of the requested existing entry remains open after the owner reported the unclear status again. The existing P05 outcome remains unknown.
+
+## Home layout restored — 21 September 2026
+
+At the owner's request, Home again uses the earlier compact logo, balance layout, Bitcoin asset card and three circular actions: Send, Swap and Receive. Remove the extra Bitcoin heading/BTC line, explanatory disclosure and two large rectangular actions from Home; Swap is again immediately visible and still shows its existing coming-soon notice. Keep the available-balance correction, loading/stale states, incoming/pending-payment notices, automatic reconciliation, Advanced options and lazy shared history. Other payment screens are unchanged.
+
+The Bitcoin card now replaces its route-description subtitle with the existing market feed's BTC/EUR unit price (`1 BTC = …`). Cached or older-than-five-minute quotes are explicitly labelled; missing quotes show loading/unavailable, never zero. Existing balance-loading/error notices retain priority. Translated in all four supported languages; no extra startup network call.
+
+Hide empty network badges instead of leaving an unlabelled dark pill beside Bitcoin. The shared Bitcoin asset icon now renders the public-domain Bitboy vector from the [Bitcoin Design Guide](https://bitcoin.design/guide/getting-started/visual-language/) at its original proportions, without the previous pale border or small font glyph. HBAR styling and labelled test-network badges are retained.
+
+## One Bitcoin balance and native payment UI — 21 September 2026
+
+- Replace route-based Bitcoin presentation with one Bitcoin asset and prominent EUR valuation/BTC amount. Keep HBAR and its existing payment/security flows under Advanced options. Send recognises the payment route; both routes share a cost review. Receive offers an actual Lightning request and a separate reusable Bitcoin deposit address.
+- Use only validated Spark `available` funds for display and spending. Pending incoming funds are separate. Invalidate only old Bitcoin cache values whose definition could include incoming transfers; do not modify wallet keys or the existing Lightning/HBAR journals.
+- Implement actual Spark 0.7.12 withdrawal and static-deposit claim adapters, strict Bitcoin address/URI parsing, integer amounts, approved fee ceilings, session checks and persistent unknown-outcome reconciliation. Quoting can sign an internal Spark swap, so onchain preparation requires explicit device authorization; scan/paste alone never invokes it.
+- Retain earlier/expired Lightning requests and watch shared Bitcoin addresses after restart. Avoid startup address/quote generation, and defer status work until the primary Bitcoin balance has loaded. A claim is not automatically credited as spendable.
+- 270 app tests, TypeScript, lint and Android build passed. Native main views captured with synthetic data in all four languages, including keyboard and large-text review. No real payment was sent. Combined receive URI, external sender/claim tests, provider failure recovery, full onchain-history reconstruction and iOS remain open. See [Bitcoin implementation and acceptance](BITCOIN_PAYMENT_ACCEPTANCE.md) for exact limits, migration, SDK behavior and the concrete partner test matrix.
+- The final candidate updated Android ending 8690 at 13:00:05; installed hash and 65 bundled source modules verified, wallet data preserved, cold locked launch without observed runtime errors. Exact evidence is recorded in release readiness.
+
+## Lightning completion work P01–P05 — 21 September 2026
+
+- Validate BOLT11 signatures, exact network prefixes and the one-hour default expiry. LNURL review shows the endpoint domain and description; callbacks must match the selected amount and any h-tag must match the original metadata bytes.
+- Recheck the balance, invoice expiry and device authorization before sending; retain the exact approved fee ceiling. Bound SDK waits. A timed-out/ambiguous submission remains pending, blocks another submission of the same invoice and can reconcile after restart. Transfer/preimage errors alone do not mean the recipient was unpaid.
+- Recognize the pinned SDK's specific local fee-ceiling rejection before leaf selection as a definite non-submission. Ask for a new review instead of leaving that request pending. Similar transport-error text without the SDK's structured validation context remains ambiguous.
+- Preserve expired receive requests for status reconciliation while hiding their QR. Show waiting, processing, expired and interrupted-connection states in all four languages. A verified receipt stays successful even if the optional local activity index fails. The success view dismisses after three seconds. Late completion cannot overwrite a newer request or a locked session.
+- Check only pending sends automatically on Home, after the primary Bitcoin balance settles. With no pending sends there is no automatic remote history query; normal shared history stays collapsed and opt-in. Journal network reads no longer block durable writes, and stale failures cannot downgrade a confirmed payment.
+- A scan made before Spark is ready now waits for initialization and prepares once. Leaving Send invalidates an unfinished review preparation.
+- 245 app tests passed, with TypeScript and changed-file ESLint. New cases use synthetic invoices, an independent published signature vector, fake services, restartable storage and controlled timers. Real Mainnet payments, native authentication/QR repetition, connectivity/process-death acceptance and second-device/iOS checks remain open; see the acceptance runbook. No payment was sent by automation.
+- Final candidate installed on Android ending 8690 at 11:52:35 with wallet data preserved. APK signature/hash and 48 source-map modules verified; locked launch passed with zero observed runtime errors. See release readiness for exact artifact evidence.
 
 ## Shared native seed derivation — 21 September 2026
 

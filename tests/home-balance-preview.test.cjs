@@ -7,7 +7,7 @@ const { loadDisplaySparkBalance, markSparkWalletSynchronized } = require('../lib
 const { calculatePortfolioEur } = require('../lib/portfolio-valuation.ts');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const scope = 'public-fixture:mainnet:MAINNET';
-const record = () => ({ version: 1, scope, spark: { value: 4200, at: Date.now() }, hedera: { value: '200000000', at: Date.now() }, rates: { btcToEur: 50000, hbarToEur: 0.2, at: Date.now() } });
+const record = () => ({ version: 1, scope, spark: { definition: 'available', value: 4200, at: Date.now() }, hedera: { value: '200000000', at: Date.now() }, rates: { btcToEur: 50000, hbarToEur: 0.2, at: Date.now() } });
 
 test('a new Home instance can display the last known full portfolio without a network connection', async () => {
   let stored = null;
@@ -24,23 +24,23 @@ test('expired, corrupt, future and unsafe preview values never become a current 
   assert.equal(parseHomeBalancePreview('not-json', scope), null);
   assert.equal(parseHomeBalancePreview(JSON.stringify({ ...record(), version: 2 }), scope), null);
   for (const value of [-1, Number.MAX_SAFE_INTEGER + 1, '0', null]) {
-    const result = parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { value, at } }), scope);
+    const result = parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { definition: 'available', value, at } }), scope);
     assert.equal(result.spark, undefined);
   }
   for (const timestamp of [at + 60000, at - 8 * 86400000, 0]) {
-    const result = parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { value: 0, at: timestamp } }), scope, at);
+    const result = parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { definition: 'available', value: 0, at: timestamp } }), scope, at);
     assert.equal(result.spark, undefined);
   }
   const result = parseHomeBalancePreview(JSON.stringify({ ...record(), hedera: { value: '9223372036854775808', at } }), scope);
   assert.equal(result.hedera, undefined);
-  assert.equal(parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { value: 0, at } }), scope).spark.value, 0);
+  assert.equal(parseHomeBalancePreview(JSON.stringify({ ...record(), spark: { definition: 'available', value: 0, at } }), scope).spark.value, 0);
 });
 
 test('independent balance updates merge without resetting older observation timestamps', async () => {
   let stored = JSON.stringify(record());
   const original = JSON.parse(stored);
   const store = new HomeBalancePreviewStore({ get: async () => stored, set: async value => { stored = value; }, remove: async () => {} });
-  await store.update({ version: 1, scope, spark: { value: 4300, at: Date.now() } }, () => {});
+  await store.update({ version: 1, scope, spark: { definition: 'available', value: 4300, at: Date.now() } }, () => {});
   const saved = JSON.parse(stored);
   assert.equal(saved.spark.value, 4300);
   assert.deepEqual(saved.hedera, original.hedera);

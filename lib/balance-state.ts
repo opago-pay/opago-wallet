@@ -1,3 +1,5 @@
+import { readBitcoinBalance, type SparkBalanceResponse } from './bitcoin/amount';
+
 export interface BalanceState<T> {
   value: T | null;
   status: 'loading' | 'ready' | 'error';
@@ -15,16 +17,6 @@ export const failedBalance = <T>(previous: BalanceState<T>, cause: unknown): Bal
   error: cause instanceof Error ? cause.message : 'Balance unavailable. Please try again.',
 });
 
-export function readSparkBalance(result: { balance?: unknown; satsBalance?: { incoming?: unknown } }): number {
-  function sats(value: unknown): number {
-    if (typeof value !== 'number' && typeof value !== 'bigint' && !(typeof value === 'string' && /^\d+$/.test(value))) {
-      throw new Error('Lightning returned an invalid balance.');
-    }
-    const amount = Number(value);
-    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Lightning returned an invalid balance.');
-    return amount;
-  }
-  const total = sats(result.balance) + sats(result.satsBalance?.incoming ?? 0);
-  if (!Number.isSafeInteger(total)) throw new Error('Lightning returned an invalid balance.');
-  return total;
+export function readSparkBalance(result: SparkBalanceResponse): number {
+  return readBitcoinBalance(result).available;
 }

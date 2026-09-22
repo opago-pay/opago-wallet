@@ -439,6 +439,8 @@ export default function SettingsScreen() {
       </View>
 
       <AdvancedOptions expanded={showAdvanced} onChange={setShowAdvanced}>
+        <Text style={{ color: '#fff', fontSize: 17, marginBottom: 10 }}>{t('How your Bitcoin balance works')}</Text>
+        <Text style={{ color: '#aaaab3', fontSize: 14, lineHeight: 22, marginBottom: 18 }}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
         <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t("Networks")}</Text>
           <Text style={styles.body}>Bitcoin · {appConfig.isMainnet ? 'Lightning Mainnet' : 'Regtest'}</Text>

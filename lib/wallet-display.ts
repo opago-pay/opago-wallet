@@ -40,3 +40,16 @@ export function formatEurValue(value: number): string {
     maximumFractionDigits: 2,
   }).format(value);
 }
+
+export function paymentHistoryTitle(direction: 'incoming' | 'outgoing', status: string): string {
+  if (friendlyPaymentStatus(status) === 'Completed') {
+    return direction === 'incoming' ? t('Money received') : t('Payment sent');
+  }
+  return direction === 'incoming' ? t('Incoming payment') : t('Outgoing payment');
+}
+
+export function paymentHistoryStatus(direction: 'incoming' | 'outgoing', asset: string, status: string): string {
+  const friendly = friendlyPaymentStatus(status);
+  return direction === 'outgoing' && asset === 'SAT' && friendly === 'Processing'
+    ? 'Status unknown' : friendly;
+}

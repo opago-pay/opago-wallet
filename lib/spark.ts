@@ -1,21 +1,26 @@
 import { appConfig } from './config';
 import { markSparkWalletSynchronized } from './display-spark-balance';
+import { attachSparkSendTiming } from './spark-send-timing';
 
 export async function initializeSparkWallet(seed: Uint8Array) {
   if (!(seed instanceof Uint8Array) || seed.length !== 64) throw new Error('Invalid BIP39 seed.');
   // Keep the optional SDK unloaded until the wallet's authenticated startup.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { SparkWallet } = require('@buildonspark/spark-sdk');
+  const { BitcoinSparkWallet } = require('./spark-bitcoin-wallet');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createSparkSigner } = require('./spark-signer-native');
 
   // Own the input for this in-flight SDK operation; the caller may lock and erase
   // its retry seed meanwhile. SessionResource disposes any late wallet result.
   const sdkSeed = new Uint8Array(seed);
   try {
-    const { wallet } = await SparkWallet.initialize({
+    const { wallet } = await BitcoinSparkWallet.initialize({
       mnemonicOrSeed: sdkSeed,
+      signer: createSparkSigner(),
       options: { network: appConfig.sparkNetwork },
     });
     try {
+      attachSparkSendTiming(wallet);
       await wallet.getSparkAddress();
       markSparkWalletSynchronized(wallet);
       return wallet;

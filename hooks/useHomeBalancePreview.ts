@@ -36,7 +36,7 @@ export function useHomeBalancePreview(input: {
   useEffect(() => {
     if (!scope || !walletSession.isUnlocked() || (spark === null && hedera === null && !(btcToEur > 0))) return;
     const next: HomeBalancePreview = { version: 1, scope };
-    if (spark !== null) next.spark = { value: spark, at: sparkAt };
+    if (spark !== null) next.spark = { value: spark, at: sparkAt, definition: 'available' };
     if (hedera !== null) next.hedera = { value: hedera.toString(), at: hederaAt };
     if (btcToEur > 0) next.rates = { btcToEur, hbarToEur: hbarToEur > 0 ? hbarToEur : 0, at: ratesAt };
     void homeBalancePreviewStore.update(next, walletSession.capture()).catch(() => undefined);

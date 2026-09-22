@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -35,6 +36,8 @@ function fixture(data = {}) {
     '@/components/ui/advanced-options': { AdvancedOptions: 'advanced' },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button' },
     '@/lib/i18n': { t: value => value, appLocale: () => 'en' },
+    '@/components/bitcoin/payment-ui': { bitcoinStyles: {}, BitcoinButton: 'bitcoin-button', BitcoinInfo: 'bitcoin-info', BitcoinMoney: 'bitcoin-money' },
+    '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage: () => {} },
     'expo-router': { useRouter: () => ({}), useFocusEffect: callback => { focus = callback; } },
     '@expo/vector-icons': { Ionicons: 'icon' },
@@ -44,6 +47,10 @@ function fixture(data = {}) {
     '@/hooks/useWalletAuth': { useWalletAuth: () => ({ walletReady: true, sparkWallet: {}, hederaAccount: null, hederaPublicKey: 'public fixture', loadOrGenerateWallet: async () => {}, refreshHederaAccount: async () => { reads.push('account'); return { accountId: '0.0.123' }; }, error: null }) },
     '@/hooks/useWalletBalances': { useWalletBalances: () => ({ balances: { spark: 0, hbarTinybars: 0n }, balanceStates: { spark: { status: 'ready', updatedAt: 1 }, hedera: { status: 'ready', updatedAt: 1 } }, balanceError: null, secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances') }) },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
+    '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: [] }) },
+    '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
+    '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [] } },
+    '@/hooks/usePendingLightningPayments': { usePendingLightningPayments: () => ({ pendingCount: 0, hiddenPaymentKeys: data.hiddenPaymentKeys || [] }) },
     '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, hbarToEur: 0.1, updatedAt: 1 }) },
     '@/lib/config': { appConfig: { isMainnet: true, hederaNetwork: 'mainnet' } },
     '@/lib/portfolio-valuation': require('../lib/portfolio-valuation.ts'),
@@ -168,4 +175,22 @@ test('Closing history before Spark is ready cancels the queued reads', async () 
   screen = app.render(); app.refocus(); await flush();
   assert.equal(findToggle(screen).props.activityExpanded, false);
   assert.deepEqual(app.reads, []);
+});
+
+test('hidden pending rows stay hidden without a reveal toggle and terminal outcomes become visible', async () => {
+  const key = 'ln:' + 'a'.repeat(64);
+  const data = { hiddenPaymentKeys: [key], local: [
+    { id: 1, txId: key, type: 'outgoing', amount: 20, asset: 'SAT', status: 'pending', timestamp: '2026-09-22T09:45:00Z' },
+    { id: 2, txId: 'ln:other', type: 'incoming', amount: 10, asset: 'SAT', status: 'confirmed', timestamp: '2026-09-22T09:13:00Z' },
+  ] };
+  const app = fixture(data);
+  let screen = app.render(); findToggle(screen).props.onToggle();
+  screen = app.render(); app.refocus(); await flush(); screen = app.render();
+  assert.deepEqual(findToggle(screen).props.transactions.map(item => item.key), ['ln:other']);
+  const hiddenToggle = React.Children.toArray(screen.props.children).find(node => node.type === 'button' &&
+    React.Children.toArray(node.props.children).some(child => child.props?.children === 'Show hidden entries ({count})'));
+  assert.equal(hiddenToggle, undefined);
+  data.local[0].status = 'confirmed';
+  screen = app.render(); app.refocus(); await flush(); screen = app.render();
+  assert.equal(findToggle(screen).props.transactions.length, 2);
 });

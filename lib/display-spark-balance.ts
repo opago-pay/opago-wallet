@@ -2,7 +2,7 @@ import { withTimeout } from './promise-timeout';
 
 export interface SparkBalanceResult {
   balance?: unknown;
-  satsBalance?: { incoming?: unknown };
+  satsBalance?: { available?: unknown; owned?: unknown; incoming?: unknown };
 }
 
 export interface SparkBalanceReader {

@@ -1,5 +1,6 @@
 import { decode } from 'light-bolt11-decoder';
 import { appConfig } from './config';
+import { assertInvoiceSignature } from './lightning/invoice-validation';
 
 const BOLT11_PREFIXES = ['lnbc', 'lntb', 'lnbcrt', 'lnsb'];
 
@@ -8,6 +9,7 @@ export interface LightningInvoiceDetails {
   amountSats: number | null;
   paymentHash: string;
   expiresAt: number | null;
+  descriptionHash?: string | null;
 }
 
 export function isBolt11Invoice(value: string): boolean {
@@ -18,6 +20,7 @@ export function isBolt11Invoice(value: string): boolean {
 export function normalizeLightningInput(value: string): string {
   let input = value.trim();
   if (!input) throw new Error('Payment destination is empty.');
+  if (input.length > 16_384) throw new Error('Payment destination is too long.');
 
   const lightningParameter = input.match(/[?&]lightning=([^&#]+)/i)?.[1];
   if (lightningParameter) input = decodeURIComponent(lightningParameter);
@@ -27,11 +30,12 @@ export function normalizeLightningInput(value: string): string {
   return input;
 }
 
-export function decodeLightningInvoice(invoiceInput: string): LightningInvoiceDetails {
+export function decodeLightningInvoice(invoiceInput: string, options: { allowExpired?: boolean } = {}): LightningInvoiceDetails {
   const invoice = normalizeLightningInput(invoiceInput);
   if (!isBolt11Invoice(invoice)) throw new Error('The destination is not a valid BOLT11 invoice.');
-  const isMainnetInvoice = invoice.toLowerCase().startsWith('lnbc');
-  const isRegtestInvoice = invoice.toLowerCase().startsWith('lnbcrt');
+  const network = invoice.match(/^ln(bcrt|bc|tbs|tb|sb)(?=\d)/i)?.[1].toLowerCase();
+  const isMainnetInvoice = network === 'bc';
+  const isRegtestInvoice = network === 'bcrt';
   if (appConfig.isMainnet ? !isMainnetInvoice : !isRegtestInvoice) {
     throw new Error(
       appConfig.isMainnet
@@ -40,11 +44,15 @@ export function decodeLightningInvoice(invoiceInput: string): LightningInvoiceDe
     );
 
   }
+  assertInvoiceSignature(invoice);
   const decoded = decode(invoice);
   const amountSection = decoded.sections.find(section => section.name === 'amount');
   const paymentHashSection = decoded.sections.find(section => section.name === 'payment_hash');
   const timestampSection = decoded.sections.find(section => section.name === 'timestamp');
   const expirySection = decoded.sections.find(section => section.name === 'expiry');
+  // The decoder's published union omits the supported h-tag.
+  const descriptionHashSection = (decoded.sections as { name: string; value?: unknown }[])
+    .find(section => section.name === 'description_hash');
 
   const paymentHash =
     paymentHashSection && 'value' in paymentHashSection ? String(paymentHashSection.value) : '';
@@ -67,18 +75,25 @@ export function decodeLightningInvoice(invoiceInput: string): LightningInvoiceDe
 
   const timestamp =
     timestampSection && 'value' in timestampSection ? Number(timestampSection.value) : null;
-  const expiry = expirySection && 'value' in expirySection ? Number(expirySection.value) : null;
-  const expiresAt = timestamp !== null && expiry !== null ? (timestamp + expiry) * 1000 : null;
-  if (expiresAt !== null && expiresAt <= Date.now()) {
+  const expiry = expirySection && 'value' in expirySection ? Number(expirySection.value) : 3600;
+  if (timestamp === null || !Number.isSafeInteger(timestamp) || timestamp < 0 ||
+      !Number.isSafeInteger(expiry) || expiry < 0 || !Number.isSafeInteger((timestamp + expiry) * 1000)) {
+    throw new Error('The Lightning invoice has an invalid expiry.');
+  }
+  const expiresAt = (timestamp + expiry) * 1000;
+  if (expiresAt <= Date.now() && !options.allowExpired) {
     throw new Error('The Lightning invoice has expired.');
   }
 
-  return { invoice, amountSats, paymentHash: paymentHash.toLowerCase(), expiresAt };
+  const descriptionHash = descriptionHashSection && 'value' in descriptionHashSection
+    ? String(descriptionHashSection.value).toLowerCase() : null;
+  return { invoice: invoice.toLowerCase(), amountSats, paymentHash: paymentHash.toLowerCase(), expiresAt, descriptionHash };
 }
 
 export function extractLightningPaymentHash(invoiceInput: string): string {
   const invoice = normalizeLightningInput(invoiceInput);
   if (!isBolt11Invoice(invoice)) throw new Error('The destination is not a valid BOLT11 invoice.');
+  assertInvoiceSignature(invoice);
   const decoded = decode(invoice);
   const paymentHashSection = decoded.sections.find(section => section.name === 'payment_hash');
   const paymentHash =

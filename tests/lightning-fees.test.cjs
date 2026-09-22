@@ -74,9 +74,40 @@ test('insufficient total balance and malformed quotes never reach payment submis
   }
   await assert.rejects(prepareDecodedSparkPayment({
     getBalance: async () => ({ balance: 19 }),
-    getLightningSendFeeEstimate: async () => assert.fail('Insufficient principal must not request a quote'),
+    getLightningSendFeeEstimate: async () => 2,
     payLightningInvoice: async () => assert.fail('Insufficient balance must not submit'),
   }, details()), /Insufficient Lightning balance/);
+});
+
+test('review starts balance and fee lookups together but waits for both before returning', async () => {
+  let resolveBalance, resolveFee;
+  const balance = new Promise(resolve => { resolveBalance = resolve; });
+  const fee = new Promise(resolve => { resolveFee = resolve; });
+  const started = [];
+  let reviewed = false;
+  const preparation = prepareDecodedSparkPayment({
+    getBalance: () => { started.push('balance'); return balance; },
+    getLightningSendFeeEstimate: () => { started.push('fee'); return fee; },
+    payLightningInvoice: async () => assert.fail('Review must not send'),
+  }, details()).then(value => { reviewed = true; return value; });
+  assert.deepEqual(started, ['balance', 'fee']);
+  resolveFee(2);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reviewed, false);
+  resolveBalance({ balance: 22 });
+  assert.equal((await preparation).maxFeeSats, 2);
+});
+
+test('a failed parallel lookup cannot produce review data and consumes the other rejection', async () => {
+  let rejectFee;
+  const fee = new Promise((resolve, reject) => { rejectFee = reject; });
+  await assert.rejects(prepareDecodedSparkPayment({
+    getBalance: async () => { throw new Error('Balance unavailable'); },
+    getLightningSendFeeEstimate: () => fee,
+    payLightningInvoice: async () => assert.fail('Failed review must not send'),
+  }, details()), /Balance unavailable/);
+  rejectFee(new Error('Private SDK invoice data'));
+  await new Promise(resolve => setImmediate(resolve));
 });
 
 test('cancelling authorization still blocks the newly prepared fee budget before submission', async () => {

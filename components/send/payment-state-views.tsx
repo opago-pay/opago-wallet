@@ -3,34 +3,11 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
-import { CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { walletAssetKeyFromSymbol } from '@/lib/wallet-assets';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { OcpOption, OcpState } from './types';
-
-export function ScannerView(props: { onScanned(value: string): void; onCancel(): void; onError?(): void }) {
-  useLanguage();
-  return (
-    <View style={styles.camera}>
-      <CameraView
-        style={{ flex: 1 }}
-        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onMountError={props.onError}
-        onBarcodeScanned={({ data }) => props.onScanned(data)}
-      />
-      <View style={styles.cameraHeader} pointerEvents="none">
-        <Text style={styles.cameraTitle}>{t("Scan payment code")}</Text>
-        <Text style={styles.cameraSubtitle}>{t("Hold the QR code inside the frame")}</Text>
-      </View>
-      <View style={styles.scannerFrame} pointerEvents="none" />
-      <TouchableOpacity style={styles.cameraClose} onPress={props.onCancel} accessibilityRole="button" accessibilityLabel={t("Close scanner")}>
-        <Text style={styles.cameraCloseText}>{t("Cancel")}</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 export function PaymentSuccessView(props: {
   proof: string;

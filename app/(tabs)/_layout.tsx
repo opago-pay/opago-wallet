@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { walletTabBarStyle } from '@/components/navigation/wallet-tab-style';
 import { WalletTabIcon } from '@/components/navigation/wallet-tab-icon';
 
 export default function TabLayout() {
@@ -19,15 +20,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#969987',
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarStyle: {
-          backgroundColor: '#0c0e09',
-          borderTopWidth: 1,
-          borderTopColor: '#292d23',
-          elevation: 0,
-          height: 66 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 14,
-          paddingTop: 10,
-          paddingBottom: Math.max(insets.bottom, 8),
-        },
+        tabBarStyle: walletTabBarStyle(insets.bottom, fontScale),
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '500',
@@ -51,7 +44,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="receive"
         options={{
-          title: t('Request'),
+          title: t('Receive'),
           tabBarIcon: ({ color }) => <WalletTabIcon name="request" color={color} />,
         }}
       />

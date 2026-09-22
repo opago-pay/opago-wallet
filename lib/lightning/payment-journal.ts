@@ -14,6 +14,15 @@ export interface LightningPaymentJournalRecord {
   result: string | null;
   createdAt: string;
   updatedAt: string;
+  hiddenAt?: string;
+}
+
+export function lightningPaymentPresentation(records: LightningPaymentJournalRecord[]) {
+  const pending = records.filter(record => record.state === 'pending');
+  return {
+    pendingCount: pending.filter(record => !record.hiddenAt).length,
+    hiddenPaymentKeys: pending.filter(record => record.hiddenAt).map(record => 'ln:' + record.paymentHash),
+  };
 }
 
 export interface LightningPaymentResolution {
@@ -88,6 +97,8 @@ function assertRecord(value: unknown): LightningPaymentJournalRecord {
     !Number.isFinite(Date.parse(record.createdAt)) ||
     typeof record.updatedAt !== 'string' ||
     !Number.isFinite(Date.parse(record.updatedAt))
+    || (record.hiddenAt !== undefined &&
+      (typeof record.hiddenAt !== 'string' || !Number.isFinite(Date.parse(record.hiddenAt))))
   ) {
     throw new Error('Lightning payment journal contains an invalid record.');
   }
@@ -120,6 +131,7 @@ export function createLightningPaymentJournal(
   now: () => Date = () => new Date(),
 ) {
   let queue: Promise<unknown> = Promise.resolve();
+  let generation = 0;
 
   function exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const running = queue.then(operation, operation);
@@ -157,6 +169,21 @@ export function createLightningPaymentJournal(
       return exclusive(async () => {
         const normalized = normalizePaymentHash(paymentHash);
         return (await read()).find(record => record.paymentHash === normalized) || null;
+      });
+    },
+
+    // Presentation only: retain pending state and the original hash so hiding
+    // an ambiguous entry can never authorize another submission of its invoice.
+    setHidden(paymentHash: string, hidden: boolean): Promise<void> {
+      return exclusive(async () => {
+        const normalized = normalizePaymentHash(paymentHash);
+        const records = await read();
+        const existing = records.find(record => record.paymentHash === normalized);
+        if (!existing || (hidden && existing.state !== 'pending')) return;
+        const updated = { ...existing };
+        if (hidden) updated.hiddenAt = existing.hiddenAt || now().toISOString();
+        else delete updated.hiddenAt;
+        await write(records.map(record => record.paymentHash === normalized ? updated : record));
       });
     },
 
@@ -212,12 +239,12 @@ export function createLightningPaymentJournal(
       state: 'confirmed' | 'failed',
       result: string,
       requestId?: string | null,
-    ): Promise<void> {
+    ): Promise<LightningPaymentJournalRecord | null> {
       return exclusive(async () => {
         const normalized = normalizePaymentHash(paymentHash);
         const records = await read();
         const existing = records.find(record => record.paymentHash === normalized);
-        if (!existing) return;
+        if (!existing || existing.state === 'confirmed') return existing || null;
         const updated: LightningPaymentJournalRecord = {
           ...existing,
           requestId: normalizeRequestId(requestId) || existing.requestId,
@@ -226,22 +253,36 @@ export function createLightningPaymentJournal(
           updatedAt: now().toISOString(),
         };
         await write([updated, ...records.filter(item => item.paymentHash !== normalized)]);
+        return updated;
       });
     },
 
-    reconcile(
+    async reconcile(
       resolve: (record: LightningPaymentJournalRecord) => Promise<LightningPaymentResolution>,
     ): Promise<LightningPaymentJournalRecord[]> {
+      const snapshot = await exclusive(async () => ({ records: await read(), generation }));
+      // Never hold the storage queue while waiting for a network response.
+      const resolutions = new Map(await Promise.all(snapshot.records
+        .filter(record => record.state === 'pending')
+        .map(async record => {
+          try { return [record.paymentHash, await resolve(record)] as const; }
+          catch { return [record.paymentHash, null] as const; }
+        })));
       return exclusive(async () => {
         const records = await read();
-        const reconciled = await Promise.all(records.map(async record => {
-          if (record.state !== 'pending') return record;
-          let resolution: LightningPaymentResolution;
-          try {
-            resolution = await resolve(record);
-          } catch {
-            return record;
-          }
+        if (snapshot.generation !== generation) return records;
+        const reconciled = records.map(record => {
+          const original = snapshot.records.find(item => item.paymentHash === record.paymentHash);
+          const resolution = resolutions.get(record.paymentHash);
+          // A submit, a retry, or another reconciliation may have completed
+          // while this lookup was in flight. A stale read must not overwrite it.
+          // Hiding/unhiding is independent of payment state. A concurrent
+          // visibility edit must not discard an authoritative network result.
+          const paymentState = (item: LightningPaymentJournalRecord | undefined) => {
+            if (!item) return null;
+            return JSON.stringify({ ...item, hiddenAt: undefined });
+          };
+          if (!resolution || record.state !== 'pending' || paymentState(original) !== paymentState(record)) return record;
           if (resolution.state === 'pending') {
             const requestId = normalizeRequestId(resolution.requestId) || record.requestId;
             if (requestId === record.requestId) return record;
@@ -254,14 +295,17 @@ export function createLightningPaymentJournal(
             result: normalizeResult(resolution.result || resolution.state.toUpperCase()),
             updatedAt: now().toISOString(),
           };
-        }));
+        });
         if (JSON.stringify(reconciled) !== JSON.stringify(records)) await write(reconciled);
         return reconciled;
       });
     },
 
     clear(): Promise<void> {
-      return exclusive(() => storage.removeItem(LIGHTNING_PAYMENT_JOURNAL_KEY));
+      return exclusive(async () => {
+        generation += 1;
+        await storage.removeItem(LIGHTNING_PAYMENT_JOURNAL_KEY);
+      });
     },
   };
 }

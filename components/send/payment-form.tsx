@@ -1,7 +1,11 @@
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useEffect, useRef } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { BitcoinButton, bitcoinStyles } from '@/components/bitcoin/payment-ui';
+import { BitcoinAmountSheet } from '@/components/bitcoin/amount-sheet';
+import { satsToBtc } from '@/lib/bitcoin/amount';
 import { TextInput, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -18,6 +22,15 @@ import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 import type { LightningAmountRequirement } from '@/lib/lightning-destination';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];
+const recipientStyles = StyleSheet.create({
+  title: { fontSize: 29, lineHeight: 36, letterSpacing: -0.5 },
+  field: { borderRadius: 24, borderWidth: 1, borderColor: '#303038', backgroundColor: '#151519', padding: 18, gap: 12 },
+  focused: { borderColor: '#ffb000' },
+  label: { fontSize: 14, lineHeight: 20, color: '#b6b6c0', fontWeight: '500' },
+  input: { minHeight: 100, color: '#fff', fontSize: 18, lineHeight: 27, textAlignVertical: 'top', padding: 0 },
+  paste: { borderTopWidth: 1, borderTopColor: '#303038', minHeight: 52, paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  pasteText: { color: '#ffb000', fontSize: 15, lineHeight: 22, fontWeight: '600', flexShrink: 1 },
+});
 
 export function PaymentForm(props: {
   destination: string;
@@ -40,10 +53,15 @@ export function PaymentForm(props: {
   onChangeSource(): void;
   onScan(): void;
   onReview(): void;
+  bitcoinRoute?: 'lightning' | 'onchain';
+  fixedAmountSats?: number | null;
+  btcToEur?: number;
+  routeAlternative?: boolean;
 }) {
   useLanguage();
   const insets = useSafeAreaInsets();
   const amountRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const [recipientFocused, setRecipientFocused] = useState(false);
   const amountMissing = Boolean(props.amountRequirement && !props.amountInput.trim());
   const reviewDisabled = props.loading || !props.walletReady || amountMissing;
   useEffect(() => {
@@ -78,13 +96,63 @@ export function PaymentForm(props: {
     );
   };
 
+  if (!isHedera && props.sourceSelected && props.destination.trim()) return <BitcoinAmountSheet
+    amount={props.amountInput} currency={props.currency} fixedAmount={props.fixedAmountSats}
+    recipient={props.amountRequirement?.recipient || props.destination} loading={props.loading}
+    disabled={!props.walletReady || (!props.amountInput.trim() && props.fixedAmountSats == null)}
+    onchain={props.bitcoinRoute === 'onchain'} alternative={props.routeAlternative} balanceError={!!props.balanceError}
+    onAmount={props.onAmountChange} onCurrency={props.onCurrencyChange} onBack={props.onScan} onContinue={props.onReview} />;
+
+  if (!isHedera) return <ScrollView style={bitcoinStyles.screen} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
+    contentContainerStyle={[bitcoinStyles.page, { paddingTop: insets.top + 12 }]}>
+    <PaymentBackButton onPress={props.onScan} disabled={props.loading} label={t('Back to scanner')} />
+    <Text style={[bitcoinStyles.title, recipientStyles.title]}>{t('Enter address')}</Text>
+    <Text style={bitcoinStyles.muted}>{t('Paste the recipient’s address or type it below.')}</Text>
+    {!appConfig.isMainnet && <Text style={bitcoinStyles.warning}>REGTEST · {t('TEST MODE')}</Text>}
+    <View style={[recipientStyles.field, recipientFocused && recipientStyles.focused]}>
+      <Text style={recipientStyles.label}>{t('Address or payment code')}</Text>
+      <TextInput style={recipientStyles.input} value={props.destination} onChangeText={props.onDestinationChange}
+        placeholder={t('Enter or paste here')} placeholderTextColor="#9696a2" multiline autoCapitalize="none"
+        autoFocus={!props.destination} onFocus={() => setRecipientFocused(true)} onBlur={() => setRecipientFocused(false)}
+        autoCorrect={false} spellCheck={false} editable={!props.loading} accessibilityLabel={t('Address or payment code')} />
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Paste from clipboard')} disabled={props.loading} style={recipientStyles.paste}
+        onPress={() => { void Clipboard.getStringAsync().then(props.onDestinationChange).catch(() => Alert.alert(t('Please try again.'))); }}>
+        <Ionicons name="clipboard-outline" size={19} color="#ffb000" accessible={false} />
+        <Text style={recipientStyles.pasteText}>{t('Paste from clipboard')}</Text>
+      </TouchableOpacity>
+    </View>
+    <Text style={bitcoinStyles.note}>{t('Opago recognises the payment route from the address or request.')}</Text>
+    {(props.amountRequirement || props.bitcoinRoute || props.sourceSelected) && <View style={{ gap: 12 }}>
+      <Text style={bitcoinStyles.value}>{t('Recipient receives')}</Text>
+      {props.fixedAmountSats != null ? <Text style={bitcoinStyles.amount}>{props.fixedAmountSats.toLocaleString(appLocale())} SAT</Text> : <>
+        <TextInput ref={amountRef} style={[bitcoinStyles.input, { fontSize: 30, textAlign: 'center' }]} value={props.amountInput}
+          onChangeText={props.onAmountChange} placeholder="0" placeholderTextColor="#888893" keyboardType="decimal-pad"
+          editable={!props.loading} accessibilityLabel={t('Amount')} />
+        <View style={styles.row}>{CURRENCIES.map(item => <TouchableOpacity key={item} style={[styles.selector, props.currency === item && styles.selectorActive]}
+          onPress={() => { props.onAmountChange(''); props.onCurrencyChange(item); }} disabled={props.loading} accessibilityRole="radio" accessibilityState={{ checked: props.currency === item }}>
+          <Text style={[styles.selectorText, props.currency === item && styles.selectorTextActive]}>{item}</Text>
+        </TouchableOpacity>)}</View>
+      </>}
+      {props.fixedAmountSats != null && <Text style={bitcoinStyles.footnote}>{satsToBtc(props.fixedAmountSats)} BTC</Text>}
+      {props.amountRequirement?.maxSats != null && <Text style={bitcoinStyles.note}>{t('The recipient accepts {min}–{max} SAT.', { min: props.amountRequirement.minSats, max: props.amountRequirement.maxSats })}</Text>}
+    </View>}
+    {props.bitcoinRoute === 'onchain' && <Text style={bitcoinStyles.note}>{t('Preparing an onchain offer requires device approval because Spark may reorganise your Bitcoin internally. No payment to the recipient is sent until you review the costs and confirm.')}</Text>}
+    {props.routeAlternative && <Text style={bitcoinStyles.warning}>{t('The Lightning part has expired. You can review a new payment to the Bitcoin address instead. Its costs and timing are different.')}</Text>}
+    {props.balanceError && <Text style={bitcoinStyles.warning}>{t('Some balances may be out of date. Please try again.')}</Text>}
+    <BitcoinButton label={t(props.bitcoinRoute === 'onchain' ? 'Prepare fee offer' : 'Continue')} onPress={props.onReview}
+      disabled={!props.destination.trim() || !props.walletReady || (amountMissing && props.fixedAmountSats == null)} loading={props.loading} />
+    <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+      <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
+    </AdvancedOptions>
+  </ScrollView>;
+
   return (
     <ScrollView
       style={styles.scrollContainer}
       contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12 }]}
       keyboardShouldPersistTaps="handled"
     >
-      {props.sourceSelected && <PaymentBackButton onPress={props.onChangeSource} disabled={props.loading} label={t('Back to payment methods')} />}
+      {props.sourceSelected && <PaymentBackButton onPress={props.onScan} disabled={props.loading} label={t('Back to scanner')} />}
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.title}>{t('Send {asset}', { asset: props.sourceSelected ? selectedPresentation.name : 'Bitcoin' })}</Text>

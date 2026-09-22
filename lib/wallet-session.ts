@@ -89,7 +89,7 @@ export class WalletSession {
     };
   }
 
-  // Only for a previously authorized SDK startup, never signing/key disclosure.
+  // Only for authenticated SDK startup/read-only preparation, never signing/key disclosure.
   // A system credential prompt can temporarily hide an otherwise valid session.
   captureRuntime() {
     if (!this.isUnlocked()) throw new Error('Unlock your wallet to continue.');

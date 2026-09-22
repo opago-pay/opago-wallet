@@ -13,6 +13,7 @@ require('./register-typescript.cjs');
 const {
   LIGHTNING_PAYMENT_JOURNAL_KEY,
   createLightningPaymentJournal,
+  lightningPaymentPresentation,
 } = require('../lib/lightning/payment-journal.ts');
 const {
   LIGHTNING_RECEIVE_REQUEST_KEY,
@@ -38,6 +39,48 @@ function memoryStorage() {
 
 const paymentHash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
 const preimage = '00'.repeat(32);
+
+test('hiding one pending payment survives restart and preserves its duplicate guard and other payments', async () => {
+  const storage = memoryStorage(); const journal = createLightningPaymentJournal(storage);
+  const other = 'a'.repeat(64);
+  await journal.recordPending(paymentHash, 20); await journal.recordPending(other, 30);
+  const original = await journal.get(paymentHash); const otherOriginal = await journal.get(other);
+  await journal.setHidden(paymentHash, true);
+  const restarted = createLightningPaymentJournal(storage);
+  const hidden = await restarted.get(paymentHash);
+  assert.ok(hidden.hiddenAt);
+  const { hiddenAt, ...retained } = hidden;
+  assert.deepEqual(retained, original);
+  assert.deepEqual(await restarted.get(other), otherOriginal);
+  assert.deepEqual(lightningPaymentPresentation(await restarted.list()), { pendingCount: 1, hiddenPaymentKeys: ['ln:' + paymentHash] });
+  await assert.rejects(restarted.recordPending(paymentHash, 20), /already being processed/);
+  await restarted.setHidden(paymentHash, false);
+  assert.deepEqual(await restarted.get(paymentHash), original);
+});
+
+test('a concurrent hide does not discard a terminal result and confirmed payments reappear automatically', async () => {
+  const journal = createLightningPaymentJournal(memoryStorage());
+  await journal.recordPending(paymentHash, 20);
+  let resolve; const pending = new Promise(done => { resolve = done; });
+  const checking = journal.reconcile(() => pending);
+  await new Promise(done => setImmediate(done));
+  await journal.setHidden(paymentHash, true);
+  resolve({ state: 'confirmed', result: 'PREIMAGE_VERIFIED' });
+  await checking;
+  assert.equal((await journal.get(paymentHash)).state, 'confirmed');
+  assert.deepEqual(lightningPaymentPresentation(await journal.list()), { pendingCount: 0, hiddenPaymentKeys: [] });
+  await assert.rejects(journal.recordPending(paymentHash, 20), /already been paid/);
+});
+
+test('old journals default to visible and malformed hiding metadata fails closed', async () => {
+  const storage = memoryStorage(); const journal = createLightningPaymentJournal(storage);
+  await journal.recordPending(paymentHash, 20);
+  assert.equal(lightningPaymentPresentation(await journal.list()).pendingCount, 1);
+  const saved = JSON.parse(storage.values.get(LIGHTNING_PAYMENT_JOURNAL_KEY));
+  saved.records[0].hiddenAt = 'invalid';
+  storage.values.set(LIGHTNING_PAYMENT_JOURNAL_KEY, JSON.stringify(saved));
+  await assert.rejects(journal.recordPending(paymentHash, 20), /invalid record/);
+});
 
 test('persists an unresolved Lightning payment without invoice or preimage material', async () => {
   const storage = memoryStorage();
@@ -72,6 +115,7 @@ test('keeps network failures pending and only promotes a proof-backed Spark succ
       return {
         id,
         status: 'TRANSFER_COMPLETED',
+        idempotencyKey: 'opago-' + paymentHash,
         paymentPreimage: preimage,
       };
     },
@@ -194,7 +238,7 @@ test('loads Spark history page by page without repeating an offset', async () =>
   assert.deepEqual(calls, [[2, 0], [2, 2]]);
 });
 
-test('restores an unexpired receive request and removes expired or corrupt data', async () => {
+test('restores receive requests even after expiry for reconciliation, and removes corrupt data', async () => {
   const storage = memoryStorage();
   const store = createLightningReceiveStore(storage);
   const request = {
@@ -212,8 +256,9 @@ test('restores an unexpired receive request and removes expired or corrupt data'
   assert.equal(await store.load(), null);
   assert.equal(storage.values.has(LIGHTNING_RECEIVE_REQUEST_KEY), false);
 
-  await store.save({ ...request, expiresAt: Date.now() - 1 });
-  assert.equal(await store.load(), null);
+  const expired = { ...request, expiresAt: Date.now() - 1 };
+  await store.save(expired);
+  assert.deepEqual(await store.load(), expired);
 });
 
 test('stores only aggregate local Lightning health without payment identifiers', async () => {

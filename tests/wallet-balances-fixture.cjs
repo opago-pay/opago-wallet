@@ -49,6 +49,7 @@ function balanceFixture(options = {}) {
     react: hooks,
     'expo-router': { useFocusEffect: callback => hooks.useEffect(() => params.focused === false ? undefined : callback(), [callback, params.focused]) },
     '@react-navigation/native': { useIsFocused: () => params.focused !== false },
+    '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/lib/balance-state': require('../lib/balance-state.ts'),
     '@/lib/promise-timeout': require('../lib/promise-timeout.ts'),
     '@/lib/startup-timing': { recordWalletStartupStage: value => stages.push(value) },

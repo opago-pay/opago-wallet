@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Share,
   ScrollView,
   Text,
   View,
@@ -42,15 +43,23 @@ import {
   HEDERA_NETWORK_LABEL,
 } from '@/lib/hedera/config';
 import { decodeLightningInvoice } from '@/lib/lightning';
-import { sparkTransferMatchesInvoice, verifyPaymentPreimage } from '@/lib/payments';
+import { resolveLightningReceive, type LightningReceiveState } from '@/lib/lightning/receive-status';
+import { withTimeout } from '@/lib/promise-timeout';
 import { lightningReceiveStore } from '@/lib/lightning/receive-store-native';
-import { loadSparkTransfersPaginated } from '@/lib/lightning/spark-history';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
 import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
 import { compactWalletIdentifier } from '@/lib/wallet-display';
 import { exponentialBackoffDelay } from '@/lib/retry';
 import { HederaActivation } from '@/components/receive/hedera-activation';
+import { BitcoinDepositScreen } from '@/components/bitcoin/deposit-screen';
+import { BitcoinButton, BitcoinMoney, BitcoinInfo, bitcoinStyles } from '@/components/bitcoin/payment-ui';
+import { bitcoinScope } from '@/lib/bitcoin/onchain';
+import { archiveBitcoinRequest } from '@/lib/bitcoin/receive-archive';
+import { walletSession } from '@/lib/wallet-session';
+import { parsePaymentAmount } from '@/lib/payment-input';
+import { friendlyPaymentMessage } from '@/lib/payment-errors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ReceiveNetwork = 'lightning' | 'hedera';
 
@@ -59,6 +68,8 @@ export default function ReceiveScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const rates = useExchangeRates();
+  const insets = useSafeAreaInsets();
+  const [showBitcoinAddress, setShowBitcoinAddress] = useState(false);
   const {
     sparkWallet,
     walletReady,
@@ -71,12 +82,14 @@ export default function ReceiveScreen() {
   } = useWalletAuth();
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
-  const [networkSelected, setNetworkSelected] = useState(false);
+  const [networkSelected, setNetworkSelected] = useState(true);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [invoiceRequestId, setInvoiceRequestId] = useState<string | null>(null);
   const [invoicePaymentHash, setInvoicePaymentHash] = useState<string | null>(null);
   const [invoiceAmountSats, setInvoiceAmountSats] = useState(0);
   const [invoiceExpiresAt, setInvoiceExpiresAt] = useState<number | null>(null);
+  const [invoiceExpired, setInvoiceExpired] = useState(false);
+  const [receiveStatus, setReceiveStatus] = useState<LightningReceiveState | 'checking' | 'offline'>('checking');
   const [amountInput, setAmountInput] = useState('');
   const [isEur, setIsEur] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -92,6 +105,10 @@ export default function ReceiveScreen() {
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const pollingEnabled = isFocused && appIsActive;
   const restoredLightningRequest = useRef(false);
+  const receiveGeneration = useRef(0);
+  const creatingInvoice = useRef(false);
+
+  useEffect(() => () => { receiveGeneration.current += 1; }, [sparkWallet]);
 
   useEffect(() => {
     hederaKnownTransactions.current = null;
@@ -108,11 +125,21 @@ export default function ReceiveScreen() {
 
   useEffect(() => {
     if (!sparkWallet || restoredLightningRequest.current) return;
-    restoredLightningRequest.current = true;
+    const generation = receiveGeneration.current;
     let cancelled = false;
     void lightningReceiveStore.load()
-      .then(saved => {
-        if (!saved || cancelled) return;
+      .then(async saved => {
+        if (cancelled || generation !== receiveGeneration.current) return;
+        restoredLightningRequest.current = true;
+        if (!saved) return;
+        const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
+        if (saved.scope && saved.scope !== scope) return;
+        const details = decodeLightningInvoice(saved.invoice, { allowExpired: true });
+        if (details.paymentHash !== saved.paymentHash || details.amountSats !== saved.amountSats) return;
+        const current = walletSession.captureRuntime();
+        const assertCurrent = () => { current(); if (cancelled || generation !== receiveGeneration.current) throw new Error('Wallet changed.'); };
+        await archiveBitcoinRequest(scope, saved, assertCurrent);
+        assertCurrent();
         setNetwork('lightning');
         setNetworkSelected(true);
         setInvoice(saved.invoice);
@@ -120,6 +147,8 @@ export default function ReceiveScreen() {
         setInvoicePaymentHash(saved.paymentHash);
         setInvoiceAmountSats(saved.amountSats);
         setInvoiceExpiresAt(saved.expiresAt);
+        setInvoiceExpired(saved.expiresAt <= Date.now());
+        setReceiveStatus('checking');
         setIsPaid(false);
       })
       .catch(() => {
@@ -144,14 +173,14 @@ export default function ReceiveScreen() {
     txId: string,
     reference = txId,
   ) => {
+    setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
+    setIsPaid(true);
     await addTransaction('incoming', amount, asset, {
       txId,
       reference,
       status: 'confirmed',
-    });
-    await lightningReceiveStore.clear();
-    setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
-    setIsPaid(true);
+    }).catch(() => undefined); // History can be rebuilt; proof remains authoritative.
+    await lightningReceiveStore.clear(reference).catch(() => undefined);
     try {
       await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
     } catch {
@@ -175,59 +204,34 @@ export default function ReceiveScreen() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let consecutiveFailures = 0;
+    const generation = receiveGeneration.current;
+    const isCurrent = () => !cancelled && generation === receiveGeneration.current;
 
     function scheduleNextPoll(delayMs: number) {
-      if (cancelled) return;
+      if (!isCurrent()) return;
       timer = setTimeout(() => void poll(), delayMs);
     }
 
     async function poll() {
       try {
-        if (invoiceRequestId && typeof sparkWallet.getLightningReceiveRequest === 'function') {
-          const request = await sparkWallet.getLightningReceiveRequest(invoiceRequestId);
-          const status = String(request?.status || '').toUpperCase();
-          if (status.includes('FAILED')) {
-            await lightningReceiveStore.clear();
-            if (!cancelled) {
-              setInvoice(null);
-              setInvoiceRequestId(null);
-              setInvoicePaymentHash(null);
-              setInvoiceAmountSats(0);
-              setInvoiceExpiresAt(null);
-              setIsPaid(false);
-              Alert.alert(t('Request closed'), t('This Lightning request could not be completed. Create a new one.'));
-            }
-            return;
-          }
-          if (status === 'TRANSFER_COMPLETED') {
-            verifyPaymentPreimage(request?.paymentPreimage, invoicePaymentHash!);
-            if (!cancelled) {
-              await markPaid(
-                invoiceAmountSats,
-                'SAT',
-                'ln:' + invoicePaymentHash!.toLowerCase(),
-                invoiceRequestId,
-              );
-            }
-            return;
-          }
-        }
-
-        const transfers = await loadSparkTransfersPaginated(sparkWallet, 200, 50);
-        const matching = transfers.find((transfer: unknown) =>
-          sparkTransferMatchesInvoice(transfer, invoicePaymentHash!, invoiceAmountSats),
-        );
-        if (matching && !cancelled) {
+        const status = await resolveLightningReceive(sparkWallet!, {
+          requestId: invoiceRequestId!, paymentHash: invoicePaymentHash!, amountSats: invoiceAmountSats,
+        });
+        if (!isCurrent()) return;
+        setReceiveStatus(status);
+        if (status === 'confirmed') {
           await markPaid(
             invoiceAmountSats,
             'SAT',
             'ln:' + invoicePaymentHash!.toLowerCase(),
-            'spark:' + matching.id,
+            invoiceRequestId!,
           );
           return;
         }
         consecutiveFailures = 0;
       } catch {
+        if (!isCurrent()) return;
+        setReceiveStatus('offline');
         consecutiveFailures += 1;
       }
       scheduleNextPoll(exponentialBackoffDelay(2_500, consecutiveFailures, 30_000));
@@ -238,7 +242,7 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [invoice, invoiceAmountSats, invoicePaymentHash, invoiceRequestId, isPaid, markPaid, pollingEnabled, sparkWallet]);
+  }, [invoice, invoiceAmountSats, invoiceExpired, invoicePaymentHash, invoiceRequestId, isPaid, markPaid, pollingEnabled, sparkWallet]);
 
   useEffect(() => {
     if (!pollingEnabled || !networkSelected || network !== 'hedera' || !walletReady || isPaid) return;
@@ -321,30 +325,26 @@ export default function ReceiveScreen() {
   }, [hederaPublicKey, hederaRequest, isPaid, network, networkSelected, pollingEnabled, refreshHederaAccount, walletReady]);
 
   function parseInvoiceAmount(): number {
-    const value = Number(amountInput.replace(',', '.'));
-    if (!Number.isFinite(value) || value <= 0) throw new Error('Enter a positive amount.');
-    const sats = isEur
-      ? rates.btcToEur > 0
-        ? Math.floor((value / rates.btcToEur) * 1e8)
-        : 0
-      : value;
-    if (!Number.isSafeInteger(sats) || sats <= 0) {
-      throw new Error(isEur ? 'The exchange rate is unavailable or amount is too small.' : 'Use whole satoshis.');
-    }
-    return sats;
+    const freshRate = rates.updatedAt > 0 && Date.now() - rates.updatedAt <= 300_000 ? rates.btcToEur : 0;
+    return parsePaymentAmount(amountInput, isEur ? 'EUR' : 'SAT', freshRate);
   }
 
   async function generateInvoice() {
-    if (!sparkWallet) return;
+    if (!sparkWallet || creatingInvoice.current) return;
+    creatingInvoice.current = true;
+    const generation = receiveGeneration.current;
+    const isCurrent = () => generation === receiveGeneration.current;
+    const assertCurrent = () => { if (!isCurrent()) throw new Error('Wallet locked.'); };
     setLoading(true);
     try {
       const amountSats = parseInvoiceAmount();
-      await Notifications.requestPermissionsAsync();
-      const result = await sparkWallet.createLightningInvoice({
+      if (amountSats <= 0) throw new Error('Enter a positive amount.');
+      const result = await withTimeout<{ id: string; invoice: string | { encodedInvoice: string } }>(sparkWallet.createLightningInvoice({
         amountSats,
         memo: 'Deposit into Opago Wallet',
         expirySeconds: 600,
-      });
+      }), 20_000, 'Lightning request timed out.');
+      assertCurrent();
       const rawInvoice =
         typeof result.invoice === 'string' ? result.invoice : result.invoice.encodedInvoice;
       const details = decodeLightningInvoice(rawInvoice);
@@ -353,24 +353,32 @@ export default function ReceiveScreen() {
         throw new Error('Spark returned no request identifier.');
       }
       const encodedRequest = 'lightning:' + details.invoice;
-      await lightningReceiveStore.save({
+      const saved = {
+        scope: await bitcoinScope(sparkWallet, appConfig.sparkNetwork),
         requestId: result.id,
         invoice: encodedRequest,
         paymentHash: details.paymentHash,
         amountSats,
         expiresAt: details.expiresAt || Date.now() + 600_000,
         createdAt: new Date().toISOString(),
-      });
+      };
+      await archiveBitcoinRequest(saved.scope, saved, assertCurrent);
+      await lightningReceiveStore.save(saved, assertCurrent);
+      assertCurrent();
       setInvoice(encodedRequest);
       setInvoiceRequestId(result.id);
       setInvoicePaymentHash(details.paymentHash);
       setInvoiceAmountSats(amountSats);
       setInvoiceExpiresAt(details.expiresAt || Date.now() + 600_000);
+      setInvoiceExpired(false);
+      setReceiveStatus('checking');
       setIsPaid(false);
     } catch (cause) {
-      Alert.alert(t('Could not create request'), t(cause instanceof Error ? cause.message : t('Bitcoin payments are unavailable.')));
+      if (!isCurrent()) return;
+      Alert.alert(t('Could not create request'), t(friendlyPaymentMessage(cause, 'Bitcoin')));
     } finally {
-      setLoading(false);
+      creatingInvoice.current = false;
+      if (isCurrent()) setLoading(false);
     }
   }
 
@@ -395,11 +403,14 @@ export default function ReceiveScreen() {
   }
 
   const reset = useCallback(() => {
+    receiveGeneration.current += 1;
     setInvoice(null);
     setInvoiceRequestId(null);
     setInvoicePaymentHash(null);
     setInvoiceAmountSats(0);
     setInvoiceExpiresAt(null);
+    setInvoiceExpired(false);
+    setReceiveStatus('checking');
     setIsPaid(false);
     setReceivedDescription('');
     setReceivedExplorerUrl(null);
@@ -412,13 +423,14 @@ export default function ReceiveScreen() {
   }, []);
 
   const clearAndReset = useCallback(async () => {
+    receiveGeneration.current += 1;
     await lightningReceiveStore.clear();
     reset();
   }, [reset]);
 
   const finishReceiving = useCallback(() => {
     reset();
-    setNetworkSelected(false);
+    setNetworkSelected(true);
     setNetwork('lightning');
     setAdvancedExpanded(false);
     setAmountInput('');
@@ -435,12 +447,12 @@ export default function ReceiveScreen() {
     if (!invoiceExpiresAt || isPaid) return;
     const remaining = invoiceExpiresAt - Date.now();
     if (remaining <= 0) {
-      void clearAndReset();
+      setInvoiceExpired(true);
       return;
     }
-    const timer = setTimeout(() => void clearAndReset(), remaining);
+    const timer = setTimeout(() => setInvoiceExpired(true), Math.min(remaining, 2_147_483_647));
     return () => clearTimeout(timer);
-  }, [clearAndReset, invoiceExpiresAt, isPaid]);
+  }, [invoiceExpiresAt, isPaid]);
 
   async function copy(value: string) {
     await Clipboard.setStringAsync(value);
@@ -505,12 +517,14 @@ export default function ReceiveScreen() {
     </View>
   );
 
+  if (showBitcoinAddress) return <BitcoinDepositScreen wallet={sparkWallet} onBack={() => setShowBitcoinAddress(false)} />;
+
   const qrValue =
     network === 'hedera'
         ? hederaRequest && hederaAccount
           ? buildHederaWalletQrValue(hederaAccount.accountId)
           : ''
-        : invoice || '';
+        : invoiceExpired || receiveStatus === 'failed' ? '' : invoice || '';
 
   const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
     { network: 'lightning', asset: 'lightning' },
@@ -522,6 +536,8 @@ export default function ReceiveScreen() {
     appConfig.isMainnet,
     appConfig.hederaNetwork,
   );
+  let draftSats = 0;
+  try { draftSats = parseInvoiceAmount(); } catch { /* Invalid or incomplete input is explained on submission. */ }
 
   async function selectNetwork(next: ReceiveNetwork) {
     if (loading) return;
@@ -574,14 +590,14 @@ export default function ReceiveScreen() {
   return (
     <ScrollView
       style={styles.scrollContainer}
-      contentContainerStyle={styles.formContent}
+      contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12, paddingHorizontal: 23 }]}
       keyboardShouldPersistTaps="handled"
     >
-      {networkSelected && <PaymentBackButton onPress={() => void backToNetworks()} disabled={loading} label={t('Back to payment methods')} />}
+      {networkSelected && (network === 'hedera' || invoice) && <PaymentBackButton onPress={() => void backToNetworks()} disabled={loading} label={t('Back')} />}
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.title}>{t('Receive {asset}', { asset: networkSelected ? selectedReceivePresentation.name : 'Bitcoin' })}</Text>
-          <Text style={styles.screenSubtitle}>{t('Create a payment request to get paid.')}</Text>
+          <Text style={bitcoinStyles.title}>{invoice && network === 'lightning' ? t('Your payment request') : t('Receive {asset}', { asset: selectedReceivePresentation.name })}</Text>
+          <Text style={styles.screenSubtitle}>{t('How much would you like to receive?')}</Text>
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
@@ -605,7 +621,7 @@ export default function ReceiveScreen() {
           </View>
         </View>
       )}
-      <View style={styles.card}>
+      <View style={network === 'hedera' ? styles.card : { gap: 16 }}>
         {!networkSelected ? (
           <>
             <View style={styles.receiveNetworkRow}>
@@ -617,42 +633,49 @@ export default function ReceiveScreen() {
           </>
         ) : (
           <>
-            <View style={styles.selectedAssetRow}>
+            {network === 'hedera' && <View style={styles.selectedAssetRow}>
               <AssetIcon asset={selectedReceiveNetwork.asset} size={38} />
               <View style={styles.selectedAssetCopy}>
                 <Text style={styles.selectedAssetTitle}>{selectedReceivePresentation.name}</Text>
                 <Text style={styles.selectedAssetMeta}>{selectedReceivePresentation.networkBadge}</Text>
               </View>
 
-            </View>
+            </View>}
 
         {network === 'lightning' && !invoice && (
           <>
             <Text style={styles.label}>{t("Amount")}</Text>
             <TextInput
-              style={styles.input}
+              style={[bitcoinStyles.input, { fontSize: 38, textAlign: 'center', marginVertical: 16 }]}
               value={amountInput}
               onChangeText={setAmountInput}
               keyboardType="decimal-pad"
               placeholder={isEur ? '0.00 EUR' : t('Satoshis')}
               placeholderTextColor="#666"
             />
+            {draftSats > 0 && <BitcoinMoney amount={draftSats} />}
             <View style={styles.row}>
               {(['EUR', 'SAT'] as const).map(currency => {
                 const selected = isEur ? currency === 'EUR' : currency === 'SAT';
                 return (
                   <TouchableOpacity
                     key={currency}
-                    style={[styles.selector, selected && styles.selectorActive]}
-                    onPress={() => setIsEur(currency === 'EUR')}
+                    style={[styles.selector, { flexDirection: 'row', justifyContent: 'center', gap: 8, minHeight: 48 }, selected && styles.selectorActive]}
+                    onPress={() => { setAmountInput(''); setIsEur(currency === 'EUR'); }}
                     accessibilityRole="radio"
+                    accessibilityLabel={currency}
                     accessibilityState={{ checked: selected }}
                   >
+                    <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                      {currency === 'SAT' ? <AssetIcon asset="bitcoin" size={22} />
+                        : <Text style={{ fontSize: 23, lineHeight: 26, color: selected ? '#ffb000' : '#8f8f9d' }}>€</Text>}
+                    </View>
                     <Text style={[styles.selectorText, selected && styles.selectorTextActive]}>{currency}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+            {isEur && (!(rates.btcToEur > 0) || Date.now() - rates.updatedAt > 300_000) && <Text style={bitcoinStyles.warning}>{t('The exchange rate is unavailable or outdated. You can enter an amount in SAT.')}</Text>}
             <TouchableOpacity style={styles.button} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
               {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Create request")}</Text>}
             </TouchableOpacity>
@@ -706,6 +729,26 @@ export default function ReceiveScreen() {
           </>
         )}
 
+        {network === 'lightning' && invoice && (
+          <View accessibilityLiveRegion="polite">
+            <BitcoinMoney amount={invoiceAmountSats} hero />
+            <Text style={bitcoinStyles.note}>{t('Lightning request. For the Bitcoin network, share the separate Bitcoin address below.')}</Text>
+            {!!invoiceExpiresAt && <Text style={bitcoinStyles.note}>{t('Request expires')}: {new Date(invoiceExpiresAt).toLocaleString()}</Text>}
+            <Text style={[styles.subtitle, styles.centerText]}>{t(
+              receiveStatus === 'offline' ? 'Connection interrupted. Your request is saved; checking again automatically.' :
+              receiveStatus === 'processing' ? 'Payment is processing. Waiting for confirmation.' :
+              receiveStatus === 'failed' ? 'This request could not be completed. Check activity before requesting again.' :
+              invoiceExpired ? 'This request has expired. Any payment already sent is still being checked.' :
+              receiveStatus === 'checking' ? 'Checking payment status…' : 'Waiting for payment…'
+            )}</Text>
+            {(invoiceExpired || receiveStatus === 'failed') && (
+              <TouchableOpacity style={styles.button} onPress={() => void clearAndReset().catch(() => Alert.alert(t('Please try again.')))}>
+                <Text style={styles.buttonText}>{t('Create a new request')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {qrValue && (
           <View style={styles.qrSection}>
             <View style={styles.qrCard}>
@@ -723,12 +766,18 @@ export default function ReceiveScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
+            {network === 'lightning' && <BitcoinButton label={t('Share request')} onPress={() => void Share.share({ message: qrValue }).catch(() => Alert.alert(t('Please try again.')))} />}
           </View>
         )}
 
           </>
         )}
       </View>
+      {network === 'lightning' && <View style={{ gap: 16, marginTop: 24 }}>
+        <BitcoinButton label={t('Show Bitcoin address')} secondary onPress={() => setShowBitcoinAddress(true)} disabled={loading} />
+        <Text style={bitcoinStyles.footnote}>{t('For example, to withdraw Bitcoin from an exchange.')}</Text>
+        <BitcoinInfo />
+      </View>}
       {networkSelected && network === 'lightning' && !invoice && <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} disabled={loading}>
         <View style={styles.receiveNetworkRow}>{receiveNetworks.filter(item => item.network !== 'lightning').map(renderNetwork)}</View>
       </AdvancedOptions>}

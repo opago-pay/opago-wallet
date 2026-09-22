@@ -7,6 +7,7 @@ import { withTimeout } from '@/lib/promise-timeout';
 import { loadDisplaySparkBalance, type SparkBalanceReader } from '@/lib/display-spark-balance';
 import { recordWalletStartupStage } from '@/lib/startup-timing';
 import { yieldToUi } from '@/lib/ui-ready';
+import { readBitcoinBalance } from '@/lib/bitcoin/amount';
 
 const SPARK_STARTUP_PRIORITY_MS = 20_000;
 
@@ -21,6 +22,7 @@ export function useWalletBalances(params: {
   const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableHedera = true, prioritizeSpark = false } = params;
   const isFocused = useIsFocused();
   const [sparkSnapshot, setSparkSnapshot] = useState(() => ({ wallet: sparkWallet, state: unknownBalance<number>() }));
+  const [incomingSnapshot, setIncomingSnapshot] = useState<{ wallet: SparkBalanceReader | null; value: number | null }>({ wallet: sparkWallet, value: null });
   const spark = sparkSnapshot.wallet === sparkWallet ? sparkSnapshot.state : unknownBalance<number>();
   const [hedera, setHedera] = useState(unknownBalance<bigint>);
   const sparkGeneration = useRef(0);
@@ -61,6 +63,7 @@ export function useWalletBalances(params: {
       const result = await withTimeout(loadDisplaySparkBalance(sparkWallet), 8_000, 'Lightning balance refresh timed out.');
       const value = readSparkBalance(result);
       if (active()) {
+        setIncomingSnapshot({ wallet: sparkWallet, value: readBitcoinBalance(result).incoming });
         setSparkSnapshot({ wallet: sparkWallet, state: loadedBalance(value) });
         recordWalletStartupStage('lightning_balance');
       }
@@ -115,6 +118,7 @@ export function useWalletBalances(params: {
 
   return {
     balances: { spark: spark.value, hbarTinybars: hedera.value },
+    bitcoinIncoming: incomingSnapshot.wallet === sparkWallet ? incomingSnapshot.value : null,
     balanceStates: { spark, hedera },
     balanceError: [spark.error, enableHedera ? hedera.error : null].filter(Boolean).join(' ') || null,
     secondaryDataReady,

@@ -1,24 +1,16 @@
 'use strict';
+const { Buffer } = require('node:buffer');
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { bech32 } = require('bech32');
+const { createHash } = require('node:crypto');
 require('./register-typescript.cjs');
 const { resolveLightningDestination } = require('../lib/lightning-destination.ts');
 const { prepareSparkPayment } = require('../lib/payments.ts');
 const { friendlyPaymentMessage } = require('../lib/payment-errors.ts');
 const { t } = require('../lib/i18n/index.ts');
 
-// Decoder fixture only: this has no valid signature and cannot be paid.
-function invoice(amountSats, timestamp = Math.floor(Date.now() / 1000)) {
-  const timestampWords = Array.from({ length: 7 }, (_, i) => Math.floor(timestamp / 32 ** (6 - i)) % 32);
-  const hashWords = bech32.toWords(Buffer.alloc(32, 7));
-  const prefix = 'lnbcrt' + (amountSats === null ? '' : amountSats * 10 + 'n');
-  return bech32.encode(prefix, [
-    ...timestampWords, 1, 1, 20, ...hashWords,
-    6, 0, 3, 3, 16, 16, // expiry: 3600 seconds
-    ...Array(104).fill(0),
-  ], 2000);
-}
+const { invoice } = require('./lightning-invoice-fixture.cjs');
 
 async function withEndpoint(run, overrides = {}, callbackInvoice) {
   const endpoint = 'https://wallet.example/.well-known/lnurlp/recipient';
@@ -40,14 +32,35 @@ async function withEndpoint(run, overrides = {}, callbackInvoice) {
   try { await run({ lnurl, requests }); } finally { global.fetch = previousFetch; }
 }
 
+test('LNURL h-tags commit to the exact original metadata and review names the endpoint', async () => {
+  const metadata = '[["text/plain", "Café 🟡"]]';
+  const descriptionHash = createHash('sha256').update(metadata).digest('hex');
+  await withEndpoint(async ({ lnurl }) => {
+    const resolved = await resolveLightningDestination(lnurl, 20);
+    assert.equal(resolved.recipientLabel, 'wallet.example\nCafé 🟡');
+  }, { metadata }, invoice(20, undefined, { descriptionHash }));
+  await withEndpoint(async ({ lnurl }) => {
+    await assert.rejects(resolveLightningDestination(lnurl, 20), /metadata commitment/);
+  }, {}, invoice(20, undefined, { descriptionHash }));
+});
+
+test('malformed LNURL metadata is rejected before the invoice callback', async () => {
+  for (const metadata of [null, '{}', 'invalid', '[["text/plain",12]]', '[["image/png;base64","x"]]', '[["text/plain","a"],["text/plain","b"]]']) {
+    await withEndpoint(async ({ lnurl, requests }) => {
+      await assert.rejects(resolveLightningDestination(lnurl, 20), /invalid metadata/);
+      assert.equal(requests.length, 1);
+    }, { metadata });
+  }
+});
+
 test('a reusable LNURL scan requests an amount without calling the invoice callback', async () => {
   await withEndpoint(async ({ lnurl, requests }) => {
     assert.deepEqual(await resolveLightningDestination(lnurl), {
-      kind: 'amount-required', limits: { minSats: 1, maxSats: 100_000_000 },
+      kind: 'amount-required', limits: { minSats: 1, maxSats: 100_000_000, recipient: 'wallet.example' },
     });
     assert.equal(requests.length, 1);
     assert.deepEqual(await resolveLightningDestination('LIGHTNING:' + lnurl), {
-      kind: 'amount-required', limits: { minSats: 1, maxSats: 100_000_000 },
+      kind: 'amount-required', limits: { minSats: 1, maxSats: 100_000_000, recipient: 'wallet.example' },
     });
     assert.equal(requests.length, 2);
   });

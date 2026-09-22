@@ -271,7 +271,7 @@ test('Lightning is never submitted if the wallet locks during the durable pendin
   const approval = session.capture();
   let sent = false;
   const resolutions = [];
-  await assert.rejects(payPreparedSparkPayment({ payLightningInvoice: async () => { sent = true; } }, {
+  await assert.rejects(payPreparedSparkPayment({ getBalance: async () => ({ balance: 100 }), payLightningInvoice: async () => { sent = true; } }, {
     invoice: { invoice: 'public-test-fixture', paymentHash: 'a'.repeat(64), expiresAt: Date.now() + 60_000, amountSats: 20 },
     amountSats: 20, maxFeeSats: 5, estimatedFeeSats: 1,
   }, {
@@ -342,8 +342,8 @@ test('identity data is rejected before any LNURL callback or eID request can be 
   let calls = 0;
   global.fetch = async () => { calls++; throw new Error('Network must not be reached'); };
   try {
-    await assert.rejects(fetchInvoiceFromLNURLP('https://merchant.example/callback', 10, { name: 'Synthetic test user' }), /not supported/);
-    await assert.rejects(fetchInvoiceFromLNURLP('https://merchant.example/callback?payerdata=synthetic', 10), /not supported/);
+    await assert.rejects(fetchInvoiceFromLNURLP({ callback: 'https://merchant.example/callback' }, 10, { name: 'Synthetic test user' }), /not supported/);
+    await assert.rejects(fetchInvoiceFromLNURLP({ callback: 'https://merchant.example/callback?payerdata=synthetic' }, 10), /not supported/);
     await assert.rejects(startEIdSession({ walletIdentifier: 'test', transactionReference: 'test' }), /not supported/);
     await assert.rejects(waitForVerifiedEId('a'.repeat(24)), /not supported/);
     assert.equal(calls, 0);

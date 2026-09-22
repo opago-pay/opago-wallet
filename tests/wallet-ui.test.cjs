@@ -29,7 +29,7 @@ test('defines presentation metadata for every wallet asset and development netwo
     ),
     ['REGTEST', 'TESTNET'],
   );
-  assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, 'LIGHTNING');
+  assert.equal(getWalletAssetPresentation('lightning', true).networkBadge, '');
   assert.equal(getWalletAssetPresentation('hedera', true).networkBadge, 'TESTNET');
   assert.equal(
     getWalletAssetPresentation('hedera', true, 'mainnet').networkBadge,
@@ -40,8 +40,8 @@ test('defines presentation metadata for every wallet asset and development netwo
 });
 
 test('maps transaction symbols to the same icons used by asset cards', () => {
-  assert.equal(walletAssetKeyFromSymbol('SAT'), 'lightning');
-  assert.equal(walletAssetKeyFromSymbol('BTC'), 'lightning');
+  assert.equal(walletAssetKeyFromSymbol('SAT'), 'bitcoin');
+  assert.equal(walletAssetKeyFromSymbol('BTC'), 'bitcoin');
   assert.equal(walletAssetKeyFromSymbol('HBAR'), 'hedera');
 });
 
@@ -81,8 +81,9 @@ test('keeps technical wallet data behind friendly display labels', () => {
   assert.match(review, /t\('Send \{amount\} HBAR', \{ amount: props\.payment\.amountHbar \}\)/);
   assert.match(review, /View receipt/);
   assert.match(lightningReview, /Show payment details/);
-  assert.match(lightningReview, /Maximum network fee/);
-  assert.match(lightningReview, /t\('Send \{amount\} satoshis', \{ amount: props\.payment\.amountSats\.toLocaleString\(appLocale\(\)\) \}\)/);
+  const unifiedReview = readSource('components', 'bitcoin', 'payment-ui.tsx');
+  assert.match(unifiedReview, /Fee, at most/);
+  assert.match(unifiedReview, /label=\{t\('Send'\)\}/);
 });
 
 test('requires an explicit Lightning review and device authorization before submission', () => {
@@ -90,7 +91,8 @@ test('requires an explicit Lightning review and device authorization before subm
   const authorization = readSource('lib', 'payment-authorization.ts');
   assert.match(send, /setPendingLightning/);
   assert.match(send, /<LightningReviewView/);
-  assert.ok(send.indexOf('await authorizePayment()') < send.indexOf('await payPreparedSparkPayment('));
+  assert.match(send, /await authorizeAndPayPreparedSparkPayment\(/);
+  assert.match(send, /const assertAuthorized = await authorizePayment\(\)/);
   assert.match(authorization, /authorizeWalletAction/);
   const deviceAuth = readSource('lib', 'device-authentication.ts');
   assert.match(deviceAuth, /authenticateAsync/);
@@ -114,6 +116,7 @@ test('shows a clearly labelled estimate for development-network balances', () =>
 
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
   assert.doesNotMatch(portfolio, /Not valued/);
+  assert.match(portfolio, /<NetworkBadge label=\{presentation\.networkBadge\}/);
   assert.match(portfolio, /Demo balance based on current market prices/);
 });
 
@@ -121,7 +124,7 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
   const sources = [
     readSource('app', '(tabs)', 'receive.tsx'),
     readSource('components', 'send', 'hedera-payment-views.tsx'),
-    readSource('components', 'send', 'lightning-payment-views.tsx'),
+    readSource('components', 'bitcoin', 'payment-progress.tsx'),
     readSource('components', 'send', 'payment-state-views.tsx'),
   ];
 

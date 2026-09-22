@@ -416,6 +416,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     const assertUnlocked = walletSession.capture();
     if (initializationRef.current) await initializationRef.current.catch(() => undefined);
     assertUnlocked();
+    // Invalidate running payment/claim/reconciliation callbacks before erasing
+    // storage, so they cannot repopulate the removed wallet's activity.
+    walletSession.lock();
     await Promise.all([
       deleteSecureItem(MNEMONIC_STORE_KEY),
       deleteSecureItem(BACKUP_STATUS_KEY),
@@ -425,10 +428,13 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       hederaPaymentJournal.clear(),
       lightningPaymentJournal.clear(),
       lightningReceiveStore.clear(),
+      import('@/lib/bitcoin/store-native').then(({ bitcoinStore, bitcoinDepositWatch }) => Promise.all([bitcoinStore.clear(), bitcoinDepositWatch.clear()])),
+      import('@/lib/bitcoin/receive-archive').then(({ clearBitcoinReceiveArchive }) => clearBitcoinReceiveArchive()),
       operationalHealth.clear(),
     ]);
     clearRuntimeState();
     setBackupStatus('loading');
+    if (AppState.currentState === 'active') walletSession.unlock();
   }, [clearRuntimeState]);
 
   const value = useMemo<WalletContextValue>(

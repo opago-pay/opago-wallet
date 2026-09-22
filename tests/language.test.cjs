@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 require('./register-typescript.cjs');
@@ -102,6 +103,38 @@ test('every translated message preserves placeholders in all supported languages
       assert.deepEqual(placeholders(value), placeholders(key), language + ': ' + key);
     }
   }
+});
+
+test('static UI messages have translations; only explicit brand names may use the English fallback', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const ts = require('typescript');
+  const unchangedBrands = new Set(['Bitcoin']);
+  const messages = node => ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+    ? [node.text]
+    : ts.isConditionalExpression(node) ? [...messages(node.whenTrue), ...messages(node.whenFalse)] : [];
+  const scan = directory => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name);
+      if (entry.isDirectory()) scan(filename);
+      else if (/\.tsx?$/.test(filename)) {
+        const source = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
+        const visit = node => {
+          if (ts.isCallExpression(node) && node.expression.getText(source) === 't' && node.arguments[0]) {
+            for (const key of messages(node.arguments[0])) {
+              if (unchangedBrands.has(key)) continue;
+              for (const language of ['de', 'fr', 'es']) {
+                assert.ok(Object.hasOwn(dictionaries[language], key), `${filename}: ${language}: ${key}`);
+              }
+            }
+          }
+          ts.forEachChild(node, visit);
+        };
+        visit(source);
+      }
+    }
+  };
+  for (const directory of ['app', 'components', 'hooks', 'lib']) scan(directory);
 });
 
 test('translations never translate or reinterpret recovery words and payment values', () => {

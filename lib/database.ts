@@ -21,10 +21,17 @@ export interface AddTransactionOptions {
 
 let db: SQLite.SQLiteDatabase | null = null;
 let initPromise: Promise<void> | null = null;
+let writeGeneration = 0;
+let writeQueue: Promise<unknown> = Promise.resolve();
+function serializeWrite<T>(work: () => Promise<T>): Promise<T> {
+  const operation = writeQueue.then(work, work);
+  writeQueue = operation.catch(() => undefined);
+  return operation;
+}
 
 async function addColumnIfMissing(
   database: SQLite.SQLiteDatabase,
-  columns: Array<{ name: string }>,
+  columns: { name: string }[],
   name: string,
   definition: string,
 ): Promise<void> {
@@ -79,8 +86,11 @@ async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 }
 
 export async function wipeTransactions(): Promise<void> {
-  const database = await getDatabase();
-  await database.execAsync('DELETE FROM transactions');
+  writeGeneration += 1;
+  await serializeWrite(async () => {
+    const database = await getDatabase();
+    await database.execAsync('DELETE FROM transactions');
+  });
 }
 
 export async function addTransaction(
@@ -90,7 +100,10 @@ export async function addTransaction(
   options: AddTransactionOptions = {},
 ): Promise<void> {
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('Transaction amount must be positive.');
+  const generation = writeGeneration;
+  return serializeWrite(async () => {
   const database = await getDatabase();
+  if (generation !== writeGeneration) return;
   await database.runAsync(
     'INSERT INTO transactions (type, amount, asset, status, timestamp, tx_id, reference) ' +
       'VALUES (?, ?, ?, ?, ?, ?, ?) ' +
@@ -105,14 +118,19 @@ export async function addTransaction(
       options.reference || null,
     ],
   );
+  });
 }
 
 export async function updateTransactionStatus(
   txId: string,
   status: TransactionStatus,
 ): Promise<void> {
+  const generation = writeGeneration;
+  return serializeWrite(async () => {
   const database = await getDatabase();
+  if (generation !== writeGeneration) return;
   await database.runAsync('UPDATE transactions SET status = ? WHERE tx_id = ?', [status, txId]);
+  });
 }
 
 export async function getTransactions(): Promise<Transaction[]> {

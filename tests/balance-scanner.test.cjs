@@ -34,11 +34,11 @@ test('refresh and offline failure retain the last known amount with an explicit 
 
 test('malformed Lightning balances cannot silently become zero', () => {
   assert.equal(readSparkBalance({ balance: 0n }), 0);
-  assert.equal(readSparkBalance({ balance: 20n, satsBalance: { incoming: '5' } }), 25);
+  assert.equal(readSparkBalance({ balance: 20n, satsBalance: { incoming: '5' } }), 20);
   for (const balance of [undefined, null, NaN, Infinity, -1, 1.2, '', 'invalid', true]) {
-    assert.throws(() => readSparkBalance({ balance }), /invalid balance/);
+    assert.throws(() => readSparkBalance({ balance }), /Invalid Bitcoin amount./);
   }
-  assert.throws(() => readSparkBalance({ balance: Number.MAX_SAFE_INTEGER, satsBalance: { incoming: 1 } }), /invalid balance/);
+  assert.throws(() => readSparkBalance({ balance: Number.MAX_SAFE_INTEGER, satsBalance: { incoming: 1 } }), /Invalid Bitcoin amount./);
 });
 
 test('an authorized scanner never calls Android permission request, even on repeated opens', async () => {

@@ -3,6 +3,7 @@ export const LIGHTNING_RECEIVE_REQUEST_KEY = 'opago.lightning.receive-request.v1
 const PAYMENT_HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 export interface StoredLightningReceiveRequest {
+  scope?: string;
   requestId: string;
   invoice: string;
   paymentHash: string;
@@ -44,36 +45,41 @@ function assertRequest(value: unknown): StoredLightningReceiveRequest {
 }
 
 export function createLightningReceiveStore(storage: LightningReceiveStorage) {
+  let queue: Promise<unknown> = Promise.resolve();
+  function exclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const running = queue.then(operation, operation);
+    queue = running.then(() => undefined, () => undefined);
+    return running;
+  }
+  async function read(): Promise<StoredLightningReceiveRequest | null> {
+    const raw = await storage.getItem(LIGHTNING_RECEIVE_REQUEST_KEY);
+    if (raw === null) return null;
+    try {
+      // Expiry prevents new payments, but does not prove that an earlier
+      // payment failed. Preserve the request for reconciliation after restart.
+      return assertRequest(JSON.parse(raw));
+    } catch {
+      await storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
+      return null;
+    }
+  }
   return {
-    async load(): Promise<StoredLightningReceiveRequest | null> {
-      const raw = await storage.getItem(LIGHTNING_RECEIVE_REQUEST_KEY);
-      if (raw === null) return null;
-      let value: unknown;
-      try {
-        value = JSON.parse(raw);
-      } catch {
-        await storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
-        return null;
-      }
-      try {
-        const request = assertRequest(value);
-        if (request.expiresAt <= Date.now()) {
-          await storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
-          return null;
-        }
-        return request;
-      } catch {
-        await storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
-        return null;
-      }
+    load(): Promise<StoredLightningReceiveRequest | null> {
+      return exclusive(read);
     },
 
-    async save(request: StoredLightningReceiveRequest): Promise<void> {
-      await storage.setItem(LIGHTNING_RECEIVE_REQUEST_KEY, JSON.stringify(assertRequest(request)));
+    save(request: StoredLightningReceiveRequest, assertCurrent?: () => void): Promise<void> {
+      return exclusive(async () => {
+        assertCurrent?.();
+        await storage.setItem(LIGHTNING_RECEIVE_REQUEST_KEY, JSON.stringify(assertRequest(request)));
+      });
     },
 
-    clear(): Promise<void> {
-      return storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
+    clear(requestId?: string): Promise<void> {
+      return exclusive(async () => {
+        if (requestId && (await read())?.requestId !== requestId) return;
+        await storage.removeItem(LIGHTNING_RECEIVE_REQUEST_KEY);
+      });
     },
   };
 }

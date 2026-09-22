@@ -111,7 +111,9 @@ function sparkFixture(initialize) {
   const exported = loadWithMocks('lib/spark.ts', {
     './config': { appConfig: { sparkNetwork: 'MAINNET' } },
     './display-spark-balance': { markSparkWalletSynchronized: wallet => synced.push(wallet) },
-    '@buildonspark/spark-sdk': { SparkWallet: { initialize } },
+    './spark-bitcoin-wallet': { BitcoinSparkWallet: { initialize } },
+    './spark-signer-native': { createSparkSigner: () => new DefaultSparkSigner() },
+    './spark-send-timing': { attachSparkSendTiming() {} },
   });
   return { ...exported, synced };
 }
@@ -122,6 +124,7 @@ test('Spark receives an owned seed with unchanged network/default account and er
   const fixture = sparkFixture(options => {
     assert.deepEqual(options.options, { network: 'MAINNET' });
     assert.equal(options.accountNumber, undefined);
+    assert.ok(options.signer instanceof DefaultSparkSigner);
     sdkSeed = options.mnemonicOrSeed;
     return new Promise(resolve => { finish = () => resolve({ wallet }); });
   });

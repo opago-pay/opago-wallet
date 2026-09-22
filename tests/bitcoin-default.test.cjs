@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -32,6 +33,8 @@ function fixture(file, overrides = {}) {
     '@/components/send/payment-back-button': { PaymentBackButton: 'back' },
     './payment-back-button': { PaymentBackButton: 'back' },
     '@/lib/i18n': { t: translate, appLocale: () => 'en' },
+    '@/components/bitcoin/payment-ui': { bitcoinStyles: {}, BitcoinButton: 'bitcoin-button', BitcoinInfo: 'bitcoin-info', BitcoinMoney: 'bitcoin-money' },
+    '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage: () => {} },
     'expo-router': { useRouter: () => ({}) },
     '@react-navigation/native': { useIsFocused: () => true },
@@ -92,11 +95,11 @@ test('Advanced options mounts children only after expansion and exposes its acce
   assert.match(text(screen), /HBAR/);
 });
 
-test('Send offers only Bitcoin by default and HBAR only after opening advanced options', () => {
+test('manual recipient entry keeps HBAR behind advanced options', () => {
   const ui = fixture('components/send/payment-form.tsx');
   const props = { source: 'spark', sourceSelected: false, advancedExpanded: false, balances: { spark: 120, hbarTinybars: 200000000n }, balanceLoading: {}, walletReady: true, destination: '', amountInput: '', currency: 'SAT', onAdvancedChange: value => { props.advancedExpanded = value; }, onSourceChange: value => { props.source = value; props.sourceSelected = true; } };
   let screen = ui.render('PaymentForm', props);
-  assert.match(text(screen), /Bitcoin/);
+  assert.match(text(screen), /Enter address/);
   assert.doesNotMatch(text(screen), /HBAR/);
   advanced(screen).props.onChange(true);
   screen = ui.render('PaymentForm', props);

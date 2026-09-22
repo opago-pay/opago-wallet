@@ -1,4 +1,6 @@
-export type WalletAssetKey = 'lightning' | 'hedera';
+// 'lightning' remains an alias for old navigation/storage clients, never a
+// second asset. New presentation code uses bitcoin; journal keys are unchanged.
+export type WalletAssetKey = 'bitcoin' | 'lightning' | 'hedera';
 
 export interface WalletAssetPresentation {
   name: string;
@@ -6,7 +8,7 @@ export interface WalletAssetPresentation {
   accent: string;
   description: string;
   networkLabel: string;
-  networkBadge: 'LIGHTNING' | 'MAINNET' | 'REGTEST' | 'TESTNET';
+  networkBadge: '' | 'MAINNET' | 'REGTEST' | 'TESTNET';
 }
 
 const BASE_ASSETS = {
@@ -14,7 +16,7 @@ const BASE_ASSETS = {
     name: 'Bitcoin',
     symbol: 'SAT',
     accent: '#f7931a',
-    description: 'Fast payments with Lightning',
+    description: 'One balance. Two payment routes.',
   },
   hedera: {
     name: 'HBAR',
@@ -29,7 +31,7 @@ export function getWalletAssetPresentation(
   mainnetEnabled: boolean,
   hederaNetwork: 'testnet' | 'mainnet' = 'testnet',
 ): WalletAssetPresentation {
-  const base = BASE_ASSETS[asset];
+  const base = BASE_ASSETS[asset === 'bitcoin' ? 'lightning' : asset];
   if (asset === 'hedera') {
     return {
       ...base,
@@ -37,11 +39,11 @@ export function getWalletAssetPresentation(
       networkBadge: hederaNetwork === 'mainnet' ? 'MAINNET' : 'TESTNET',
     };
   }
-  if (asset === 'lightning') {
+  if (asset === 'lightning' || asset === 'bitcoin') {
     return {
       ...base,
-      networkLabel: mainnetEnabled ? 'Bitcoin Lightning' : 'Bitcoin regtest',
-      networkBadge: mainnetEnabled ? 'LIGHTNING' : 'REGTEST',
+      networkLabel: mainnetEnabled ? 'Bitcoin' : 'Bitcoin regtest',
+      networkBadge: mainnetEnabled ? '' : 'REGTEST',
     };
   }
   throw new Error('Unsupported wallet asset.');
@@ -49,5 +51,5 @@ export function getWalletAssetPresentation(
 
 export function walletAssetKeyFromSymbol(symbol: string): WalletAssetKey {
   if (symbol === 'HBAR') return 'hedera';
-  return 'lightning';
+  return 'bitcoin';
 }
