@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchJson } from '@/lib/http';
+import { measurePerformance } from '@/lib/performance-trace';
 
-const CACHE_EXPIRY = 60_000;
+// Reopening Send/Receive within a few minutes must not compete with Spark
+// requests just to refresh a display-only fiat estimate.
+const CACHE_EXPIRY = 5 * 60_000;
 export interface ExchangeRates {
   btcToEur: number;
   hbarToEur: number;
@@ -27,11 +30,11 @@ function hasBitcoinRate(rates: ExchangeRates): boolean {
 async function requestRates(): Promise<ExchangeRates> {
   if (ratesRequest) return ratesRequest;
   ratesRequest = (async () => {
-    const data = await fetchJson<CoinGeckoResponse>(
+    const data = await measurePerformance('rates.fetch', () => fetchJson<CoinGeckoResponse>(
       'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,hedera-hashgraph&vs_currencies=eur',
       {},
       { purpose: 'Exchange-rate service', timeoutMs: 8_000 },
-    );
+    ));
     const btcToEur = Number(data.bitcoin?.eur);
     const hbarToEur = Number(data['hedera-hashgraph']?.eur);
     // A missing optional-asset price must not hide the Bitcoin estimate.

@@ -53,6 +53,7 @@ function balanceFixture(options = {}) {
     '@/lib/balance-state': require('../lib/balance-state.ts'),
     '@/lib/promise-timeout': require('../lib/promise-timeout.ts'),
     '@/lib/startup-timing': { recordWalletStartupStage: value => stages.push(value) },
+    '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
     '@/lib/display-spark-balance': { loadDisplaySparkBalance: async () => { reads.push('spark'); return options.sparkRead ? options.sparkRead() : { balance: 120n }; } },
     '@/lib/ui-ready': { yieldToUi: () => options.holdFrames ? new Promise(resolve => frames.push(resolve)) : Promise.resolve() },
   };

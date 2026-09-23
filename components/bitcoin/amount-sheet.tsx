@@ -1,3 +1,4 @@
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { useEffect } from 'react';
 import { Keyboard, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,7 +49,7 @@ export function BitcoinAmountSheet(props: {
                   accessibilityRole="button" accessibilityState={{ disabled: props.loading }}
                   accessibilityLabel={key === '⌫' ? t('Delete last digit') : key === separator ? t('Decimal separator') : key}
                   onPress={() => { if (!props.loading) props.onAmount(editPaymentAmount(props.amount, key === '⌫' ? 'delete' : key, props.currency, separator)); }}>
-                  {key === '⌫' ? <Ionicons name="backspace-outline" size={25} color="#fafaf7" /> : <Text style={amountStyles.keyText}>{key}</Text>}
+                  {key === '⌫' ? <Ionicons name="backspace-outline" size={25} color={adaptColor('#fafaf7', 'color')} /> : <Text style={amountStyles.keyText}>{key}</Text>}
                 </TouchableOpacity>)}
             </View>)}
         </View>
@@ -59,7 +60,7 @@ export function BitcoinAmountSheet(props: {
     </View>
   </BitcoinSendScreen>;
 }
-const amountStyles = StyleSheet.create({
+const amountStyles = adaptiveStyles(StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', gap: 18 }, amount: { fontSize: 40, color: '#fafaf7', textAlign: 'center', fontWeight: '600', paddingVertical: 16 },
   field: { flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: '#44444a', paddingVertical: 8 },
   input: { flex: 1, color: '#fafaf7', fontSize: 42, textAlign: 'center', paddingVertical: 6, fontVariant: ['tabular-nums'] },
@@ -70,4 +71,4 @@ const amountStyles = StyleSheet.create({
   keypad: { gap: 8 }, keyRow: { flexDirection: 'row', gap: 10 }, emptyKey: { flex: 1 },
   key: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#242427', paddingVertical: 4 },
   keyText: { fontSize: 28, color: '#fafaf7', fontWeight: '500', fontVariant: ['tabular-nums'] },
-});
+}));

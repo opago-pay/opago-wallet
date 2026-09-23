@@ -26,7 +26,7 @@ function fixture(file, overrides = {}) {
       return state[i];
     }, useCallback: fn => fn, useMemo: fn => fn(), useEffect: () => {} },
     'react/jsx-runtime': require('react/jsx-runtime'),
-    'react-native': { StyleSheet: { create: value => value }, ScrollView: 'scroll', Text: 'text', View: 'view', ActivityIndicator: 'loading', AppState: { currentState: 'active' } },
+    'react-native': { StyleSheet: { create: value => value }, ScrollView: 'scroll', Text: 'text', View: 'view', ActivityIndicator: 'loading', Keyboard: { dismiss: () => {} }, useWindowDimensions: () => ({ width: 390 }), AppState: { currentState: 'active' } },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', TextInput: 'input' },
     './wallet-interaction': { TouchableOpacity: 'button' },
     '@/components/ui/advanced-options': { AdvancedOptions: 'advanced' },
@@ -36,6 +36,9 @@ function fixture(file, overrides = {}) {
     '@/components/bitcoin/payment-ui': { bitcoinStyles: {}, BitcoinButton: 'bitcoin-button', BitcoinInfo: 'bitcoin-info', BitcoinMoney: 'bitcoin-money' },
     '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage: () => {} },
+    '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
+    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value },
+    '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
     'expo-router': { useRouter: () => ({}) },
     '@react-navigation/native': { useIsFocused: () => true },
     '@expo/vector-icons': { Ionicons: 'icon' },
@@ -110,22 +113,28 @@ test('manual recipient entry keeps HBAR behind advanced options', () => {
   assert.equal(nodes(screen).some(node => node.type === 'back'), true);
 });
 
-test('Receive hides HBAR initially and returns to collapsed Bitcoin after leaving HBAR', async () => {
+test('Receive reveals HBAR through Show all coins and returns to Lightning', async () => {
   const ui = fixture('app/(tabs)/receive.tsx');
   let screen = ui.render();
   assert.doesNotMatch(text(screen), /HBAR/);
-  advanced(screen).props.onChange(true);
+  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel?.startsWith('Via ')).props.onPress();
   screen = ui.render();
-  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel?.startsWith('HBAR,')).props.onPress();
+  assert.doesNotMatch(text(screen), /Receive to your Hedera account/);
+  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel === 'Show all coins').props.onPress();
+  screen = ui.render();
+  assert.match(text(screen), /Receive to your Hedera account/);
+  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityRole === 'radio' && text(node).startsWith('HBAR')).props.onPress();
   await flush();
   screen = ui.render();
   assert.match(text(screen), /Receive HBAR/);
-  nodes(screen).find(node => node.type === 'back').props.onPress();
+  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel?.startsWith('Via ')).props.onPress();
+  screen = ui.render();
+  nodes(screen).find(node => node.type === 'button' && node.props.accessibilityRole === 'radio' && text(node).startsWith('Lightning')).props.onPress();
   await flush();
   screen = ui.render();
   assert.match(text(screen), /Receive Bitcoin/);
   assert.doesNotMatch(text(screen), /HBAR/);
-  assert.equal(advanced(screen).props.expanded, false);
+  assert.equal(advanced(screen), undefined);
 });
 
 test('Balance refresh never resolves an HBAR account until explicitly enabled', async t => {

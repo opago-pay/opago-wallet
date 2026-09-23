@@ -1,13 +1,16 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useRef } from 'react';
 import {
   TextInput as NativeTextInput,
+  Pressable as NativePressable,
   TouchableOpacity as NativeTouchableOpacity,
   View,
+  type PressableProps,
   type TextInputProps,
   type TouchableOpacityProps,
   type ViewProps,
 } from 'react-native';
 import { walletSession } from '@/lib/wallet-session';
+import { beginPerformanceSpan, recordPerformanceDuration } from '@/lib/performance-trace';
 
 // Observe gestures before a child consumes them, without claiming its responder.
 // Native modals need their own boundary because they have a separate view root.
@@ -37,9 +40,39 @@ export const TextInput = forwardRef<NativeTextInput, TextInputProps>(function Wa
 
 // Also count accessibility/keyboard activation, which may have no touch event.
 export const TouchableOpacity = forwardRef<React.ComponentRef<typeof NativeTouchableOpacity>, TouchableOpacityProps>(function WalletTouchableOpacity(props, ref) {
-  return <NativeTouchableOpacity {...props} ref={ref}
-    onPressIn={event => { walletSession.touch(); props.onPressIn?.(event); }}
-    onPress={event => { walletSession.touch(); props.onPress?.(event); }}
-    onLongPress={props.onLongPress ? event => { walletSession.touch(); props.onLongPress?.(event); } : undefined}
+  const pressedAt = useRef<number | null>(null);
+  return <NativeTouchableOpacity {...props} ref={ref} activeOpacity={props.activeOpacity ?? 0.58}
+    onPressIn={event => { pressedAt.current = performance.now(); walletSession.touch(); props.onPressIn?.(event); }}
+    onPress={event => {
+      if (pressedAt.current !== null) recordPerformanceDuration('ui.tap_to_handler', performance.now() - pressedAt.current);
+      pressedAt.current = null;
+      const finish = beginPerformanceSpan('ui.handler');
+      try { walletSession.touch(); props.onPress?.(event); } finally { finish(); }
+    }}
+    onLongPress={props.onLongPress ? event => {
+      pressedAt.current = null;
+      const finish = beginPerformanceSpan('ui.handler');
+      try { walletSession.touch(); props.onLongPress?.(event); } finally { finish(); }
+    } : undefined}
+  />;
+});
+
+export const Pressable = forwardRef<View, PressableProps>(function WalletPressable(props, ref) {
+  const pressedAt = useRef<number | null>(null);
+  return <NativePressable {...props} ref={ref}
+    style={state => [typeof props.style === 'function' ? props.style(state) : props.style,
+      state.pressed && !props.disabled ? { opacity: 0.58 } : undefined]}
+    onPressIn={event => { pressedAt.current = performance.now(); walletSession.touch(); props.onPressIn?.(event); }}
+    onPress={event => {
+      if (pressedAt.current !== null) recordPerformanceDuration('ui.tap_to_handler', performance.now() - pressedAt.current);
+      pressedAt.current = null;
+      const finish = beginPerformanceSpan('ui.handler');
+      try { walletSession.touch(); props.onPress?.(event); } finally { finish(); }
+    }}
+    onLongPress={props.onLongPress ? event => {
+      pressedAt.current = null;
+      const finish = beginPerformanceSpan('ui.handler');
+      try { walletSession.touch(); props.onLongPress?.(event); } finally { finish(); }
+    } : undefined}
   />;
 });

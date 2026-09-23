@@ -8,6 +8,7 @@ import { loadDisplaySparkBalance, type SparkBalanceReader } from '@/lib/display-
 import { recordWalletStartupStage } from '@/lib/startup-timing';
 import { yieldToUi } from '@/lib/ui-ready';
 import { readBitcoinBalance } from '@/lib/bitcoin/amount';
+import { measurePerformance } from '@/lib/performance-trace';
 
 const SPARK_STARTUP_PRIORITY_MS = 20_000;
 
@@ -15,22 +16,31 @@ export function useWalletBalances(params: {
   walletReady: boolean;
   sparkWallet: SparkBalanceReader | null;
   initializationError?: string | null;
+  enableSpark?: boolean;
   enableHedera?: boolean;
   prioritizeSpark?: boolean;
   refreshHederaAccount(): Promise<HederaAccountSnapshot | null>;
 }) {
-  const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableHedera = true, prioritizeSpark = false } = params;
+  const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableSpark = true, enableHedera = true, prioritizeSpark = false } = params;
   const isFocused = useIsFocused();
   const [sparkSnapshot, setSparkSnapshot] = useState(() => ({ wallet: sparkWallet, state: unknownBalance<number>() }));
   const [incomingSnapshot, setIncomingSnapshot] = useState<{ wallet: SparkBalanceReader | null; value: number | null }>({ wallet: sparkWallet, value: null });
   const spark = sparkSnapshot.wallet === sparkWallet ? sparkSnapshot.state : unknownBalance<number>();
   const [hedera, setHedera] = useState(unknownBalance<bigint>);
   const sparkGeneration = useRef(0);
+  const hasFocusedSpark = useRef(false);
+  const lastFocusedSparkWallet = useRef<SparkBalanceReader | null>(null);
   const hederaGeneration = useRef(0);
   const hederaPending = useRef<Promise<void> | null>(null);
+  const hederaLoaded = useRef(false);
+  const hederaEnabled = useRef(enableHedera);
+  hederaEnabled.current = enableHedera;
   const focused = useRef(false);
   const [priorityExpired, setPriorityExpired] = useState(false);
-  const sparkSettled = walletReady && !!(sparkWallet || initializationError) && spark.status !== 'loading';
+  // A refresh of a known balance must not reset already-released optional reads.
+  const sparkSettled = walletReady && (!enableSpark || (
+    !!(sparkWallet || initializationError) && (spark.status !== 'loading' || spark.value !== null)
+  ));
   const secondaryDataReady = walletReady && (!prioritizeSpark || sparkSettled || priorityExpired);
 
   useEffect(() => {
@@ -46,6 +56,7 @@ export function useWalletBalances(params: {
   }, [walletReady, prioritizeSpark, isFocused, sparkSettled, priorityExpired]);
 
   const refreshSparkBalance = useCallback(async () => {
+    if (!enableSpark) return { current: focused.current, settled: true };
     const request = ++sparkGeneration.current;
     const active = () => focused.current && request === sparkGeneration.current;
     setSparkSnapshot(current => ({
@@ -60,7 +71,8 @@ export function useWalletBalances(params: {
     }
     recordWalletStartupStage('lightning_balance_started');
     try {
-      const result = await withTimeout(loadDisplaySparkBalance(sparkWallet), 8_000, 'Lightning balance refresh timed out.');
+      const result = await measurePerformance('balance.spark', () =>
+        withTimeout(loadDisplaySparkBalance(sparkWallet), 8_000, 'Lightning balance refresh timed out.'));
       const value = readSparkBalance(result);
       if (active()) {
         setIncomingSnapshot({ wallet: sparkWallet, value: readBitcoinBalance(result).incoming });
@@ -71,23 +83,32 @@ export function useWalletBalances(params: {
       if (active()) setSparkSnapshot(current => ({ wallet: sparkWallet, state: failedBalance(current.state, cause) }));
     }
     return { current: active(), settled: true };
-  }, [walletReady, sparkWallet, initializationError]);
+  }, [walletReady, sparkWallet, initializationError, enableSpark]);
 
-  const refreshHederaBalance = useCallback((): Promise<void> => {
+  const refreshHederaBalance = useCallback((force = true): Promise<void> => {
     if (!walletReady || !focused.current) return Promise.resolve();
     if (hederaPending.current) return hederaPending.current;
+    if (!force && hederaLoaded.current) return Promise.resolve();
     const request = ++hederaGeneration.current;
     const active = () => focused.current && request === hederaGeneration.current;
     setHedera(current => refreshingBalance(current));
     const operation = (async () => {
       await yieldToUi();
-      if (!active()) return;
+      if (!active() || (!force && !hederaEnabled.current)) return;
       recordWalletStartupStage('hbar_refresh_started');
       try {
-        const account = await withTimeout(refreshHederaAccount(), 8_000, 'HBAR balance refresh timed out.');
-        if (active()) { setHedera(loadedBalance(account?.balanceTinybars ?? 0n)); recordWalletStartupStage('hbar_balance'); }
+        const account = await measurePerformance('balance.hedera', () =>
+          withTimeout(refreshHederaAccount(), 8_000, 'HBAR balance refresh timed out.'));
+        if (active()) {
+          hederaLoaded.current = true;
+          setHedera(loadedBalance(account?.balanceTinybars ?? 0n));
+          recordWalletStartupStage('hbar_balance');
+        }
       } catch (cause) {
-        if (active()) setHedera(current => failedBalance(current, cause));
+        if (active()) {
+          hederaLoaded.current = false;
+          setHedera(current => failedBalance(current, cause));
+        }
       }
     })().finally(() => {
       if (hederaPending.current === operation) hederaPending.current = null;
@@ -99,22 +120,41 @@ export function useWalletBalances(params: {
   // Asset disclosure changes must never restart Bitcoin's balance request.
   useFocusEffect(useCallback(() => {
     focused.current = true;
-    void refreshSparkBalance();
+    let cancelled = false;
+    const deferRefresh = hasFocusedSpark.current && lastFocusedSparkWallet.current === sparkWallet;
+    hasFocusedSpark.current = true;
+    lastFocusedSparkWallet.current = sparkWallet;
+    if (deferRefresh) {
+      // A return from Security should paint Home before starting SDK work again.
+      void yieldToUi().then(() => {
+        if (!cancelled) void refreshSparkBalance();
+      });
+    } else {
+      void refreshSparkBalance();
+    }
     return () => {
+      cancelled = true;
       focused.current = false;
       sparkGeneration.current += 1;
     };
   }, [refreshSparkBalance]));
 
+  // Leaving Home invalidates late results. Closing a disclosure only hides its
+  // data: keep an in-flight read and reuse successful data for this Home visit.
+  useEffect(() => () => {
+    hederaGeneration.current += 1;
+    hederaPending.current = null;
+    hederaLoaded.current = false;
+  }, [isFocused, sparkWallet, refreshHederaBalance]);
+
   useEffect(() => {
-    if (isFocused && enableHedera && secondaryDataReady) void refreshHederaBalance();
-    return () => { hederaGeneration.current += 1; hederaPending.current = null; };
-  }, [isFocused, enableHedera, secondaryDataReady, refreshHederaBalance]);
+    if (isFocused && enableHedera && secondaryDataReady) void refreshHederaBalance(false);
+  }, [isFocused, sparkWallet, enableHedera, secondaryDataReady, refreshHederaBalance]);
 
   const refreshBalances = useCallback(async () => {
     const result = await refreshSparkBalance();
-    if (result.current && enableHedera && (!prioritizeSpark || result.settled || priorityExpired)) await refreshHederaBalance();
-  }, [refreshSparkBalance, refreshHederaBalance, enableHedera, prioritizeSpark, priorityExpired]);
+    if (result.current && hederaEnabled.current && (!prioritizeSpark || result.settled || priorityExpired)) await refreshHederaBalance();
+  }, [refreshSparkBalance, refreshHederaBalance, prioritizeSpark, priorityExpired]);
 
   return {
     balances: { spark: spark.value, hbarTinybars: hedera.value },

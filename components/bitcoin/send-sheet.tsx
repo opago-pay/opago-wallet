@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, AppState, BackHandler, findNodeHandle, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -38,9 +39,9 @@ export function BitcoinSendScreen(props: { title?: string; loading?: boolean; on
   </WalletActivityBoundary>;
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' },
   title: { color: '#fafaf7', fontSize: 29, fontWeight: '600', letterSpacing: -0.6, paddingHorizontal: 24, marginBottom: 24 },
   scroll: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 16 },
   footer: { paddingHorizontal: 24, paddingTop: 16, backgroundColor: '#09090b' },
-});
+}));

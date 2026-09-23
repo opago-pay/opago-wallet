@@ -140,3 +140,15 @@ export async function getTransactions(): Promise<Transaction[]> {
       'FROM transactions ORDER BY id DESC LIMIT 50',
   );
 }
+
+export async function getTransactionPage(limit = 10, beforeId?: number): Promise<Transaction[]> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      (beforeId !== undefined && (!Number.isSafeInteger(beforeId) || beforeId < 1))) throw new Error('Invalid history page.');
+  const database = await getDatabase();
+  return database.getAllAsync<Transaction>(
+    'SELECT id, type, amount, asset, status, timestamp, tx_id AS txId, reference ' +
+      "FROM transactions WHERE asset IN ('SAT', 'HBAR') " + (beforeId === undefined ? '' : 'AND id < ? ') +
+      'ORDER BY id DESC LIMIT ?',
+    beforeId === undefined ? [limit] : [beforeId, limit],
+  );
+}

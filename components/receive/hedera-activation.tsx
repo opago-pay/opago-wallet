@@ -1,3 +1,4 @@
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -34,14 +35,14 @@ export function HederaActivation({ publicKey, network }: { publicKey: string; ne
       <Text style={styles.caption}>{t('Share only this public key with whoever creates your Hedera account. Your recovery words are never needed.')}</Text>
       <Text style={styles.key} selectable>{normalizeHederaPublicKey(publicKey)}</Text>
       <TouchableOpacity style={styles.copyButton} accessibilityRole="button" onPress={() => void copyPublicKey()}>
-        <Ionicons name="copy-outline" size={18} color="#fff" />
+        <Ionicons name="copy-outline" size={18} color={adaptColor('#fff', 'color')} />
         <Text style={styles.copyLabel}>{t('Copy activation public key')}</Text>
       </TouchableOpacity>
     </View>}
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   card: { paddingVertical: 12 },
   title: { color: '#fff', fontSize: 23, fontWeight: '700', marginTop: 14 },
   body: { color: '#b5b5bf', fontSize: 15, lineHeight: 23, marginTop: 12 },
@@ -53,4 +54,4 @@ const styles = StyleSheet.create({
   key: { color: '#b5b5bf', fontFamily: 'monospace', fontSize: 13, lineHeight: 21, marginTop: 14 },
   copyButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderColor: '#33333a', borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 14 },
   copyLabel: { color: '#fff', fontSize: 14, flexShrink: 1 },
-});
+}));

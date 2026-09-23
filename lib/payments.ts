@@ -417,7 +417,9 @@ export function sparkTransferMatchesInvoice(
     (isCompleted || isReceiveCompleted) &&
     typeof transferHash === 'string' &&
     transferHash.toLowerCase() === paymentHash.toLowerCase() &&
-    Number(item.totalValue) === amountSats
+    Number.isSafeInteger(Number(item.totalValue)) &&
+    Number(item.totalValue) > 0 &&
+    (amountSats === 0 || Number(item.totalValue) === amountSats)
   );
   if (!metadataMatches) return false;
   try {

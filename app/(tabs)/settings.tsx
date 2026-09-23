@@ -1,6 +1,8 @@
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { AdvancedOptions } from '@/components/ui/advanced-options';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColorMode } from '@/hooks/useColorMode';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { walletSession } from '@/lib/wallet-session';
 import { authorizeWalletAction } from '@/lib/device-authentication';
@@ -18,11 +20,12 @@ import {
   View,
 } from 'react-native';
 import { TextInput, TouchableOpacity, WalletActivityBoundary } from '@/components/ui/wallet-interaction';
-import { Image } from 'expo-image';
+import { CloseWalletScreen } from '@/components/navigation/close-wallet-screen';
 import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRecoveryPhrase } from '@/components/security/recovery-phrase';
 import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { LanguagePicker } from '@/components/settings/language-picker';
+import { ColorModePicker } from '@/components/settings/color-mode-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
@@ -32,6 +35,7 @@ import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
 import { operationalHealth } from '@/lib/operational-health-native';
 import type { ServiceHealthRecord } from '@/lib/operational-health';
+import { getPerformanceReport, markNavigationReady, performanceTracingEnabled } from '@/lib/performance-trace';
 
 function SensitiveInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-verification');
@@ -55,6 +59,7 @@ function selectBackupChallengePositions(wordCount: number): number[] {
 
 export default function SettingsScreen() {
   useLanguage();
+  useColorMode();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { wipeWallet, hederaPublicKey, backupStatus, markBackupVerified, lockWallet } = useWalletAuth();
@@ -78,6 +83,14 @@ export default function SettingsScreen() {
   const [lightningHealth, setLightningHealth] = useState<ServiceHealthRecord | null>(null);
 
   useFocusEffect(useCallback(() => {
+    // Tabs keep this screen mounted, so measure every visit rather than only the first mount.
+    const frame = requestAnimationFrame(() => markNavigationReady('settings'));
+    return () => cancelAnimationFrame(frame);
+  }, []));
+
+  useFocusEffect(useCallback(() => {
+    // The local service diagnostic is only visible when the advanced section is open.
+    if (!showAdvanced) return;
     let active = true;
     void operationalHealth.get('lightning')
       .then(record => {
@@ -89,7 +102,7 @@ export default function SettingsScreen() {
     return () => {
       active = false;
     };
-  }, []));
+  }, [showAdvanced]));
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -272,13 +285,13 @@ export default function SettingsScreen() {
   const busy = isUnlocking || isVerifyingBackup || isSavingBackup || isDeleting;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 }]}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={styles.title} accessibilityRole="header">{t("Security")}</Text>
           <Text style={styles.subtitle}>{t("Keep access to your money.")}</Text>
         </View>
-        <Image source={require('@/assets/images/logo_new.svg')} style={styles.logo} contentFit="contain" accessibilityLabel="Opago" />
+        <CloseWalletScreen disabled={busy} />
       </View>
 
       {backupStatus === 'loading' ? <View style={styles.backupCard}><BackupStatusNotice /></View> : <View style={styles.backupCard}>
@@ -342,7 +355,7 @@ export default function SettingsScreen() {
         <Text style={styles.body}>{t("Opago locks when you leave the app or after 2 minutes without activity. Unlock with your device passcode or biometrics.")}</Text>
         <Text style={styles.caption}>{t("Every payment needs your review and confirmation with supported biometrics or your Android device passcode.")}</Text>
         <TouchableOpacity accessibilityRole="button" style={styles.lockButton} onPress={lockWallet}>
-          <Ionicons name="lock-closed-outline" size={19} color="#d5d5dc" />
+          <Ionicons name="lock-closed-outline" size={19} color={adaptColor('#d5d5dc', 'color')} />
           <Text style={styles.actionText}>{t("Lock wallet now")}</Text>
         </TouchableOpacity>
       </View>
@@ -421,6 +434,7 @@ export default function SettingsScreen() {
         </KeyboardAvoidingView></WalletActivityBoundary>
       </Modal>
 
+      <ColorModePicker />
       <LanguagePicker />
       <View style={styles.section}>
         <Text style={styles.sectionTitle} accessibilityRole="header">{t("Manage this wallet")}</Text>
@@ -439,8 +453,8 @@ export default function SettingsScreen() {
       </View>
 
       <AdvancedOptions expanded={showAdvanced} onChange={setShowAdvanced}>
-        <Text style={{ color: '#fff', fontSize: 17, marginBottom: 10 }}>{t('How your Bitcoin balance works')}</Text>
-        <Text style={{ color: '#aaaab3', fontSize: 14, lineHeight: 22, marginBottom: 18 }}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
+        <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 17, marginBottom: 10 }}>{t('How your Bitcoin balance works')}</Text>
+        <Text style={{ color: adaptColor('#aaaab3', 'color'), fontSize: 14, lineHeight: 22, marginBottom: 18 }}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
         <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t("Networks")}</Text>
           <Text style={styles.body}>Bitcoin · {appConfig.isMainnet ? 'Lightning Mainnet' : 'Regtest'}</Text>
@@ -462,12 +476,22 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {performanceTracingEnabled() && <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>{t('Performance diagnostics')}</Text>
+          <Text style={styles.body}>{t('Only step names and durations are recorded. No wallet details are included.')}</Text>
+          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
+            onPress={() => void Clipboard.setStringAsync(getPerformanceReport())
+              .then(() => Alert.alert(t('Copied'), t('Timing report copied to clipboard.')))
+              .catch(() => Alert.alert(t('Copy unavailable'), t('Please try again.')))}>
+            <Text style={styles.actionText}>{t('Copy timing report')}</Text>
+          </TouchableOpacity>
+        </View>}
       </AdvancedOptions>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c' },
   content: { paddingHorizontal: 20, paddingBottom: 44 },
   header: { marginBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 20 },
@@ -508,4 +532,4 @@ const styles = StyleSheet.create({
   verifyButtonText: { color: '#111', fontWeight: '700', fontSize: 16, textAlign: 'center' },
   cancelButton: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   cancelButtonText: { color: '#b8b8c0', fontWeight: '600', fontSize: 16 },
-});
+}));

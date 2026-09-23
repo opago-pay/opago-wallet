@@ -51,6 +51,7 @@ function fixture(options = {}) {
     '@/lib/payment-errors':{friendlyPaymentMessage:()=> 'Payment unavailable'},
     '@/lib/optional-haptics':{notifyPaymentHaptics:async()=>{}},'expo-haptics':{NotificationFeedbackType:{Success:'success',Error:'error'}},
     '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async () => [] },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: async () => [] } },
     '@/components/send/payment-form': { PaymentForm: 'form' },
     '@/components/send/payment-scanner': { PaymentScanner: 'scanner' },
     '@/components/send/hedera-payment-views': { HederaReviewView: 'hbar-review' },

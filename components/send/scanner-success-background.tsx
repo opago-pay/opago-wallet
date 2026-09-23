@@ -28,15 +28,15 @@ export function ScannerSuccessBackground() {
     <ScrollView scrollEnabled={false} style={styles.screenContent}
       contentContainerStyle={[styles.page, { paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 20) }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('Send Bitcoin')}</Text>
+        <Text style={[styles.title, { color: '#f9f9fa' }]}>{t('Send Bitcoin')}</Text>
         <View style={styles.circle}><Ionicons name="close" size={22} color="#f9f9fa" /></View>
       </View>
-      <Text style={styles.prompt}>{t('Hold the QR code inside the frame.')}</Text>
+      <Text style={[styles.prompt, { color: '#d0cfd1' }]}>{t('Hold the QR code inside the frame.')}</Text>
       <View style={styles.stage}>
         <View style={{ width: finderSize, height: finderSize }}>
           <View style={styles.finderStatus}>
             <View style={styles.check}><Ionicons name="checkmark" size={25} color="#0a251b" /></View>
-            <Text style={styles.foundText}>{t('Code recognized')}</Text>
+            <Text style={[styles.foundText, { color: '#fff' }]}>{t('Code recognized')}</Text>
           </View>
           {[styles.topLeft, styles.topRight, styles.bottomLeft, styles.bottomRight].map((corner, i) =>
             <View key={i} style={[styles.corner, corner, { borderColor: '#8de4bd' }]} />)}
@@ -45,11 +45,11 @@ export function ScannerSuccessBackground() {
       {/* Preserve the original scene's layout below the frame, behind the sheet. */}
       <View style={styles.bottom}>
         <View style={[styles.dock, fontScale > 1.5 && styles.dockStack]}>
-          <View style={styles.dockButton}><Ionicons name="clipboard-outline" size={19} color="#ffb000" /><Text style={styles.dockText}>{t('Paste')}</Text></View>
+          <View style={styles.dockButton}><Ionicons name="clipboard-outline" size={19} color="#ffb000" /><Text style={[styles.dockText, { color: '#f7f7f7' }]}>{t('Paste')}</Text></View>
           <View style={fontScale > 1.5 ? styles.dividerHorizontal : styles.divider} />
-          <View style={styles.dockButton}><Ionicons name="create-outline" size={19} color="#eeeef1" /><Text style={styles.dockText}>{t('Type')}</Text></View>
+          <View style={styles.dockButton}><Ionicons name="create-outline" size={19} color="#eeeef1" /><Text style={[styles.dockText, { color: '#f7f7f7' }]}>{t('Type')}</Text></View>
         </View>
-        <Text style={styles.trust}>{t('You confirm every payment.')}</Text>
+        <Text style={[styles.trust, { color: '#b7b7c0' }]}>{t('You confirm every payment.')}</Text>
       </View>
     </ScrollView>
   </View>;

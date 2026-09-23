@@ -57,6 +57,7 @@ import { SessionResource } from '../lib/session-resource';
 import { yieldToUi } from '../lib/ui-ready';
 import { homeBalancePreviewStore } from '../lib/home-balance-preview-native';
 import { beginWalletStartupTiming, recordWalletStartupStage } from '../lib/startup-timing';
+import { measurePerformance } from '../lib/performance-trace';
 
 type SparkWalletInstance = Awaited<ReturnType<typeof initializeSparkWallet>>;
 
@@ -161,7 +162,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   }, [clearRuntimeState]);
 
   const unlockWallet = useCallback(async () => {
-    await authenticateDevice('Unlock Opago', { allowDeviceCredential: true });
+    await measurePerformance('wallet.device_unlock', () => authenticateDevice('Unlock Opago', { allowDeviceCredential: true }));
     if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
     beginWalletStartupTiming();
     walletSession.unlock();
@@ -184,10 +185,17 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       const assertUnlocked = walletSession.capture();
       const generation = ++initializationGenerationRef.current;
       setInitStatus('Deriving wallet keys...');
+      // This independent secure-store read can overlap native seed derivation.
+      // Observe rejection immediately so a failed derivation cannot leave an
+      // unhandled backup-status promise behind.
+      const savedBackupPromise = getSecureItem(BACKUP_STATUS_KEY).then(
+        value => ({ ok: true as const, value }),
+        cause => ({ ok: false as const, cause }),
+      );
       await yieldToUi();
       assertUnlocked();
       recordWalletStartupStage('seed_derivation_started');
-      const seed = await deriveAuthenticatedWalletSeed(mnemonic);
+      const seed = await measurePerformance('wallet.seed_derivation', () => deriveAuthenticatedWalletSeed(mnemonic));
       // Native work can finish after a lock. Never publish/use its late result.
       let handedToSpark = false;
       const eraseSeed = () => {
@@ -203,7 +211,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
         const hederaPrivateKey = deriveHederaPrivateKeyFromSeed(seed);
         const publicKey = hederaPrivateKey.publicKey.toStringRaw().toLowerCase();
         recordWalletStartupStage('key_derivation_complete');
-        const savedBackup = await getSecureItem(BACKUP_STATUS_KEY);
+        const backupResult = await savedBackupPromise;
+        if (!backupResult.ok) throw backupResult.cause;
+        const savedBackup = backupResult.value;
         assertUnlocked();
         recordWalletStartupStage('backup_status_loaded');
 
@@ -225,7 +235,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
             await yieldToUi();
             assertRuntimeCurrent();
             recordWalletStartupStage('spark_init_started');
-            return initializeSparkWallet(seed);
+            return measurePerformance('wallet.spark_initialize', () => initializeSparkWallet(seed));
           },
           { maxAttempts: 3, baseDelayMs: 750, maxDelayMs: 3_000 },
         ))
@@ -274,7 +284,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     return runExclusive(async () => {
       const assertUnlocked = walletSession.capture();
       recordWalletStartupStage('mnemonic_read_started');
-      const mnemonic = await getSecureItem(MNEMONIC_STORE_KEY);
+      const mnemonic = await measurePerformance('wallet.secure_read', () => getSecureItem(MNEMONIC_STORE_KEY));
       assertUnlocked();
       recordWalletStartupStage('mnemonic_read_complete');
       if (!mnemonic) throw new Error('This wallet’s keys are unavailable. Restore your paper backup; a new wallet will not be created automatically.');
@@ -428,7 +438,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       hederaPaymentJournal.clear(),
       lightningPaymentJournal.clear(),
       lightningReceiveStore.clear(),
-      import('@/lib/bitcoin/store-native').then(({ bitcoinStore, bitcoinDepositWatch }) => Promise.all([bitcoinStore.clear(), bitcoinDepositWatch.clear()])),
+      import('@/lib/bitcoin/store-native').then(({ bitcoinStore, bitcoinDepositWatch, bitcoinStaticAddressCache }) => Promise.all([
+        bitcoinStore.clear(), bitcoinDepositWatch.clear(), bitcoinStaticAddressCache.clear(),
+      ])),
       import('@/lib/bitcoin/receive-archive').then(({ clearBitcoinReceiveArchive }) => clearBitcoinReceiveArchive()),
       operationalHealth.clear(),
     ]);

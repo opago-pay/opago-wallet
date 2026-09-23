@@ -258,6 +258,23 @@ export async function loadHederaHistory(
   return history;
 }
 
+export async function loadHederaHistoryPage(rawAccountId: string, limit = 10, before?: string) {
+  const accountId = parseHederaAccountId(rawAccountId);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error('Invalid HBAR history page.');
+  const raw = await listMirrorTransactions(accountId, limit, before, true);
+  const seen = new Set<string>();
+  const items = raw.flatMap(transaction => {
+    const item = historyItemFromMirror(transaction, accountId);
+    if (!item || seen.has(item.transactionId)) return [];
+    seen.add(item.transactionId);
+    return [item];
+  });
+  const oldest = raw.at(-1)?.consensus_timestamp;
+  if (raw.length && (!oldest || !/^\d+\.\d{1,9}$/.test(oldest))) throw new Error('Invalid HBAR history timestamp.');
+  return { items, next: raw.length === limit ? oldest! : null,
+    through: oldest ? Date.parse(consensusTimestampToIso(oldest)) : undefined };
+}
+
 export async function loadHederaTransactionStatus(
   transactionId: string,
 ): Promise<HederaTransactionStatus> {

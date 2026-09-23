@@ -32,7 +32,15 @@ function hookFixture(file, makeDependencies, invoke) {
       if (!slots[i] || !same(slots[i].deps, deps)) effects.push({ i, fn, deps });
     },
   };
-  const dependencies = { react: hooks, 'react/jsx-runtime': require('react/jsx-runtime'), ...makeDependencies(hooks) };
+  const dependencies = {
+    react: hooks,
+    'react/jsx-runtime': require('react/jsx-runtime'),
+    '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
+    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value },
+    '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
+    '../lib/performance-trace': require('./performance-trace-stub.cjs'),
+    ...makeDependencies(hooks),
+  };
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;

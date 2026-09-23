@@ -25,6 +25,7 @@ function fixture(options = {}) {
     '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [] } },
     '@/lib/payment-authorization': { authorizePayment: async () => { calls.push('authenticate'); return () => { if(locked) throw Error('locked'); }; } },
     '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async () => [] },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: async () => [] } },
     '@/lib/payment-errors': { friendlyPaymentMessage: () => 'Payment unavailable' },
     '@/lib/optional-haptics': { notifyPaymentHaptics: async () => {} }, 'expo-haptics': { NotificationFeedbackType: {Error:'error'} },
     '@/components/send/payment-form': { PaymentForm: 'form' },

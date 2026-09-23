@@ -4,6 +4,7 @@ import { withTimeout } from '../promise-timeout';
 import { walletSession } from '../wallet-session';
 import type { LightningPaymentLifecycle } from '../payments';
 import { lightningPaymentJournal } from './payment-journal-native';
+import type { LightningPaymentJournalRecord } from './payment-journal';
 import {
   loadSparkTransfersPaginated,
   loadSparkLightningSendRequests,
@@ -16,8 +17,13 @@ import {
 export async function reconcileLightningPayments(
   wallet: SparkHistoryWalletLike,
   sharedHistory: Promise<SparkTransferLike[]> | null = null,
+  pendingSnapshot?: LightningPaymentJournalRecord[],
 ) {
   const assertSession = walletSession.captureRuntime();
+  const before = pendingSnapshot ?? await lightningPaymentJournal.list();
+  assertSession();
+  if (!before.some(record => record.state === 'pending')) return before;
+  const previousByHash = new Map(before.map(record => [record.paymentHash, record]));
   // Pending records without a Spark request ID share one paginated history
   // read. This avoids one network scan per record after an ambiguous submit.
   let history = sharedHistory;
@@ -30,7 +36,10 @@ export async function reconcileLightningPayments(
   const records = await lightningPaymentJournal.reconcile(record =>
     withTimeout(resolveLightningPaymentFromSpark(wallet, record, loadHistory, loadRequests), 35_000, 'Lightning reconciliation timed out.'),
   );
-  await Promise.all(records.map(async record => {
+  await Promise.all(records.filter(record => {
+    const previous = previousByHash.get(record.paymentHash);
+    return !previous || previous.state !== record.state || previous.requestId !== record.requestId;
+  }).map(async record => {
     try {
       assertSession();
       await addTransaction('outgoing', record.amountSats, 'SAT', {

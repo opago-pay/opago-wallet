@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import QRCode from 'react-native-qrcode-svg';
+import { WalletQrCode } from '@/components/receive/wallet-qr-code';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useBitcoinOperations } from '@/hooks/useBitcoinOperations';
 import { t } from '@/lib/i18n';
@@ -12,16 +12,19 @@ import { authorizePayment } from '@/lib/payment-authorization';
 import { validateBitcoinAddress } from '@/lib/bitcoin/destination';
 import { bitcoinScope, type OnchainWallet } from '@/lib/bitcoin/onchain';
 import { prepareBitcoinDeposit, claimBitcoinDeposit, type BitcoinDepositQuote } from '@/lib/bitcoin/deposits';
-import { bitcoinStore, bitcoinDepositWatch } from '@/lib/bitcoin/store-native';
+import { bitcoinStore, bitcoinDepositWatch, bitcoinStaticAddressCache } from '@/lib/bitcoin/store-native';
 import { withTimeout } from '@/lib/promise-timeout';
 import { PaymentBackButton } from '@/components/send/payment-back-button';
 import { BitcoinButton, BitcoinMoney, bitcoinStyles } from './payment-ui';
+
+const StableQRCode = WalletQrCode;
 
 export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet | null; onBack(): void }) {
   useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [address, setAddress] = useState<string | null>(null);
+  const [knownAddress, setKnownAddress] = useState<{ wallet: OnchainWallet; value: string } | null>(null);
+  const address = knownAddress?.wallet === wallet ? knownAddress.value : null;
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [quote, setQuote] = useState<BitcoinDepositQuote | null>(null);
@@ -38,12 +41,19 @@ export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet
   async function showAddress() {
     if (!wallet) return;
     const assertCurrent = walletSession.captureRuntime();
-    const result = await withTimeout(wallet.getStaticDepositAddress(), 20_000, 'Bitcoin address unavailable.');
-    assertCurrent();
     const scope = await bitcoinScope(wallet, appConfig.sparkNetwork);
+    assertCurrent();
+    const cached = await bitcoinStaticAddressCache.load(scope, appConfig.sparkNetwork, assertCurrent);
+    const address = cached || validateBitcoinAddress(
+      await withTimeout(wallet.getStaticDepositAddress(), 20_000, 'Bitcoin address unavailable.'),
+      appConfig.sparkNetwork,
+    );
+    assertCurrent();
     await bitcoinDepositWatch.enable(scope, assertCurrent);
     assertCurrent();
-    setAddress(validateBitcoinAddress(result));
+    if (!cached) await bitcoinStaticAddressCache.save(scope, address, appConfig.sparkNetwork, assertCurrent);
+    assertCurrent();
+    setKnownAddress({ wallet, value: address });
     refresh();
   }
   async function claim() {
@@ -71,7 +81,7 @@ export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet
       <Text style={bitcoinStyles.muted}>{t('Network confirmation and a claim are required before these Bitcoin become available. The claim fee is deducted from the deposit. The exact fee and minimum viable amount are available after the transaction is detected; review them before approving. Very small deposits may not cover the fee.')}</Text>
       <Text style={bitcoinStyles.note}>{t('This address is reusable. Deposits are tracked as wallet incoming, not as payment of a specific Lightning request. Detection starts after Bitcoin network confirmation.')}</Text>
       {address ? <>
-        <View style={{ alignSelf: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 20 }}><QRCode value={address} size={Math.max(100, Math.min(216, width - 110))} /></View>
+        <View style={{ alignSelf: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 20 }}><StableQRCode value={address} size={Math.max(100, Math.min(216, width - 110))} /></View>
         <Text selectable style={bitcoinStyles.address}>{address}</Text>
         <BitcoinButton label={t('Copy address')} onPress={() => void run(async () => { await Clipboard.setStringAsync(address); })} />
         <BitcoinButton label={t('Share Bitcoin address')} secondary onPress={() => void run(async () => { await Share.share({ message: `bitcoin:${address}` }); })} />

@@ -33,5 +33,6 @@ class OpagoWalletCryptoModule : Module() {
         throw IllegalStateException("Wallet key derivation failed.")
       }
     }
+
   }
 }

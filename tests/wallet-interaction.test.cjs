@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const fs = require('node:fs');
@@ -17,6 +18,8 @@ function load(file, dependencies, allowUnusedImports = false) {
   const exports = {};
   new Function('require', 'exports', code)(name => {
     if (name === 'react/jsx-runtime') return require(name);
+    if (name === '@/lib/theme-styles') return { adaptiveStyles: styles => styles, adaptColor: value => value };
+    if (name === '@/lib/performance-trace' || name === '../lib/performance-trace') return require('./performance-trace-stub.cjs');
     if (name in dependencies) return dependencies[name];
     if (allowUnusedImports) return {};
     throw new Error('Unexpected dependency: ' + name);
@@ -29,8 +32,8 @@ function interactionFixture() {
   const session = new WalletSession(() => now);
   session.unlock();
   const ui = load('components/ui/wallet-interaction.tsx', {
-    react: React,
-    'react-native': { TextInput: 'input', TouchableOpacity: 'button', View: 'view' },
+    react: { ...React, useRef: initial => ({ current: initial }) },
+    'react-native': { TextInput: 'input', TouchableOpacity: 'button', Pressable: 'pressable', View: 'view' },
     '@/lib/wallet-session': { walletSession: session },
   });
   return { ...ui, session, advance: duration => { now += duration; } };
@@ -41,6 +44,7 @@ test('gestures, keyboard edits and accessible buttons keep an active wallet open
   const boundary = fixture.WalletActivityBoundary({}).props;
   const input = fixture.TextInput.render({}, null).props;
   const button = fixture.TouchableOpacity.render({ onLongPress: () => {} }, null).props;
+  const pressable = fixture.Pressable.render({}, null).props;
   const events = [
     () => assert.equal(boundary.onStartShouldSetResponderCapture({}), false),
     () => assert.equal(boundary.onMoveShouldSetResponderCapture({}), false),
@@ -51,6 +55,8 @@ test('gestures, keyboard edits and accessible buttons keep an active wallet open
     () => input.onSubmitEditing({}),
     () => button.onPress({}), // Also used by TalkBack and keyboard activation.
     () => button.onLongPress({}),
+    () => pressable.onPressIn({}),
+    () => pressable.onPress({}),
   ];
   for (const event of events) {
     fixture.advance(40_000);
@@ -63,6 +69,18 @@ test('gestures, keyboard edits and accessible buttons keep an active wallet open
   assert.equal(fixture.session.isUnlocked(), false);
   input.onChangeText('late input');
   assert.equal(fixture.session.isUnlocked(), false);
+});
+
+test('all shared touch controls visibly dim only while pressed', () => {
+  const fixture = interactionFixture();
+  const touchable = fixture.TouchableOpacity.render({}, null).props;
+  assert.equal(touchable.activeOpacity, 0.58);
+  assert.equal(fixture.TouchableOpacity.render({ activeOpacity: 0.7 }, null).props.activeOpacity, 0.7);
+  const pressable = fixture.Pressable.render({ style: { opacity: 0.8 } }, null).props;
+  assert.deepEqual(pressable.style({ pressed: false }), [{ opacity: 0.8 }, undefined]);
+  assert.deepEqual(pressable.style({ pressed: true }), [{ opacity: 0.8 }, { opacity: 0.58 }]);
+  const disabled = fixture.Pressable.render({ disabled: true }, null).props;
+  assert.deepEqual(disabled.style({ pressed: true }), [undefined, undefined]);
 });
 
 test('activity wrappers preserve callbacks, native input refs and child gesture ownership', () => {
@@ -85,6 +103,12 @@ test('activity wrappers preserve callbacks, native input refs and child gesture 
   assert.equal(button.props.disabled, true);
   button.props.onPress(event);
   assert.deepEqual(calls, ['typed', event, event, event]);
+  const pressable = fixture.Pressable.render({ onPress: value => calls.push(value), hitSlop: 8 }, reference);
+  assert.equal(pressable.props.ref, reference);
+  assert.equal(pressable.props.hitSlop, 8);
+  assert.equal(pressable.props.onLongPress, undefined);
+  pressable.props.onPress(event);
+  assert.equal(calls.length, 5);
 });
 
 test('rendering and background/authentication events do not count as user activity', () => {

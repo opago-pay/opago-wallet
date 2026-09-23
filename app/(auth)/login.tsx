@@ -1,5 +1,7 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColorMode } from '@/hooks/useColorMode';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Platform,
@@ -20,6 +22,7 @@ function RecoveryInputScreenCaptureGuard() {
 }
 
 export default function LoginScreen() {
+  useColorMode();
   useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -148,7 +151,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0c0e0b' },
   keyboardAvoidingView: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: 26 },
@@ -174,4 +177,4 @@ const styles = StyleSheet.create({
   disabledButton: { opacity: 0.5 },
   loadingText: { color: '#aab29f', marginTop: 18, textAlign: 'center', fontSize: 13 },
   errorText: { color: '#ffab97', marginTop: 18, lineHeight: 20, textAlign: 'center' },
-});
+}));

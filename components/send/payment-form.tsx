@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 import type { LightningAmountRequirement } from '@/lib/lightning-destination';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];
-const recipientStyles = StyleSheet.create({
+const recipientStyles = adaptiveStyles(StyleSheet.create({
   title: { fontSize: 29, lineHeight: 36, letterSpacing: -0.5 },
   field: { borderRadius: 24, borderWidth: 1, borderColor: '#303038', backgroundColor: '#151519', padding: 18, gap: 12 },
   focused: { borderColor: '#ffb000' },
@@ -30,7 +31,7 @@ const recipientStyles = StyleSheet.create({
   input: { minHeight: 100, color: '#fff', fontSize: 18, lineHeight: 27, textAlignVertical: 'top', padding: 0 },
   paste: { borderTopWidth: 1, borderTopColor: '#303038', minHeight: 52, paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
   pasteText: { color: '#ffb000', fontSize: 15, lineHeight: 22, fontWeight: '600', flexShrink: 1 },
-});
+}));
 
 export function PaymentForm(props: {
   destination: string;

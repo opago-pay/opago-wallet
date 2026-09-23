@@ -16,6 +16,7 @@ export interface SparkUserRequestLike {
   encodedInvoice?: unknown;
   paymentPreimage?: unknown;
   invoice?: { paymentHash?: unknown };
+  transfer?: { totalAmount?: { originalValue?: unknown; originalUnit?: unknown } };
 }
 
 export interface SparkTransferLike {
@@ -127,6 +128,20 @@ export async function loadSparkTransfersPaginated(
     offset = nextOffset;
   }
   return transfers;
+}
+
+/** One display page only. Recovery's independent full-history search is unchanged. */
+export async function loadSparkTransferPage(wallet: SparkHistoryWalletLike, limit = 10, offset = 0) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) {
+    throw new Error('Invalid Lightning history page.');
+  }
+  const page = await withTimeout(wallet.getTransfers(limit, offset), 8_000, 'Lightning history page timed out.');
+  if (!Array.isArray(page.transfers)) throw new Error('Lightning history is unavailable.');
+  const transfers = page.transfers.slice(0, limit);
+  const reported = page.offset;
+  const next = reported === -1 || transfers.length < limit ? null
+    : Number.isSafeInteger(reported) && reported! > offset ? reported! : offset + transfers.length;
+  return { transfers, next };
 }
 
 // A send request can exist at the provider before it appears in transfer

@@ -33,7 +33,7 @@ function assertRequest(value: unknown): StoredLightningReceiveRequest {
     typeof request.paymentHash !== 'string' ||
     !PAYMENT_HASH_PATTERN.test(request.paymentHash) ||
     !Number.isSafeInteger(request.amountSats) ||
-    (request.amountSats || 0) <= 0 ||
+    (request.amountSats || 0) < 0 ||
     typeof request.expiresAt !== 'number' ||
     !Number.isSafeInteger(request.expiresAt) ||
     typeof request.createdAt !== 'string' ||

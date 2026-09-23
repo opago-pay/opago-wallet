@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useState } from 'react';
@@ -66,7 +67,7 @@ export function BackupReminder() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', backgroundColor: '#000b', padding: 24 },
   card: { backgroundColor: '#16161a', borderRadius: 24, flexGrow: 0, maxHeight: '100%' },
   cardContent: { padding: 24 },
@@ -77,4 +78,4 @@ const styles = StyleSheet.create({
   secondary: { padding: 12, alignItems: 'center' },
   reminder: { borderColor: '#6b541b', borderWidth: 1, borderRadius: 18, padding: 18, marginBottom: 20 },
   reminderTitle: { color: '#ffb000', fontSize: 17, fontWeight: '700' },
-});
+}));

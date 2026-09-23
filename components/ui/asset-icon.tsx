@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import Svg, { Path } from 'react-native-svg';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -64,9 +65,9 @@ function iconBorder(asset: WalletAssetKey): string {
   return 'rgba(39,211,178,0.65)';
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

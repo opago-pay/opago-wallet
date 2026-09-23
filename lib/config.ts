@@ -205,6 +205,7 @@ export const appConfig = Object.freeze({
   sparkNetwork: lightningBuildPolicy.network,
   lightningBuildProfile: lightningBuildPolicy.profile,
   eIdBackendUrl: process.env.EXPO_PUBLIC_EID_BACKEND_URL || '',
+  moonPayBackendUrl: process.env.EXPO_PUBLIC_MOONPAY_BACKEND_URL || '',
   hederaNetwork: hederaBuildPolicy.network,
   hederaBuildProfile: hederaBuildPolicy.buildProfile,
   hederaMirrorNodeUrl: hederaBuildPolicy.mirrorNodeUrl,

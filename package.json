@@ -37,11 +37,14 @@
     "@buildonspark/spark-sdk": "0.7.12",
     "@expo/vector-icons": "^15.0.3",
     "@hiero-ledger/sdk": "2.88.0",
+    "@moonpay/react-native-moonpay-sdk": "^1.1.8",
     "@noble/hashes": "^1.8.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "@scure/base": "1.2.6",
+    "@scure/btc-signer": "1.7.0",
     "bech32": "^2.0.0",
     "bip39": "^3.1.0",
     "buffer": "^6.0.3",
@@ -82,10 +85,10 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
+    "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1",
-    "@scure/btc-signer": "1.7.0",
-    "@scure/base": "1.2.6"
+    "react-native-webview": "^13.15.0",
+    "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
@@ -93,9 +96,9 @@
     "eslint-config-expo": "~10.0.0",
     "ethers": "6.17.0",
     "hardhat": "3.16.0",
+    "mocha": "11.8.0",
     "solc": "0.8.28",
-    "typescript": "~5.9.2",
-    "mocha": "11.8.0"
+    "typescript": "~5.9.2"
   },
   "private": true,
   "overrides": {

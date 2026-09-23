@@ -1,14 +1,18 @@
-import { t } from '@/lib/i18n';
+import { adaptColor } from '@/lib/theme-styles';
+import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColorMode } from '@/hooks/useColorMode';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   AppState,
+  Keyboard,
   Share,
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { TextInput, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +20,10 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { notifyPaymentHaptics } from '@/lib/optional-haptics';
 import * as Notifications from 'expo-notifications';
-import { Image } from 'expo-image';
+import { CloseWalletScreen } from '@/components/navigation/close-wallet-screen';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import QRCode from 'react-native-qrcode-svg';
-import { AdvancedOptions } from '@/components/ui/advanced-options';
-import { PaymentBackButton } from '@/components/send/payment-back-button';
+import { WalletQrCode } from '@/components/receive/wallet-qr-code';
 import { AssetIcon } from '@/components/ui/asset-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { BackupReminder, BackupStatusNotice } from '@/components/security/backup-prompt';
@@ -33,43 +35,48 @@ import {
   loadHederaHistory,
 } from '@/lib/hedera/account';
 import {
-  buildHederaReceiveRequest,
   buildHederaWalletQrValue,
-  parseHederaTransferTinybars,
 } from '@/lib/hedera/payments';
 import {
   HEDERA_NETWORK,
   HEDERA_NETWORK_BADGE,
-  HEDERA_NETWORK_LABEL,
 } from '@/lib/hedera/config';
 import { decodeLightningInvoice } from '@/lib/lightning';
-import { resolveLightningReceive, type LightningReceiveState } from '@/lib/lightning/receive-status';
+import { resolveLightningReceiveOutcome, type LightningReceiveState } from '@/lib/lightning/receive-status';
 import { withTimeout } from '@/lib/promise-timeout';
 import { lightningReceiveStore } from '@/lib/lightning/receive-store-native';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { sendStyles as styles } from '@/styles/send-styles';
-import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-assets';
-import { compactWalletIdentifier } from '@/lib/wallet-display';
 import { exponentialBackoffDelay } from '@/lib/retry';
 import { HederaActivation } from '@/components/receive/hedera-activation';
 import { BitcoinDepositScreen } from '@/components/bitcoin/deposit-screen';
-import { BitcoinButton, BitcoinMoney, BitcoinInfo, bitcoinStyles } from '@/components/bitcoin/payment-ui';
+import { BitcoinButton, bitcoinStyles } from '@/components/bitcoin/payment-ui';
 import { bitcoinScope } from '@/lib/bitcoin/onchain';
 import { archiveBitcoinRequest } from '@/lib/bitcoin/receive-archive';
 import { walletSession } from '@/lib/wallet-session';
 import { parsePaymentAmount } from '@/lib/payment-input';
 import { friendlyPaymentMessage } from '@/lib/payment-errors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validateBitcoinAddress } from '@/lib/bitcoin/destination';
+import { satsToBtc } from '@/lib/bitcoin/amount';
+import { bitcoinDepositWatch, bitcoinStaticAddressCache } from '@/lib/bitcoin/store-native';
+import { beginPerformanceSpan, markNavigationReady, measurePerformance, recordPerformanceDuration } from '@/lib/performance-trace';
 
-type ReceiveNetwork = 'lightning' | 'hedera';
+type ReceiveNetwork = 'lightning' | 'onchain' | 'hedera';
+// Polling and amount edits rerender Receive frequently; QR encoding is only
+// necessary when its actual value or physical size changes.
+const StableQRCode = WalletQrCode;
 
 export default function ReceiveScreen() {
   useLanguage();
+  useColorMode();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const isFocused = useIsFocused();
   const rates = useExchangeRates();
   const insets = useSafeAreaInsets();
-  const [showBitcoinAddress, setShowBitcoinAddress] = useState(false);
+  const { width } = useWindowDimensions();
   const {
     sparkWallet,
     walletReady,
@@ -81,40 +88,67 @@ export default function ReceiveScreen() {
     beginBackup,
   } = useWalletAuth();
   const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
-  const [advancedExpanded, setAdvancedExpanded] = useState(false);
-  const [networkSelected, setNetworkSelected] = useState(true);
+  const [networkPickerOpen, setNetworkPickerOpen] = useState(false);
+  const [amountEditorOpen, setAmountEditorOpen] = useState(false);
+  const receiveScrollRef = useRef<ScrollView>(null);
+  const [showAllCoins, setShowAllCoins] = useState(false);
   const [invoice, setInvoice] = useState<string | null>(null);
+  const [invoiceOwnerKey, setInvoiceOwnerKey] = useState<string | null>(null);
   const [invoiceRequestId, setInvoiceRequestId] = useState<string | null>(null);
   const [invoicePaymentHash, setInvoicePaymentHash] = useState<string | null>(null);
   const [invoiceAmountSats, setInvoiceAmountSats] = useState(0);
   const [invoiceExpiresAt, setInvoiceExpiresAt] = useState<number | null>(null);
   const [invoiceExpired, setInvoiceExpired] = useState(false);
+  const [restoredOwnerKey, setRestoredOwnerKey] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [onchainAddress, setOnchainAddress] = useState<{ ownerKey: string; address: string } | null>(null);
+  const [onchainError, setOnchainError] = useState<string | null>(null);
+  const [onchainLoading, setOnchainLoading] = useState(false);
+  const [showDepositDetails, setShowDepositDetails] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
   const [receiveStatus, setReceiveStatus] = useState<LightningReceiveState | 'checking' | 'offline'>('checking');
   const [amountInput, setAmountInput] = useState('');
   const [isEur, setIsEur] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
+  const paymentDetectedAt = useRef<number | null>(null);
+  const [paidNetwork, setPaidNetwork] = useState<'lightning' | 'hedera' | null>(null);
   const [receivedDescription, setReceivedDescription] = useState('');
   const [receivedExplorerUrl, setReceivedExplorerUrl] = useState<string | null>(null);
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
-  const hederaExpectedAmountTinybars = useRef<bigint | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
+  const [hederaReadyOwnerKey, setHederaReadyOwnerKey] = useState<string | null>(null);
   const [hederaLookupError, setHederaLookupError] = useState<string | null>(null);
   const [hederaMissing, setHederaMissing] = useState(false);
-  const [hederaRequest, setHederaRequest] = useState<string | null>(null);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const pollingEnabled = isFocused && appIsActive;
-  const restoredLightningRequest = useRef(false);
+  useEffect(() => {
+    if (backupStatus !== 'loading' && backupStatus !== 'verified' && backupStatus !== 'deferred') markNavigationReady('receive');
+  }, [backupStatus]);
+  const ownerKey = walletReady && hederaPublicKey ? `${appConfig.sparkNetwork}:${hederaPublicKey}` : null;
+  const restoreComplete = !!ownerKey && restoredOwnerKey === ownerKey;
+  const activeOwnerKey = useRef(ownerKey);
+  activeOwnerKey.current = ownerKey;
+  const restoredLightningRequest = useRef<string | null>(null);
   const receiveGeneration = useRef(0);
-  const creatingInvoice = useRef(false);
+  const creatingInvoice = useRef<{ ownerKey: string; generation: number } | null>(null);
+  const lastInvoiceAttempt = useRef<string | null>(null);
+  const switchStartedAt = useRef<number | null>(null);
+  const onQrReady = useCallback(() => {
+    markNavigationReady('receive');
+    recordPerformanceDuration('receive.qr_visible', 0);
+    if (switchStartedAt.current !== null) {
+      recordPerformanceDuration('receive.switch_to_qr', performance.now() - switchStartedAt.current);
+      switchStartedAt.current = null;
+    }
+  }, []);
 
-  useEffect(() => () => { receiveGeneration.current += 1; }, [sparkWallet]);
+  useEffect(() => () => { receiveGeneration.current += 1; }, [sparkWallet, ownerKey]);
 
   useEffect(() => {
     hederaKnownTransactions.current = null;
-    hederaExpectedAmountTinybars.current = null;
-    setHederaRequest(null);
     setHederaReady(false);
+    setHederaReadyOwnerKey(null);
     setHederaMissing(false);
     setHederaLookupError(null);
   }, [hederaPublicKey]);
@@ -124,25 +158,40 @@ export default function ReceiveScreen() {
   }, [loadOrGenerateWallet, walletReady]);
 
   useEffect(() => {
-    if (!sparkWallet || restoredLightningRequest.current) return;
+    if (!sparkWallet || !ownerKey || restoredLightningRequest.current === ownerKey) return;
+    restoredLightningRequest.current = ownerKey;
+    setRestoredOwnerKey(null);
+    setInvoice(null);
+    setInvoiceOwnerKey(null);
+    setInvoiceRequestId(null);
+    setInvoicePaymentHash(null);
+    setInvoiceExpiresAt(null);
+    setInvoiceExpired(false);
+    setOnchainAddress(null);
+    setOnchainError(null);
+    setLoading(false);
+    lastInvoiceAttempt.current = null;
     const generation = receiveGeneration.current;
+    const finishRestore = beginPerformanceSpan('receive.restore');
     let cancelled = false;
-    void lightningReceiveStore.load()
+    void measurePerformance('receive.restore_storage', () => lightningReceiveStore.load())
       .then(async saved => {
         if (cancelled || generation !== receiveGeneration.current) return;
-        restoredLightningRequest.current = true;
         if (!saved) return;
         const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
-        if (saved.scope && saved.scope !== scope) return;
+        if (saved.scope !== scope) return;
         const details = decodeLightningInvoice(saved.invoice, { allowExpired: true });
-        if (details.paymentHash !== saved.paymentHash || details.amountSats !== saved.amountSats) return;
+        if (details.paymentHash !== saved.paymentHash || details.amountSats !== (saved.amountSats || null)) return;
         const current = walletSession.captureRuntime();
-        const assertCurrent = () => { current(); if (cancelled || generation !== receiveGeneration.current) throw new Error('Wallet changed.'); };
+        const assertCurrent = () => { current(); if (cancelled || generation !== receiveGeneration.current || activeOwnerKey.current !== ownerKey) throw new Error('Wallet changed.'); };
         await archiveBitcoinRequest(scope, saved, assertCurrent);
         assertCurrent();
-        setNetwork('lightning');
-        setNetworkSelected(true);
-        setInvoice(saved.invoice);
+        if (saved.expiresAt > Date.now()) {
+          setInvoice(saved.invoice);
+          setInvoiceOwnerKey(ownerKey);
+          setAmountInput(saved.amountSats ? String(saved.amountSats) : '');
+          setIsEur(false);
+        }
         setInvoiceRequestId(saved.requestId);
         setInvoicePaymentHash(saved.paymentHash);
         setInvoiceAmountSats(saved.amountSats);
@@ -152,13 +201,18 @@ export default function ReceiveScreen() {
         setIsPaid(false);
       })
       .catch(() => {
+        finishRestore('error');
         // A storage failure must not crash the receive screen. The user can
         // still create a fresh request in the current session.
+      })
+      .finally(() => {
+        finishRestore(cancelled ? 'cancelled' : 'ok');
+        if (!cancelled && generation === receiveGeneration.current && activeOwnerKey.current === ownerKey) setRestoredOwnerKey(ownerKey);
       });
     return () => {
       cancelled = true;
     };
-  }, [sparkWallet]);
+  }, [sparkWallet, ownerKey]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -173,6 +227,9 @@ export default function ReceiveScreen() {
     txId: string,
     reference = txId,
   ) => {
+    paymentDetectedAt.current = performance.now();
+    recordPerformanceDuration('receive.payment_detected', 0);
+    setPaidNetwork('lightning');
     setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
     setIsPaid(true);
     await addTransaction('incoming', amount, asset, {
@@ -200,12 +257,13 @@ export default function ReceiveScreen() {
   }, []);
 
   useEffect(() => {
-    if (!pollingEnabled || !invoice || !invoicePaymentHash || !sparkWallet || isPaid) return;
+    if (!pollingEnabled || !invoice || !invoicePaymentHash || !sparkWallet || !ownerKey ||
+        invoiceOwnerKey !== ownerKey || !walletReady || isPaid) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let consecutiveFailures = 0;
     const generation = receiveGeneration.current;
-    const isCurrent = () => !cancelled && generation === receiveGeneration.current;
+    const isCurrent = () => !cancelled && generation === receiveGeneration.current && activeOwnerKey.current === ownerKey;
 
     function scheduleNextPoll(delayMs: number) {
       if (!isCurrent()) return;
@@ -214,14 +272,14 @@ export default function ReceiveScreen() {
 
     async function poll() {
       try {
-        const status = await resolveLightningReceive(sparkWallet!, {
+        const outcome = await measurePerformance('receive.status', () => resolveLightningReceiveOutcome(sparkWallet!, {
           requestId: invoiceRequestId!, paymentHash: invoicePaymentHash!, amountSats: invoiceAmountSats,
-        });
+        }));
         if (!isCurrent()) return;
-        setReceiveStatus(status);
-        if (status === 'confirmed') {
+        setReceiveStatus(outcome.state);
+        if (outcome.state === 'confirmed' && outcome.amountSats) {
           await markPaid(
-            invoiceAmountSats,
+            outcome.amountSats,
             'SAT',
             'ln:' + invoicePaymentHash!.toLowerCase(),
             invoiceRequestId!,
@@ -242,22 +300,24 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [invoice, invoiceAmountSats, invoiceExpired, invoicePaymentHash, invoiceRequestId, isPaid, markPaid, pollingEnabled, sparkWallet]);
+  }, [invoice, invoiceAmountSats, invoiceExpired, invoicePaymentHash, invoiceRequestId, invoiceOwnerKey,
+    isPaid, markPaid, ownerKey, pollingEnabled, sparkWallet, walletReady]);
 
   useEffect(() => {
-    if (!pollingEnabled || !networkSelected || network !== 'hedera' || !walletReady || isPaid) return;
+    if (!pollingEnabled || network !== 'hedera' || !walletReady || isPaid) return;
+    const requestOwnerKey = ownerKey;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let consecutiveFailures = 0;
 
     function scheduleNextPoll(delayMs: number) {
-      if (cancelled) return;
+      if (cancelled || activeOwnerKey.current !== requestOwnerKey) return;
       timer = setTimeout(runPoll, delayMs);
     }
 
     function runPoll() {
       void initializeAndPoll().catch(cause => {
-        if (cancelled) return;
+        if (cancelled || activeOwnerKey.current !== requestOwnerKey) return;
         setHederaLookupError(cause instanceof Error ? cause.message : t('Account lookup unavailable.'));
         setHederaMissing(false);
         consecutiveFailures += 1;
@@ -266,9 +326,8 @@ export default function ReceiveScreen() {
     }
 
     async function initializeAndPoll() {
-      if (hederaKnownTransactions.current !== null && !hederaRequest) return;
       const account = await refreshHederaAccount();
-      if (cancelled) return;
+      if (cancelled || activeOwnerKey.current !== requestOwnerKey) return;
       setHederaLookupError(null);
       setHederaMissing(!account);
       if (!account) {
@@ -278,24 +337,31 @@ export default function ReceiveScreen() {
         return;
       }
       const history = await loadHederaHistory(account.accountId, 10);
+      if (cancelled || activeOwnerKey.current !== requestOwnerKey) return;
       if (hederaKnownTransactions.current === null) {
         hederaKnownTransactions.current = new Set(
           history.map(item => item.transactionId),
         );
-        if (!cancelled) setHederaReady(true);
+        if (!cancelled && activeOwnerKey.current === requestOwnerKey) {
+          setHederaReady(true);
+          setHederaReadyOwnerKey(requestOwnerKey);
+        }
       } else {
         const incoming = findNewConfirmedIncomingHederaTransaction(
           history,
           hederaKnownTransactions.current,
-          hederaExpectedAmountTinybars.current,
+          null,
         );
         for (const item of history) {
           hederaKnownTransactions.current.add(item.transactionId);
         }
-        if (incoming && !cancelled) {
+        if (incoming && !cancelled && activeOwnerKey.current === requestOwnerKey) {
+          paymentDetectedAt.current = performance.now();
+          recordPerformanceDuration('receive.payment_detected', 0);
           const description = t('{amount} HBAR confirmed on {network}.', { amount: incoming.amountHbar, network: HEDERA_NETWORK });
           setReceivedDescription(description);
           setReceivedExplorerUrl(incoming.hashscanUrl);
+          setPaidNetwork('hedera');
           setIsPaid(true);
           await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
           try {
@@ -312,7 +378,6 @@ export default function ReceiveScreen() {
           return;
         }
       }
-      if (!hederaRequest) return;
       consecutiveFailures = 0;
       scheduleNextPoll(8_000);
     }
@@ -322,33 +387,35 @@ export default function ReceiveScreen() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [hederaPublicKey, hederaRequest, isPaid, network, networkSelected, pollingEnabled, refreshHederaAccount, walletReady]);
+  }, [hederaPublicKey, isPaid, network, ownerKey, pollingEnabled, refreshHederaAccount, walletReady]);
 
-  function parseInvoiceAmount(): number {
+  const parseInvoiceAmount = useCallback((): number => {
     const freshRate = rates.updatedAt > 0 && Date.now() - rates.updatedAt <= 300_000 ? rates.btcToEur : 0;
     return parsePaymentAmount(amountInput, isEur ? 'EUR' : 'SAT', freshRate);
-  }
+  }, [amountInput, isEur, rates.btcToEur, rates.updatedAt]);
 
-  async function generateInvoice() {
-    if (!sparkWallet || creatingInvoice.current) return;
-    creatingInvoice.current = true;
+  const generateInvoice = useCallback(async (amountSats: number) => {
+    if (!sparkWallet || !ownerKey) return;
     const generation = receiveGeneration.current;
-    const isCurrent = () => generation === receiveGeneration.current;
+    if (creatingInvoice.current?.ownerKey === ownerKey && creatingInvoice.current.generation === generation) return;
+    const task = { ownerKey, generation };
+    const finishCreate = beginPerformanceSpan('receive.create_invoice');
+    creatingInvoice.current = task;
+    const isCurrent = () => generation === receiveGeneration.current && activeOwnerKey.current === ownerKey;
     const assertCurrent = () => { if (!isCurrent()) throw new Error('Wallet locked.'); };
     setLoading(true);
     try {
-      const amountSats = parseInvoiceAmount();
-      if (amountSats <= 0) throw new Error('Enter a positive amount.');
-      const result = await withTimeout<{ id: string; invoice: string | { encodedInvoice: string } }>(sparkWallet.createLightningInvoice({
+      if (!Number.isSafeInteger(amountSats) || amountSats < 0) throw new Error('Enter a valid amount.');
+      const result = await measurePerformance('receive.spark_invoice', () => withTimeout<{ id: string; invoice: string | { encodedInvoice: string } }>(sparkWallet.createLightningInvoice({
         amountSats,
-        memo: 'Deposit into Opago Wallet',
+        memo: 'Opago',
         expirySeconds: 600,
-      }), 20_000, 'Lightning request timed out.');
+      }), 20_000, 'Lightning request timed out.'));
       assertCurrent();
       const rawInvoice =
         typeof result.invoice === 'string' ? result.invoice : result.invoice.encodedInvoice;
       const details = decodeLightningInvoice(rawInvoice);
-      if (details.amountSats !== amountSats) throw new Error('Spark returned an invoice with the wrong amount.');
+      if (details.amountSats !== (amountSats || null)) throw new Error('Spark returned an invoice with the wrong amount.');
       if (typeof result.id !== 'string' || !result.id) {
         throw new Error('Spark returned no request identifier.');
       }
@@ -362,10 +429,13 @@ export default function ReceiveScreen() {
         expiresAt: details.expiresAt || Date.now() + 600_000,
         createdAt: new Date().toISOString(),
       };
-      await archiveBitcoinRequest(saved.scope, saved, assertCurrent);
-      await lightningReceiveStore.save(saved, assertCurrent);
+      await measurePerformance('receive.invoice_persist', async () => {
+        await archiveBitcoinRequest(saved.scope, saved, assertCurrent);
+        await lightningReceiveStore.save(saved, assertCurrent);
+      });
       assertCurrent();
       setInvoice(encodedRequest);
+      setInvoiceOwnerKey(ownerKey);
       setInvoiceRequestId(result.id);
       setInvoicePaymentHash(details.paymentHash);
       setInvoiceAmountSats(amountSats);
@@ -373,84 +443,86 @@ export default function ReceiveScreen() {
       setInvoiceExpired(false);
       setReceiveStatus('checking');
       setIsPaid(false);
+      setRequestError(null);
     } catch (cause) {
+      finishCreate('error');
       if (!isCurrent()) return;
-      Alert.alert(t('Could not create request'), t(friendlyPaymentMessage(cause, 'Bitcoin')));
+      setRequestError(t(friendlyPaymentMessage(cause, 'Bitcoin')));
     } finally {
-      creatingInvoice.current = false;
+      finishCreate();
+      if (creatingInvoice.current === task) creatingInvoice.current = null;
       if (isCurrent()) setLoading(false);
     }
-  }
+  }, [sparkWallet, ownerKey]);
 
-  async function prepareHederaRequest() {
-    setLoading(true);
-    try {
-      const account = hederaAccount || await refreshHederaAccount();
-      if (!account) throw new Error('No ' + HEDERA_NETWORK_LABEL + ' account exists for this wallet.');
-      const amountTinybars = amountInput.trim()
-        ? parseHederaTransferTinybars(amountInput)
-        : null;
-      hederaExpectedAmountTinybars.current = amountTinybars;
-      setHederaRequest(buildHederaReceiveRequest(account.accountId, amountTinybars));
-    } catch (cause) {
-      Alert.alert(
-        t('Could not create HBAR request'),
-        t(cause instanceof Error ? cause.message : HEDERA_NETWORK_LABEL + ' is unavailable.'),
-      );
-    } finally {
-      setLoading(false);
+  const reset = useCallback((clearLightning: boolean) => {
+    if (clearLightning) {
+      receiveGeneration.current += 1;
+      setInvoice(null);
+      setInvoiceOwnerKey(null);
+      setInvoiceRequestId(null);
+      setInvoicePaymentHash(null);
+      setInvoiceAmountSats(0);
+      setInvoiceExpiresAt(null);
+      setInvoiceExpired(false);
+      setReceiveStatus('checking');
     }
-  }
-
-  const reset = useCallback(() => {
-    receiveGeneration.current += 1;
-    setInvoice(null);
-    setInvoiceRequestId(null);
-    setInvoicePaymentHash(null);
-    setInvoiceAmountSats(0);
-    setInvoiceExpiresAt(null);
-    setInvoiceExpired(false);
-    setReceiveStatus('checking');
     setIsPaid(false);
+    setPaidNetwork(null);
     setReceivedDescription('');
     setReceivedExplorerUrl(null);
     hederaKnownTransactions.current = null;
-    hederaExpectedAmountTinybars.current = null;
     setHederaReady(false);
+    setHederaReadyOwnerKey(null);
     setHederaLookupError(null);
     setHederaMissing(false);
-    setHederaRequest(null);
   }, []);
 
-  const clearAndReset = useCallback(async () => {
-    receiveGeneration.current += 1;
-    await lightningReceiveStore.clear();
-    reset();
-  }, [reset]);
-
   const finishReceiving = useCallback(() => {
-    reset();
-    setNetworkSelected(true);
+    const clearLightning = paidNetwork === 'lightning';
+    reset(clearLightning);
+    if (clearLightning) lastInvoiceAttempt.current = null;
     setNetwork('lightning');
-    setAdvancedExpanded(false);
-    setAmountInput('');
-    setIsEur(true);
-  }, [reset]);
+    setNetworkPickerOpen(false);
+    setAmountEditorOpen(false);
+    setShowAllCoins(false);
+    if (clearLightning) {
+      setAmountInput('');
+      setIsEur(true);
+    }
+  }, [paidNetwork, reset]);
+
+  const returnHomeAfterReceive = useCallback(() => {
+    finishReceiving();
+    routerRef.current.replace('/(tabs)');
+  }, [finishReceiving]);
 
   useEffect(() => {
     if (!isPaid) return;
-    const timer = setTimeout(finishReceiving, 3_000);
+    if (paymentDetectedAt.current !== null) {
+      recordPerformanceDuration('receive.confirm_to_screen', performance.now() - paymentDetectedAt.current);
+      paymentDetectedAt.current = null;
+    }
+    const timer = setTimeout(returnHomeAfterReceive, 3_000);
     return () => clearTimeout(timer);
-  }, [finishReceiving, isPaid]);
+  }, [isPaid, returnHomeAfterReceive]);
 
   useEffect(() => {
     if (!invoiceExpiresAt || isPaid) return;
+    const expire = () => {
+      receiveGeneration.current += 1;
+      lastInvoiceAttempt.current = null;
+      setInvoice(null);
+      setInvoiceOwnerKey(null);
+      setInvoiceExpiresAt(null);
+      setInvoiceExpired(true);
+    };
     const remaining = invoiceExpiresAt - Date.now();
     if (remaining <= 0) {
-      setInvoiceExpired(true);
+      expire();
       return;
     }
-    const timer = setTimeout(() => setInvoiceExpired(true), Math.min(remaining, 2_147_483_647));
+    const timer = setTimeout(expire, Math.min(remaining, 2_147_483_647));
     return () => clearTimeout(timer);
   }, [invoiceExpiresAt, isPaid]);
 
@@ -471,10 +543,76 @@ export default function ReceiveScreen() {
     }
   }
 
-  if (backupStatus === 'loading') return <View style={[styles.container, styles.centered]}><BackupStatusNotice /></View>;
+  useEffect(() => {
+    if (!restoreComplete || !sparkWallet || !walletReady || !ownerKey || network !== 'lightning' || !pollingEnabled || isPaid || loading) return;
+    let amountSats: number;
+    try {
+      amountSats = parseInvoiceAmount();
+      if (amountInput.trim() && amountSats <= 0) throw new Error('Enter a positive amount.');
+    } catch (cause) {
+      setRequestError(t(cause instanceof Error ? cause.message : 'Enter a valid amount.'));
+      return;
+    }
+    if (invoice && invoiceOwnerKey === ownerKey && !invoiceExpired && receiveStatus !== 'failed' &&
+        invoiceAmountSats === amountSats && (!invoiceExpiresAt || invoiceExpiresAt > Date.now())) return;
+    const key = `${amountSats}:${amountInput}:${isEur}:${rates.updatedAt}`;
+    if (lastInvoiceAttempt.current === key) return;
+    const timer = setTimeout(() => {
+      if (lastInvoiceAttempt.current === key) return;
+      lastInvoiceAttempt.current = key;
+      void generateInvoice(amountSats);
+    }, amountInput.trim() ? 500 : 0);
+    return () => clearTimeout(timer);
+  }, [restoreComplete, sparkWallet, walletReady, ownerKey, network, pollingEnabled, isPaid, loading,
+    amountInput, isEur, rates.updatedAt, invoice, invoiceOwnerKey, invoiceExpiresAt, invoiceExpired, invoiceAmountSats, receiveStatus,
+    retryVersion, parseInvoiceAmount, generateInvoice]);
+
+  const shouldPrefetchOnchain = network === 'onchain' ||
+    (restoreComplete && !!invoice && invoiceOwnerKey === ownerKey);
+
+  useEffect(() => {
+    // Warm the wallet-bound static address while Lightning is displayed. A
+    // later tab switch should only change which already prepared QR is shown.
+    if (!sparkWallet || !walletReady || !ownerKey || onchainAddress?.ownerKey === ownerKey || onchainError || !pollingEnabled ||
+        !shouldPrefetchOnchain) return;
+    let cancelled = false;
+    const assertWallet = walletSession.captureRuntime();
+    const assertCurrent = () => {
+      assertWallet();
+      if (cancelled || activeOwnerKey.current !== ownerKey) throw new Error('Wallet changed.');
+    };
+    setOnchainLoading(true);
+    void measurePerformance('receive.onchain_address', async () => {
+      const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
+      assertCurrent();
+      const cachedAddress = await bitcoinStaticAddressCache.load(scope, appConfig.sparkNetwork, assertCurrent);
+      let address = cachedAddress;
+      if (!address) {
+        address = validateBitcoinAddress(
+          await withTimeout(sparkWallet.getStaticDepositAddress(), 20_000, 'Bitcoin address unavailable.'),
+          appConfig.sparkNetwork,
+        );
+      }
+      assertCurrent();
+      await bitcoinDepositWatch.enable(scope, assertCurrent);
+      if (!cachedAddress) await bitcoinStaticAddressCache.save(scope, address, appConfig.sparkNetwork, assertCurrent);
+      assertCurrent();
+      setOnchainAddress({ ownerKey, address });
+      setOnchainError(null);
+    }).catch(cause => {
+      if (!cancelled && activeOwnerKey.current === ownerKey) setOnchainError(t(friendlyPaymentMessage(cause, 'Bitcoin')));
+    }).finally(() => { if (!cancelled && activeOwnerKey.current === ownerKey) setOnchainLoading(false); });
+    return () => { cancelled = true; };
+  }, [sparkWallet, walletReady, ownerKey, onchainAddress?.ownerKey, onchainError, pollingEnabled, shouldPrefetchOnchain]);
+
+  if (backupStatus === 'loading') return <View style={[styles.container, styles.centered]}>
+    <CloseWalletScreen style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
+    <BackupStatusNotice />
+  </View>;
 
   if (backupStatus !== 'verified' && backupStatus !== 'deferred') return (
     <View style={[styles.container, styles.centered]}>
+      <CloseWalletScreen style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
       <Text style={styles.successTitle}>{t("Back up before adding money")}</Text>
       <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Security.")}</Text>
       <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push('/(tabs)/settings'); }}>
@@ -494,10 +632,7 @@ export default function ReceiveScreen() {
       </Text>
       <TouchableOpacity
         style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
-        onPress={() => {
-          finishReceiving();
-          router.replace('/(tabs)');
-        }}
+        onPress={returnHomeAfterReceive}
       >
         <Text style={styles.buttonText}>{t("Done")}</Text>
       </TouchableOpacity>
@@ -517,270 +652,213 @@ export default function ReceiveScreen() {
     </View>
   );
 
-  if (showBitcoinAddress) return <BitcoinDepositScreen wallet={sparkWallet} onBack={() => setShowBitcoinAddress(false)} />;
+  if (showDepositDetails) return <BitcoinDepositScreen wallet={sparkWallet} onBack={() => setShowDepositDetails(false)} />;
 
-  const qrValue =
-    network === 'hedera'
-        ? hederaRequest && hederaAccount
-          ? buildHederaWalletQrValue(hederaAccount.accountId)
-          : ''
-        : invoiceExpired || receiveStatus === 'failed' ? '' : invoice || '';
-
-  const receiveNetworks: { network: ReceiveNetwork; asset: WalletAssetKey }[] = [
-    { network: 'lightning', asset: 'lightning' },
-    { network: 'hedera', asset: 'hedera' },
-  ];
-  const selectedReceiveNetwork = receiveNetworks.find(item => item.network === network)!;
-  const selectedReceivePresentation = getWalletAssetPresentation(
-    selectedReceiveNetwork.asset,
-    appConfig.isMainnet,
-    appConfig.hederaNetwork,
-  );
-  let draftSats = 0;
-  try { draftSats = parseInvoiceAmount(); } catch { /* Invalid or incomplete input is explained on submission. */ }
-
-  async function selectNetwork(next: ReceiveNetwork) {
-    if (loading) return;
-    setLoading(true);
-    try {
-      await clearAndReset();
-      setNetwork(next);
-      setNetworkSelected(true);
-      setAdvancedExpanded(false);
-      setAmountInput('');
-      setIsEur(true);
-    } catch {
-      Alert.alert(t('Please try again.'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function backToNetworks() {
-    if (loading) return;
-    setLoading(true);
-    try {
-      await clearAndReset();
-      finishReceiving();
-    } catch {
-      Alert.alert(t('Please try again.'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const renderNetwork = (item: typeof receiveNetworks[number]) => {
-    const presentation = getWalletAssetPresentation(item.asset, appConfig.isMainnet, appConfig.hederaNetwork);
-    return (
-      <TouchableOpacity
-        key={item.network}
-        style={styles.receiveNetworkSelector}
-        onPress={() => void selectNetwork(item.network)}
-        disabled={loading}
-        accessibilityRole="button"
-        accessibilityLabel={`${presentation.name}, ${presentation.networkLabel}`}
-      >
-        <AssetIcon asset={item.asset} size={34} />
-        <Text style={styles.receiveNetworkText}>{presentation.name}</Text>
-        <Text style={styles.receiveNetworkMeta}>{presentation.networkBadge}</Text>
-      </TouchableOpacity>
-    );
+  const switchNetwork = (next: ReceiveNetwork) => {
+    if (next === network) return;
+    switchStartedAt.current = performance.now();
+    setNetwork(next);
+    setNetworkPickerOpen(false);
+    setAmountEditorOpen(false);
+    Keyboard.dismiss();
   };
+  const changeAmount = (value: string) => {
+    if (value === amountInput) return;
+    let newAmountSats: number | null = null;
+    try {
+      const freshRate = rates.updatedAt > 0 && Date.now() - rates.updatedAt <= 300_000 ? rates.btcToEur : 0;
+      newAmountSats = parsePaymentAmount(value, isEur ? 'EUR' : 'SAT', freshRate);
+    } catch { /* A partial amount invalidates the previous payment code. */ }
+    let previousAmountSats: number | null = null;
+    try { previousAmountSats = parseInvoiceAmount(); } catch { /* Partial input has no fixed amount. */ }
+    const amountChanged = newAmountSats !== previousAmountSats;
+    setAmountInput(value);
+    setRequestError(null);
+    if (amountChanged) {
+      receiveGeneration.current += 1;
+      lastInvoiceAttempt.current = null;
+      setLoading(false);
+      if (invoiceRequestId) void lightningReceiveStore.clear(invoiceRequestId).catch(() => undefined);
+      setInvoice(null);
+      setInvoiceOwnerKey(null);
+      setInvoiceRequestId(null);
+      setInvoicePaymentHash(null);
+      setInvoiceExpiresAt(null);
+      setInvoiceExpired(false);
+      setReceiveStatus('checking');
+    }
+  };
+  let draftSats: number | null = null;
+  if (network !== 'hedera') {
+    try { draftSats = parseInvoiceAmount(); } catch { /* A partial amount never produces a QR. */ }
+  }
+  const numericAmount = Number(amountInput.replace(',', '.'));
+  const amountLabel = amountInput.trim() && draftSats !== null && draftSats > 0 && Number.isFinite(numericAmount)
+    ? `${numericAmount.toLocaleString(appLocale(), { minimumFractionDigits: isEur ? 2 : 0, maximumFractionDigits: isEur ? 2 : 0 })} ${isEur ? '€' : 'Sats'}`
+    : null;
+  const lightningReady = network === 'lightning' && !!sparkWallet && !!ownerKey && restoreComplete &&
+    !!invoice && invoiceOwnerKey === ownerKey && !invoiceExpired &&
+    (!invoiceExpiresAt || invoiceExpiresAt > Date.now()) &&
+    receiveStatus !== 'failed' && draftSats !== null && draftSats === invoiceAmountSats;
+  const onchainReady = network === 'onchain' && !!sparkWallet && !!ownerKey &&
+    onchainAddress?.ownerKey === ownerKey && draftSats !== null;
+  const hederaReadyForQr = network === 'hedera' && !!ownerKey && !!hederaAccount &&
+    hederaReady && hederaReadyOwnerKey === ownerKey;
+  const qrValue = lightningReady ? invoice! : onchainReady
+    ? `bitcoin:${onchainAddress!.address}${draftSats! > 0 ? `?amount=${satsToBtc(draftSats!)}` : ''}`
+    : hederaReadyForQr ? buildHederaWalletQrValue(hederaAccount.accountId) : '';
+  const displayValue = network === 'hedera' ? hederaAccount?.accountId
+    : network === 'onchain' && draftSats === 0 ? onchainAddress?.address : qrValue;
+  // Leave 22 px of white card around the QR, in addition to its encoded quiet zone.
+  const qrSize = Math.max(160, Math.min(300, width - 90));
+  const receiveRoutes: { id: ReceiveNetwork; label: string; description: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
+    { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet.', icon: 'flash-outline' },
+    { id: 'onchain', label: 'Bitcoin network', description: 'Receive to a Bitcoin address, for example from an exchange.', icon: 'logo-bitcoin' },
+  ];
+  if (showAllCoins || network === 'hedera') receiveRoutes.push({
+    id: 'hedera', label: 'HBAR', description: 'Receive to your Hedera account.', icon: 'wallet-outline',
+  });
 
-  return (
-    <ScrollView
-      style={styles.scrollContainer}
-      contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12, paddingHorizontal: 23 }]}
-      keyboardShouldPersistTaps="handled"
+  return <ScrollView
+    ref={receiveScrollRef}
+    style={styles.scrollContainer}
+    contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28, paddingHorizontal: 23 }]}
+    keyboardShouldPersistTaps="handled"
+  >
+    <View style={styles.header}>
+      <Text style={bitcoinStyles.title}>{t(network === 'hedera' ? 'Receive HBAR' : 'Receive Bitcoin')}</Text>
+      <CloseWalletScreen />
+    </View>
+    <BackupReminder />
+
+    <TouchableOpacity
+      onPress={() => setNetworkPickerOpen(open => !open)}
+      accessibilityRole="button"
+      accessibilityLabel={t('Via {network}', { network: network === 'lightning' ? 'Lightning' : network === 'onchain' ? t('Bitcoin network') : 'HBAR' })}
+      accessibilityState={{ expanded: networkPickerOpen }}
+      style={{ alignSelf: 'flex-start', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 14, marginBottom: networkPickerOpen ? 6 : 16 }}
     >
-      {networkSelected && (network === 'hedera' || invoice) && <PaymentBackButton onPress={() => void backToNetworks()} disabled={loading} label={t('Back')} />}
-      <View style={styles.header}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={bitcoinStyles.title}>{invoice && network === 'lightning' ? t('Your payment request') : t('Receive {asset}', { asset: selectedReceivePresentation.name })}</Text>
-          <Text style={styles.screenSubtitle}>{t('How much would you like to receive?')}</Text>
+      <Text style={{ color: adaptColor('#d8d8dc', 'color'), fontSize: 15, fontWeight: '600' }}>
+        {t('Via {network}', { network: network === 'lightning' ? 'Lightning' : network === 'onchain' ? t('Bitcoin network') : 'HBAR' })}
+      </Text>
+      <Ionicons name={networkPickerOpen ? 'chevron-up' : 'chevron-down'} size={17} color={adaptColor('#a9a9b0', 'color')} />
+    </TouchableOpacity>
+    {networkPickerOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 18, padding: 6, marginBottom: 16 }}>
+      {receiveRoutes.map(item => <TouchableOpacity
+        key={item.id}
+        onPress={() => { if (item.id === network) setNetworkPickerOpen(false); else switchNetwork(item.id); }}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: network === item.id }}
+        style={{ minHeight: 68, borderRadius: 13, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12,
+          backgroundColor: network === item.id ? adaptColor('#2a2924', 'backgroundColor') : 'transparent' }}
+      >
+        {item.id === 'hedera' ? <AssetIcon asset="hedera" size={21} /> :
+          <Ionicons name={item.icon} size={21} color={network === item.id ? '#ffb000' : adaptColor('#c8c8ce', 'color')} />}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 15, fontWeight: '700' }}>{t(item.label)}</Text>
+          <Text style={{ color: adaptColor('#aaaab4', 'color'), fontSize: 12, lineHeight: 17, marginTop: 2 }}>{t(item.description)}</Text>
         </View>
-        <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
-      </View>
-      <BackupReminder />
-      {networkSelected && network === 'hedera' && (
-        <View style={styles.modeNotice}>
-          <View style={[styles.modeNoticeIcon, HEDERA_NETWORK === 'mainnet' && styles.modeNoticeIconLive]}>
-            <Ionicons
-              name={HEDERA_NETWORK === 'mainnet' ? 'shield-checkmark' : 'flask-outline'}
-              size={18}
-              color={HEDERA_NETWORK === 'mainnet' ? '#49d17d' : '#b7a8ff'}
-            />
-          </View>
-          <View style={styles.modeNoticeCopy}>
-              <Text style={styles.modeNoticeTitle}>HBAR · {HEDERA_NETWORK_BADGE}</Text>
-              <Text style={styles.modeNoticeText}>
-                {HEDERA_NETWORK === 'mainnet'
-                  ? t('Real payments are active.')
-                  : t('Test payments only — no real value.')}
-              </Text>
-          </View>
+        {network === item.id && <Ionicons name="checkmark" size={19} color="#ffb000" />}
+      </TouchableOpacity>)}
+      {!showAllCoins && network !== 'hedera' && <TouchableOpacity
+        onPress={() => setShowAllCoins(true)}
+        accessibilityRole="button"
+        accessibilityLabel={t('Show all coins')}
+        style={{ minHeight: 56, borderRadius: 13, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+      >
+        <Ionicons name="grid-outline" size={21} color="#ffb000" />
+        <Text style={{ color: '#ffb000', fontSize: 15, fontWeight: '700', flex: 1 }}>{t('Show all coins')}</Text>
+        <Ionicons name="chevron-down" size={17} color="#ffb000" />
+      </TouchableOpacity>}
+    </View>}
+
+    {network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+        <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 16, fontWeight: '700', flexShrink: 1 }}>{t('Amount (optional)')}</Text>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          {(['EUR', 'SAT'] as const).map(currency => <TouchableOpacity
+            key={currency}
+            onPress={() => { changeAmount(''); setIsEur(currency === 'EUR'); lastInvoiceAttempt.current = null; }}
+            accessibilityRole="radio"
+            accessibilityLabel={currency === 'EUR' ? t('Euro') : t('Sats')}
+            accessibilityState={{ checked: isEur ? currency === 'EUR' : currency === 'SAT' }}
+            style={{ minHeight: 44, minWidth: 48, paddingHorizontal: 9, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: (isEur ? currency === 'EUR' : currency === 'SAT') ? adaptColor('#30302a', 'backgroundColor') : 'transparent' }}
+          ><Text style={{ color: adaptColor((isEur ? currency === 'EUR' : currency === 'SAT') ? '#ffb000' : '#a9a9b1', 'color'), fontWeight: '700', fontSize: 14 }}>
+            {currency === 'EUR' ? '€' : 'SAT'}
+          </Text></TouchableOpacity>)}
         </View>
-      )}
-      <View style={network === 'hedera' ? styles.card : { gap: 16 }}>
-        {!networkSelected ? (
-          <>
-            <View style={styles.receiveNetworkRow}>
-              {receiveNetworks.filter(item => item.network === 'lightning').map(renderNetwork)}
-            </View>
-            <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} disabled={loading}>
-              <View style={styles.receiveNetworkRow}>{receiveNetworks.filter(item => item.network !== 'lightning').map(renderNetwork)}</View>
-            </AdvancedOptions>
-          </>
-        ) : (
-          <>
-            {network === 'hedera' && <View style={styles.selectedAssetRow}>
-              <AssetIcon asset={selectedReceiveNetwork.asset} size={38} />
-              <View style={styles.selectedAssetCopy}>
-                <Text style={styles.selectedAssetTitle}>{selectedReceivePresentation.name}</Text>
-                <Text style={styles.selectedAssetMeta}>{selectedReceivePresentation.networkBadge}</Text>
-              </View>
-
-            </View>}
-
-        {network === 'lightning' && !invoice && (
-          <>
-            <Text style={styles.label}>{t("Amount")}</Text>
-            <TextInput
-              style={[bitcoinStyles.input, { fontSize: 38, textAlign: 'center', marginVertical: 16 }]}
-              value={amountInput}
-              onChangeText={setAmountInput}
-              keyboardType="decimal-pad"
-              placeholder={isEur ? '0.00 EUR' : t('Satoshis')}
-              placeholderTextColor="#666"
-            />
-            {draftSats > 0 && <BitcoinMoney amount={draftSats} />}
-            <View style={styles.row}>
-              {(['EUR', 'SAT'] as const).map(currency => {
-                const selected = isEur ? currency === 'EUR' : currency === 'SAT';
-                return (
-                  <TouchableOpacity
-                    key={currency}
-                    style={[styles.selector, { flexDirection: 'row', justifyContent: 'center', gap: 8, minHeight: 48 }, selected && styles.selectorActive]}
-                    onPress={() => { setAmountInput(''); setIsEur(currency === 'EUR'); }}
-                    accessibilityRole="radio"
-                    accessibilityLabel={currency}
-                    accessibilityState={{ checked: selected }}
-                  >
-                    <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                      {currency === 'SAT' ? <AssetIcon asset="bitcoin" size={22} />
-                        : <Text style={{ fontSize: 23, lineHeight: 26, color: selected ? '#ffb000' : '#8f8f9d' }}>€</Text>}
-                    </View>
-                    <Text style={[styles.selectorText, selected && styles.selectorTextActive]}>{currency}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {isEur && (!(rates.btcToEur > 0) || Date.now() - rates.updatedAt > 300_000) && <Text style={bitcoinStyles.warning}>{t('The exchange rate is unavailable or outdated. You can enter an amount in SAT.')}</Text>}
-            <TouchableOpacity style={styles.button} onPress={() => void generateInvoice()} disabled={loading || !walletReady}>
-              {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Create request")}</Text>}
-            </TouchableOpacity>
-          </>
-        )}
-
-        {network === 'hedera' && (
-          <>
-            {hederaLookupError ? (
-              <Text style={styles.errorText}>
-                {t("Account verification unavailable:")} {t(hederaLookupError)} {t("Retrying automatically. If you already deposited, wait for verification before sending again.")}</Text>
-            ) : hederaMissing && hederaPublicKey ? (
-              <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} />
-            ) : !hederaReady ? (
-              <ActivityIndicator color="#ffb000" />
-            ) : hederaAccount ? (
-              <>
-                <Text style={styles.label}>{t("Your HBAR account")}</Text>
-                <TouchableOpacity
-                  style={styles.proofBox}
-                  onPress={() => void copy(hederaAccount.accountId)}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("Copy Hedera account ID")}
-                >
-                  <Text style={styles.accountDisplay}>{compactWalletIdentifier(hederaAccount.accountId)}</Text>
-                  <View style={styles.copyHint}>
-                    <Ionicons name="copy-outline" size={15} color="#8f8f9d" />
-                    <Text style={styles.copyHintText}>{t("Tap to copy")}</Text>
-                  </View>
-                </TouchableOpacity>
-                {!hederaRequest && (
-                  <>
-                    <Text style={styles.label}>{t("Amount (optional)")}</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={amountInput}
-                      onChangeText={setAmountInput}
-                      keyboardType="decimal-pad"
-                      placeholder={t("Leave empty for an open request")}
-                      placeholderTextColor="#666"
-                    />
-                    <TouchableOpacity style={styles.button} onPress={() => void prepareHederaRequest()} disabled={loading}>
-                      {loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Create payment QR")}</Text>}
-                    </TouchableOpacity>
-                  </>
-                )}
-              </>
-            ) : (
-              <Text style={styles.errorText}>{t('No {network} account was found.', { network: HEDERA_NETWORK_LABEL })}</Text>
-            )}
-          </>
-        )}
-
-        {network === 'lightning' && invoice && (
-          <View accessibilityLiveRegion="polite">
-            <BitcoinMoney amount={invoiceAmountSats} hero />
-            <Text style={bitcoinStyles.note}>{t('Lightning request. For the Bitcoin network, share the separate Bitcoin address below.')}</Text>
-            {!!invoiceExpiresAt && <Text style={bitcoinStyles.note}>{t('Request expires')}: {new Date(invoiceExpiresAt).toLocaleString()}</Text>}
-            <Text style={[styles.subtitle, styles.centerText]}>{t(
-              receiveStatus === 'offline' ? 'Connection interrupted. Your request is saved; checking again automatically.' :
-              receiveStatus === 'processing' ? 'Payment is processing. Waiting for confirmation.' :
-              receiveStatus === 'failed' ? 'This request could not be completed. Check activity before requesting again.' :
-              invoiceExpired ? 'This request has expired. Any payment already sent is still being checked.' :
-              receiveStatus === 'checking' ? 'Checking payment status…' : 'Waiting for payment…'
-            )}</Text>
-            {(invoiceExpired || receiveStatus === 'failed') && (
-              <TouchableOpacity style={styles.button} onPress={() => void clearAndReset().catch(() => Alert.alert(t('Please try again.')))}>
-                <Text style={styles.buttonText}>{t('Create a new request')}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {qrValue && (
-          <View style={styles.qrSection}>
-            <View style={styles.qrCard}>
-              <QRCode value={qrValue} size={210} />
-            </View>
-            {network === 'hedera' && (
-              <Text style={[styles.subtitle, styles.centerText]}>
-                {t("Works with HashPack and other Hedera wallets. Confirm the amount in the sending wallet.")}</Text>
-            )}
-            <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => void copy(qrValue)}>
-              <View style={styles.buttonContent}>
-                <Ionicons name="copy-outline" size={18} color="#fff" />
-                <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                  {network === 'hedera' ? t('Copy account ID') : t('Copy payment link')}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            {network === 'lightning' && <BitcoinButton label={t('Share request')} onPress={() => void Share.share({ message: qrValue }).catch(() => Alert.alert(t('Please try again.')))} />}
-          </View>
-        )}
-
-          </>
-        )}
       </View>
-      {network === 'lightning' && <View style={{ gap: 16, marginTop: 24 }}>
-        <BitcoinButton label={t('Show Bitcoin address')} secondary onPress={() => setShowBitcoinAddress(true)} disabled={loading} />
-        <Text style={bitcoinStyles.footnote}>{t('For example, to withdraw Bitcoin from an exchange.')}</Text>
-        <BitcoinInfo />
+      <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: adaptColor('#46464c', 'borderColor'), borderRadius: 14, minHeight: 56, paddingHorizontal: 14 }}>
+        <TextInput
+          value={amountInput}
+          onChangeText={changeAmount}
+          editable={restoreComplete}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor={adaptColor('#696971', 'color')}
+          accessibilityLabel={t('Amount (optional)')}
+          style={{ color: adaptColor('#fff', 'color'), fontSize: 26, fontWeight: '700', flex: 1, paddingVertical: 6 }}
+        />
+        <Text style={{ color: '#ffb000', fontSize: 19, fontWeight: '700' }}>{isEur ? '€' : 'SAT'}</Text>
+      </View>
+      {requestError && <Text style={{ color: adaptColor('#ffab97', 'color'), fontSize: 13, marginTop: 8 }}>{requestError}</Text>}
+    </View>}
+
+    <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
+      {qrValue ? <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 22, overflow: 'hidden' }}>
+        <StableQRCode value={qrValue} size={qrSize} focused={isFocused} onReady={onQrReady} />
+      </View> : <View style={{ width: qrSize + 44, height: qrSize + 44, borderRadius: 24, backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+        {loading || onchainLoading || (!hederaReady && network === 'hedera') || (!restoreComplete && network === 'lightning')
+          ? <ActivityIndicator color="#ffb000" size="large" />
+          : <Ionicons name="qr-code-outline" size={40} color="#686871" />}
+        <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', marginTop: 12 }}>
+          {(network === 'lightning' ? requestError : network === 'onchain' ? onchainError : hederaLookupError) || t('Preparing payment code…')}
+        </Text>
       </View>}
-      {networkSelected && network === 'lightning' && !invoice && <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} disabled={loading}>
-        <View style={styles.receiveNetworkRow}>{receiveNetworks.filter(item => item.network !== 'lightning').map(renderNetwork)}</View>
-      </AdvancedOptions>}
-    </ScrollView>
-  );
+    </View>
+
+    {network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
+      onPress={() => {
+        setNetworkPickerOpen(false);
+        setAmountEditorOpen(true);
+        // The editor sits above the QR so a later keyboard never covers the amount.
+        setTimeout(() => receiveScrollRef.current?.scrollTo({ y: 0, animated: true }), 0);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={amountLabel ? t('Change amount') : t('Add amount')}
+      style={{ alignSelf: 'center', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, paddingHorizontal: 12 }}
+    >
+      <Ionicons name={amountLabel ? 'pencil-outline' : 'add'} size={19} color="#ffb000" />
+      <Text style={{ color: adaptColor('#ffb000', 'color'), fontSize: 15, fontWeight: '700' }}>
+        {amountLabel ? `${amountLabel} · ${t('Change')}` : t('Add amount')}
+      </Text>
+    </TouchableOpacity>}
+
+    {network === 'lightning' && qrValue && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, marginBottom: 12 }}>
+      {t(receiveStatus === 'offline' ? 'Connection interrupted. Your request is saved; checking again automatically.' :
+        receiveStatus === 'processing' ? 'Payment is processing. Waiting for confirmation.' : 'Show this code to receive Bitcoin.')}
+    </Text>}
+    {network === 'onchain' && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+      {t('Bitcoin deposits require network confirmation and a claim fee before the balance is available.')}
+    </Text>}
+    {network === 'hedera' && (hederaMissing && hederaPublicKey ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} /> :
+      <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+        {hederaLookupError ? t('Account verification unavailable:') + ' ' + t(hederaLookupError) :
+          t('HashPack scans the account ID. Enter the amount in the sending wallet.')}
+      </Text>)}
+
+    {qrValue && <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
+      <TouchableOpacity onPress={() => void copy(displayValue || qrValue)} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
+        <Ionicons name="copy-outline" size={18} color="#ffb000" /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Copy')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => void Share.share({ message: qrValue }).catch(() => Alert.alert(t('Please try again.')))} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
+        <Ionicons name="share-outline" size={18} color="#ffb000" /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Share')}</Text>
+      </TouchableOpacity>
+    </View>}
+    {requestError && network === 'lightning' && <BitcoinButton label={t('Try again')} secondary onPress={() => { lastInvoiceAttempt.current = null; setRequestError(null); setRetryVersion(value => value + 1); }} />}
+    {onchainError && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => setOnchainError(null)} />}
+    {network === 'onchain' && <BitcoinButton label={t('Incoming Bitcoin')} secondary onPress={() => setShowDepositDetails(true)} />}
+
+  </ScrollView>;
 }

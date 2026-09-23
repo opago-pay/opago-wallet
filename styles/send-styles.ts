@@ -1,6 +1,7 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { StyleSheet } from 'react-native';
 
-export const sendStyles = StyleSheet.create({
+export const sendStyles = adaptiveStyles(StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0c',
@@ -374,4 +375,4 @@ export const sendStyles = StyleSheet.create({
   },
   cameraCloseText: { color: '#fff', fontWeight: '700' },
   errorText: { color: '#ff6666', marginTop: 12, textAlign: 'center' },
-});
+}));

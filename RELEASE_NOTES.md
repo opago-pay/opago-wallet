@@ -1,6 +1,64 @@
 # Opago Wallet release notes
 
-Latest internal wallet update: 22 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
+Latest internal wallet update: 23 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
+
+## Live Receive QR and network switch — 23 September 2026
+
+Receive opens on Lightning and creates an open-amount QR automatically. Entering SAT or EUR replaces it after a short pause with an invoice for exactly the new amount; the old QR disappears immediately so it cannot be scanned with the wrong value. Expired requests are renewed while older requests remain tracked. Verified payments to open invoices are recorded with their actual received amount, including after restart. Bitcoin switches to a watched on-chain deposit address and updates its BIP21 QR when the amount changes. HBAR remains under Advanced options; its HashPack-compatible QR contains the account ID, so the payer must enter the optional amount in the sending wallet. Existing on-chain claim details and backup requirements remain accessible.
+
+435 app tests, TypeScript, lint, production-profile validation, native release unit tests, bundle/source verification and APK-v2 signature passed. Installed on Android …8690 on 23 September at 11:01:52 MESZ; APK SHA-256 `d944fcae791646dcbcbb3f4e70a4dbf0cb47b2c46147a2f19dfca0b902afe29a` matches the installed artifact. Locked launch had no observed startup errors. Owner testing of actual Lightning, on-chain and HBAR scanning/payment remains open. Evidence: `.codex-local-evidence/receive-live-qr-{android-build.log,source-hashes.json,device-update.json}` and `receive-suite-final.log`.
+
+## Larger Security shortcut — 23 September 2026
+
+Home's Security shortcut now has a visible 64×64 circular button instead of a transparent 48×48 target, with a 34-point gear instead of 27 points. It includes extra hit tolerance, a pressed background and Android ripple; the icon shares its parent touch target. The existing accessible Security label, navigation and wallet activity tracking remain. TypeScript, changed-file lint and 31 existing UI/history/interaction tests passed. Owner touch acceptance remains pending.
+
+Installed on Android …8690 on 23 September at 10:35:17 MESZ. SHA-256 `507e4744323daae078f9fb8015a79585f43b948d0e5de83e10f2554da70d154d` matches the installed APK. Release/native checks, APK-v2 signature and 92 bundled source modules verified. Locked launch completed without observed startup errors; original installation preserved. Evidence: `.codex-local-evidence/settings-target-{tests.log,android-build.log,source-hashes.json,device-update.json}`.
+
+## Load history in small pages — 23 September 2026
+
+The previous “Load earlier” control only revealed prefetched rows: opening Home history requested up to 500 Spark transfers and ran payment reconciliation inside an eight-second combined refresh. Local rows could appear while the spinner still waited for those jobs, followed by a generic partial-history error. The owner confirmed the touch fix, but reported this loading/error behavior.
+
+Home now starts with up to ten merged payments. Bitcoin display history requests a single ten-record Spark page, respecting the provider's continuation/end marker. HBAR uses ten-record timestamp pages for both supported transfer types, and SQLite uses ten-row keyset pages. Small local payment journals supply saved state without performing network reconciliation. A chronological merge deduplicates records and withholds older rows beyond an unread source boundary; filtered internal transfers can produce fewer than ten visible payments, with older pages available through the footer. Pages are fetched only by explicit initial/refresh/retry/load-earlier actions, without a loop that downloads the entire history. The previous 500-display-entry ceiling no longer limits manual paging.
+
+The initial page is published when its bounded source reads finish, at the same time its loading indicator ends. Further loading uses the footer indicator. Failed sources preserve existing rows, identify the unavailable history in the selected language, and retry their same cursor without refetching successful sources. Empty results with an unavailable source are not presented as “No payments yet.” Late timed-out responses cannot silently update the page. The existing separate Lightning/on-chain recovery remains intact; HBAR recovery runs independently after the page is published and cannot turn a loaded page into a refresh failure. Confirmed updates continue to invalidate cached history.
+
+430 automated app tests, TypeScript and changed-file lint passed. Tests cover the Home 10/20/25-entry flow, source continuation/end markers, interleaved Bitcoin/HBAR ordering, duplicate taps/rows, filtered records, timeout/late-response isolation, same-cursor retries, HBAR timestamp paging and a bounded SQLite keyset query. Actual network responsiveness remains for owner acceptance; no agent-operated wallet interaction, payment or payment timing capture.
+
+Installed on Android …8690 on 23 September at 10:25:48 MESZ. SHA-256 `0bf72b2e3d6a0fe15a8e45ee452e71e55ba96479146d76411add0d1014c688bd` matches the installed APK. Native/release checks, APK-v2 signature and 92 bundled source modules verified. Original installation preserved; locked launch completed without observed startup errors. Evidence: `.codex-local-evidence/history-pages-{tests.log,android-build.log,source-hashes.json,device-update.json}`.
+
+## History touch control — 23 September 2026
+
+The owner reports that the preceding history update still barely responds to taps on either the text or arrow. Its installation was confirmed on Android …8690. History now has one full-width pressable card with an 80-point minimum height, a larger chevron area, extra hit tolerance, Android ripple and a pressed background. Its label/content no longer shrinks when expanded; decorative children share the parent's touch target. A loading indicator remains visible inside the button while the requested history loads. Home preserves handled taps instead of consuming them only to dismiss a previously focused keyboard.
+
+The toggle requests the action shown by the current render, so repeated activations before the next render cannot invert the pending update back to its starting state. A regression test covers repeated opening and closing, and the pressable retains wallet activity tracking for touch and accessibility activation. Lazy history reads and the previous caching fixes are preserved. These changes address specific interaction weaknesses; the reported device-level responsiveness still needs owner confirmation.
+
+421 automated app tests, TypeScript and changed-file lint passed. No agent-operated wallet interaction or payment, and no payment timing capture.
+
+Installed on Android …8690 on 23 September at 10:08:02 MESZ. SHA-256 `325d92c78ecd7d6753e96d5902dd21a387f6a2d51f720d3e8cf68fb9805fdacd` matches the installed APK. Native/release checks, APK-v2 signature and 90 bundled source modules verified; original installation preserved. Locked launch completed without observed startup errors. Evidence: `.codex-local-evidence/history-touch-{tests.log,android-build.log,source-hashes.json,device-update.json}`.
+
+## Home balance labels and responsive history — 23 September 2026
+
+Home shows “Balance” instead of “Bitcoin balance” and removes the small valuation footnote. The HBAR Mainnet badge is hidden on Home; development-network badges and loading/stale/error states remain. The displayed balance calculation is unchanged.
+
+Refreshing an already visible total keeps the amount and “Balance” label, with a small muted spinner next to the amount. An unknown balance still uses a placeholder; errors and unavailable rates remain explicit. A refresh of a known Bitcoin balance no longer closes/reopens the readiness gate for optional data and pending-payment watchers. HBAR disclosure shares in-flight reads and reuses successful data for the current Home visit; pull-to-refresh, returning to Home and retrying a failed read still fetch fresh data. Payment authorization uses its existing independent fresh-balance checks.
+
+History disclosure no longer invalidates the focus lifecycle or starts duplicate source queries. Repeated opening within the same Home visit shares an in-flight refresh or reuses successfully loaded data. Returning to Home and explicit pull-to-refresh still refresh the history; late responses after leaving the screen are discarded. Rows and the date formatter are reused, and the previously opened list remains mounted but hidden from both layout and accessibility when collapsed. The history remains initially collapsed and lazy, with its larger paging button at the bottom.
+
+Confirmed payment-status changes explicitly invalidate cached history and refresh it when visible, without relying on the former readiness-toggle side effect. If collapsed, the updated history loads on the next opening.
+
+420 automated app tests, TypeScript and changed-file lint passed. Regression tests exercise rapid history/HBAR toggles during and after loading, explicit refresh, readiness stability, HBAR error retry, payment-settlement invalidation and late responses after leaving Home. Actual device responsiveness remains for owner acceptance; no payment timing capture or agent-operated payment.
+
+Installed on Android …8690 on 23 September at 00:34:37 MESZ. SHA-256 `f2e676ee11e417717bdfa86c2d6340e79ff257e57ddef03fdba5de84da2b70cd` matches the installed APK. Release/native checks, APK-v2 signature and 89 bundled source modules verified. The update preserved the original installation, and locked launch completed without observed startup errors. Evidence: `.codex-local-evidence/home-history-{tests.log,android-build.log,source-hashes.json,device-update.json}`.
+
+## Home navigation and history footer — 23 September 2026
+
+The Home header now opens Security through a settings icon. The bottom navigation is removed; Send and Receive remain available through Home's existing actions. Security and Receive have accessible close buttons leading back to Home, including the receive backup gate. Existing nested payment back/cancel controls and authorization guards are preserved. Scroll content accounts for the bottom safe area.
+
+“Load earlier” is now a full-width, 56-point-minimum button below the last visible transaction. It reveals the next 20 existing history entries, retaining the current lazy history loading and 500-entry limit. No payment preparation or sending optimizations were changed.
+
+413 existing app tests, TypeScript and changed-file lint passed. Native visual/navigation acceptance remains for the owner; no agent-operated wallet interaction or payment. Send timing is disabled in this UI build.
+
+Installed on Android …8690 on 23 September at 00:03:17 MESZ. SHA-256 `87cb3106f39264ce3e324d7dd1e1736766ec2a4398e47da1abf9cd1e310f5698` matches the installed APK. Release/native checks, APK-v2 signature and 89 bundled source modules verified; removed tab-bar components are absent from the bundle. First installation preserved and locked launch completed without observed startup errors. Evidence: `.codex-local-evidence/home-navigation-{tests.log,android-build.log,source-hashes.json,device-update.json}`.
 
 ## Overlap independent Lightning preparation — 22 September 2026
 

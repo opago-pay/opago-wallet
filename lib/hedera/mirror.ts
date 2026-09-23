@@ -59,7 +59,7 @@ function preserveExactIntegers(rawJson: string): string {
 
 function mirrorErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== 'object') return fallback;
-  const status = (body as { _status?: { messages?: Array<{ message?: unknown }> } })._status;
+  const status = (body as { _status?: { messages?: { message?: unknown }[] } })._status;
   const message = status?.messages?.find(item => typeof item.message === 'string')?.message;
   return typeof message === 'string' ? message : fallback;
 }
@@ -148,7 +148,10 @@ export async function getMirrorAccountById(
 export async function listMirrorTransactions(
   rawAccountId: string,
   limit = 25,
+  before?: string,
+  requireAllTypes = false,
 ): Promise<MirrorTransactionRecord[]> {
+  if (before !== undefined && !/^\d+\.\d{1,9}$/.test(before)) throw new Error('Invalid history timestamp.');
   const accountId = parseHederaAccountId(rawAccountId);
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
   const results = await Promise.allSettled(
@@ -158,6 +161,7 @@ export async function listMirrorTransactions(
       url.searchParams.set('transactiontype', transactionType);
       url.searchParams.set('limit', String(safeLimit));
       url.searchParams.set('order', 'desc');
+      if (before) url.searchParams.set('timestamp', 'lt:' + before);
       const response = await fetchMirrorJson<MirrorTransactionsResponse>(
         url,
         HEDERA_NETWORK_LABEL + ' ' + transactionType.toLowerCase() + ' history',
@@ -169,7 +173,7 @@ export async function listMirrorTransactions(
     .filter((result): result is PromiseFulfilledResult<MirrorTransactionRecord[]> =>
       result.status === 'fulfilled')
     .map(result => result.value);
-  if (responses.length === 0) {
+  if (responses.length === 0 || (requireAllTypes && responses.length !== results.length)) {
     const failure = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
     throw failure.reason;
   }

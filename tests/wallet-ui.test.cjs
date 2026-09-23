@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -56,14 +57,14 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   assert.match(icon, /props\.asset === 'hedera'/);
   assert.match(icon, /hedera-logo\.png/);
   assert.doesNotMatch(icon, /\\u210f/);
-  for (const asset of ['lightning', 'hedera']) {
-    assert.match(portfolio, new RegExp(`asset="${asset}"`));
-  }
+  assert.match(portfolio, /asset="hedera"/);
+  assert.doesNotMatch(portfolio, /asset="lightning"/);
+  assert.match(portfolio, /walletAssetKeyFromSymbol\(transaction\.asset\)/);
   assert.doesNotMatch(portfolio, /HBAR payments are live/);
   assert.doesNotMatch(portfolio, /Your HBAR is live/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
-  assert.match(receive, /<AssetIcon asset=\{item\.asset\}/);
+  assert.match(receive, /<AssetIcon asset="hedera"/);
   assert.doesNotMatch(portfolio, /assetDot/);
 });
 
@@ -117,7 +118,8 @@ test('shows a clearly labelled estimate for development-network balances', () =>
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
   assert.doesNotMatch(portfolio, /Not valued/);
   assert.match(portfolio, /<NetworkBadge label=\{presentation\.networkBadge\}/);
-  assert.match(portfolio, /Demo balance based on current market prices/);
+  assert.match(portfolio, /if \(!label\.trim\(\) \|\| label === 'MAINNET'\) return null/);
+  assert.doesNotMatch(portfolio, /Demo balance based on current market prices|Based on current market prices/);
 });
 
 test('uses graphical confirmation states instead of prototype OK text', () => {
@@ -148,9 +150,9 @@ test('keeps send and request focused on the first consumer decision', () => {
   assert.match(send, /Scan to pay/);
   assert.match(send, /or enter a payment request/);
   assert.match(send, /sourceSelected/);
-  assert.match(receive, /Receive \{asset\}/);
-  assert.match(receive, /useState\(true\)/);
-  assert.match(receive, /Create request/);
+  assert.match(receive, /Receive Bitcoin/);
+  assert.match(receive, /createLightningInvoice/);
+  assert.match(receive, /<StableQRCode value=\{qrValue\}/);
   assert.doesNotMatch(receive, />Invoice amount</);
   assert.doesNotMatch(receive, />Create 10-minute invoice</);
 });

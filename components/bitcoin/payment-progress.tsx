@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,7 +50,7 @@ export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amou
   </BitcoinSendScreen>;
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   content: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 32, paddingVertical: 32 },
   hero: { width: 224, height: 224, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', width: 224, height: 224, borderRadius: 112, backgroundColor: '#ffb00008', borderWidth: 1, borderColor: '#ffb0000e' },
@@ -62,4 +63,4 @@ const styles = StyleSheet.create({
   heading: { color: '#fafaf7', fontSize: 27, fontWeight: '600', textAlign: 'center', letterSpacing: -0.5 },
   amount: { color: '#fafaf7', fontSize: 38, fontWeight: '600', textAlign: 'center', fontVariant: ['tabular-nums'] },
   note: { color: '#a6a6ad', fontSize: 15, lineHeight: 22, textAlign: 'center' },
-});
+}));

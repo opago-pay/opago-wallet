@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addTransaction } from '../database';
-import { resolveLightningReceive, type SparkReceiveWalletLike } from '../lightning/receive-status';
+import { resolveLightningReceiveOutcome, type SparkReceiveWalletLike } from '../lightning/receive-status';
 import type { StoredLightningReceiveRequest } from '../lightning/receive-store';
 import { sats } from './amount';
 
@@ -20,7 +20,7 @@ async function read(): Promise<TrackedBitcoinRequest[]> {
   const records = JSON.parse(raw);
   if (!Array.isArray(records)) throw new Error('Bitcoin request storage is unavailable.');
   for (const row of records) {
-    if (!row.scope || !row.requestId || !/^[a-f\d]{64}$/.test(row.paymentHash) || sats(row.amountSats) <= 0 || !['waiting', 'confirmed'].includes(row.state)) {
+    if (!row.scope || !row.requestId || !/^[a-f\d]{64}$/.test(row.paymentHash) || sats(row.amountSats) < 0 || !['waiting', 'confirmed'].includes(row.state)) {
       throw new Error('Bitcoin request storage is unavailable.');
     }
   }
@@ -54,9 +54,10 @@ export async function reconcileArchivedBitcoinRequests(wallet: SparkReceiveWalle
   let confirmed = 0;
   for (const record of batch) {
     assertCurrent();
-    const status = await resolveLightningReceive(wallet, record);
+    const outcome = await resolveLightningReceiveOutcome(wallet, record);
     assertCurrent();
-    if (status !== 'confirmed') continue;
+    if (outcome.state !== 'confirmed' || !outcome.amountSats) continue;
+    const confirmedAmount = outcome.amountSats;
     await exclusive(async () => {
       if (epoch !== generation) return;
       assertCurrent();
@@ -65,8 +66,9 @@ export async function reconcileArchivedBitcoinRequests(wallet: SparkReceiveWalle
       const current = records.find(row => row.scope === scope && row.paymentHash === record.paymentHash);
       if (!current || current.state === 'confirmed') return;
       // Activity and archive can be replayed: payment hash is the unique key.
-      await addTransaction('incoming', current.amountSats, 'SAT', { txId: `ln:${current.paymentHash}`, reference: current.requestId, status: 'confirmed' });
+      await addTransaction('incoming', confirmedAmount, 'SAT', { txId: `ln:${current.paymentHash}`, reference: current.requestId, status: 'confirmed' });
       assertCurrent();
+      current.amountSats = confirmedAmount;
       current.state = 'confirmed';
       await AsyncStorage.setItem(KEY, JSON.stringify(records));
       confirmed += 1;

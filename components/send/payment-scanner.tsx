@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextInput, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColorMode } from '@/hooks/useColorMode';
 import { t } from '@/lib/i18n';
 import { scannerPermission } from '@/lib/scanner-permission';
 import { hasBackCameraTorch } from '@/lib/camera-capabilities';
@@ -18,9 +19,11 @@ import { walletSession } from '@/lib/wallet-session';
 import { ScannerSheet } from './scanner-sheet';
 import { ScannerShade, ScannerSuccessBackground } from './scanner-success-background';
 import { scannerStyles as styles } from './scanner-styles';
+import { measurePerformance } from '@/lib/performance-trace';
 
 export function PaymentScanner(props: { onDetected(value: string): void; onCancel(): void }) {
   useLanguage();
+  useColorMode();
   const insets = useSafeAreaInsets();
   const { width, height, fontScale } = useWindowDimensions();
   const focused = useIsFocused();
@@ -53,7 +56,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     setPermissionBusy(true);
     setCameraError('');
     try {
-      const result = await scannerPermission(Camera, request);
+      const result = await measurePerformance('scanner.permission', () => scannerPermission(Camera, request));
       if (mounted.current) setPermission(result);
     } catch {
       if (mounted.current) setCameraError('Could not open the camera. Please try again.');
@@ -114,7 +117,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
   async function recognize(value: string, ticket: number, assertSession: () => void) {
     const current = () => mounted.current && visible.current && generation.current === ticket;
     try {
-      const result = await recognizePayment(value);
+      const result = await measurePerformance('scanner.recognize', () => recognizePayment(value));
       if (!current()) return;
       assertSession();
       mode.current = 'leaving';
@@ -146,7 +149,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     const ticket = ++generation.current;
     try {
       const assertSession = walletSession.capture();
-      const value = await Clipboard.getStringAsync();
+      const value = await measurePerformance('scanner.clipboard', () => Clipboard.getStringAsync());
       if (!mounted.current || !visible.current || generation.current !== ticket) return;
       assertSession();
       if (!value.trim()) { showError('Your clipboard is empty.'); return; }
@@ -185,18 +188,18 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     <ScrollView style={styles.screenContent} contentContainerStyle={[styles.page, { paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 20) }]}
       importantForAccessibility={modal ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={modal}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('Send Bitcoin')}</Text>
+        <Text style={[styles.title, { color: '#f9f9fa' }]}>{t('Send Bitcoin')}</Text>
         <TouchableOpacity style={styles.circle} accessibilityRole="button" accessibilityLabel={t('Close scanner')} onPress={close}>
           <Ionicons name="close" size={22} color="#f9f9fa" />
         </TouchableOpacity>
       </View>
-      <Text style={styles.prompt}>{t('Hold the QR code inside the frame.')}</Text>
+      <Text style={[styles.prompt, { color: '#d0cfd1' }]}>{t('Hold the QR code inside the frame.')}</Text>
       <View style={styles.stage}>
         {cameraReady || recognized || manual ? <>
           <View style={{ width: finderSize, height: finderSize }} accessible={!!recognized} accessibilityLabel={recognized ? t('Code recognized') : undefined}>
             {(recognized || checking || error) && <View style={styles.finderStatus}>
-              {recognized ? <><View style={styles.check}><Ionicons name="checkmark" size={25} color="#0a251b" /></View><Text style={styles.foundText}>{t('Code recognized')}</Text></>
-                : checking ? <><ActivityIndicator color="#ffb000" /><Text style={styles.foundText}>{t('Checking code…')}</Text></>
+              {recognized ? <><View style={styles.check}><Ionicons name="checkmark" size={25} color="#0a251b" /></View><Text style={[styles.foundText, { color: '#fff' }]}>{t('Code recognized')}</Text></>
+                : checking ? <><ActivityIndicator color="#ffb000" /><Text style={[styles.foundText, { color: '#fff' }]}>{t('Checking code…')}</Text></>
                   : <Ionicons name="scan-outline" size={36} color="#ffc1ac" />}
             </View>}
             {[styles.topLeft, styles.topRight, styles.bottomLeft, styles.bottomRight].map((corner, i) =>
@@ -208,30 +211,30 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
             <Ionicons name={torch ? 'flashlight' : 'flashlight-outline'} size={21} color={torch ? '#171108' : '#fff'} />
           </TouchableOpacity>}
         </> : <View style={styles.cameraMessage}>
-          {permissionBusy || (!permission && !cameraError) ? <><ActivityIndicator color="#ffb000" /><Text style={styles.message}>{t('Opening camera…')}</Text></>
-            : <><Ionicons name="camera-outline" size={38} color="#ffb000" /><Text style={styles.message}>{t(cameraError || 'Allow camera access to scan a payment QR code.')}</Text>
+          {permissionBusy || (!permission && !cameraError) ? <><ActivityIndicator color="#ffb000" /><Text style={[styles.message, { color: '#d4d4da' }]}>{t('Opening camera…')}</Text></>
+            : <><Ionicons name="camera-outline" size={38} color="#ffb000" /><Text style={[styles.message, { color: '#d4d4da' }]}>{t(cameraError || 'Allow camera access to scan a payment QR code.')}</Text>
               {Platform.OS !== 'web' && <TouchableOpacity style={styles.permissionButton} accessibilityRole="button" onPress={() => {
                 if (permission && !permission.granted && !permission.canAskAgain) void Linking.openSettings().catch(() => setCameraError('Open your device settings to allow camera access for Opago.'));
                 else void checkPermission(true);
               }}><Text style={styles.permissionText}>{t(permission?.granted ? 'Try again' : permission?.canAskAgain === false ? 'Open device settings' : 'Allow camera')}</Text></TouchableOpacity>}
             </>}
         </View>}
-        {!!error && !manual && <View style={styles.errorBox}><Text style={styles.error} accessibilityRole="alert">{t(error)}</Text>
-          <TouchableOpacity style={styles.secondary} accessibilityRole="button" onPress={resume}><Text style={styles.secondaryText}>{t('Scan again')}</Text></TouchableOpacity></View>}
+        {!!error && !manual && <View style={styles.errorBox}><Text style={[styles.error, { color: '#ffc1ac' }]} accessibilityRole="alert">{t(error)}</Text>
+          <TouchableOpacity style={styles.secondary} accessibilityRole="button" onPress={resume}><Text style={[styles.secondaryText, { color: '#ceced4' }]}>{t('Scan again')}</Text></TouchableOpacity></View>}
       </View>
       <View style={styles.bottom}>
         <View style={[styles.dock, fontScale > 1.5 && styles.dockStack]}>
           <TouchableOpacity style={styles.dockButton} accessibilityRole="button" accessibilityLabel={t('Paste from clipboard')}
             disabled={checking} onPress={() => void paste()}>
             {checking ? <ActivityIndicator color="#ffb000" /> : <Ionicons name="clipboard-outline" size={19} color="#ffb000" />}
-            <Text style={styles.dockText}>{t('Paste')}</Text>
+            <Text style={[styles.dockText, { color: '#f7f7f7' }]}>{t('Paste')}</Text>
           </TouchableOpacity>
           <View style={fontScale > 1.5 ? styles.dividerHorizontal : styles.divider} />
           <TouchableOpacity style={styles.dockButton} accessibilityRole="button" accessibilityLabel={t('Enter address')} onPress={enterManually}>
-            <Ionicons name="create-outline" size={19} color="#eeeef1" /><Text style={styles.dockText}>{t('Type')}</Text>
+            <Ionicons name="create-outline" size={19} color="#eeeef1" /><Text style={[styles.dockText, { color: '#f7f7f7' }]}>{t('Type')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.trust}>{t('You confirm every payment.')}</Text>
+        <Text style={[styles.trust, { color: '#b7b7c0' }]}>{t('You confirm every payment.')}</Text>
       </View>
     </ScrollView>
     </>}

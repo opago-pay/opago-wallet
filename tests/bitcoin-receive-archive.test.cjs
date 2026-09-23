@@ -10,7 +10,10 @@ function archiveFixture(memory = new Map()) {
   const dependencies = {
     '@react-native-async-storage/async-storage': { getItem: async key => memory.get(key) ?? null, setItem: async (key,value) => memory.set(key,value), removeItem: async key => memory.delete(key) },
     '../database': { addTransaction: async (direction,amount,asset,details) => activity.set(details.txId, { direction,amount,asset }) },
-    '../lightning/receive-status': { resolveLightningReceive: async (_,record) => { checked.push(record.requestId); return confirmed.has(record.requestId) ? 'confirmed' : 'waiting'; } },
+    '../lightning/receive-status': { resolveLightningReceiveOutcome: async (_,record) => {
+      checked.push(record.requestId);
+      return confirmed.has(record.requestId) ? { state: 'confirmed', amountSats: record.amountSats || 34 } : { state: 'waiting', amountSats: null };
+    } },
     './amount': require('../lib/bitcoin/amount.ts'),
   };
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname,'../lib/bitcoin/receive-archive.ts'),'utf8'),{
@@ -50,6 +53,13 @@ test('two actual receipts of the same amount remain two payments; the payment ha
   assert.equal(await f.reconcileArchivedBitcoinRequests({},'scope',()=>{}),2);
   assert.equal(f.activity.size,2);
   assert.equal(await f.reconcileArchivedBitcoinRequests({},'scope',()=>{}),0);
+});
+test('an open Lightning request records the verified amount actually received', async () => {
+  const f = archiveFixture();
+  await f.archiveBitcoinRequest('scope', { ...request(3), amountSats: 0 }, () => {});
+  f.pay(['request-3']);
+  assert.equal(await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {}), 1);
+  assert.equal(f.activity.get(`ln:${request(3).paymentHash}`).amount, 34);
 });
 test('bounded polling rotates through every old request and wallet removal erases tracking', async () => {
   const f=archiveFixture();

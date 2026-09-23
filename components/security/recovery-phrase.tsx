@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -27,10 +28,10 @@ export function ProtectedRecoveryPhrase({ phrase }: { phrase: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16, marginBottom: 16 },
   word: { width: '48%', flexGrow: 1, backgroundColor: '#202023', borderRadius: 12, padding: 12, minHeight: 76 },
   fullWidth: { width: '100%' },
   number: { color: '#aaaab0', fontSize: 13, marginBottom: 5 },
   value: { color: '#fff', fontSize: 20, fontWeight: '600' },
-});
+}));

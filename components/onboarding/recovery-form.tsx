@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -174,7 +175,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 },
   backButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#30342b', alignItems: 'center', justifyContent: 'center' },
   eyebrow: { color: '#9ca18f', fontSize: 10, fontWeight: '600', letterSpacing: 1.5 },
@@ -214,4 +215,4 @@ const styles = StyleSheet.create({
   reviewError: { color: '#ffab97', fontSize: 13, lineHeight: 20, marginBottom: 20 },
   privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 24 },
   privacyText: { color: '#929788', fontSize: 11 },
-});
+}));

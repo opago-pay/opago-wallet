@@ -6,6 +6,7 @@ import { TouchableOpacity, WalletActivityBoundary } from '@/components/ui/wallet
 import { t } from '@/lib/i18n';
 import { scannerStyles as styles } from './scanner-styles';
 import { modalKeyboardInset } from '@/lib/keyboard-inset';
+import { adaptColor } from '@/lib/theme-styles';
 
 export function ScannerSheet(props: { visible: boolean; onClose(): void; onShow?(): void; title: string; compact?: boolean; hideClose?: boolean; dismissDisabled?: boolean; footer?: ReactNode; children: ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -49,12 +50,12 @@ export function ScannerSheet(props: { visible: boolean; onClose(): void; onShow?
       onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}>
         <View style={[styles.sheet, { maxHeight: Math.max(1, viewportHeight - keyboardInset - insets.top - 12), paddingBottom: keyboardFrame ? 12 : Math.max(insets.bottom, 20) }]}
           accessibilityViewIsModal importantForAccessibility="yes">
-          <View style={styles.handle} accessible={false} />
+          <View style={[styles.handle, { backgroundColor: adaptColor('#505053', 'color') }]} accessible={false} />
           <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
             <View style={styles.sheetHeader}>
               <Text ref={title} accessibilityRole="header" style={props.compact ? styles.eyebrow : styles.sheetTitle}>{props.title}</Text>
-              {!props.compact && !props.hideClose && <TouchableOpacity style={styles.circle} accessibilityRole="button" accessibilityLabel={t('Close entry')} disabled={props.dismissDisabled} onPress={props.onClose}>
-                <Ionicons name="close" size={21} color="#eeeef1" />
+              {!props.compact && !props.hideClose && <TouchableOpacity style={[styles.circle, { backgroundColor: adaptColor('#252527', 'backgroundColor'), borderColor: adaptColor('#39393e', 'borderColor') }]} accessibilityRole="button" accessibilityLabel={t('Close entry')} disabled={props.dismissDisabled} onPress={props.onClose}>
+                <Ionicons name="close" size={21} color={adaptColor('#eeeef1', 'color')} />
               </TouchableOpacity>}
             </View>
             {props.children}

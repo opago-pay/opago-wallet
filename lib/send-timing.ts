@@ -18,12 +18,12 @@ let active: Trace | null = null;
 let sequence = 0;
 
 export function sendTimingEnabled(): boolean {
-  return process.env.EXPO_PUBLIC_SEND_TIMING === 'true';
+  return process.env.EXPO_PUBLIC_SEND_TIMING === 'true' || process.env.EXPO_PUBLIC_PERF_TRACE === 'true';
 }
 
 /** One explicit Send attempt; no arguments, wallet identifiers or errors are recorded. */
 export function beginSendTiming(): () => void {
-  if (!sendTimingEnabled() || active || sequence >= 1) return () => {};
+  if (!sendTimingEnabled() || active) return () => {};
   const trace: Trace = { run: ++sequence, started: performance.now(), spans: [], completed: false };
   active = trace;
   return () => {

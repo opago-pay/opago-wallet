@@ -33,7 +33,7 @@ export function normalizeLightningInput(value: string): string {
 export function decodeLightningInvoice(invoiceInput: string, options: { allowExpired?: boolean } = {}): LightningInvoiceDetails {
   const invoice = normalizeLightningInput(invoiceInput);
   if (!isBolt11Invoice(invoice)) throw new Error('The destination is not a valid BOLT11 invoice.');
-  const network = invoice.match(/^ln(bcrt|bc|tbs|tb|sb)(?=\d)/i)?.[1].toLowerCase();
+  const network = invoice.match(/^ln(bcrt|bc|tbs|tb|sb)(?=\d|1)/i)?.[1].toLowerCase();
   const isMainnetInvoice = network === 'bc';
   const isRegtestInvoice = network === 'bcrt';
   if (appConfig.isMainnet ? !isMainnetInvoice : !isRegtestInvoice) {

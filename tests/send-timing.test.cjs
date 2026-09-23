@@ -39,7 +39,7 @@ test('send timing is opt-in and never changes a disabled SDK instance', async ()
   assert.deepEqual(f.rows, []);
 });
 
-test('one capture preserves values/promises/errors and logs only fixed names and numeric durations', async () => {
+test('each capture preserves values/promises/errors and logs only fixed names and numeric durations', async () => {
   const f = fixture(); const stop = f.beginSendTiming();
   const sensitive = { invoice: 'synthetic-sensitive-invoice', key: 'synthetic-secret', amount: 99999 };
   assert.equal(f.timeSendStep('proof_check', () => { f.advance(3); return sensitive; }), sensitive);
@@ -67,7 +67,9 @@ test('one capture preserves values/promises/errors and logs only fixed names and
   }
   const prior = f.rows.length;
   f.beginSendTiming()(); f.timeSendStep('sdk_send', () => 1); f.flush();
-  assert.equal(f.rows.length, prior); // automatically stops after one attempt
+  assert.equal(f.rows.length, prior + 1); // a later attempt can be measured independently
+  assert.equal(f.rows.at(-1).stage, 'total');
+  assert.equal(f.rows.at(-1).run, 2);
 });
 
 test('late completions cannot extend a finished trace, and trace memory is bounded', async () => {

@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
@@ -32,7 +33,7 @@ export function LanguagePicker() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   section: { marginTop: 32, paddingTop: 28, borderTopWidth: 1, borderColor: '#28282c' },
   title: { color: '#fff', fontSize: 20, fontWeight: '600' },
   subtitle: { color: '#b8b8c0', fontSize: 15, lineHeight: 23, marginTop: 8, marginBottom: 16 },
@@ -41,4 +42,4 @@ const styles = StyleSheet.create({
   selected: { borderColor: '#96701c', backgroundColor: '#211c11' },
   name: { fontSize: 16, color: '#eeeef0', flex: 1 },
   selectedText: { color: '#ffca54', fontWeight: '600' },
-});
+}));

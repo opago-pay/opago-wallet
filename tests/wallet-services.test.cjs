@@ -1,4 +1,5 @@
 'use strict';
+/* global __dirname */
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -157,7 +158,8 @@ test('pauses receive polling off-screen and backs off after transient failures',
   assert.match(source, /AppState\.addEventListener\('change'/);
   assert.match(source, /const pollingEnabled = isFocused && appIsActive/);
   assert.match(source, /exponentialBackoffDelay\(/);
-  assert.match(source, /hederaKnownTransactions\.current !== null && !hederaRequest/);
+  assert.match(source, /scheduleNextPoll\(8_000\)/);
+  assert.doesNotMatch(source, /hederaRequest/);
 });
 
 test('bounds optional dashboard services and always releases pull-to-refresh', () => {
@@ -167,11 +169,11 @@ test('bounds optional dashboard services and always releases pull-to-refresh', (
   );
 
   assert.match(source, /OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000/);
-  assert.match(source, /refreshProgressively<DisplayTransaction>/);
+  assert.match(source, /new HistoryPager<DisplayTransaction>/);
   assert.match(source, /generation !== refreshGenerationRef.current/);
   assert.match(source, /refreshInProgressRef/);
   assert.match(
     source,
-    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refreshBalances\(\);\s*await refresh\(\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refreshBalances\(\);[\s\S]*?if \(historyOpen\) await refresh\(true\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
   );
 });

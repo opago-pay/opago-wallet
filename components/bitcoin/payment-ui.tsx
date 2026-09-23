@@ -1,3 +1,4 @@
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import React, { useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +40,7 @@ export function BitcoinReview(props: {
       <AssetIcon asset="bitcoin" size={38} /><View style={{ flex: 1, gap: 4 }}>
         <Text numberOfLines={2} style={bitcoinStyles.value}>{props.route === 'onchain' ? shortRecipient : props.label?.split('\n')[0] || t('Lightning payment request')}</Text>
         <Text style={bitcoinStyles.note}>{props.route === 'lightning' ? 'Lightning' : t('Bitcoin network')}</Text>
-      </View><Ionicons name={details ? 'chevron-up' : 'chevron-down'} color="#aaaab3" size={18} />
+      </View><Ionicons name={details ? 'chevron-up' : 'chevron-down'} color={adaptColor('#aaaab3', 'color')} size={18} />
     </TouchableOpacity>
     {details && <View style={bitcoinStyles.box}>
       {!!props.label && <><Text style={bitcoinStyles.value}>{props.label}</Text><Text style={bitcoinStyles.note}>{t('Label supplied by the sender. Identity not verified.')}</Text></>}
@@ -93,7 +94,7 @@ export function BitcoinPaymentActions(props: { label: string; onConfirm(): void;
   const stacked = width / fontScale < 320;
   return <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 10 }}>
     <View style={{ flex: stacked ? undefined : 1 }}><BitcoinButton label={t('Cancel')} secondary disabled={props.loading}
-      style={{ backgroundColor: '#303034', borderColor: '#64646c' }}
+      style={{ backgroundColor: adaptColor('#303034', 'backgroundColor'), borderColor: adaptColor('#64646c', 'borderColor') }}
       onPress={() => { Keyboard.dismiss(); props.onCancel(); }} /></View>
     <View style={{ flex: stacked ? undefined : 1.3 }}><BitcoinButton label={props.label} loading={props.loading} disabled={props.disabled}
       onPress={() => { Keyboard.dismiss(); props.onConfirm(); }} /></View>
@@ -104,7 +105,7 @@ export function BitcoinButton({ label, onPress, loading, disabled, secondary, st
 }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
     disabled={disabled || loading} onPress={onPress} style={[bitcoinStyles.button, secondary && bitcoinStyles.secondary, style, (disabled || loading) && { opacity: 0.5 }]}>
-    {loading ? <ActivityIndicator color={secondary ? '#fff' : '#101011'} /> : <Text style={[bitcoinStyles.buttonText, secondary && { color: '#fafaf7' }]}>{label}</Text>}
+    {loading ? <ActivityIndicator color={secondary ? adaptColor('#fff', 'color') : '#101011'} /> : <Text style={[bitcoinStyles.buttonText, secondary && { color: adaptColor('#fafaf7', 'color') }]}>{label}</Text>}
   </TouchableOpacity>;
 }
 export function BitcoinInfo() {
@@ -114,7 +115,7 @@ export function BitcoinInfo() {
     <Text style={bitcoinStyles.muted}>{t('One balance. Two payment routes.')}</Text><Ionicons name="information-circle-outline" size={23} color="#aaaab3" />
   </TouchableOpacity>{expanded && <Text style={bitcoinStyles.note}>{t('It stays your Bitcoin. Lightning and the Bitcoin network are two ways to send and receive Bitcoin. You use one Bitcoin balance. Opago recognises the route from the address or request. You see costs and timing before sending. Learn about Spark and its dependencies in advanced wallet details.')}</Text>}</View>;
 }
-export const bitcoinStyles = StyleSheet.create({
+export const bitcoinStyles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' }, page: { flexGrow: 1, paddingHorizontal: 23, paddingBottom: 36, gap: 16 },
   title: { color: '#fafaf7', fontSize: 31, lineHeight: 37, fontWeight: '600', letterSpacing: -0.8, marginTop: 12 },
   value: { color: '#fafaf7', fontSize: 16, fontWeight: '600' }, muted: { color: '#aaaab3', fontSize: 14, lineHeight: 21 },
@@ -130,4 +131,4 @@ export const bitcoinStyles = StyleSheet.create({
   address: { color: '#fafaf7', fontSize: 14, lineHeight: 22 },
   disclosure: { minHeight: 48, borderTopColor: '#2c2c31', borderTopWidth: 1, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   input: { color: '#fafaf7', fontSize: 16, minHeight: 54, borderWidth: 1, borderColor: '#2c2c31', backgroundColor: '#161619', borderRadius: 15, padding: 14 },
-});
+}));

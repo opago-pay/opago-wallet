@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { Link } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
@@ -15,7 +16,7 @@ export default function ModalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -26,4 +27,4 @@ const styles = StyleSheet.create({
     marginTop: 15,
     paddingVertical: 15,
   },
-});
+}));

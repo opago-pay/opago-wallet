@@ -254,6 +254,22 @@ test('receive restart preserves an expired invoice and still confirms payment ma
   assert.equal(status, 'confirmed');
 });
 
+test('open Lightning receive stores zero request amount and confirms the actual paid SAT amount', async () => {
+  const disk = storage();
+  const open = { ...savedRequest(), amountSats: 0 };
+  await createLightningReceiveStore(disk).save(open);
+  assert.equal((await createLightningReceiveStore(disk).load()).amountSats, 0);
+  const { resolveLightningReceiveOutcome } = require('../lib/lightning/receive-status.ts');
+  const result = await resolveLightningReceiveOutcome({
+    getLightningReceiveRequest: async () => ({
+      id: open.requestId, status: 'TRANSFER_COMPLETED', invoice: { paymentHash }, paymentPreimage: preimage,
+      transfer: { totalAmount: { originalValue: 34, originalUnit: 'SATOSHI' } },
+    }),
+    getTransfers: async () => assert.fail('The direct proof and amount are sufficient'),
+  }, open);
+  assert.deepEqual(result, { state: 'confirmed', amountSats: 34 });
+});
+
 test('pending receive polls use only the direct request, while a failed lookup falls back to history', async () => {
   const saved = savedRequest();
   assert.equal(await resolveLightningReceive({

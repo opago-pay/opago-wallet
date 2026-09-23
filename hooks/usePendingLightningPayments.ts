@@ -29,11 +29,12 @@ export function usePendingLightningPayments(
       try {
         await yieldToUi();
         if (cancelled) return;
-        const before = (await lightningPaymentJournal.list()).filter(record => record.state === 'pending');
+        const records = await lightningPaymentJournal.list();
+        const before = records.filter(record => record.state === 'pending');
         if (cancelled) return;
-        setPresentation(lightningPaymentPresentation(before));
+        setPresentation(lightningPaymentPresentation(records));
         if (!before.length) return;
-        const after = await reconcileLightningPayments(wallet!);
+        const after = await reconcileLightningPayments(wallet!, null, records);
         if (cancelled) return;
         const remaining = after.filter(record => record.state === 'pending').length;
         setPresentation(lightningPaymentPresentation(after));

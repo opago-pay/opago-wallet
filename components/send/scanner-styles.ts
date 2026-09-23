@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
+import { adaptiveStyles } from '@/lib/theme-styles';
 
-export const scannerStyles = StyleSheet.create({
+export const scannerStyles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' },
   screenContent: { flex: 1 },
   page: { flexGrow: 1, paddingHorizontal: 22 },
@@ -53,4 +54,4 @@ export const scannerStyles = StyleSheet.create({
   recipientTitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: '#f7f7fa' },
   recipientValue: { fontSize: 12, lineHeight: 18, color: '#b3b3bb' },
   amount: { fontSize: 27, lineHeight: 34, color: '#f9f9fa', fontWeight: '600', letterSpacing: -0.6, marginBottom: 22 },
-});
+}));

@@ -1,3 +1,4 @@
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -48,7 +49,7 @@ export function WalletGate({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = adaptiveStyles(StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c' },
   hidden: { opacity: 0 },
   lock: { flex: 1, backgroundColor: '#0a0a0c', justifyContent: 'center', alignItems: 'center', padding: 28 },
@@ -57,4 +58,4 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#ffb000', borderRadius: 18, minHeight: 56, padding: 18, alignSelf: 'stretch', alignItems: 'center', marginTop: 30 },
   buttonText: { color: '#111', fontSize: 17, fontWeight: '700' },
   error: { color: '#ffab97', lineHeight: 22, marginTop: 20, textAlign: 'center' },
-});
+}));

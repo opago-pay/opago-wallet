@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [string]$DeviceSerial = ''
+  [string]$DeviceSerial = '',
+  [string]$MoonPayBackendUrl = ''
 )
 
 Set-StrictMode -Version Latest
@@ -111,6 +112,20 @@ $buildSettings = @{
   EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
   EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS = '100'
   EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
+}
+if (-not [string]::IsNullOrWhiteSpace($MoonPayBackendUrl)) {
+  $parsedMoonPayBackend = $null
+  if (-not [System.Uri]::TryCreate($MoonPayBackendUrl, [System.UriKind]::Absolute, [ref]$parsedMoonPayBackend) -or
+      $parsedMoonPayBackend.Scheme -ne 'https' -or
+      $parsedMoonPayBackend.HostNameType -ne [System.UriHostNameType]::Dns -or
+      $parsedMoonPayBackend.Host -match '(^localhost$|\.local$)' -or
+      $parsedMoonPayBackend.AbsolutePath -ne '/' -or
+      -not [string]::IsNullOrEmpty($parsedMoonPayBackend.Query) -or
+      -not [string]::IsNullOrEmpty($parsedMoonPayBackend.UserInfo) -or
+      -not [string]::IsNullOrEmpty($parsedMoonPayBackend.Fragment)) {
+    throw 'MoonPayBackendUrl must be a public HTTPS origin without credentials or a fragment.'
+  }
+  $buildSettings.EXPO_PUBLIC_MOONPAY_BACKEND_URL = $parsedMoonPayBackend.AbsoluteUri.TrimEnd('/')
 }
 $savedEnvironment = @{}
 $publicNames = @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith('EXPO_PUBLIC_') } | ForEach-Object Name)
