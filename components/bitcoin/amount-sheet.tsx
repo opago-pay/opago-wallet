@@ -1,4 +1,4 @@
-import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { useEffect } from 'react';
 import { Keyboard, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,21 +8,25 @@ import { BitcoinPaymentActions, bitcoinStyles } from './payment-ui';
 import { appLocale, t } from '@/lib/i18n';
 import { appConfig } from '@/lib/config';
 import type { PaymentCurrency } from '@/components/send/types';
-import { editPaymentAmount } from '@/lib/payment-input';
+import { editPaymentAmount, paymentDecimalSeparator } from '@/lib/payment-input';
+import { BitcoinConnectionStatus } from './connection-status';
 
 export function BitcoinAmountSheet(props: {
   amount: string; currency: PaymentCurrency; fixedAmount?: number | null;
   recipient: string; loading: boolean; disabled: boolean; onchain: boolean; alternative?: boolean; balanceError?: boolean;
+  sparkStatus?: 'idle' | 'connecting' | 'ready' | 'error'; sparkError?: string | null; onRetrySpark?(): Promise<void>;
   onAmount(value: string): void; onCurrency(value: PaymentCurrency): void; onBack(): void; onContinue(): void;
 }) {
   const { height } = useWindowDimensions();
-  const separator = new Intl.NumberFormat(appLocale()).formatToParts(1.1).find(part => part.type === 'decimal')?.value === ',' ? ',' : '.';
+  const separator = paymentDecimalSeparator(appLocale());
   useEffect(() => { Keyboard.dismiss(); }, []);
   const keyHeight = height < 740 ? 48 : 56;
   return <BitcoinSendScreen title={t('Amount')} loading={props.loading} onBack={props.onBack}
     footer={<BitcoinPaymentActions label={t(props.onchain ? 'Prepare fee offer' : 'Continue')}
       onConfirm={props.onContinue} onCancel={props.onBack} loading={props.loading} disabled={props.disabled} />}>
     <View style={amountStyles.content}>
+      {props.sparkStatus === 'error' && props.onRetrySpark &&
+        <BitcoinConnectionStatus status="error" error={props.sparkError ?? null} onRetry={props.onRetrySpark} />}
       <Text style={bitcoinStyles.muted} numberOfLines={2}>{props.recipient.length > 64 ? `${props.recipient.slice(0, 22)}…${props.recipient.slice(-12)}` : props.recipient}</Text>
       {!appConfig.isMainnet && <Text style={bitcoinStyles.warning}>REGTEST · {t('TEST MODE')}</Text>}
       {props.fixedAmount != null ? <Text style={amountStyles.amount}>{props.fixedAmount.toLocaleString(appLocale())} SAT</Text> : <>
@@ -38,7 +42,7 @@ export function BitcoinAmountSheet(props: {
             accessibilityRole="radio" accessibilityLabel={currency} accessibilityState={{ checked: props.currency === currency }}
             style={[amountStyles.currency, currency === props.currency && amountStyles.selected]}
             onPress={() => { props.onAmount(''); props.onCurrency(currency); }}>
-            <Text style={[amountStyles.currencyText, currency === props.currency && { color: '#ffb000' }]}>{currency}</Text>
+            <Text style={[amountStyles.currencyText, currency === props.currency && { color: themeColor('accentText') }]}>{currency}</Text>
           </TouchableOpacity>)}
         </View>
         <View style={amountStyles.keypad}>

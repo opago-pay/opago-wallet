@@ -1,4 +1,4 @@
-import { adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
@@ -8,13 +8,14 @@ import {
   ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecoveryForm } from '@/components/onboarding/recovery-form';
+import { LegalLinks } from '@/components/legal/legal-links';
 
 function RecoveryInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-input');
@@ -22,18 +23,21 @@ function RecoveryInputScreenCaptureGuard() {
 }
 
 export default function LoginScreen() {
-  useColorMode();
+  const { mode } = useColorMode();
   useLanguage();
   const router = useRouter();
+  const { restore } = useLocalSearchParams<{ restore?: string }>();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { createWallet, restoreWallet, isInitializing, walletReady, initStatus, error } = useWalletAuth();
-  const [isRestoring, setIsRestoring] = useState(false);
+  const { createWallet, restoreWallet, recoveryRequired, isInitializing, walletReady, initStatus, error } = useWalletAuth();
+  const [isRestoring, setIsRestoring] = useState(restore === '1');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (walletReady) router.replace('/(tabs)');
   }, [router, walletReady]);
+
+  useEffect(() => { if (restore === '1') setIsRestoring(true); }, [restore]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
@@ -79,14 +83,16 @@ export default function LoginScreen() {
             {isRestoring ? (
               <RecoveryForm
                 loading={loading}
-                onBack={() => setIsRestoring(false)}
+                onBack={() => recoveryRequired ? router.replace('/(tabs)') : setIsRestoring(false)}
                 onRestore={phrase => runWalletAction(() => restoreWallet(phrase))}
               />
             ) : (
               <>
                 <View style={styles.header}>
                   <Image
-                    source={require('@/assets/images/opago-wordmark.svg')}
+                    source={mode === 'light'
+                      ? require('@/assets/images/opago-wordmark-light.svg')
+                      : require('@/assets/images/opago-wordmark.svg')}
                     style={styles.wordmark}
                     contentFit="contain"
                     accessibilityLabel="Opago"
@@ -102,7 +108,7 @@ export default function LoginScreen() {
                 </View>
 
                 <View style={styles.actions}>
-                  <TouchableOpacity
+                  {!recoveryRequired && <TouchableOpacity
                     style={[styles.primaryButton, loading && styles.disabledButton]}
                     onPress={() => void runWalletAction(createWallet)}
                     disabled={loading}
@@ -116,7 +122,7 @@ export default function LoginScreen() {
                     {loading
                       ? <ActivityIndicator color="#15150e" />
                       : <Ionicons name="arrow-forward" size={22} color="#15150e" />}
-                  </TouchableOpacity>
+                  </TouchableOpacity>}
                   <TouchableOpacity
                     style={[styles.restoreButton, loading && styles.disabledButton]}
                     onPress={() => setIsRestoring(true)}
@@ -129,10 +135,10 @@ export default function LoginScreen() {
                       <Text style={styles.restoreButtonTitle}>{t("I already have a wallet")}</Text>
                       <Text style={styles.restoreButtonSubtitle}>{t("Restore with your recovery phrase")}</Text>
                     </View>
-                    <Ionicons name="arrow-forward" size={21} color="#b0b4a7" style={styles.restoreArrow} />
+                    <Ionicons name="arrow-forward" size={21} color={adaptColor('#b0b4a7', 'color')} style={styles.restoreArrow} />
                   </TouchableOpacity>
                   <View style={styles.footer}>
-                    <Ionicons name="key-outline" size={13} color="#979f8d" />
+                    <Ionicons name="key-outline" size={13} color={adaptColor('#979f8d', 'color')} />
                     <Text style={styles.footerText}>{t("Your keys. Your control.")}</Text>
                   </View>
                 </View>
@@ -144,6 +150,7 @@ export default function LoginScreen() {
               </Text>
             )}
             {error && !loading && <Text style={styles.errorText} accessibilityRole="alert">{t(error || '')}</Text>}
+            <LegalLinks variant="footer" disabled={loading} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

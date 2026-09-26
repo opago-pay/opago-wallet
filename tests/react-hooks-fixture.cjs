@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
@@ -36,7 +35,7 @@ function hookFixture(file, makeDependencies, invoke) {
     react: hooks,
     'react/jsx-runtime': require('react/jsx-runtime'),
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
-    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value },
+    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
     '../lib/performance-trace': require('./performance-trace-stub.cjs'),
     ...makeDependencies(hooks),

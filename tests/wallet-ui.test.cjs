@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -127,13 +126,15 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
     readSource('app', '(tabs)', 'receive.tsx'),
     readSource('components', 'send', 'hedera-payment-views.tsx'),
     readSource('components', 'bitcoin', 'payment-progress.tsx'),
-    readSource('components', 'send', 'payment-state-views.tsx'),
   ];
 
   for (const source of sources) {
     assert.match(source, /name="checkmark"/);
     assert.doesNotMatch(source, />OK<\/Text>/);
   }
+  const lightning = readSource('components', 'send', 'lightning-payment-views.tsx');
+  assert.match(lightning, /<BitcoinPaymentProgress phase="success"/);
+  assert.doesNotMatch(lightning, />OK<\/Text>/);
 });
 
 test('keeps send and request focused on the first consumer decision', () => {

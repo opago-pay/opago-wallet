@@ -1,4 +1,4 @@
-import { adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -67,7 +67,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
           style={styles.backButton} onPress={back} disabled={loading}
           accessibilityRole="button" accessibilityLabel={state.stage === 'choose' ? t('Back to welcome') : t('Previous step')}
         >
-          <Ionicons name="arrow-back" size={22} color="#f6f3e9" />
+          <Ionicons name="arrow-back" size={22} color={adaptColor('#f6f3e9', 'color')} />
         </TouchableOpacity>
         <Text style={styles.eyebrow}>{t("RESTORE YOUR WALLET")}</Text>
       </View>
@@ -82,13 +82,13 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
             accessibilityRole="button" accessibilityState={{ expanded: otherLengths }}
           >
             <Text style={styles.otherLengthsText}>{t("My backup has 15, 18 or 21 words")}</Text>
-            <Ionicons name={otherLengths ? 'chevron-up' : 'chevron-down'} size={16} color="#a1a296" />
+            <Ionicons name={otherLengths ? 'chevron-up' : 'chevron-down'} size={16} color={adaptColor('#a1a296', 'color')} />
           </TouchableOpacity>
           {otherLengths && (
             <View style={styles.lengthOptions}>{([15, 18, 21] as const).map(count => lengthButton(count, true))}</View>
           )}
           <View style={styles.note}>
-            <Ionicons name="list-outline" size={20} color="#ffb000" />
+            <Ionicons name="list-outline" size={20} color={adaptColor('#ffb000', 'color')} />
             <Text style={styles.noteText}>{t("We’ll ask for one word at a time, in the order on your backup.")}</Text>
           </View>
         </View>
@@ -109,7 +109,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
             value={state.words[state.index]}
             onChangeText={value => dispatch({ type: 'change', value })}
             placeholder={t('Enter word {number}', { number: state.index + 1 })}
-            placeholderTextColor="#696d60"
+            placeholderTextColor={adaptColor('#696d60', 'color')}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
@@ -120,7 +120,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
             submitBehavior="submit"
             blurOnSubmit={false}
             returnKeyType="next"
-            selectionColor="#ffb000"
+              selectionColor={themeColor('accentText')}
             editable={!loading}
             onSubmitEditing={() => dispatch({ type: 'next' })}
             accessibilityLabel={t('Recovery word {number} of {count}', { number: state.index + 1, count: state.wordCount })}
@@ -136,7 +136,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
             <Text style={styles.primaryButtonText}>
               {state.editing ? t('Save word') : state.index === state.wordCount - 1 ? t('Review my words') : t('Next word')}
             </Text>
-            <Ionicons name="arrow-forward" size={21} color="#15150e" />
+            <Ionicons name="arrow-forward" size={21} color={adaptColor('#15150e', 'color')} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -163,12 +163,12 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
             accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>{t("Restore my wallet")}</Text>
-            {loading ? <ActivityIndicator color="#15150e" /> : <Ionicons name="arrow-forward" size={21} color="#15150e" />}
+            {loading ? <ActivityIndicator color={adaptColor('#15150e', 'color')} /> : <Ionicons name="arrow-forward" size={21} color={adaptColor('#15150e', 'color')} />}
           </TouchableOpacity>
         </View>
       )}
       <View style={styles.privacy}>
-        <Ionicons name="lock-closed-outline" size={13} color="#929788" />
+        <Ionicons name="lock-closed-outline" size={13} color={adaptColor('#929788', 'color')} />
         <Text style={styles.privacyText}>{t("Your words stay on this device.")}</Text>
       </View>
     </View>

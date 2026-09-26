@@ -4,18 +4,16 @@ import { beginPerformanceSpan, markNavigationReady, measurePerformance } from '@
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, BackHandler, Platform } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import * as IntentLauncher from 'expo-intent-launcher';
-import * as Linking from 'expo-linking';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { paymentScanInbox } from '@/lib/payment-scan';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { useBitcoinOperations } from '@/hooks/useBitcoinOperations';
-import { fetchInvoiceFromLNURLP } from '@/lib/lnurl-safe';
-import { fetchOcpExecutionPayload, fetchOcpOptions, resolveOcpUrl } from '@/lib/ocp-safe';
+import { fetchOcpExecutionPayload, resolveOcpUrl } from '@/lib/ocp-safe';
+import { loadPaymentEndpoint } from '@/lib/payment-endpoint';
 import { resolveLightningDestination, type LightningAmountRequirement } from '@/lib/lightning-destination';
 import { friendlyPaymentMessage } from '@/lib/payment-errors';
 import {
@@ -34,15 +32,14 @@ import { walletSession } from '@/lib/wallet-session';
 import { appConfig } from '@/lib/config';
 import { parseBitcoinDestination, type BitcoinDestination } from '@/lib/bitcoin/destination';
 import { prepareBitcoinWithdrawal, submitBitcoinWithdrawal, type PreparedBitcoinWithdrawal } from '@/lib/bitcoin/onchain';
-import { bitcoinStore } from '@/lib/bitcoin/store-native';
+import { bitcoinStore, bitcoinRequestCursor } from '@/lib/bitcoin/store-native';
 import type { BitcoinOperation } from '@/lib/bitcoin/store';
 import { BitcoinReview, BitcoinReviewLoading } from '@/components/bitcoin/payment-ui';
 import { BitcoinTransferResult } from '@/components/bitcoin/transfer-result';
 import { BitcoinPaymentProgress } from '@/components/bitcoin/payment-progress';
 import { notifyPaymentHaptics } from '@/lib/optional-haptics';
 import { lightningPaymentLifecycle, reconcileLightningPayments } from '@/lib/lightning/reconcile-native';
-import { lightningPaymentJournal } from '@/lib/lightning/payment-journal-native';
-import { startEIdSession, waitForVerifiedEId } from '@/lib/eid';
+import { lightningPaymentJournalFor } from '@/lib/lightning/payment-journal-native';
 import { PaymentForm } from '@/components/send/payment-form';
 import { PaymentScanner } from '@/components/send/payment-scanner';
 import {
@@ -69,30 +66,17 @@ import {
   parseHederaTransferTinybars,
   type HederaTransferResult,
 } from '@/lib/hedera/payments';
-import {
-  IdentityRequiredView,
-  OcpQuoteView,
-} from '@/components/send/payment-state-views';
+import { OcpQuoteView } from '@/components/send/payment-state-views';
 import type {
   OcpOption,
   OcpState,
   PaymentCurrency,
   PaymentSource,
-  PendingEId,
   PendingHederaPayment,
   PendingLightningPayment,
 } from '@/components/send/types';
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : t('Payment failed.');
-
-function isExpectedEIdDeepLink(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'opagowallet:' && url.hostname === 'eid-success';
-  } catch {
-    return false;
-  }
-}
 
 export default function SendScreen() {
   useLanguage();
@@ -115,6 +99,9 @@ export default function SendScreen() {
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const {
     sparkWallet,
+    sparkStatus,
+    sparkError,
+    retrySparkConnection,
     walletReady,
     hederaPublicKey,
     hederaAccount,
@@ -153,11 +140,6 @@ export default function SendScreen() {
   const [hederaResult, setHederaResult] = useState<HederaTransferResult | null>(null);
   const [ocpState, setOcpState] = useState<OcpState | null>(null);
   const [selectedOcpOption, setSelectedOcpOption] = useState<OcpOption | null>(null);
-  const [pendingEId, setPendingEId] = useState<PendingEId | null>(null);
-  const [eIdSessionId, setEIdSessionId] = useState<string | null>(null);
-  const [eIdDemo, setEIdDemo] = useState(false);
-  const waitingForEId = useRef(false);
-  const completingEId = useRef(false);
   const paymentInFlight = useRef(false);
   const consumedHederaRequestKey = useRef<string | null>(null);
   const consumedScanRequest = useRef<string | null>(null);
@@ -166,17 +148,19 @@ export default function SendScreen() {
   const preparationInFlight = useRef(false);
 
   useFocusEffect(useCallback(() => {
-    if (!sparkWallet) return;
+    if (!sparkWallet || !hederaPublicKey) return;
     let cancelled = false;
+    const scope = { network: appConfig.sparkNetwork, publicKey: hederaPublicKey };
+    const lightningPaymentJournal = lightningPaymentJournalFor(scope.network, scope.publicKey);
     // Most visits have no unresolved send. Avoid a full journal rewrite and
     // remote reconciliation while the scanner is opening.
     void lightningPaymentJournal.list().then(records => {
       if (!cancelled && records.some(record => record.state === 'pending')) {
-        void reconcileLightningPayments(sparkWallet, null, records).catch(() => undefined);
+        void reconcileLightningPayments(sparkWallet, scope, null, records).catch(() => undefined);
       }
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [sparkWallet]));
+  }, [sparkWallet, hederaPublicKey]));
 
   useEffect(() => {
     if (!walletReady) void loadOrGenerateWallet().catch(() => undefined); // Provider retains the error.
@@ -217,75 +201,6 @@ export default function SendScreen() {
       prepareSparkPayment(sparkWallet, invoice, requestedAmount));
     if (isCurrent()) setPendingLightning({ ...payment, recipientLabel });
   }, [sparkWallet]);
-
-  const finishEIdPayment = useCallback(async () => {
-    if (!pendingEId || !eIdSessionId || completingEId.current) return;
-    completingEId.current = true;
-    waitingForEId.current = false;
-    setLoading(true);
-    try {
-      const payerData = await waitForVerifiedEId(eIdSessionId);
-      const invoice = await fetchInvoiceFromLNURLP(
-        pendingEId.lnurl,
-        pendingEId.amountSats,
-        payerData,
-      );
-      await prepareLightningInvoice(invoice, pendingEId.amountSats, t('Verified payment request'));
-      setPendingEId(null);
-      setEIdSessionId(null);
-    } catch (cause) {
-      Alert.alert(t('Identity verification failed'), t(messageOf(cause)));
-      await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      completingEId.current = false;
-      setLoading(false);
-    }
-  }, [eIdSessionId, pendingEId, prepareLightningInvoice]);
-
-  useEffect(() => {
-    const appSub = AppState.addEventListener('change', state => {
-      if (state === 'active' && waitingForEId.current) void finishEIdPayment();
-    });
-    const linkSub = Linking.addEventListener('url', event => {
-      if (isExpectedEIdDeepLink(event.url) && waitingForEId.current) void finishEIdPayment();
-    });
-    return () => {
-      appSub.remove();
-      linkSub.remove();
-    };
-  }, [finishEIdPayment]);
-
-  async function beginEIdVerification() {
-    if (!pendingEId) return;
-    setLoading(true);
-    try {
-      const session = await startEIdSession({
-        walletIdentifier: hederaAccount?.accountId || hederaPublicKey || 'local-wallet',
-        transactionReference: 'lnurl:' + new URL(pendingEId.lnurl.callback).origin,
-      });
-      setEIdSessionId(session.sessionId);
-      setEIdDemo(session.demo);
-      waitingForEId.current = true;
-      if (session.demo) {
-        Alert.alert(t('Demo identity session'), t('This is explicitly not a legal eID verification.'));
-      }
-      const clientUrl =
-        'eid://127.0.0.1:24727/eID-Client?tcTokenURL=' + encodeURIComponent(session.tcTokenURL);
-      if (Platform.OS === 'android') {
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: clientUrl,
-          flags: 268435456,
-        });
-      } else {
-        await Linking.openURL(clientUrl);
-      }
-    } catch (cause) {
-      waitingForEId.current = false;
-      Alert.alert(t('Could not start AusweisApp'), t(messageOf(cause)));
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const handleDestination = useCallback(async (
     scannedValue?: string,
@@ -366,14 +281,16 @@ export default function SendScreen() {
           if (!amount || scannedValue !== undefined || bitcoinDestination?.address !== bitcoin.address) return;
           if (!sparkWallet) throw new Error('Spark wallet is not ready.');
           const existingScope = await (await import('@/lib/bitcoin/onchain')).bitcoinScope(sparkWallet, appConfig.sparkNetwork);
-          if ((await bitcoinStore.list(existingScope)).some(item => item.kind === 'withdrawal' && item.state !== 'confirmed')) {
+          if ((await bitcoinStore.listActive(existingScope)).some(item => item.kind === 'withdrawal' &&
+            !['confirmed', 'failed', 'aborted'].includes(item.state))) {
             throw new Error('A Bitcoin payment is still being checked. Do not send it again.');
           }
           const authorization = await authorizePayment();
           const assertCurrent = () => { authorization(); if (!isCurrent()) throw new Error('Wallet changed.'); };
           assertCurrent();
           const prepared = await measurePerformance('send.prepare', () =>
-            prepareBitcoinWithdrawal(sparkWallet, appConfig.sparkNetwork, bitcoin.address!, amount, assertCurrent));
+            prepareBitcoinWithdrawal(sparkWallet, appConfig.sparkNetwork, bitcoin.address!, amount,
+              assertCurrent, bitcoinStore, bitcoinRequestCursor));
           if (isCurrent()) setPendingBitcoin(prepared);
           return;
         }
@@ -386,19 +303,19 @@ export default function SendScreen() {
 
       const ocpUrl = await resolveOcpUrl(raw);
       if (!isCurrent()) return;
+      let preloadedLnurl;
       if (ocpUrl) {
-        try {
-          const quote = await fetchOcpOptions(ocpUrl);
-          if (!isCurrent()) return;
-          setOcpState({ callbackUrl: ocpUrl, quote });
+        const endpoint = await loadPaymentEndpoint(ocpUrl);
+        if (!isCurrent()) return;
+        if (endpoint.kind === 'ocp') {
+          setOcpState({ callbackUrl: ocpUrl, quote: endpoint.quote });
           setSelectedOcpOption(null);
           return;
-        } catch {
-          // Standard LNURL-pay endpoints intentionally fall through.
         }
+        preloadedLnurl = endpoint.info;
       }
       const requested = parsePaymentAmount(enteredAmountInput, currency, rates.updatedAt > 0 && Date.now() - rates.updatedAt < 300_000 ? rates.btcToEur : 0);
-      const resolved = await resolveLightningDestination(raw, requested);
+      const resolved = await resolveLightningDestination(raw, requested, preloadedLnurl);
       if (!isCurrent()) return;
       if (resolved.kind === 'amount-required') {
         setAmountRequirement(resolved.limits);
@@ -442,7 +359,7 @@ export default function SendScreen() {
       const assertCurrent = () => { authorization(); if (generation !== preparationGeneration.current) throw new Error('Wallet changed.'); };
       assertCurrent();
       setPaymentPhase('sending');
-      const result = await submitBitcoinWithdrawal(sparkWallet, bitcoinStore, pendingBitcoin, assertCurrent);
+      const result = await submitBitcoinWithdrawal(sparkWallet, bitcoinStore, pendingBitcoin, assertCurrent, bitcoinRequestCursor);
       if (generation !== preparationGeneration.current) return;
       setPendingBitcoin(null);
       setBitcoinResult(result);
@@ -492,6 +409,10 @@ export default function SendScreen() {
 
   async function executeLightningPayment() {
     if (!pendingLightning || !sparkWallet || paymentInFlight.current) return;
+    if (!hederaPublicKey) {
+      Alert.alert(t('Payment could not be completed'), t('Wallet identity is unavailable. Unlock the wallet again.'));
+      return;
+    }
     paymentInFlight.current = true;
     const finishTiming = beginSendTiming();
     const finishPerformance = beginPerformanceSpan('send.submit');
@@ -512,7 +433,7 @@ export default function SendScreen() {
           if (isCurrent()) setPaymentPhase('sending');
           return assertAuthorized;
         },
-        lightningPaymentLifecycle,
+        lightningPaymentLifecycle({ network: appConfig.sparkNetwork, publicKey: hederaPublicKey }),
         () => { assertPreparationSession(); if (!isCurrent()) throw new Error('Payment preparation cancelled.'); },
       );
       if (!isCurrent()) return;
@@ -587,13 +508,9 @@ export default function SendScreen() {
     setHederaResult(null);
     setOcpState(null);
     setSelectedOcpOption(null);
-    setPendingEId(null);
-    setEIdSessionId(null);
-    setEIdDemo(false);
     setSourceSelected(false);
     setSource('spark');
     setAdvancedExpanded(false);
-    waitingForEId.current = false;
   }, []);
 
   useFocusEffect(useCallback(() => reset, [reset]));
@@ -612,14 +529,14 @@ export default function SendScreen() {
       if (pendingLightning) { setPendingLightning(null); return true; }
       if (pendingBitcoin) { setPendingBitcoin(null); return true; }
       if (bitcoinResult) { reset(); return true; }
-      if (ocpState || pendingEId || hederaResult || lightningResult || sourceSelected || entryMode === 'manual') {
+      if (ocpState || hederaResult || lightningResult || sourceSelected || entryMode === 'manual') {
         reset();
         return true;
       }
       return false;
     });
     return () => subscription.remove();
-  }, [loading, reviewPreparation, pendingHedera, pendingLightning, pendingBitcoin, bitcoinResult, ocpState, pendingEId, hederaResult, lightningResult, sourceSelected, entryMode, reset]));
+  }, [loading, reviewPreparation, pendingHedera, pendingLightning, pendingBitcoin, bitcoinResult, ocpState, hederaResult, lightningResult, sourceSelected, entryMode, reset]));
 
   useFocusEffect(useCallback(() => {
     if (!walletReady || typeof activeScanKey !== 'string') return;
@@ -713,17 +630,6 @@ export default function SendScreen() {
     );
   }
 
-  if (pendingEId) {
-    return (
-      <IdentityRequiredView
-        demo={eIdDemo}
-        loading={loading}
-        onBegin={() => void beginEIdVerification()}
-        onCancel={reset}
-      />
-    );
-  }
-
   if (ocpState) {
     return (
       <OcpQuoteView
@@ -774,6 +680,9 @@ export default function SendScreen() {
       balanceLoading={{ spark: balanceStates.spark.status === 'loading', hedera: balanceStates.hedera.status === 'loading' }}
       loading={loading}
       walletReady={walletReady}
+      sparkStatus={sparkStatus}
+      sparkError={sparkError}
+      onRetrySpark={retrySparkConnection}
       onDestinationChange={value => {
         preparationGeneration.current += 1;
         setBitcoinDestination(null);

@@ -1,5 +1,5 @@
 import { decodeLightningInvoice, normalizeLightningInput, resolveInvoiceAmount } from './lightning';
-import { fetchInvoiceFromLNURLP, lnurlDescription, resolveLightningAddress, resolveLNURL } from './lnurl-safe';
+import { fetchInvoiceFromLNURLP, lnurlDescription, resolveLightningAddress, resolveLNURL, type LNURLPResponse } from './lnurl-safe';
 import { resolveLnurlAmount } from './payment-input';
 
 export interface LightningAmountRequirement {
@@ -18,13 +18,14 @@ export type LightningDestinationResult =
 export async function resolveLightningDestination(
   input: string,
   requestedAmountSats = 0,
+  preloadedLnurl?: LNURLPResponse,
 ): Promise<LightningDestinationResult> {
   const normalized = normalizeLightningInput(input);
   const isAddress = normalized.includes('@');
   if (isAddress || /^lnurl1/i.test(normalized)) {
-    const info = isAddress
+    const info = preloadedLnurl ?? (isAddress
       ? await resolveLightningAddress(normalized)
-      : await resolveLNURL(normalized);
+      : await resolveLNURL(normalized));
     const limits = {
       minSats: Math.ceil(info.minSendable / 1000),
       maxSats: Math.floor(info.maxSendable / 1000),

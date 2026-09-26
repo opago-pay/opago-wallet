@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 const path = require('node:path');
 const Mocha = require('mocha');
 const runtime = require('./contract-test-runtime.cjs');

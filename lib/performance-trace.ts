@@ -5,7 +5,7 @@ const STAGES = [
   'wallet.device_unlock', 'wallet.secure_read', 'wallet.seed_derivation', 'wallet.spark_initialize',
   'balance.spark', 'balance.hedera', 'rates.fetch',
   'history.page', 'history.local', 'history.spark', 'history.hedera',
-  'bitcoin.store', 'bitcoin.withdrawals', 'bitcoin.deposits', 'bitcoin.receipts',
+  'bitcoin.store', 'bitcoin.provider-restore', 'bitcoin.withdrawals', 'bitcoin.deposits', 'bitcoin.receipts',
   'receive.restore', 'receive.restore_storage', 'receive.create_invoice', 'receive.spark_invoice',
   'receive.invoice_persist', 'receive.qr_render', 'receive.qr_visible', 'receive.switch_to_qr',
   'receive.status', 'receive.payment_detected', 'receive.confirm_to_screen', 'receive.onchain_address',

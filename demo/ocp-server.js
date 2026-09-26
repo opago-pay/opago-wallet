@@ -7,9 +7,21 @@ const { bech32 } = require('bech32');
 
 const PORT = Number(process.env.OCP_DEMO_PORT || 3333);
 const BIND_HOST = process.env.OCP_DEMO_BIND_HOST || '127.0.0.1';
-const QUOTE_TTL_MS = Math.max(5_000, Number(process.env.OCP_DEMO_QUOTE_TTL_MS || 60_000));
+const configuredTtl = Number(process.env.OCP_DEMO_QUOTE_TTL_MS || 60_000);
+if (!Number.isSafeInteger(configuredTtl) || configuredTtl < 5_000 || configuredTtl > 300_000) {
+  throw new Error('OCP_DEMO_QUOTE_TTL_MS must be between 5000 and 300000 milliseconds.');
+}
+const QUOTE_TTL_MS = configuredTtl;
 const LIGHTNING_INVOICE = process.env.OCP_DEMO_LIGHTNING_INVOICE || '';
+const MAX_QUOTES = 1_000;
 const quotes = new Map();
+
+function discardExpiredQuotes() {
+  const now = Date.now();
+  for (const [id, quote] of quotes) {
+    if (quote.expiresAt <= now) quotes.delete(id);
+  }
+}
 
 function positiveNumber(name, fallback) {
   const value = Number(process.env[name] || fallback);
@@ -37,6 +49,8 @@ function sendJson(res, status, body) {
 }
 
 function createQuote() {
+  discardExpiredQuotes();
+  if (quotes.size >= MAX_QUOTES) throw new Error('Demo quote capacity reached. Try again after expiry.');
   const transferAmounts = [];
   if (LIGHTNING_INVOICE) {
     transferAmounts.push({
@@ -131,6 +145,9 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 503, { status: 'ERROR', reason: error.message });
   }
 });
+
+const cleanup = setInterval(discardExpiredQuotes, 60_000);
+cleanup.unref();
 
 function localAddress() {
   if (BIND_HOST !== '0.0.0.0') return BIND_HOST;

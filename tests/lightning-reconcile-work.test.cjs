@@ -12,10 +12,10 @@ function fixture(initial, reconciled) {
     '../lightning': { createPaymentReference: hash => 'ln:' + hash },
     '../promise-timeout': { withTimeout: promise => promise },
     '../wallet-session': { walletSession: { captureRuntime: () => () => {} } },
-    './payment-journal-native': { lightningPaymentJournal: {
+    './payment-journal-native': { lightningPaymentJournalFor: () => ({
       list: async () => { calls.lists++; return initial; },
       reconcile: async () => { calls.reconciles++; return reconciled; },
-    } },
+    }) },
     './spark-history': {},
   };
   const source = fs.readFileSync(path.join(__dirname, '../lib/lightning/reconcile-native.ts'), 'utf8');
@@ -33,16 +33,16 @@ const pending = { paymentHash: 'a'.repeat(64), amountSats: 20, requestId: null, 
 test('ordinary Send visits do not rewrite settled payment history', async () => {
   const records = [{ ...pending, state: 'confirmed' }];
   const app = fixture(records, records);
-  assert.deepEqual(await app.reconcile({}), records);
+  assert.deepEqual(await app.reconcile({}, { network: 'REGTEST', publicKey: 'a'.repeat(64) }), records);
   assert.deepEqual(app.calls, { lists: 1, reconciles: 0, writes: [] });
 });
 
 test('an unresolved status poll writes no duplicate local activity, but a real resolution does', async () => {
   const unchanged = fixture([pending], [pending]);
-  await unchanged.reconcile({});
+  await unchanged.reconcile({}, { network: 'REGTEST', publicKey: 'a'.repeat(64) });
   assert.equal(unchanged.calls.writes.length, 0);
   const resolved = fixture([pending], [{ ...pending, state: 'confirmed', requestId: 'request-1' }]);
-  await resolved.reconcile({});
+  await resolved.reconcile({}, { network: 'REGTEST', publicKey: 'a'.repeat(64) });
   assert.equal(resolved.calls.writes.length, 1);
   assert.equal(resolved.calls.writes[0][3].status, 'confirmed');
 });

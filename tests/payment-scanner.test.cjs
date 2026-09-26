@@ -21,7 +21,7 @@ function fixture(options = {}) {
     '@/hooks/useLanguage': { useLanguage(){} }, '@/lib/i18n': { t:key=>key },
     'expo-camera': { Camera:{},CameraView:'camera' },
     'react-native-svg': { __esModule:true, default:'svg',Defs:'defs',LinearGradient:'gradient',Rect:'rect',Stop:'stop' },
-    './scanner-styles': { scannerStyles:{} }, './scanner-sheet': { ScannerSheet:'sheet' },
+    './scanner-styles': options.scannerStyles || { scannerStyles:{}, scannerDarkStyles:{} }, './scanner-sheet': { ScannerSheet:'sheet' },
     './scanner-success-background': { ScannerShade:'shade', ScannerSuccessBackground:'scan-background' },
     '@/lib/camera-capabilities': { hasBackCameraTorch:async()=>state.torch },
     '@/lib/scanner-permission': { scannerPermission:async(_,request)=>{calls.push(request?'permission-request':'permission-read');return {granted:state.granted,canAskAgain:true};} },
@@ -75,6 +75,31 @@ test('manual sheet validates input and advances directly into the payment flow',
  assert.equal(nodes(tree).some(n=>n.type==='camera'),false);nodes(tree).find(n=>n.type==='input').props.onChangeText('0.0.123');tree=app.render();
  button(tree,'Continue').props.onPress();tree=await app.settle();assert.equal(button(tree,'Review payment'),undefined);
  assert.deepEqual(detected(app),[['detected','0.0.123']]);
+});
+
+test('manual entry uses theme-aware fields while the camera overlay stays dark', async t => {
+ require('./register-typescript.cjs');
+ const theme = require('../lib/theme-styles.ts');
+ const { colorModePreference } = require('../lib/color-mode.ts');
+ await colorModePreference.initialize({ getItem: async () => 'dark', setItem: async () => {} });
+ t.after(() => colorModePreference.setMode('dark'));
+ const styleModule = hookFixture('components/send/scanner-styles.ts', () => ({
+  'react-native': { StyleSheet: { create: value => value } }, '@/lib/theme-styles': theme,
+ }), exports => exports);
+ const scannerStyles = styleModule.render();
+ for (const mode of ['light', 'dark']) {
+  await colorModePreference.setMode(mode);
+  const app = fixture({ scannerStyles }); t.after(app.unmount);
+  let tree = await app.settle();
+  const cameraTitle = nodes(tree).find(node => node.type === 'text' && node.props.children === 'Paste');
+  assert.ok(cameraTitle.props.style.some(style => style?.color === '#f7f7f7'));
+  button(tree, 'Enter address').props.onPress(); tree = app.render();
+  const input = nodes(tree).find(node => node.type === 'input');
+  assert.equal(input.props.style.backgroundColor, mode === 'light' ? theme.themePalette.light.raised : '#202023');
+  assert.equal(input.props.style.color, mode === 'light' ? theme.themePalette.light.text : '#f8f8fa');
+  assert.equal(nodes(tree).find(node => node.props.nativeID === 'scannerRecipientLabel').props.style.color,
+   mode === 'light' ? theme.themePalette.light.secondary : '#c3c3ca');
+ }
 });
 test('camera runs continuously until capture and restarts after cancelled validation or manual entry',async t=>{
  let finish;const app=fixture({validate:()=>new Promise(resolve=>{finish=resolve;})});t.after(app.unmount);

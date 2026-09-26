@@ -1,4 +1,3 @@
-import type { LNURLPResponse } from '@/lib/lnurl-safe';
 import type { OcpOption, OcpResponse } from '@/lib/ocp-safe';
 import type { HederaCheckoutRequest } from '@/lib/hedera/checkout';
 import type { PreparedSparkPayment } from '@/lib/payments';
@@ -20,11 +19,6 @@ export interface PendingHederaPayment {
 
 export interface PendingLightningPayment extends PreparedSparkPayment {
   recipientLabel: string;
-}
-
-export interface PendingEId {
-  lnurl: LNURLPResponse;
-  amountSats: number;
 }
 
 export interface OcpState {

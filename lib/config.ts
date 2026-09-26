@@ -217,19 +217,28 @@ export const appConfig = Object.freeze({
   ),
 });
 
-function isPrivateDevelopmentHost(hostname: string): boolean {
+export function isPrivateDevelopmentHost(hostname: string): boolean {
+  // Literal IPv6 addresses are uncommon payment endpoints. Without a native
+  // canonical IP parser/connection guard, fail closed for every IPv6 literal
+  // (including IPv4-mapped and link-local forms) in production.
+  if (hostname.startsWith('[') && hostname.endsWith(']')) return true;
+  const ipv4 = hostname.split('.').map(Number);
+  if (ipv4.length === 4 && ipv4.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)) {
+    const [first, second, third] = ipv4;
+    return first === 0 || first === 10 || first === 127 || first >= 224 ||
+      (first === 100 && second >= 64 && second <= 127) ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && (second === 168 || (second === 0 && (third === 0 || third === 2)))) ||
+      (first === 198 && (second === 18 || second === 19 || (second === 51 && third === 100))) ||
+      (first === 203 && second === 0 && third === 113);
+  }
   return (
     hostname === 'localhost' ||
     hostname.endsWith('.localhost') ||
     hostname === '10.0.2.2' ||
     hostname === '0.0.0.0' ||
-    hostname.endsWith('.local') ||
-    /^127\./.test(hostname) ||
-    /^169\.254\./.test(hostname) ||
-    /^10\./.test(hostname) ||
-    /^192\.168\./.test(hostname) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-    /^\[?(::1|f[cd][a-f0-9:]*|fe8[0-9a-f][a-f0-9:]*)\]?$/.test(hostname)
+    hostname.endsWith('.local')
   );
 }
 

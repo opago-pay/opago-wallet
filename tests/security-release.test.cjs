@@ -47,8 +47,9 @@ test('inactivity expires a session even before the UI timer runs; interaction ca
   assert.throws(() => session.capture(), /unlock/i);
 });
 
-function deviceAuthFixture({ level = 3, result = { success: true }, duringPrompt, allowDeviceCredential = false, androidVersion = 34, duringCheck } = {}) {
+function deviceAuthFixture({ level = 3, result = { success: true }, duringPrompt, allowDeviceCredential = false, androidVersion = 34, os = 'android', duringCheck } = {}) {
   const listeners = new Set();
+  const diagnostics = [];
   let prompts = 0;
   let removed = false;
   const session = new WalletSession();
@@ -58,8 +59,9 @@ function deviceAuthFixture({ level = 3, result = { success: true }, duringPrompt
   const deviceAuth = isolatedModule('lib/device-authentication.ts', {
     './i18n': require('../lib/i18n/index.ts'),
     './wallet-session': { walletSession: session },
+    './auth-diagnostics': { recordAuthDiagnostic: (event, category) => diagnostics.push({ event, category }), categorizeAuthFailure: () => 'unknown' },
     'react-native': {
-      Platform: { OS: 'android', Version: androidVersion },
+      Platform: { OS: os, Version: androidVersion },
       AppState: Object.assign(appState, { addEventListener: (_name, cb) => {
         listeners.add(cb);
         return { remove() { removed = true; listeners.delete(cb); } };
@@ -78,7 +80,7 @@ function deviceAuthFixture({ level = 3, result = { success: true }, duringPrompt
       },
     },
   });
-  return { ...deviceAuth, session, changeState, prompts: () => prompts, removed: () => removed };
+  return { ...deviceAuth, session, changeState, diagnostics, prompts: () => prompts, removed: () => removed };
 }
 
 test('explicit biometric-only authentication still rejects PIN-only and weak biometric levels', async () => {
@@ -105,6 +107,22 @@ test('unlocking an already locked wallet supports the separate Android PIN activ
   await fixture.authenticateDevice('Unlock', { allowDeviceCredential: true });
   assert.equal(fixture.prompts(), 1);
   await assert.rejects(deviceAuthFixture({ level: 0 }).authenticateDevice('Unlock', { allowDeviceCredential: true }), /device PIN/);
+});
+
+test('a successful protected iOS keychain read waits for foreground before unlock can continue', async () => {
+  const fixture = deviceAuthFixture({ os: 'ios' });
+  let resolved = false;
+  const pending = fixture.readProtectedKeyForUnlock(async () => {
+    fixture.changeState('background');
+    return 'synthetic phrase';
+  }).then(value => { resolved = true; return value; });
+  await Promise.resolve();
+  assert.equal(resolved, false);
+  fixture.changeState('active');
+  assert.equal(await pending, 'synthetic phrase');
+  assert.equal(fixture.prompts(), 0);
+  fixture.changeState('background');
+  await assert.rejects(fixture.readProtectedKeyForUnlock(async () => 'synthetic phrase'), /Return to Opago/);
 });
 
 test('PIN-only Android wallets authorize only after the system prompt succeeds in the foreground', async () => {
@@ -208,6 +226,68 @@ test('Android 10 PIN-only devices get a clear compatibility error; strong biomet
   assert.equal(biometric.prompts(), 1);
 });
 
+test('iOS biometric-only policy rejects passcode-only authentication before a wallet action', async () => {
+  const pinOnly = deviceAuthFixture({ os: 'ios', level: 1 });
+  await assert.rejects(pinOnly.authorizeWalletAction('Create'), /fingerprint or strong face recognition/);
+  assert.equal(pinOnly.prompts(), 0);
+  const biometric = deviceAuthFixture({ os: 'ios', level: 3 });
+  (await biometric.authorizeWalletAction('Pay'))();
+  assert.equal(biometric.prompts(), 1);
+});
+
+test('successful iOS Face ID waits for the app to resume even when dismissal takes over two seconds', async () => {
+  let finished = false;
+  const fixture = deviceAuthFixture({ os: 'ios', duringPrompt: change => {
+    change('inactive');
+    setTimeout(() => change('active'), 2_100);
+  } });
+  const approval = fixture.authenticateDevice('Unlock').then(() => { finished = true; });
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(finished, false);
+  await approval;
+  assert.equal(finished, true);
+  assert.equal(fixture.removed(), true);
+});
+
+test('a cancelled Face ID prompt cannot authorize a backgrounded iOS wallet', async () => {
+  const fixture = deviceAuthFixture({ os: 'ios', result: { success: false }, duringPrompt: change => {
+    change('background');
+  } });
+  await assert.rejects(fixture.authenticateDevice('Unlock'), /cancelled/);
+  assert.equal(fixture.removed(), true);
+});
+
+test('iOS Face ID succeeds after its system UI briefly backgrounds Opago', async () => {
+  const fixture = deviceAuthFixture({ os: 'ios', duringPrompt: change => {
+    change('background');
+    setTimeout(() => change('active'), 20);
+  } });
+  const oldApproval = fixture.session.capture();
+  (await fixture.authorizeWalletAction('Show recovery words'))();
+  assert.equal(fixture.prompts(), 1);
+  assert.throws(oldApproval, /locked/i);
+  fixture.changeState('background');
+  assert.equal(fixture.session.isUnlocked(), false);
+});
+
+test('an iOS protected key read keeps only its own session through Face ID', async () => {
+  const fixture = deviceAuthFixture({ os: 'ios' });
+  const oldApproval = fixture.session.capture();
+  const phrase = await fixture.withProtectedWalletAccess(async () => {
+    fixture.changeState('background');
+    setTimeout(() => fixture.changeState('active'), 20);
+    return 'synthetic-recovery-key';
+  });
+  assert.equal(phrase, 'synthetic-recovery-key');
+  assert.throws(oldApproval, /locked/i);
+  const interrupted = deviceAuthFixture({ os: 'ios' });
+  await assert.rejects(interrupted.withProtectedWalletAccess(async () => {
+    interrupted.changeState('background');
+    throw new Error('synthetic keychain failure');
+  }), /synthetic keychain failure/);
+  assert.equal(interrupted.session.isUnlocked(), false);
+});
+
 test('a PIN prompt preserves SDK startup but revokes old action approvals; a real lock revokes both', () => {
   const session = new WalletSession();
   session.unlock();
@@ -255,6 +335,49 @@ test('a queued SDK startup is skipped entirely if its session locks', async () =
   resource.reset();
   assert.equal(await result, null);
   assert.equal(starts, 0);
+});
+
+test('Spark deadline reports a stuck startup without overlapping key-bearing factories', async () => {
+  const { SessionResource } = require('../lib/session-resource.ts');
+  const resource = new SessionResource();
+  const events = [];
+  let finish;
+  const first = resource.initialize(signal => new Promise(resolve => {
+    finish = () => resolve({ cleanupConnections: async () => { events.push('late disposed'); } });
+    signal.addEventListener('abort', () => events.push('abort signaled'));
+  }), 15);
+  while (!finish) await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(first, /startup timed out/);
+  assert.deepEqual(events, ['abort signaled']);
+  const second = resource.initialize(async () => {
+    events.push('second started');
+    return { cleanupConnections: async () => { events.push('second disposed'); } };
+  }, 500);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(events, ['abort signaled']);
+  finish();
+  assert.ok(await second);
+  assert.deepEqual(events, ['abort signaled', 'late disposed', 'second started']);
+  resource.reset();
+});
+
+test('locking signals startup cancellation and a late error cannot revive the old session', async () => {
+  const { SessionResource } = require('../lib/session-resource.ts');
+  const resource = new SessionResource();
+  let rejectOld;
+  let aborted = false;
+  const first = resource.initialize(signal => new Promise((resolve, reject) => {
+    rejectOld = reject;
+    signal.addEventListener('abort', () => { aborted = true; });
+  }));
+  while (!rejectOld) await new Promise(resolve => setImmediate(resolve));
+  resource.reset();
+  assert.equal(aborted, true);
+  const second = resource.initialize(async () => ({ cleanupConnections: async () => undefined }));
+  rejectOld(new Error('late native failure'));
+  await assert.rejects(first, /late native failure/);
+  assert.ok(await second);
+  resource.reset();
 });
 
 test('the maintained query parser preserves Expo Router query encoding and named exports', () => {

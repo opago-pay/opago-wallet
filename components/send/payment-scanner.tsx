@@ -18,8 +18,9 @@ import { friendlyPaymentMessage } from '@/lib/payment-errors';
 import { walletSession } from '@/lib/wallet-session';
 import { ScannerSheet } from './scanner-sheet';
 import { ScannerShade, ScannerSuccessBackground } from './scanner-success-background';
-import { scannerStyles as styles } from './scanner-styles';
+import { scannerDarkStyles as styles, scannerStyles as sheetStyles } from './scanner-styles';
 import { measurePerformance } from '@/lib/performance-trace';
+import { adaptColor } from '@/lib/theme-styles';
 
 export function PaymentScanner(props: { onDetected(value: string): void; onCancel(): void }) {
   useLanguage();
@@ -239,16 +240,16 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     </ScrollView>
     </>}
     <ScannerSheet visible={manual && visible.current} onClose={resume} onShow={() => entryInput.current?.focus()} title={t('Enter address')}>
-      <Text style={styles.sheetDescription}>{t('Address or payment request')}</Text>
-      <Text nativeID="scannerRecipientLabel" style={styles.label}>{t('Recipient')}</Text>
-      <TextInput ref={entryInput} style={styles.input} accessibilityLabel={t('Recipient')} accessibilityLabelledBy="scannerRecipientLabel"
-        placeholder={t('Address or payment code')} placeholderTextColor="#898994" value={entry}
+      <Text style={sheetStyles.sheetDescription}>{t('Address or payment request')}</Text>
+      <Text nativeID="scannerRecipientLabel" style={sheetStyles.label}>{t('Recipient')}</Text>
+      <TextInput ref={entryInput} style={sheetStyles.input} accessibilityLabel={t('Recipient')} accessibilityLabelledBy="scannerRecipientLabel"
+        placeholder={t('Address or payment code')} placeholderTextColor={adaptColor('#898994', 'color')} value={entry}
         onChangeText={value => { invalidate(); setEntry(value); setError(''); }} multiline
         autoCorrect={false} spellCheck={false} autoCapitalize="none" textContentType="none" autoComplete="off" maxLength={16384} />
-      {!!error && <Text style={styles.error} accessibilityRole="alert">{t(error)}</Text>}
-      <TouchableOpacity style={[styles.primary, (!entry.trim() || checking) && styles.disabled]} accessibilityRole="button"
+      {!!error && <Text style={sheetStyles.error} accessibilityRole="alert">{t(error)}</Text>}
+      <TouchableOpacity style={[sheetStyles.primary, (!entry.trim() || checking) && sheetStyles.disabled]} accessibilityRole="button"
         disabled={!entry.trim() || checking} onPress={submitEntry}>
-        {checking ? <ActivityIndicator color="#171108" /> : <Text style={styles.primaryText}>{t('Continue')}</Text>}
+        {checking ? <ActivityIndicator color="#171108" /> : <Text style={sheetStyles.primaryText}>{t('Continue')}</Text>}
       </TouchableOpacity>
     </ScannerSheet>
   </View>;

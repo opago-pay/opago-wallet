@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '@/lib/i18n';
-import { scannerStyles as styles } from './scanner-styles';
+import { scannerDarkStyles as styles } from './scanner-styles';
 
 export function ScannerShade() {
   return <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none" accessible={false}>

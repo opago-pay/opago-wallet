@@ -1,9 +1,10 @@
 import de from './locales/de.json';
 import fr from './locales/fr.json';
 import es from './locales/es.json';
+import it from './locales/it.json';
 import { languagePreference, LANGUAGE_LOCALES, type AppLanguage } from './language';
 
-export const dictionaries: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = { de, fr, es };
+export const dictionaries: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = { de, fr, es, it };
 export type TranslationValues = Record<string, string | number>;
 
 export function translate(language: AppLanguage, message: string, values: TranslationValues = {}): string {

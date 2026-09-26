@@ -60,7 +60,7 @@ export function BitcoinReview(props: {
       <Cost label={t('Maximum total')} amount={props.amountSats + props.feeSats} />
     </View>
     {props.route === 'onchain' && <Text style={[bitcoinStyles.note, { marginBottom: 16 }]}>{t('Bitcoin network confirmation required.')}</Text>}
-    {props.feeSats > props.amountSats / 10 && <Text style={[bitcoinStyles.note, { color: '#ffce6b', marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
+    {props.feeSats > props.amountSats / 10 && <Text style={[bitcoinStyles.note, { color: adaptColor('#ffce6b', 'color'), marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
   </BitcoinSendScreen>;
 }
 
@@ -79,7 +79,7 @@ export function BitcoinReviewLoading(props: { amountSats?: number; label?: strin
         <Text style={[bitcoinStyles.note, { textAlign: 'center' }]}>{t('Recipient receives')}</Text>
         <Text style={bitcoinStyles.amount}>{props.amountSats.toLocaleString(appLocale())} SAT</Text>
       </>}
-      <ActivityIndicator color="#ffb000" size="large" />
+      <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="large" />
       <Text style={[bitcoinStyles.muted, { textAlign: 'center' }]}>{t('Checking payment and fees…')}</Text>
     </View>
   </BitcoinSendScreen>;
@@ -112,23 +112,23 @@ export function BitcoinInfo() {
   const [expanded, setExpanded] = useState(false);
   return <View><TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={t('About your Bitcoin balance')}
     style={bitcoinStyles.disclosure} onPress={() => setExpanded(!expanded)}>
-    <Text style={bitcoinStyles.muted}>{t('One balance. Two payment routes.')}</Text><Ionicons name="information-circle-outline" size={23} color="#aaaab3" />
+    <Text style={bitcoinStyles.muted}>{t('One balance. Two payment routes.')}</Text><Ionicons name="information-circle-outline" size={23} color={adaptColor('#aaaab3', 'color')} />
   </TouchableOpacity>{expanded && <Text style={bitcoinStyles.note}>{t('It stays your Bitcoin. Lightning and the Bitcoin network are two ways to send and receive Bitcoin. You use one Bitcoin balance. Opago recognises the route from the address or request. You see costs and timing before sending. Learn about Spark and its dependencies in advanced wallet details.')}</Text>}</View>;
 }
 export const bitcoinStyles = adaptiveStyles(StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#09090b' }, page: { flexGrow: 1, paddingHorizontal: 23, paddingBottom: 36, gap: 16 },
+  screen: { flex: 1, backgroundColor: '#09090b' }, page: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 36, gap: 16 },
   title: { color: '#fafaf7', fontSize: 31, lineHeight: 37, fontWeight: '600', letterSpacing: -0.8, marginTop: 12 },
   value: { color: '#fafaf7', fontSize: 16, fontWeight: '600' }, muted: { color: '#aaaab3', fontSize: 14, lineHeight: 21 },
   note: { color: '#aaaab3', fontSize: 13, lineHeight: 20 }, footnote: { color: '#aaaab3', fontSize: 12, textAlign: 'center', lineHeight: 18 },
   amount: { color: '#fafaf7', fontSize: 42, fontWeight: '600', textAlign: 'center', marginVertical: 8, fontVariant: ['tabular-nums'] },
   recipient: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 },
   quote: { marginVertical: 8, gap: 14 }, row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, justifyContent: 'space-between' },
-  button: { backgroundColor: '#ffb000', borderRadius: 15, minHeight: 54, padding: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#101011', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  button: { backgroundColor: '#ffb000', borderRadius: 16, minHeight: 54, padding: 16, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { color: '#101011', fontSize: 16, lineHeight: 22, fontWeight: '600', textAlign: 'center' },
   secondary: { backgroundColor: '#161619', borderWidth: 1, borderColor: '#2c2c31' },
   box: { backgroundColor: '#161619', borderWidth: 1, borderColor: '#2c2c31', borderRadius: 18, padding: 17, gap: 12 },
   warning: { color: '#ffce6b', backgroundColor: '#282113', borderRadius: 15, padding: 14, fontSize: 14, lineHeight: 21 },
   address: { color: '#fafaf7', fontSize: 14, lineHeight: 22 },
   disclosure: { minHeight: 48, borderTopColor: '#2c2c31', borderTopWidth: 1, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
-  input: { color: '#fafaf7', fontSize: 16, minHeight: 54, borderWidth: 1, borderColor: '#2c2c31', backgroundColor: '#161619', borderRadius: 15, padding: 14 },
+  input: { color: '#fafaf7', fontSize: 16, lineHeight: 24, minHeight: 54, borderWidth: 1, borderColor: '#2c2c31', backgroundColor: '#161619', borderRadius: 16, padding: 14 },
 }));

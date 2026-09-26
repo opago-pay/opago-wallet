@@ -35,6 +35,7 @@ test('Travel Rule merchant verifies canonical proofs and rejects replay', async 
   process.env.EIDAS_BACKEND_URL = 'http://127.0.0.1:' + keyAddress.port;
   process.env.EIDAS_DEMO_INVOICE = 'lnbcrt1configured-demo-invoice';
   process.env.EIDAS_DEMO_AMOUNT_MSAT = '1000';
+  process.env.EIDAS_DEMO_TRANSACTION_REFERENCE = 'lnurl:https://merchant.example';
 
   const { server } = require('../demo/travel-rule-merchant.js');
   await listen(server);
@@ -85,4 +86,22 @@ test('Travel Rule merchant verifies canonical proofs and rejects replay', async 
   const rejected = await fetch(tamperedUrl);
   assert.equal(rejected.status, 400);
   assert.match((await rejected.json()).reason, /invalid eIDAS signature/i);
+
+  const otherPayload = { ...payload, sessionNonce: crypto.randomBytes(24).toString('hex'),
+    transactionReference: 'lnurl:https://attacker.example' };
+  const otherPayerData = { ...otherPayload, compliance: { mandatory: true, algorithm: 'ed25519',
+    signature: crypto.sign(null, Buffer.from(JSON.stringify(otherPayload)), privateKey).toString('hex') } };
+  const otherUrl = new URL(callback);
+  otherUrl.searchParams.set('payerdata', JSON.stringify(otherPayerData));
+  const otherResponse = await fetch(otherUrl);
+  assert.equal(otherResponse.status, 400);
+  assert.match((await otherResponse.json()).reason, /another merchant or payment/i);
+
+  const concurrentPayload = { ...payload, sessionNonce: crypto.randomBytes(24).toString('hex') };
+  const concurrentPayerData = { ...concurrentPayload, compliance: { mandatory: true, algorithm: 'ed25519',
+    signature: crypto.sign(null, Buffer.from(JSON.stringify(concurrentPayload)), privateKey).toString('hex') } };
+  const concurrentUrl = new URL(callback);
+  concurrentUrl.searchParams.set('payerdata', JSON.stringify(concurrentPayerData));
+  const pair = await Promise.all([fetch(concurrentUrl), fetch(concurrentUrl)]);
+  assert.deepEqual(pair.map(response => response.status).sort(), [200, 400]);
 });

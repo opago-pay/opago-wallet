@@ -1,4 +1,4 @@
-import { adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useRef, useState } from 'react';
@@ -21,6 +21,7 @@ import { getWalletAssetPresentation, type WalletAssetKey } from '@/lib/wallet-as
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PaymentCurrency, PaymentSource, WalletBalances } from './types';
 import type { LightningAmountRequirement } from '@/lib/lightning-destination';
+import { BitcoinConnectionStatus } from '@/components/bitcoin/connection-status';
 
 const CURRENCIES: PaymentCurrency[] = ['SAT', 'EUR'];
 const recipientStyles = adaptiveStyles(StyleSheet.create({
@@ -47,6 +48,9 @@ export function PaymentForm(props: {
   balanceLoading: { spark: boolean; hedera: boolean };
   loading: boolean;
   walletReady: boolean;
+  sparkStatus?: 'idle' | 'connecting' | 'ready' | 'error';
+  sparkError?: string | null;
+  onRetrySpark?(): Promise<void>;
   onDestinationChange(value: string): void;
   onAmountChange(value: string): void;
   onCurrencyChange(value: PaymentCurrency): void;
@@ -87,11 +91,11 @@ export function PaymentForm(props: {
         accessibilityLabel={t('{asset}, {network}, balance {balance}', { asset: presentation.name, network: presentation.networkLabel, balance: item.balance })}>
         <View style={styles.assetSelectorHeader}>
           <AssetIcon asset={item.asset} size={34} />
-          <Ionicons name="chevron-forward" size={18} color="#696974" />
+          <Ionicons name="chevron-forward" size={18} color={adaptColor('#696974', 'color')} />
         </View>
         <Text style={styles.assetSelectorTitle}>{presentation.name}</Text>
         <Text style={styles.assetSelectorBalance}>{item.balance}</Text>
-        {props.balanceLoading[item.source] && <ActivityIndicator color="#ffb000" size="small" accessibilityLabel={t('Updating balance')} />}
+        {props.balanceLoading[item.source] && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" accessibilityLabel={t('Updating balance')} />}
         <Text style={styles.assetSelectorMeta}>{presentation.networkBadge}</Text>
       </TouchableOpacity>
     );
@@ -102,6 +106,7 @@ export function PaymentForm(props: {
     recipient={props.amountRequirement?.recipient || props.destination} loading={props.loading}
     disabled={!props.walletReady || (!props.amountInput.trim() && props.fixedAmountSats == null)}
     onchain={props.bitcoinRoute === 'onchain'} alternative={props.routeAlternative} balanceError={!!props.balanceError}
+    sparkStatus={props.sparkStatus} sparkError={props.sparkError} onRetrySpark={props.onRetrySpark}
     onAmount={props.onAmountChange} onCurrency={props.onCurrencyChange} onBack={props.onScan} onContinue={props.onReview} />;
 
   if (!isHedera) return <ScrollView style={bitcoinStyles.screen} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
@@ -109,6 +114,8 @@ export function PaymentForm(props: {
     <PaymentBackButton onPress={props.onScan} disabled={props.loading} label={t('Back to scanner')} />
     <Text style={[bitcoinStyles.title, recipientStyles.title]}>{t('Enter address')}</Text>
     <Text style={bitcoinStyles.muted}>{t('Paste the recipient’s address or type it below.')}</Text>
+    {props.sparkStatus === 'error' && props.onRetrySpark &&
+      <BitcoinConnectionStatus status="error" error={props.sparkError ?? null} onRetry={props.onRetrySpark} />}
     {!appConfig.isMainnet && <Text style={bitcoinStyles.warning}>REGTEST · {t('TEST MODE')}</Text>}
     <View style={[recipientStyles.field, recipientFocused && recipientStyles.focused]}>
       <Text style={recipientStyles.label}>{t('Address or payment code')}</Text>
@@ -118,7 +125,7 @@ export function PaymentForm(props: {
         autoCorrect={false} spellCheck={false} editable={!props.loading} accessibilityLabel={t('Address or payment code')} />
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Paste from clipboard')} disabled={props.loading} style={recipientStyles.paste}
         onPress={() => { void Clipboard.getStringAsync().then(props.onDestinationChange).catch(() => Alert.alert(t('Please try again.'))); }}>
-        <Ionicons name="clipboard-outline" size={19} color="#ffb000" accessible={false} />
+        <Ionicons name="clipboard-outline" size={19} color={adaptColor('#ffb000', 'color')} accessible={false} />
         <Text style={recipientStyles.pasteText}>{t('Paste from clipboard')}</Text>
       </TouchableOpacity>
     </View>
@@ -161,10 +168,12 @@ export function PaymentForm(props: {
         </View>
         <Image source={require('@/assets/images/logo_new.svg')} style={{ width: 36, height: 36 }} />
       </View>
+      {props.source !== 'hedera' && props.sparkStatus === 'error' && props.onRetrySpark &&
+        <BitcoinConnectionStatus status="error" error={props.sparkError ?? null} onRetry={props.onRetrySpark} />}
       {props.sourceSelected && !appConfig.isMainnet && !isHedera && (
         <View style={styles.modeNotice}>
           <View style={styles.modeNoticeIcon}>
-            <Ionicons name="flask-outline" size={18} color="#b7a8ff" />
+            <Ionicons name="flask-outline" size={18} color={adaptColor('#b7a8ff', 'color')} />
           </View>
           <View style={styles.modeNoticeCopy}>
             <Text style={styles.modeNoticeTitle}>{t("Bitcoin demo mode")}</Text>
@@ -233,7 +242,7 @@ export function PaymentForm(props: {
                 <Text style={styles.selectedAssetMeta}>
                   {selectedSource.balance} · {selectedPresentation.networkBadge}
                 </Text>
-                {props.balanceLoading[props.source] && <ActivityIndicator color="#ffb000" size="small" accessibilityLabel={t("Updating balance")} />}
+                {props.balanceLoading[props.source] && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" accessibilityLabel={t("Updating balance")} />}
               </View>
             </View>
 
@@ -246,7 +255,7 @@ export function PaymentForm(props: {
                 accessibilityRole="button"
                 accessibilityLabel={t("Scan payment QR code")}
               >
-                <Ionicons name="qr-code-outline" size={18} color="#ffb000" />
+                <Ionicons name="qr-code-outline" size={18} color={adaptColor('#ffb000', 'color')} />
                 <Text style={styles.scanText}>{t("Scan QR")}</Text>
               </TouchableOpacity>
             </View>

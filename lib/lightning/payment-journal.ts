@@ -1,4 +1,9 @@
 export const LIGHTNING_PAYMENT_JOURNAL_KEY = 'opago.lightning.payment-journal.v1';
+export const LIGHTNING_PAYMENT_JOURNAL_V2_PREFIX = 'opago.lightning.payment-journal.v2.';
+export function lightningPaymentScope(network: 'MAINNET' | 'REGTEST', publicKey: string): string {
+  if (!/^[0-9a-f]{64}$/.test(publicKey)) throw new Error('Lightning wallet identity is invalid.');
+  return `${network}:${publicKey}`;
+}
 
 const MAX_JOURNAL_RECORDS = 100;
 const PAYMENT_HASH_PATTERN = /^[0-9a-f]{64}$/;
@@ -7,6 +12,7 @@ const RESULT_PATTERN = /^[A-Z][A-Z0-9_]{0,95}$/;
 export type LightningPaymentJournalState = 'pending' | 'confirmed' | 'failed';
 
 export interface LightningPaymentJournalRecord {
+  scope: string;
   paymentHash: string;
   amountSats: number;
   requestId: string | null;
@@ -38,7 +44,8 @@ export interface LightningPaymentJournalStorage {
 }
 
 interface JournalDocument {
-  version: 1;
+  version: 2;
+  scope: string;
   records: LightningPaymentJournalRecord[];
 }
 
@@ -72,12 +79,13 @@ function normalizeResult(value: string | null): string | null {
   return normalized;
 }
 
-function assertRecord(value: unknown): LightningPaymentJournalRecord {
+function assertRecord(value: unknown, scope: string): LightningPaymentJournalRecord {
   if (!value || typeof value !== 'object') {
     throw new Error('Lightning payment journal contains an invalid record.');
   }
   const record = value as Partial<LightningPaymentJournalRecord>;
   if (
+    record.scope !== scope ||
     typeof record.paymentHash !== 'string' ||
     !PAYMENT_HASH_PATTERN.test(record.paymentHash) ||
     !Number.isSafeInteger(record.amountSats) ||
@@ -105,8 +113,8 @@ function assertRecord(value: unknown): LightningPaymentJournalRecord {
   return record as LightningPaymentJournalRecord;
 }
 
-function parseDocument(raw: string | null): JournalDocument {
-  if (raw === null) return { version: 1, records: [] };
+function parseDocument(raw: string | null, scope: string): JournalDocument {
+  if (raw === null) return { version: 2, scope, records: [] };
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -117,19 +125,22 @@ function parseDocument(raw: string | null): JournalDocument {
     throw new Error('Lightning payment journal is invalid.');
   }
   const document = value as Partial<JournalDocument>;
-  if (document.version !== 1 || !Array.isArray(document.records)) {
+  if (document.version !== 2 || document.scope !== scope || !Array.isArray(document.records)) {
     throw new Error('Lightning payment journal version is unsupported.');
   }
   if (document.records.length > MAX_JOURNAL_RECORDS) {
     throw new Error('Lightning payment journal exceeds its safe size.');
   }
-  return { version: 1, records: document.records.map(assertRecord) };
+  return { version: 2, scope, records: document.records.map(record => assertRecord(record, scope)) };
 }
 
 export function createLightningPaymentJournal(
   storage: LightningPaymentJournalStorage,
+  scope: string,
   now: () => Date = () => new Date(),
 ) {
+  if (!/^(MAINNET|REGTEST):[0-9a-f]{64}$/.test(scope)) throw new Error('Lightning payment scope is invalid.');
+  const key = LIGHTNING_PAYMENT_JOURNAL_V2_PREFIX + scope;
   let queue: Promise<unknown> = Promise.resolve();
   let generation = 0;
 
@@ -140,7 +151,28 @@ export function createLightningPaymentJournal(
   }
 
   async function read(): Promise<LightningPaymentJournalRecord[]> {
-    return parseDocument(await storage.getItem(LIGHTNING_PAYMENT_JOURNAL_KEY)).records;
+    return parseDocument(await storage.getItem(key), scope).records;
+  }
+
+  async function assertNoUnscopedPending(paymentHash: string): Promise<void> {
+    const raw = await storage.getItem(LIGHTNING_PAYMENT_JOURNAL_KEY);
+    if (raw === null) return;
+    let legacy: unknown;
+    try { legacy = JSON.parse(raw); }
+    catch { throw new Error('Legacy Lightning payment journal needs review before another payment.'); }
+    const document = legacy as { version?: unknown; records?: unknown };
+    if (document?.version !== 1 || !Array.isArray(document.records) ||
+        document.records.some((record: unknown) => !record || typeof record !== 'object' ||
+          !['pending', 'confirmed', 'failed'].includes((record as { state?: string }).state || ''))) {
+      throw new Error('Legacy Lightning payment journal needs review before another payment.');
+    }
+    if (document.records.some((record: { state: string }) => record.state === 'pending')) {
+      throw new Error('An unscoped Lightning payment is unresolved. Review it before sending again.');
+    }
+    if (document.records.some((record: { paymentHash?: string; state: string }) =>
+      record.paymentHash === paymentHash && record.state === 'confirmed')) {
+      throw new Error('This Lightning invoice has already been paid.');
+    }
   }
 
   async function write(records: LightningPaymentJournalRecord[]): Promise<void> {
@@ -153,11 +185,11 @@ export function createLightningPaymentJournal(
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, MAX_JOURNAL_RECORDS - pending.length);
     const document: JournalDocument = {
-      version: 1,
+      version: 2, scope,
       records: [...pending, ...resolved]
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     };
-    await storage.setItem(LIGHTNING_PAYMENT_JOURNAL_KEY, JSON.stringify(document));
+    await storage.setItem(key, JSON.stringify(document));
   }
 
   return {
@@ -190,6 +222,7 @@ export function createLightningPaymentJournal(
     recordPending(paymentHash: string, amountSats: number): Promise<void> {
       return exclusive(async () => {
         const normalized = normalizePaymentHash(paymentHash);
+        await assertNoUnscopedPending(normalized);
         if (!Number.isSafeInteger(amountSats) || amountSats <= 0) {
           throw new Error('Lightning payment amount must be a positive whole number of satoshis.');
         }
@@ -206,6 +239,7 @@ export function createLightningPaymentJournal(
         }
         const timestamp = now().toISOString();
         const record: LightningPaymentJournalRecord = {
+          scope,
           paymentHash: normalized,
           amountSats,
           requestId: null,
@@ -304,7 +338,7 @@ export function createLightningPaymentJournal(
     clear(): Promise<void> {
       return exclusive(async () => {
         generation += 1;
-        await storage.removeItem(LIGHTNING_PAYMENT_JOURNAL_KEY);
+        await storage.removeItem(key);
       });
     },
   };

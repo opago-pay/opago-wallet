@@ -3,7 +3,7 @@ import { createPaymentReference } from '../lightning';
 import { withTimeout } from '../promise-timeout';
 import { walletSession } from '../wallet-session';
 import type { LightningPaymentLifecycle } from '../payments';
-import { lightningPaymentJournal } from './payment-journal-native';
+import { lightningPaymentJournalFor } from './payment-journal-native';
 import type { LightningPaymentJournalRecord } from './payment-journal';
 import {
   loadSparkTransfersPaginated,
@@ -16,9 +16,11 @@ import {
 
 export async function reconcileLightningPayments(
   wallet: SparkHistoryWalletLike,
+  scope: { network: 'MAINNET' | 'REGTEST'; publicKey: string },
   sharedHistory: Promise<SparkTransferLike[]> | null = null,
   pendingSnapshot?: LightningPaymentJournalRecord[],
 ) {
+  const lightningPaymentJournal = lightningPaymentJournalFor(scope.network, scope.publicKey);
   const assertSession = walletSession.captureRuntime();
   const before = pendingSnapshot ?? await lightningPaymentJournal.list();
   assertSession();
@@ -54,8 +56,12 @@ export async function reconcileLightningPayments(
   return records;
 }
 
-export const lightningPaymentLifecycle: LightningPaymentLifecycle = {
+export function lightningPaymentLifecycle(scope: { network: 'MAINNET' | 'REGTEST'; publicKey: string }): LightningPaymentLifecycle {
+  const lightningPaymentJournal = lightningPaymentJournalFor(scope.network, scope.publicKey);
+  const assertSession = walletSession.captureRuntime();
+  return {
   async onPending(payment) {
+    assertSession();
     await lightningPaymentJournal.recordPending(
       payment.invoice.paymentHash,
       payment.amountSats,
@@ -76,10 +82,13 @@ export const lightningPaymentLifecycle: LightningPaymentLifecycle = {
   async onResolved(paymentHash, state, result, requestId) {
     const record = await lightningPaymentJournal.recordResolved(paymentHash, state, result, requestId);
     if (!record) return;
+    try { assertSession(); }
+    catch { return; } // The old scope remains reconciled; never index it into a new wallet's local activity.
     void addTransaction('outgoing', record.amountSats, 'SAT', {
       txId: createPaymentReference(paymentHash),
       reference: record.requestId || createPaymentReference(paymentHash),
       status: record.state,
     }).catch(() => { /* A history write must not delay a verified result. */ });
   },
-};
+  };
+}

@@ -126,5 +126,7 @@ test('treats cached account metadata as untrusted and wipes both network binding
   assert.match(nativeSource, /getHederaAccountBindingStorageKey\('testnet'\)/);
   assert.match(nativeSource, /getHederaAccountBindingStorageKey\('mainnet'\)/);
   assert.doesNotMatch(nativeSource, /mnemonic|private.?key|recovery phrase/i);
-  assert.match(authSource, /clearHederaAccountBindings\(\)/);
+  const wipeSource = readFileSync(path.join(__dirname, '..', 'lib', 'wallet-wipe-native.ts'), 'utf8');
+  assert.match(authSource, /resumePendingWalletWipe\(\)/);
+  assert.match(wipeSource, /clearHederaAccountBindings\(\)/);
 });

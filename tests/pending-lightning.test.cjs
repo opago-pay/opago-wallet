@@ -7,13 +7,15 @@ function fixture(options = {}) {
   const reads = []; const params = { ready: false, focused: true, ...options };
   const snapshots = [];
   const client = {};
+  const paymentScope = { network: 'REGTEST', publicKey: 'a'.repeat(64) };
   const app = hookFixture('hooks/usePendingLightningPayments.ts', hooks => ({
     'expo-router': { useFocusEffect: fn => hooks.useEffect(() => params.focused ? fn() : undefined, [fn, params.focused]) },
     '@/lib/ui-ready': { yieldToUi: async () => { reads.push('frame'); } },
-    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: async () => { reads.push('journal'); return params.records || []; } } },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: async () => { reads.push('journal'); return params.records || []; } }) },
     '@/lib/lightning/payment-journal': require('../lib/lightning/payment-journal.ts'),
-    '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async (_wallet, _history, snapshot) => { snapshots.push(snapshot); reads.push('network'); return params.resolve ? params.resolve() : []; } },
-  }), exports => exports.usePendingLightningPayments(client, params.ready, async () => { reads.push('balance'); }));
+    '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async (_wallet, _scope, _history, snapshot) => { snapshots.push(snapshot); reads.push('network'); return params.resolve ? params.resolve() : []; } },
+  }), exports => exports.usePendingLightningPayments(client,
+    paymentScope, params.ready, async () => { reads.push('balance'); }));
   return { ...app, reads, params, snapshots };
 }
 test('pending payment recovery waits for Bitcoin; a wallet without pending sends never loads remote history', async t => {

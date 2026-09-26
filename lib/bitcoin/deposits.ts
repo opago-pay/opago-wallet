@@ -1,7 +1,9 @@
 import { sats } from './amount';
 import { depositAmount } from './chain-data';
 import { validateBitcoinAddress, type BitcoinNetwork } from './destination';
-import { bitcoinScope, currencySats, listBitcoinRequests, type OnchainWallet } from './onchain';
+import { bitcoinScope, currencySats, listBitcoinRequests, scanBitcoinRequestPages, type ClaimStaticDeposit, type OnchainWallet } from './onchain';
+import type { BitcoinRequestCursor } from './request-cursor';
+import type { BitcoinDepositCursor } from './deposit-cursor';
 import type { BitcoinOperation, BitcoinStore } from './store';
 import { withTimeout } from '../promise-timeout';
 
@@ -17,44 +19,83 @@ export interface BitcoinDepositQuote {
 /** Confirmed-only endpoint. A static address is general wallet incoming,
  * deliberately NEVER matched to an invoice by its amount or creation time. */
 export async function discoverBitcoinDeposits(wallet: OnchainWallet, store: BitcoinStore, network: BitcoinNetwork,
-  assertCurrent: () => void): Promise<BitcoinOperation[]> {
+  assertCurrent: () => void, cursor?: BitcoinRequestCursor, depositCursor?: BitcoinDepositCursor): Promise<BitcoinOperation[]> {
   const scope = await bitcoinScope(wallet, network);
   const addresses = await timed(wallet.queryStaticDepositAddresses());
   assertCurrent();
-  for (const raw of addresses.slice(0, 20)) {
-    const address = validateBitcoinAddress(raw, network);
+  if (addresses.length > 10_000) throw new Error('Bitcoin deposit discovery is incomplete: too many addresses.');
+  const checkedAddresses = addresses.map(raw => validateBitcoinAddress(raw, network));
+  const indexOutputs = async (address: string, utxos: Awaited<ReturnType<OnchainWallet['getUtxosForDepositAddress']>>) => {
+    const candidates: BitcoinOperation[] = [];
+    const pageIds = new Set<string>();
+    for (const utxo of utxos) {
+      if (!/^[a-f\d]{64}$/i.test(utxo.txid) || !Number.isSafeInteger(utxo.vout) || utxo.vout < 0) throw new Error('Invalid Bitcoin deposit.');
+      const txid = utxo.txid.toLowerCase();
+      const id = `deposit:${network}:${txid}:${utxo.vout}`;
+      if (pageIds.has(id)) continue;
+      candidates.push({
+        id, scope, network, kind: 'deposit', address, amountSats: 0, feeSats: null,
+        txid, vout: utxo.vout, state: 'action_required', createdAt: new Date().toISOString(),
+      });
+      pageIds.add(id);
+    }
+    const existing = new Set(await store.existingIds(scope, [...pageIds]));
+    await store.upsertDiscoveredDeposits(scope, candidates.filter(item => !existing.has(item.id)), assertCurrent);
+  };
+  if (depositCursor) {
+    await depositCursor.run(scope, checkedAddresses, async (start, advance) => {
+      if (!checkedAddresses.length) { await advance(null); return; }
+      let { addressIndex, offset } = start;
+      for (let page = 0; page < 10 && addressIndex < checkedAddresses.length; page++) {
+        const address = checkedAddresses[addressIndex];
+        const utxos = await timed(wallet.getUtxosForDepositAddress(address, 100, offset, false));
+        assertCurrent();
+        await indexOutputs(address, utxos);
+        assertCurrent();
+        if (utxos.length < 100) { addressIndex += 1; offset = 0; }
+        else offset += 100;
+        await advance(addressIndex === checkedAddresses.length ? null : {
+          addressCount: checkedAddresses.length, addressIndex, offset, anchor: checkedAddresses[addressIndex],
+        });
+      }
+    });
+  } else for (const address of checkedAddresses) {
     for (let page = 0; page < 10; page++) {
       const utxos = await timed(wallet.getUtxosForDepositAddress(address, 100, page * 100, false));
       assertCurrent();
-      for (const utxo of utxos) {
-        if (!/^[a-f\d]{64}$/i.test(utxo.txid) || !Number.isSafeInteger(utxo.vout) || utxo.vout < 0) throw new Error('Invalid Bitcoin deposit.');
-        const txid = utxo.txid.toLowerCase();
-        const id = `deposit:${network}:${txid}:${utxo.vout}`;
-        await store.update(scope, id, previous => previous ?? ({
-          id, scope, network, kind: 'deposit', address, amountSats: 0, feeSats: null,
-          txid, vout: utxo.vout, state: 'action_required', createdAt: new Date().toISOString(),
-        }), assertCurrent);
-      }
+      await indexOutputs(address, utxos);
       if (utxos.length < 100) break;
+      if (page === 9) throw new Error('Bitcoin deposit discovery is incomplete: too many outputs.');
     }
   }
   // Recover accepted claims after force-stop, including the submit/persist gap.
-  const deposits = (await store.list(scope)).filter(row => row.kind === 'deposit' && row.state !== 'confirmed');
-  if (!deposits.length) return store.list(scope);
-  const requests = await listBitcoinRequests(wallet);
+  const deposits = (await store.listActive(scope)).filter(row => row.kind === 'deposit');
+  if (!deposits.length) return store.listActive(scope);
+  const applyClaim = async (record: BitcoinOperation, claim: ClaimStaticDeposit) => {
+    // TRANSFER_COMPLETED is the provider's completed transfer evidence. The
+    // live SDK balance remains the sole source of available funds.
+    const completed = ['TRANSFER_COMPLETED', 'SPEND_TX_CREATED', 'SPEND_TX_BROADCAST'].includes(claim.status);
+    await store.update(scope, record.id, previous => ({ ...previous!, requestId: claim.id,
+      transferId: claim.transferSparkId, amountSats: currencySats(claim.creditAmount),
+      state: completed ? 'confirmed' : 'checking',
+    }), assertCurrent);
+  };
+  let requests: Awaited<ReturnType<typeof listBitcoinRequests>> = [];
+  if (cursor) {
+    await scanBitcoinRequestPages(wallet, cursor, scope, 'deposit', async page => {
+      for (const record of deposits) {
+        const claim = page.find(item => item.typename === 'ClaimStaticDeposit' &&
+          'transactionId' in item && item.transactionId === record.txid && item.outputIndex === record.vout && item.network === network);
+        if (claim) await applyClaim(record, claim as ClaimStaticDeposit);
+      }
+    }, assertCurrent);
+  } else requests = await listBitcoinRequests(wallet);
   for (const record of deposits) {
     assertCurrent();
-    const claim = requests.find(item => item.typename === 'ClaimStaticDeposit' &&
+    const claim = !cursor && requests.find(item => item.typename === 'ClaimStaticDeposit' &&
       'transactionId' in item && item.transactionId === record.txid && item.outputIndex === record.vout && item.network === network);
-    if (claim && 'creditAmount' in claim) {
-      // TRANSFER_COMPLETED is the provider's completed transfer evidence. The
-      // live SDK balance remains the sole source of available funds.
-      const completed = ['TRANSFER_COMPLETED', 'SPEND_TX_CREATED', 'SPEND_TX_BROADCAST'].includes(claim.status);
-      await store.update(scope, record.id, previous => ({ ...previous!, requestId: claim.id,
-        transferId: claim.transferSparkId, amountSats: currencySats(claim.creditAmount),
-        state: completed ? 'confirmed' : 'checking',
-      }), assertCurrent);
-    } else if (record.transferId) {
+    if (claim && 'creditAmount' in claim) await applyClaim(record, claim as ClaimStaticDeposit);
+    else if (record.transferId) {
       const transfer = await timed(wallet.getTransfer(record.transferId));
       assertCurrent();
       if (transfer?.id === record.transferId && transfer.status === 'TRANSFER_STATUS_COMPLETED') {
@@ -62,7 +103,7 @@ export async function discoverBitcoinDeposits(wallet: OnchainWallet, store: Bitc
       }
     }
   }
-  return store.list(scope);
+  return store.listActive(scope);
 }
 
 export async function prepareBitcoinDeposit(wallet: OnchainWallet, operation: BitcoinOperation,
@@ -94,7 +135,12 @@ export async function claimBitcoinDeposit(wallet: OnchainWallet, store: BitcoinS
     if (!previous || previous.state !== 'action_required') throw new Error('This Bitcoin deposit is still being checked.');
     return { ...previous, state: 'checking', feeSats, amountSats: creditSats };
   }, assertAuthorized);
-  assertAuthorized();
+  try {
+    assertAuthorized();
+  } catch (cause) {
+    await store.abortBeforeSubmission(operation.scope, operation.id, 'checking');
+    throw cause;
+  }
   try {
     const result = await withTimeout(wallet.claimStaticDepositWithMaxFee({
       transactionId: operation.txid!, outputIndex: operation.vout!, maxFee: feeSats,

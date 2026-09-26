@@ -36,6 +36,7 @@ export interface HederaHistoryItem {
   counterpartyAccountId: string | null;
   result: string;
   hashscanUrl: string;
+  nonce: number;
 }
 
 export interface HederaTransactionStatus {
@@ -91,6 +92,21 @@ function snapshotFromMirror(
 export async function findHederaAccount(
   publicKey: string | PublicKey,
 ): Promise<HederaAccountSnapshot | null> {
+  const matches = await listHederaAccountsForKey(publicKey);
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(
+      'More than one Hedera ' + HEDERA_NETWORK + ' account uses this key. A unique account is required.',
+    );
+  }
+  return matches[0];
+}
+
+/** Display only accounts whose on-network key matches the current wallet.
+ * Selection is still verified again by numeric account ID before binding. */
+export async function listHederaAccountsForKey(
+  publicKey: string | PublicKey,
+): Promise<HederaAccountSnapshot[]> {
   const normalizedPublicKey = normalizeHederaPublicKey(publicKey);
   const matches = (await findMirrorAccountsByPublicKey(normalizedPublicKey))
     .filter(account => !account.deleted && typeof account.account === 'string')
@@ -103,13 +119,7 @@ export async function findHederaAccount(
       }
     });
 
-  if (matches.length === 0) return null;
-  if (matches.length > 1) {
-    throw new Error(
-      'More than one Hedera ' + HEDERA_NETWORK + ' account uses this key. A unique account is required.',
-    );
-  }
-  return snapshotFromMirror(matches[0], normalizedPublicKey);
+  return matches.map(account => snapshotFromMirror(account, normalizedPublicKey));
 }
 
 // Backward-compatible export for provisioning and Phase 1 acceptance tooling.
@@ -177,9 +187,8 @@ function historyItemFromMirror(
   walletAccountId: string,
 ): HederaHistoryItem | null {
   if (
-    !['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION'].includes(transaction.name || '') ||
+    !['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION', 'CONTRACTCALL'].includes(transaction.name || '') ||
     transaction.scheduled ||
-    (transaction.nonce != null && transaction.nonce !== 0) ||
     !transaction.transaction_id ||
     !transaction.consensus_timestamp
   ) {
@@ -222,6 +231,7 @@ function historyItemFromMirror(
     ),
     result: transaction.result || 'UNKNOWN',
     hashscanUrl: getHederaTransactionExplorerUrl(transaction.transaction_id),
+    nonce: transaction.nonce ?? 0,
   };
 }
 
@@ -238,6 +248,23 @@ export function findNewConfirmedIncomingHederaTransaction(
   ) || null;
 }
 
+function historyItemsFromMirror(transactions: MirrorTransactionRecord[], accountId: string): HederaHistoryItem[] {
+  const seen = new Map<string, { item: HederaHistoryItem; nonce: number }>();
+  for (const transaction of transactions) {
+    const item = historyItemFromMirror(transaction, accountId);
+    if (!item) continue;
+    const nonce = transaction.nonce ?? 0;
+    const previous = seen.get(item.transactionId);
+    // The parent carries the charged transaction fee. Use a child only when
+    // the parent has no HBAR delta for this account.
+    if (!previous || (nonce === 0 && previous.nonce !== 0)) {
+      seen.set(item.transactionId, { item, nonce });
+    }
+  }
+  return [...seen.values()].map(value => value.item)
+    .sort((left, right) => right.consensusTimestamp.localeCompare(left.consensusTimestamp));
+}
+
 export async function loadHederaHistory(
   rawAccountId: string,
   limit = 25,
@@ -245,30 +272,14 @@ export async function loadHederaHistory(
   const accountId = parseHederaAccountId(rawAccountId);
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
   const transactions = await listMirrorTransactions(accountId, safeLimit);
-  const seen = new Set<string>();
-  const history: HederaHistoryItem[] = [];
-
-  for (const transaction of transactions) {
-    const item = historyItemFromMirror(transaction, accountId);
-    if (!item || seen.has(item.transactionId)) continue;
-    seen.add(item.transactionId);
-    history.push(item);
-    if (history.length >= safeLimit) break;
-  }
-  return history;
+  return historyItemsFromMirror(transactions, accountId).slice(0, safeLimit);
 }
 
 export async function loadHederaHistoryPage(rawAccountId: string, limit = 10, before?: string) {
   const accountId = parseHederaAccountId(rawAccountId);
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error('Invalid HBAR history page.');
   const raw = await listMirrorTransactions(accountId, limit, before, true);
-  const seen = new Set<string>();
-  const items = raw.flatMap(transaction => {
-    const item = historyItemFromMirror(transaction, accountId);
-    if (!item || seen.has(item.transactionId)) return [];
-    seen.add(item.transactionId);
-    return [item];
-  });
+  const items = historyItemsFromMirror(raw, accountId);
   const oldest = raw.at(-1)?.consensus_timestamp;
   if (raw.length && (!oldest || !/^\d+\.\d{1,9}$/.test(oldest))) throw new Error('Invalid HBAR history timestamp.');
   return { items, next: raw.length === limit ? oldest! : null,
@@ -288,11 +299,12 @@ export async function loadHederaTransactionStatus(
       hashscanUrl: getHederaTransactionExplorerUrl(transactionId),
     };
   }
-  const result = transaction.result || 'UNKNOWN';
+  const result = String(transaction.result || '').trim().toUpperCase();
+  const pending = !result || result === 'UNKNOWN' || result === 'FUTURE_VALUE';
   return {
     transactionId: transaction.transaction_id || transactionId,
-    state: result === 'SUCCESS' ? 'success' : 'failed',
-    result,
+    state: pending ? 'pending' : result === 'SUCCESS' ? 'success' : 'failed',
+    result: pending ? null : result,
     consensusTimestamp: transaction.consensus_timestamp || null,
     hashscanUrl: getHederaTransactionExplorerUrl(
       transaction.transaction_id || transactionId,

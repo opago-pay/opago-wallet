@@ -6,7 +6,8 @@ const path = require('node:path');
 const ts = require('typescript');
 require('./register-typescript.cjs');
 const { payPreparedSparkPayment, prepareDecodedSparkPayment, LightningPaymentPendingError } = require('../lib/payments.ts');
-const { createLightningPaymentJournal } = require('../lib/lightning/payment-journal.ts');
+const { createLightningPaymentJournal: createScopedLightningPaymentJournal } = require('../lib/lightning/payment-journal.ts');
+const createLightningPaymentJournal = storage => createScopedLightningPaymentJournal(storage, 'REGTEST:' + 'a'.repeat(64));
 const paymentHash = '66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925';
 const preimage = '00'.repeat(32);
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -23,7 +24,7 @@ function storage(beforeWrite = async () => {}) {
     removeItem: async key => { data.delete(key); },
   };
 }
-function nativeLifecycle(journal, addTransaction) {
+function nativeLifecycle(journal, addTransaction, assertSession = () => {}) {
   const source = fs.readFileSync(path.join(__dirname, '../lib/lightning/reconcile-native.ts'), 'utf8');
   const code = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -32,8 +33,8 @@ function nativeLifecycle(journal, addTransaction) {
     '../database': { addTransaction },
     '../lightning': { createPaymentReference: hash => 'ln:' + hash },
     '../promise-timeout': {},
-    '../wallet-session': {},
-    './payment-journal-native': { lightningPaymentJournal: journal },
+    '../wallet-session': { walletSession: { captureRuntime: () => assertSession } },
+    './payment-journal-native': { lightningPaymentJournalFor: () => journal },
     './spark-history': {},
   };
   const exports = {};
@@ -41,7 +42,7 @@ function nativeLifecycle(journal, addTransaction) {
     assert.ok(name in dependencies, 'Unexpected dependency: ' + name);
     return dependencies[name];
   }, exports);
-  return exports.lightningPaymentLifecycle;
+  return exports.lightningPaymentLifecycle({ network: 'REGTEST', publicKey: 'a'.repeat(64) });
 }
 function wallet(result = { id: 'request-1', preimage }) {
   return {
@@ -136,4 +137,18 @@ test('an authoritative unpaid result stores its request ID together with the fai
   const saved = await journal.get(paymentHash);
   assert.equal(saved.state, 'failed');
   assert.equal(saved.requestId, 'request-1');
+});
+
+test('a late old-session Lightning result updates only its scoped journal, not new local activity', async () => {
+  const journal = createLightningPaymentJournal(storage());
+  const indexed = [];
+  let current = true;
+  const lifecycle = nativeLifecycle(journal, async (...args) => { indexed.push(args[3].status); },
+    () => { if (!current) throw new Error('Wallet changed.'); });
+  await lifecycle.onPending({ invoice: { paymentHash }, amountSats: 20 });
+  await flush();
+  current = false;
+  await lifecycle.onResolved(paymentHash, 'confirmed', 'PREIMAGE_VERIFIED', 'request-1');
+  assert.equal((await journal.get(paymentHash)).state, 'confirmed');
+  assert.deepEqual(indexed, ['pending']);
 });

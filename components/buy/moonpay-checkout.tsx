@@ -1,3 +1,4 @@
+import { adaptColor } from '@/lib/theme-styles';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -100,11 +101,11 @@ export function MoonPayCheckout({ config, asset, destination, eurAmount, onBrows
       accessibilityRole="button"
       disabled={!ready || busy}
       onPress={() => void openCheckout()}
-      style={{ minHeight: 58, borderRadius: 18, backgroundColor: '#ffb000', alignItems: 'center', justifyContent: 'center', opacity: !ready || busy ? 0.5 : 1 }}
+      style={{ minHeight: 58, borderRadius: 18, backgroundColor: adaptColor('#ffb000', 'backgroundColor'), alignItems: 'center', justifyContent: 'center', opacity: !ready || busy ? 0.5 : 1 }}
     >
-      {busy ? <ActivityIndicator color="#15150e" /> : <Text style={{ color: '#15150e', fontSize: 17, fontWeight: '800' }}>{t('Continue to MoonPay')}</Text>}
+      {busy ? <ActivityIndicator color={adaptColor('#15150e', 'color')} /> : <Text style={{ color: adaptColor('#15150e', 'color'), fontSize: 17, fontWeight: '800' }}>{t('Continue to MoonPay')}</Text>}
     </TouchableOpacity>
-    {error && <Text accessibilityRole="alert" style={{ color: '#f0a66b', textAlign: 'center', marginTop: 12 }}>
+    {error && <Text accessibilityRole="alert" style={{ color: adaptColor('#f0a66b', 'color'), textAlign: 'center', marginTop: 12 }}>
       {t('MoonPay could not be opened. Please try again.')}
     </Text>}
   </View>;

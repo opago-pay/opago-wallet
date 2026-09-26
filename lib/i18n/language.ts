@@ -1,7 +1,7 @@
-export const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'de'] as const;
+export const SUPPORTED_LANGUAGES = ['en', 'fr', 'es', 'de', 'it'] as const;
 export type AppLanguage = typeof SUPPORTED_LANGUAGES[number];
-export const LANGUAGE_NAMES: Record<AppLanguage, string> = { en: 'English', fr: 'Français', es: 'Español', de: 'Deutsch' };
-export const LANGUAGE_LOCALES: Record<AppLanguage, string> = { en: 'en-GB', fr: 'fr-FR', es: 'es-ES', de: 'de-DE' };
+export const LANGUAGE_NAMES: Record<AppLanguage, string> = { en: 'English', fr: 'Français', es: 'Español', de: 'Deutsch', it: 'Italiano' };
+export const LANGUAGE_LOCALES: Record<AppLanguage, string> = { en: 'en-GB', fr: 'fr-FR', es: 'es-ES', de: 'de-DE', it: 'it-IT' };
 export const LANGUAGE_STORAGE_KEY = 'opago_app_language';
 
 export function isAppLanguage(value: unknown): value is AppLanguage {

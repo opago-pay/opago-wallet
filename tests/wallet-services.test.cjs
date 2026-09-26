@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
@@ -101,7 +100,7 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     'utf8',
   );
   const walletReadyIndex = source.indexOf('setWalletReady(true);');
-  const sparkStartupIndex = source.indexOf('void sparkResource.current.initialize(');
+  const sparkStartupIndex = source.indexOf('void connectSpark(seed, generation);');
 
   assert.ok(walletReadyIndex >= 0, 'wallet readiness assignment is missing');
   assert.ok(sparkStartupIndex >= 0, 'background Spark startup is missing');
@@ -114,7 +113,7 @@ test('does not block Hedera wallet readiness on optional Spark startup', () => {
     source,
     /if \(initializationGenerationRef\.current !== generation\) return;/,
   );
-  assert.match(source, /Lightning wallet unavailable:/);
+  assert.match(source, /setSparkStatus\('error'\)/);
   assert.match(source, /maxAttempts: 3/);
 });
 

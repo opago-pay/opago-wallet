@@ -1,15 +1,17 @@
-import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
-import { AdvancedOptions } from '@/components/ui/advanced-options';
+import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { walletSession } from '@/lib/wallet-session';
-import { authorizeWalletAction } from '@/lib/device-authentication';
+import { readRecoveryPhraseForDisplay } from '@/lib/recovery-access';
 import {
   ActivityIndicator,
+  AccessibilityInfo,
   AppState,
   Alert,
+  BackHandler,
+  findNodeHandle,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -26,16 +28,22 @@ import { ProtectedRecoveryPhrase } from '@/components/security/recovery-phrase';
 import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { ColorModePicker } from '@/components/settings/color-mode-picker';
+import { getSettingsSection, SettingsMenu, settingsSectionTitle, type SettingsSection } from '@/components/settings/settings-menu';
+import { SettingsTransition } from '@/components/settings/settings-transition';
+import { LegalLinks } from '@/components/legal/legal-links';
+import { LegacyPaymentReview } from '@/components/security/legacy-payment-review';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { usePreventScreenCapture } from 'expo-screen-capture';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
-import { getSecureItem, MNEMONIC_STORE_KEY } from '@/lib/storage';
 import { appConfig } from '@/lib/config';
 import { operationalHealth } from '@/lib/operational-health-native';
 import type { ServiceHealthRecord } from '@/lib/operational-health';
 import { getPerformanceReport, markNavigationReady, performanceTracingEnabled } from '@/lib/performance-trace';
+import { categorizeAuthFailure, recordAuthDiagnostic } from '@/lib/auth-diagnostics';
+import { bindHederaWalletAccount } from '@/lib/hedera/account-binding-native';
+import { listHederaAccountsForKey, type HederaAccountSnapshot } from '@/lib/hedera/account';
 
 function SensitiveInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-verification');
@@ -61,8 +69,13 @@ export default function SettingsScreen() {
   useLanguage();
   useColorMode();
   const router = useRouter();
+  const params = useLocalSearchParams<{ section?: string | string[] }>();
+  const activeSection = getSettingsSection(params.section);
+  const scrollRef = useRef<ScrollView>(null);
+  const titleRef = useRef<Text>(null);
+  const sensitiveRequest = useRef(0);
   const insets = useSafeAreaInsets();
-  const { wipeWallet, hederaPublicKey, backupStatus, markBackupVerified, lockWallet } = useWalletAuth();
+  const { wipeWallet, hederaPublicKey, hederaAccount, refreshHederaAccount, backupStatus, markBackupVerified, lockWallet } = useWalletAuth();
   const backupChecked = backupStatus === 'verified';
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
@@ -79,14 +92,73 @@ export default function SettingsScreen() {
   const [backupWordInput, setBackupWordInput] = useState('');
   const [backupChallengeError, setBackupChallengeError] = useState('');
   const backupInputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const showAdvanced = activeSection === 'advanced';
   const [lightningHealth, setLightningHealth] = useState<ServiceHealthRecord | null>(null);
+  const [accountIdInput, setAccountIdInput] = useState('');
+  const [bindingAccount, setBindingAccount] = useState(false);
+  const [searchingAccounts, setSearchingAccounts] = useState(false);
+  const [searchedAccounts, setSearchedAccounts] = useState(false);
+  const [matchingAccounts, setMatchingAccounts] = useState<HederaAccountSnapshot[]>([]);
+
+  const clearSensitiveContent = useCallback(() => {
+    // Tabs stay mounted. A late authentication response must not reopen a secret
+    // after leaving this page or returning to the settings overview.
+    sensitiveRequest.current += 1;
+    setMnemonic(null);
+    setIsRevealed(false);
+    setBackupChallenge(null);
+    setBackupChallengeIndex(0);
+    setBackupWordInput('');
+    setBackupChallengeError('');
+    setDeletionVerified(false);
+    setHasViewedWords(false);
+    setIsUnlocking(false);
+    setIsVerifyingBackup(false);
+  }, []);
+
+  async function searchHederaAccounts() {
+    if (!hederaPublicKey || searchingAccounts) return;
+    setSearchingAccounts(true);
+    try {
+      const assertCurrent = walletSession.captureRuntime();
+      const accounts = await listHederaAccountsForKey(hederaPublicKey);
+      assertCurrent();
+      setMatchingAccounts(accounts);
+      setSearchedAccounts(true);
+      if (accounts.length === 1) setAccountIdInput(accounts[0].accountId);
+    } catch (cause) {
+      Alert.alert(t('Hedera account unavailable'), cause instanceof Error ? cause.message : t('Please try again.'));
+    } finally { setSearchingAccounts(false); }
+  }
+
+  async function importHederaAccount() {
+    if (!hederaPublicKey || bindingAccount) return;
+    setBindingAccount(true);
+    try {
+      const assertCurrent = walletSession.captureRuntime();
+      await bindHederaWalletAccount(accountIdInput.trim(), hederaPublicKey, assertCurrent);
+      assertCurrent();
+      await refreshHederaAccount();
+      setAccountIdInput('');
+      Alert.alert(t('Hedera account linked'), t('The account ID and wallet key match on the network.'));
+    } catch (cause) {
+      Alert.alert(t('Hedera account unavailable'), cause instanceof Error ? cause.message : t('Please try again.'));
+    } finally { setBindingAccount(false); }
+  }
 
   useFocusEffect(useCallback(() => {
-    // Tabs keep this screen mounted, so measure every visit rather than only the first mount.
-    const frame = requestAnimationFrame(() => markNavigationReady('settings'));
-    return () => cancelAnimationFrame(frame);
-  }, []));
+    if (activeSection !== 'security' && activeSection !== 'wallet') clearSensitiveContent();
+    const frame = requestAnimationFrame(() => {
+      markNavigationReady('settings');
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      const handle = findNodeHandle(titleRef.current);
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      clearSensitiveContent();
+    };
+  }, [activeSection, clearSensitiveContent]));
 
   useFocusEffect(useCallback(() => {
     // The local service diagnostic is only visible when the advanced section is open.
@@ -136,22 +208,26 @@ export default function SettingsScreen() {
       setIsRevealed(false);
       return;
     }
+    const request = sensitiveRequest.current;
+    recordAuthDiagnostic('recovery_reveal.begin');
     setIsUnlocking(true);
     try {
-      const assertUnlocked = await authorizeWalletAction('Unlock your Opago recovery phrase');
-      const phrase = await getSecureItem(MNEMONIC_STORE_KEY);
-      assertUnlocked();
+      const phrase = await readRecoveryPhraseForDisplay();
+      if (request !== sensitiveRequest.current) return;
       if (!phrase) throw new Error('Recovery phrase is unavailable.');
       setMnemonic(phrase);
       setIsRevealed(true);
       setHasViewedWords(true);
+      recordAuthDiagnostic('recovery_reveal.success');
     } catch (cause) {
+      recordAuthDiagnostic('recovery_reveal.failed', categorizeAuthFailure(cause));
+      if (request !== sensitiveRequest.current) return;
       Alert.alert(
         t('Could not unlock recovery phrase'),
         t(cause instanceof Error ? cause.message : t('Device authentication failed.')),
       );
     } finally {
-      setIsUnlocking(false);
+      if (request === sensitiveRequest.current) setIsUnlocking(false);
     }
   }
 
@@ -180,12 +256,12 @@ export default function SettingsScreen() {
 
   async function beginRecoveryBackupVerification(purpose: 'backup' | 'removal' = 'backup') {
     if (isVerifyingBackup || savingBackup.current) return;
+    const request = sensitiveRequest.current;
     setIsVerifyingBackup(true);
     setVerificationPurpose(purpose);
     try {
-      const assertUnlocked = await authorizeWalletAction('Unlock your Opago recovery phrase');
-      const phrase = await getSecureItem(MNEMONIC_STORE_KEY);
-      assertUnlocked();
+      const phrase = await readRecoveryPhraseForDisplay();
+      if (request !== sensitiveRequest.current) return;
       if (!phrase || !hederaPublicKey) throw new Error('Recovery phrase is unavailable.');
       const words = phrase.trim().toLowerCase().split(/\s+/);
       const positions = selectBackupChallengePositions(words.length);
@@ -200,13 +276,14 @@ export default function SettingsScreen() {
       setBackupWordInput('');
       setBackupChallengeError('');
     } catch (cause) {
+      if (request !== sensitiveRequest.current) return;
       setDeletionVerified(false);
       Alert.alert(
         t('Could not start backup verification'),
         t(cause instanceof Error ? cause.message : t('The phrase could not be verified.')),
       );
     } finally {
-      setIsVerifyingBackup(false);
+      if (request === sensitiveRequest.current) setIsVerifyingBackup(false);
     }
   }
 
@@ -241,11 +318,14 @@ export default function SettingsScreen() {
     setIsSavingBackup(true);
     setBackupChallenge(null);
     setBackupChallengeIndex(0);
+    const request = sensitiveRequest.current;
     try {
       await markBackupVerified();
+      if (request !== sensitiveRequest.current) return;
       setDeletionVerified(true);
       if (verificationPurpose === 'removal') showRemovalConfirmation();
     } catch {
+      if (request !== sensitiveRequest.current) return;
       setDeletionVerified(false);
       Alert.alert(t('Backup check not saved'), t('Unlock your wallet and check the backup again.'));
     } finally {
@@ -272,31 +352,61 @@ export default function SettingsScreen() {
 
   function showRemovalConfirmation() {
     const assertAuthorized = walletSession.capture();
+    const request = sensitiveRequest.current;
     Alert.alert(
       t('Remove wallet from this device?'),
       t('This removes the wallet’s keys, saved account details and local payment history from this device. It does not reverse payments. You will need the complete recovery phrase to access this wallet again.'),
       [
         { text: t('Cancel'), style: 'cancel' },
-        { text: t('Remove wallet'), style: 'destructive', onPress: () => void performReset(assertAuthorized) },
+        { text: t('Remove wallet'), style: 'destructive', onPress: () => {
+          if (request === sensitiveRequest.current) void performReset(assertAuthorized);
+        } },
       ],
     );
   }
 
   const busy = isUnlocking || isVerifyingBackup || isSavingBackup || isDeleting;
+  const navigateToSection = useCallback((section: SettingsSection) => {
+    if (busy) return;
+    Keyboard.dismiss();
+    clearSensitiveContent();
+    router.setParams({ section });
+  }, [busy, clearSensitiveContent, router]);
+
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (busy) return true;
+      if (activeSection === 'overview') return false;
+      navigateToSection('overview');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [activeSection, busy, navigateToSection]));
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 }]}>
+    <ScrollView ref={scrollRef} style={styles.container} keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 }]}>
+      {activeSection !== 'overview' && <TouchableOpacity style={styles.backButton} onPress={() => navigateToSection('overview')}
+        accessibilityRole="button" accessibilityLabel={t('Back to settings')} accessibilityState={{ disabled: busy }} disabled={busy}>
+        <Ionicons name="chevron-back" size={20} color={themeColor('secondary')} accessible={false} />
+        <Text style={styles.backText}>{t('Settings')}</Text>
+      </TouchableOpacity>}
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.title} accessibilityRole="header">{t("Security")}</Text>
-          <Text style={styles.subtitle}>{t("Keep access to your money.")}</Text>
+          <Text ref={titleRef} style={styles.title} accessibilityRole="header">{settingsSectionTitle(activeSection)}</Text>
+          {activeSection === 'overview' && <Text style={styles.subtitle}>{t('Your wallet, your preferences.')}</Text>}
         </View>
         <CloseWalletScreen disabled={busy} />
       </View>
 
+      <SettingsTransition screen={activeSection}>
+      {activeSection === 'overview' && <SettingsMenu backupChecked={backupChecked} backupLoading={backupStatus === 'loading'}
+        disabled={busy} onSelect={navigateToSection} onLock={lockWallet} />}
+
+      {activeSection === 'security' && <>
       {backupStatus === 'loading' ? <View style={styles.backupCard}><BackupStatusNotice /></View> : <View style={styles.backupCard}>
         <View style={styles.statusRow}>
-          <Ionicons name={backupChecked ? 'checkmark-circle-outline' : 'key-outline'} size={20} color={backupChecked ? '#75d3af' : '#ffb000'} />
+          <Ionicons name={backupChecked ? 'checkmark-circle-outline' : 'key-outline'} size={20} color={themeColor(backupChecked ? 'successText' : 'accentText')} />
           <Text style={[styles.statusText, backupChecked && styles.checkedText]} accessibilityLiveRegion="polite">
             {backupChecked ? t('Backup checked') : t('Backup needed')}
           </Text>
@@ -320,7 +430,7 @@ export default function SettingsScreen() {
           accessibilityState={{ expanded: isRevealed, disabled: busy, busy: isUnlocking }}
           accessibilityHint={t("Reveals numbered words after device authentication. Screen readers can read each word when focused. Use headphones or a private space.")}
         >
-          {isUnlocking ? <ActivityIndicator color="#ffb000" /> : (
+          {isUnlocking ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : (
             <Text style={[styles.actionText, !backupChecked && !hasViewedWords && styles.primaryText]}>
               {isRevealed ? t('Hide recovery words') : t('Show recovery words')}
             </Text>
@@ -342,7 +452,7 @@ export default function SettingsScreen() {
           accessibilityRole="button"
           accessibilityState={{ disabled: busy, busy: isVerifyingBackup || isSavingBackup }}
         >
-          {isVerifyingBackup || isSavingBackup ? <ActivityIndicator color="#ffb000" /> : (
+          {isVerifyingBackup || isSavingBackup ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : (
             <Text style={[styles.actionText, !backupChecked && hasViewedWords && styles.primaryText]}>
               {backupChecked ? t('Check backup again') : t('Check my backup')}
             </Text>
@@ -359,6 +469,7 @@ export default function SettingsScreen() {
           <Text style={styles.actionText}>{t("Lock wallet now")}</Text>
         </TouchableOpacity>
       </View>
+      </>}
 
       <Modal
         visible={backupChallenge !== null}
@@ -390,7 +501,7 @@ export default function SettingsScreen() {
                 ref={backupInputRef}
                 style={styles.verificationInput}
                 placeholder={t("One word")}
-                placeholderTextColor="#666"
+                placeholderTextColor={adaptColor('#666', 'color')}
                 value={backupWordInput}
                 onChangeText={value => {
                   setBackupWordInput(value);
@@ -434,12 +545,16 @@ export default function SettingsScreen() {
         </KeyboardAvoidingView></WalletActivityBoundary>
       </Modal>
 
-      <ColorModePicker />
-      <LanguagePicker />
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle} accessibilityRole="header">{t("Manage this wallet")}</Text>
+      {activeSection === 'appearance' && <ColorModePicker embedded />}
+      {activeSection === 'language' && <LanguagePicker embedded />}
+      {activeSection === 'help' && <LegalLinks embedded disabled={busy} />}
+      {activeSection === 'wallet' && <View style={styles.walletCard}>
         <Text style={styles.body}>{t("Remove the keys and saved payment data from this device. Keep your complete recovery phrase to access the wallet again.")}</Text>
         <Text style={styles.caption}>{t("Backup verification and a separate confirmation protect against accidental removal.")}</Text>
+        <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
+          onPress={() => navigateToSection('security')} disabled={busy} accessibilityState={{ disabled: busy }}>
+          <Text style={styles.actionText}>{t('Security and backup')}</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.dangerButton, busy && styles.disabledButton]}
           onPress={confirmReset}
@@ -448,11 +563,12 @@ export default function SettingsScreen() {
           accessibilityState={{ disabled: busy, busy: isDeleting }}
           accessibilityHint={t("Checks your backup before opening a separate removal confirmation.")}
         >
-          {isDeleting ? <ActivityIndicator color="#ffab97" /> : <Text style={styles.dangerText}>{t("Remove wallet from this device")}</Text>}
+          {isDeleting ? <ActivityIndicator color={adaptColor('#ffab97', 'color')} /> : <Text style={styles.dangerText}>{t("Remove wallet from this device")}</Text>}
         </TouchableOpacity>
-      </View>
+      </View>}
 
-      <AdvancedOptions expanded={showAdvanced} onChange={setShowAdvanced}>
+      {showAdvanced && <View>
+        <LegacyPaymentReview />
         <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 17, marginBottom: 10 }}>{t('How your Bitcoin balance works')}</Text>
         <Text style={{ color: adaptColor('#aaaab3', 'color'), fontSize: 14, lineHeight: 22, marginBottom: 18 }}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
         <View style={styles.advancedSection}>
@@ -475,6 +591,30 @@ export default function SettingsScreen() {
               <Text style={styles.actionText}>{t("Copy public key")}</Text>
             </TouchableOpacity>
           )}
+          <Text style={styles.stepLabel}>{t('Hedera account ID')}</Text>
+          <Text style={styles.caption}>{hederaAccount?.accountId || t('No Hedera account selected.')}</Text>
+          <Text style={styles.caption}>{t('If several Hedera accounts use this wallet key, enter the account ID to use. Opago checks the key on the network before linking it.')}</Text>
+          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
+            accessibilityState={{ disabled: !hederaPublicKey || searchingAccounts || busy, busy: searchingAccounts }}
+            disabled={!hederaPublicKey || searchingAccounts || busy} onPress={() => void searchHederaAccounts()}>
+            {searchingAccounts ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : <Text style={styles.actionText}>{t('Find my HBAR accounts')}</Text>}
+          </TouchableOpacity>
+          {searchedAccounts && matchingAccounts.length === 0 && <Text style={styles.caption}>{t('No matching HBAR accounts found. You can enter an account ID manually.')}</Text>}
+          {matchingAccounts.map(account => (
+            <TouchableOpacity key={account.accountId} style={[styles.actionButton, styles.secondaryButton]}
+              accessibilityRole="button" accessibilityState={{ selected: accountIdInput === account.accountId }}
+              onPress={() => setAccountIdInput(account.accountId)}>
+              <Text style={styles.actionText}>{account.accountId} · {account.balanceHbar} HBAR</Text>
+            </TouchableOpacity>
+          ))}
+          <TextInput style={styles.verificationInput} value={accountIdInput} onChangeText={setAccountIdInput}
+            placeholder="0.0.123456" placeholderTextColor={adaptColor('#777', 'color')} autoCapitalize="none" autoCorrect={false}
+            accessibilityLabel={t('Hedera account ID')} />
+          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
+            accessibilityState={{ disabled: !hederaPublicKey || bindingAccount || busy, busy: bindingAccount }}
+            disabled={!hederaPublicKey || bindingAccount || busy} onPress={() => void importHederaAccount()}>
+            {bindingAccount ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : <Text style={styles.actionText}>{t('Link account ID')}</Text>}
+          </TouchableOpacity>
         </View>
         {performanceTracingEnabled() && <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t('Performance diagnostics')}</Text>
@@ -486,19 +626,22 @@ export default function SettingsScreen() {
             <Text style={styles.actionText}>{t('Copy timing report')}</Text>
           </TouchableOpacity>
         </View>}
-      </AdvancedOptions>
+      </View>}
+      </SettingsTransition>
     </ScrollView>
   );
 }
 
 const styles = adaptiveStyles(StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0c' },
-  content: { paddingHorizontal: 20, paddingBottom: 44 },
+  content: { paddingHorizontal: 20, paddingBottom: 44, width: '100%', maxWidth: 640, alignSelf: 'center' },
   header: { marginBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 20 },
   headerCopy: { flex: 1 },
-  title: { fontSize: 32, fontWeight: '700', color: '#fff', letterSpacing: -0.8 },
-  subtitle: { color: '#a3a3ad', fontSize: 15, marginTop: 6 },
-  logo: { width: 36, height: 36 },
+  title: { fontSize: 32, lineHeight: 38, fontWeight: '600', color: '#fff', letterSpacing: -0.8 },
+  subtitle: { color: '#a3a3ad', fontSize: 15, lineHeight: 22, marginTop: 6 },
+  backButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10, paddingRight: 12 },
+  backText: { fontSize: 14, color: '#aaaab3', fontWeight: '500' },
+  walletCard: { padding: 20, borderRadius: 20, backgroundColor: '#151518', borderWidth: 1, borderColor: '#2d2d31' },
   backupCard: { backgroundColor: '#151518', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#2d2d31' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   statusText: { color: '#ffb000', fontSize: 14, fontWeight: '600', flexShrink: 1 },
@@ -507,7 +650,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   body: { color: '#b8b8c0', fontSize: 15, lineHeight: 23 },
   caption: { color: '#a3a3ad', fontSize: 14, lineHeight: 21, marginTop: 7 },
   stepLabel: { color: '#eeeef0', fontSize: 16, fontWeight: '600', marginTop: 24 },
-  actionButton: { minHeight: 54, padding: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  actionButton: { minHeight: 54, padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
   primaryButton: { backgroundColor: '#ffb000' },
   secondaryButton: { backgroundColor: '#202024', borderWidth: 1, borderColor: '#39393e' },
   actionText: { color: '#eeeef0', fontSize: 16, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
@@ -524,7 +667,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   modalOverlay: { flexGrow: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.85)', padding: 20 },
   challengeCard: { backgroundColor: '#17171b', borderWidth: 1, borderColor: '#39393e', borderRadius: 24, padding: 22 },
   challengeEyebrow: { color: '#ffb000', fontSize: 13, fontWeight: '700', letterSpacing: 1, marginBottom: 12 },
-  challengeTitle: { color: '#fff', fontSize: 28, fontWeight: '700', marginBottom: 12 },
+  challengeTitle: { color: '#fff', fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.5, marginBottom: 12 },
   challengeSubtitle: { color: '#b8b8c0', fontSize: 16, lineHeight: 23, marginBottom: 20 },
   verificationInput: { backgroundColor: '#222227', borderWidth: 1, borderColor: '#48484f', borderRadius: 14, color: '#fff', fontSize: 20, padding: 16, minHeight: 58, marginBottom: 12 },
   challengeError: { color: '#ffab97', fontSize: 14, lineHeight: 21, marginBottom: 12 },

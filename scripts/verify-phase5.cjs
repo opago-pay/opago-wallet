@@ -15,6 +15,12 @@ const commonEnvironment = {
 };
 
 const gates = [
+  { label: 'Spark iOS native logging', command: process.execPath,
+    args: ['scripts/patch-spark-ios-logging.cjs', '--check'] },
+  { label: 'Spark React Native XHR transport', command: process.execPath,
+    args: ['scripts/patch-spark-xhr-transport.cjs', '--check'] },
+  { label: 'EAS production configuration', command: process.execPath,
+    args: ['scripts/verify-eas-production-profile.cjs'] },
   { label: 'TypeScript', command: process.execPath, args: [npmCli, 'run', 'typecheck'] },
   { label: 'ESLint', command: process.execPath, args: [npmCli, 'run', 'lint'] },
   { label: 'Application tests', command: process.execPath, args: [npmCli, 'test'] },

@@ -4,8 +4,14 @@ export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): strin
   const message = cause instanceof Error ? cause.message : '';
   const normalized = message.toLowerCase();
   if (message === 'The EUR exchange rate is unavailable.') return t('EUR estimate unavailable');
+  if (/secure network (?:transport|request)/i.test(message)) {
+    return t('The payment connection could not be secured. Check your connection and try again later. Nothing was sent.');
+  }
   if (message === 'The Bitcoin fee quote expired. Review this payment again.' || message === 'The Bitcoin fee changed. Review the deposit again.') return t(message);
   if (/bitcoin.*still being checked/.test(normalized)) return t('Please do not send again. We are checking the payment automatically.');
+  if (/unscoped (?:lightning|hedera) payment|legacy (?:lightning|hedera) payment journal/.test(normalized)) {
+    return t('An older payment needs review. Do not send again. Open Settings > Advanced options to see its reference and contact support.');
+  }
   if (/invalid bitcoin address or network/.test(normalized)) return t('Check the Bitcoin address and network. Its checksum must be valid and its network must match this wallet.');
   if (/ambiguous bitcoin|conflicting amounts/.test(normalized)) return t('This Bitcoin request contains conflicting instructions. Ask the recipient for a new request.');
   if (/unsupported feature|no supported payment route/.test(normalized)) return t('This Bitcoin request requires a payment feature this version does not support.');

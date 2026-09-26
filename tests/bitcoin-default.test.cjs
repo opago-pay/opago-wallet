@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -37,7 +36,7 @@ function fixture(file, overrides = {}) {
     '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage: () => {} },
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
-    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value },
+    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
     'expo-router': { useRouter: () => ({}) },
     '@react-navigation/native': { useIsFocused: () => true },
@@ -153,11 +152,33 @@ test('Balance refresh never resolves an HBAR account until explicitly enabled', 
 test('A valid Bitcoin price remains available when the rate service omits HBAR', async () => {
   let effect;
   const ui = fixture('hooks/useExchangeRates.ts', {
-    react: { useState: initial => { const key = state.length; state.push(typeof initial === 'function' ? initial() : initial); return [state[key], value => { state[key] = value; }]; }, useEffect: callback => { effect = callback; }, useMemo: fn => fn() },
+    react: { useState: initial => { const key = state.length; state.push(typeof initial === 'function' ? initial() : initial); return [state[key], value => { state[key] = value; }]; }, useEffect: callback => { effect = callback; }, useMemo: fn => fn(), useCallback: fn => fn },
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     '@/lib/http': { fetchJson: async () => ({ bitcoin: { eur: 50000 } }) },
   });
   const state = [];
-  ui.render('useExchangeRates'); effect(); await flush();
+  ui.render('useExchangeRates'); const cleanup = effect(); await flush(); cleanup();
   assert.deepEqual(state[0], { btcToEur: 50000, hbarToEur: 0 });
+  assert.equal(state[2], false);
+});
+
+test('EUR receive rates fall back to Kraken when CoinGecko fails', async () => {
+  let effect;
+  const state = [];
+  const requested = [];
+  const ui = fixture('hooks/useExchangeRates.ts', {
+    react: { useState: initial => { const key = state.length; state.push(typeof initial === 'function' ? initial() : initial); return [state[key], value => { state[key] = value; }]; }, useEffect: callback => { effect = callback; }, useMemo: fn => fn(), useCallback: fn => fn },
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
+    '@/lib/http': { fetchJson: async url => {
+      requested.push(url);
+      if (url.includes('coingecko')) throw new Error('rate limit');
+      return { error: [], result: { 'BTC/EUR': { c: ['75000.25', '0.01'] } } };
+    } },
+  });
+  ui.render('useExchangeRates'); const cleanup = effect(); await flush(); cleanup();
+  assert.equal(requested.length, 2);
+  assert.match(requested[1], /kraken\.com.*XBTEUR/);
+  assert.deepEqual(state[0], { btcToEur: 75000.25, hbarToEur: 0 });
+  assert.ok(state[1] > 0);
   assert.equal(state[2], false);
 });

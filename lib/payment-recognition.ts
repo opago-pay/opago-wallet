@@ -1,7 +1,8 @@
 import { parseBitcoinDestination } from './bitcoin/destination';
 import { decodeLightningInvoice, normalizeLightningInput } from './lightning';
 import { resolveLightningAddress, resolveLNURL } from './lnurl-safe';
-import { fetchOcpOptions, resolveOcpUrl } from './ocp-safe';
+import { resolveOcpUrl } from './ocp-safe';
+import { loadPaymentEndpoint } from './payment-endpoint';
 import { inferPaymentSourceFromRequest } from './payment-input';
 
 export type RecognizedPayment = {
@@ -32,16 +33,12 @@ export async function recognizePayment(input: string): Promise<RecognizedPayment
     amount: bitcoin.amountSats === null ? null : String(bitcoin.amountSats), unit: 'SAT' };
   const normalized = normalizeLightningInput(raw);
   if (normalized.includes('@') || /^lnurl1/i.test(normalized)) {
-    // Keep the existing OCP adapter available; standard LNURL-pay falls through.
     const ocpUrl = await resolveOcpUrl(normalized);
-    if (ocpUrl) {
-      try {
-        const quote = await fetchOcpOptions(ocpUrl);
-        if (quote.transferAmounts.length) return { input: raw, kind: 'checkout', recipient: new URL(ocpUrl).hostname,
-          amount: null, unit: 'SAT' };
-      } catch { /* Standard LNURL is validated by its own adapter below. */ }
-    }
-    const info = normalized.includes('@') ? await resolveLightningAddress(normalized) : await resolveLNURL(normalized);
+    const endpoint = ocpUrl ? await loadPaymentEndpoint(ocpUrl) : null;
+    if (endpoint?.kind === 'ocp') return { input: raw, kind: 'checkout', recipient: new URL(ocpUrl!).hostname,
+      amount: null, unit: 'SAT' };
+    const info = endpoint?.kind === 'lnurl' ? endpoint.info : normalized.includes('@')
+      ? await resolveLightningAddress(normalized) : await resolveLNURL(normalized);
     const min = Math.ceil(info.minSendable / 1000), max = Math.floor(info.maxSendable / 1000);
     return { input: raw, kind: 'lightning', recipient: normalized.includes('@') ? normalized : info.recipientDomain!,
       amount: min === max ? String(min) : null, unit: 'SAT' };

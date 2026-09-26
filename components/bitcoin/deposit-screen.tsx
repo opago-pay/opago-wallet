@@ -1,3 +1,4 @@
+import { adaptColor } from '@/lib/theme-styles';
 import React, { useRef, useState } from 'react';
 import { Alert, ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +82,7 @@ export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet
       <Text style={bitcoinStyles.muted}>{t('Network confirmation and a claim are required before these Bitcoin become available. The claim fee is deducted from the deposit. The exact fee and minimum viable amount are available after the transaction is detected; review them before approving. Very small deposits may not cover the fee.')}</Text>
       <Text style={bitcoinStyles.note}>{t('This address is reusable. Deposits are tracked as wallet incoming, not as payment of a specific Lightning request. Detection starts after Bitcoin network confirmation.')}</Text>
       {address ? <>
-        <View style={{ alignSelf: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 20 }}><StableQRCode value={address} size={Math.max(100, Math.min(216, width - 110))} /></View>
+        <View style={{ alignSelf: 'center', backgroundColor: adaptColor('#fff', 'backgroundColor'), padding: 16, borderRadius: 20 }}><StableQRCode value={address} size={Math.max(100, Math.min(216, width - 110))} /></View>
         <Text selectable style={bitcoinStyles.address}>{address}</Text>
         <BitcoinButton label={t('Copy address')} onPress={() => void run(async () => { await Clipboard.setStringAsync(address); })} />
         <BitcoinButton label={t('Share Bitcoin address')} secondary onPress={() => void run(async () => { await Share.share({ message: `bitcoin:${address}` }); })} />

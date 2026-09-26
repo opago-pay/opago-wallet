@@ -1,6 +1,14 @@
 export type PaymentCurrency = 'SAT' | 'EUR';
 export type ScannablePaymentSource = 'spark' | 'hedera';
 
+// The app currently offers English, French, Spanish, German and Italian.
+// Hermes on iOS does not consistently expose Intl.NumberFormat.formatToParts;
+// the amount keypad must render even when that optional method is absent.
+export function paymentDecimalSeparator(locale: string): '.' | ',' {
+  const language = locale.toLowerCase().split(/[-_]/)[0];
+  return language === 'de' || language === 'fr' || language === 'es' || language === 'it' ? ',' : '.';
+}
+
 /** Edit the amount without invoking a system keyboard or interpreting pasted text. */
 export function editPaymentAmount(input: string, key: string, currency: PaymentCurrency, separator: '.' | ','): string {
   if (key === 'delete') return input.slice(0, -1);

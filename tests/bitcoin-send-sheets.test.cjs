@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const React = require('react');
 require('./register-typescript.cjs');
 const { modalKeyboardInset } = require('../lib/keyboard-inset.ts');
-const { editPaymentAmount, parsePaymentAmount } = require('../lib/payment-input.ts');
+const { editPaymentAmount, parsePaymentAmount, paymentDecimalSeparator } = require('../lib/payment-input.ts');
 const { hookFixture } = require('./react-hooks-fixture.cjs');
 const nodes = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...React.Children.toArray(tree.props?.children).flatMap(nodes), ...nodes(tree.props?.footer)];
 // Render local pure amount/cost/button components so the assertions cover what users see.
@@ -21,7 +21,7 @@ const base = {
  '@/lib/i18n': {t:key=>key,appLocale:()=> 'en'}, '@/lib/config':{appConfig:{isMainnet:true}},
  '@/components/ui/asset-icon':{AssetIcon:'asset'}, '@expo/vector-icons':{Ionicons:'icon'},
  './send-sheet': {BitcoinSendScreen:'screen'},
- '@/lib/payment-input': {editPaymentAmount},
+ '@/lib/payment-input': {editPaymentAmount,paymentDecimalSeparator},
 };
 test('review sheet shows exact SAT costs, hides raw requests and only sends on explicit confirmation',async t=>{
  const calls=[];const props={amountSats:10,feeSats:2,route:'lightning',recipient:'synthetic-long-invoice',label:'wallet.example\nUnverified description',loading:false,onConfirm:()=>calls.push('send'),onCancel:()=>calls.push('back')};
@@ -57,7 +57,27 @@ test('amount sheet clears input on unit changes and fixed invoices have no edita
  props.onchain=true;tree=app.render();assert.match(text(tree),/confirm sending afterwards/);
  assert.equal(tree.props.footer.props.label,'Prepare fee offer');assert.equal(tree.props.footer.props.onCancel,props.onBack);assert.equal(calls.includes('continue'),false);
 });
+test('scanned invoice amount screen renders without Intl.formatToParts on iOS Hermes',async t=>{
+ const descriptor=Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype,'formatToParts');
+ Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',{...descriptor,value:undefined});
+ try {
+  for(const [locale,expectedSeparator] of [['de-DE',','],['en-GB','.']]){
+   const props={amount:'',currency:'EUR',recipient:'synthetic invoice',loading:false,disabled:false,onchain:false,
+    onAmount(){},onCurrency(){},onBack(){},onContinue(){}};
+   const app=hookFixture('components/bitcoin/amount-sheet.tsx',()=>({...base,
+    '@/lib/i18n':{t:key=>key,appLocale:()=>locale},'./payment-ui':{BitcoinPaymentActions:'actions',bitcoinStyles:{}}}),e=>e.BitcoinAmountSheet(props));
+   t.after(app.unmount);
+   let tree=await app.settle();
+   assert.equal(text(nodes(tree).find(n=>n.props.accessibilityLabel==='Decimal separator')),expectedSeparator);
+   props.fixedAmount=20;
+   tree=app.render();
+   assert.match(text(tree),/20 SAT/);
+  }
+ } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
+});
 test('custom keypad supports localized fractions and deletion without rounding or decimal SAT',()=>{
+ assert.equal(paymentDecimalSeparator('en-GB'),'.');
+ for(const locale of ['de-DE','fr-FR','es-ES','it-IT']) assert.equal(paymentDecimalSeparator(locale),',');
  for(const separator of ['.',',']){
   let amount='';for(const key of [separator,'0','1'])amount=editPaymentAmount(amount,key,'EUR',separator);
   assert.equal(amount,`0${separator}01`);assert.equal(parsePaymentAmount(amount,'EUR',75000),13);
@@ -101,16 +121,16 @@ test('full-screen payment hides private content on background/blur and guards An
 });
 
 test('payment animation follows real phases, stops on success and respects reduced motion',async t=>{
- const calls=[];let motion;const props={phase:'authorizing',amountSats:20};
+ const calls=[];let motionAllowed=true;const props={phase:'authorizing',amountSats:20};
  const app=hookFixture('components/bitcoin/payment-progress.tsx',()=>({...base,
-  'react-native':{...base['react-native'],Easing:{linear:'linear'},
-   Animated:{View:'animated',Value:class{setValue(){}interpolate(){return'rotation';}},timing:()=>({}),loop:()=>({start:()=>calls.push('start'),stop:()=>calls.push('stop')})},
-   AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(_,fn)=>{motion=fn;return{remove(){}};}}},
+  '@/hooks/useWalletMotion':{useWalletMotion:()=>motionAllowed},
+  'react-native':{...base['react-native'],Platform:{OS:'ios'},Easing:{linear:'linear'},
+   Animated:{View:'animated',Value:class{setValue(){}interpolate(){return'rotation';}},timing:()=>({}),loop:()=>({start:()=>calls.push('start'),stop:()=>calls.push('stop')})}},
  }),e=>e.BitcoinPaymentProgress(props));t.after(app.unmount);
  let tree=await app.settle();assert.match(text(tree),/Confirm on your device/);assert.deepEqual(calls,['start']);
  props.phase='sending';tree=app.render();assert.match(text(tree),/Sending Bitcoin/);assert.doesNotMatch(text(tree),/Payment confirmed/);
- motion(true);app.render();assert.deepEqual(calls,['start','stop']);
- motion(false);app.render();props.phase='success';tree=app.render();assert.equal(tree.props.loading,false);assert.match(text(tree),/Payment confirmed/);
+ motionAllowed=false;app.render();assert.deepEqual(calls,['start','stop']);
+ motionAllowed=true;app.render();props.phase='success';tree=app.render();assert.equal(tree.props.loading,false);assert.match(text(tree),/Payment confirmed/);
  assert.deepEqual(calls,['start','stop','start','stop']);
 });
 test('native sheet has no header action and cannot dismiss an in-flight payment',async t=>{
@@ -121,7 +141,7 @@ test('native sheet has no header action and cannot dismiss an in-flight payment'
   '@/lib/keyboard-inset':{modalKeyboardInset},
   'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24,bottom:16})},
   '@/components/ui/wallet-interaction':{...base['@/components/ui/wallet-interaction'],WalletActivityBoundary:'activity'},
-  './scanner-styles':{scannerStyles:{}},
+  './scanner-styles':{scannerStyles:{},scannerDarkStyles:{}},
  }),e=>e.ScannerSheet(props));t.after(app.unmount);
  let tree=await app.settle();tree.props.onRequestClose();assert.deepEqual(calls,[]);
  assert.equal(nodes(tree).some(n=>n.type==='button'),false);
@@ -142,7 +162,7 @@ test('modal keyboard layout handles overlay, native resize and hide without doub
    useWindowDimensions:()=>({height:740}),AccessibilityInfo:{isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})},findNodeHandle:()=>null},
   'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24,bottom:16})},
   '@/components/ui/wallet-interaction':{...base['@/components/ui/wallet-interaction'],WalletActivityBoundary:'activity'},
-  './scanner-styles':{scannerStyles:{}},'@/lib/keyboard-inset':{modalKeyboardInset},
+  './scanner-styles':{scannerStyles:{},scannerDarkStyles:{}},'@/lib/keyboard-inset':{modalKeyboardInset},
  }),e=>e.ScannerSheet(props));t.after(app.unmount);
  let tree=await app.settle();listeners.keyboardDidShow({duration:0,endCoordinates:{screenY:420,height:320}});tree=app.render();
  let root=nodes(tree).find(n=>n.type==='activity');assert.equal(root.props.style[1].paddingBottom,320);

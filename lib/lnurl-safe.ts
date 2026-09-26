@@ -17,7 +17,7 @@ export interface LNURLPResponse {
   payerData?: { compliance?: { mandatory?: boolean } };
 }
 
-function validateLNURLResponse(data: LNURLPResponse): LNURLPResponse {
+export function validateLNURLResponse(data: LNURLPResponse): LNURLPResponse {
   if (!data || typeof data !== 'object') throw new Error('LNURL endpoint returned invalid payment limits.');
   if (data.compliance?.isSubjectToTravelRule || Object.values(data.payerData || {}).some(field => field?.mandatory)) {
     requireIdentityPayments();

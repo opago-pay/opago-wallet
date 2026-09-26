@@ -1,4 +1,4 @@
-import { adaptColor } from '@/lib/theme-styles';
+import { adaptColor, themeColor } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
@@ -50,6 +50,7 @@ import { sendStyles as styles } from '@/styles/send-styles';
 import { exponentialBackoffDelay } from '@/lib/retry';
 import { HederaActivation } from '@/components/receive/hedera-activation';
 import { BitcoinDepositScreen } from '@/components/bitcoin/deposit-screen';
+import { BitcoinConnectionStatus } from '@/components/bitcoin/connection-status';
 import { BitcoinButton, bitcoinStyles } from '@/components/bitcoin/payment-ui';
 import { bitcoinScope } from '@/lib/bitcoin/onchain';
 import { archiveBitcoinRequest } from '@/lib/bitcoin/receive-archive';
@@ -67,6 +68,13 @@ type ReceiveNetwork = 'lightning' | 'onchain' | 'hedera';
 // necessary when its actual value or physical size changes.
 const StableQRCode = WalletQrCode;
 
+function receiveAmountError(cause: unknown, rateLoading: boolean): string {
+  const message = cause instanceof Error ? cause.message : 'Enter a valid amount.';
+  return t(message === 'The EUR exchange rate is unavailable.'
+    ? rateLoading ? 'Loading exchange rates…' : 'The exchange rate is unavailable or outdated. You can enter an amount in SAT.'
+    : message);
+}
+
 export default function ReceiveScreen() {
   useLanguage();
   useColorMode();
@@ -79,6 +87,9 @@ export default function ReceiveScreen() {
   const { width } = useWindowDimensions();
   const {
     sparkWallet,
+    sparkStatus,
+    sparkError,
+    retrySparkConnection,
     walletReady,
     loadOrGenerateWallet,
     hederaAccount,
@@ -247,7 +258,7 @@ export default function ReceiveScreen() {
       const permissions = await Notifications.getPermissionsAsync();
       if (permissions.granted) {
         await Notifications.scheduleNotificationAsync({
-          content: { title: t('Payment received'), body: t('{amount} SAT confirmed.', { amount }) },
+          content: { title: t('Payment received') },
           trigger: null,
         });
       }
@@ -368,7 +379,7 @@ export default function ReceiveScreen() {
             const permissions = await Notifications.getPermissionsAsync();
             if (permissions.granted) {
               await Notifications.scheduleNotificationAsync({
-                content: { title: t('Payment received'), body: description },
+                content: { title: t('Payment received') },
                 trigger: null,
               });
             }
@@ -550,7 +561,7 @@ export default function ReceiveScreen() {
       amountSats = parseInvoiceAmount();
       if (amountInput.trim() && amountSats <= 0) throw new Error('Enter a positive amount.');
     } catch (cause) {
-      setRequestError(t(cause instanceof Error ? cause.message : 'Enter a valid amount.'));
+      setRequestError(receiveAmountError(cause, rates.isLoading));
       return;
     }
     if (invoice && invoiceOwnerKey === ownerKey && !invoiceExpired && receiveStatus !== 'failed' &&
@@ -564,7 +575,7 @@ export default function ReceiveScreen() {
     }, amountInput.trim() ? 500 : 0);
     return () => clearTimeout(timer);
   }, [restoreComplete, sparkWallet, walletReady, ownerKey, network, pollingEnabled, isPaid, loading,
-    amountInput, isEur, rates.updatedAt, invoice, invoiceOwnerKey, invoiceExpiresAt, invoiceExpired, invoiceAmountSats, receiveStatus,
+    amountInput, isEur, rates.updatedAt, rates.isLoading, invoice, invoiceOwnerKey, invoiceExpiresAt, invoiceExpired, invoiceAmountSats, receiveStatus,
     retryVersion, parseInvoiceAmount, generateInvoice]);
 
   const shouldPrefetchOnchain = network === 'onchain' ||
@@ -614,8 +625,8 @@ export default function ReceiveScreen() {
     <View style={[styles.container, styles.centered]}>
       <CloseWalletScreen style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
       <Text style={styles.successTitle}>{t("Back up before adding money")}</Text>
-      <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Security.")}</Text>
-      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push('/(tabs)/settings'); }}>
+      <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Settings > Security and backup.")}</Text>
+      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push({ pathname: '/(tabs)/settings', params: { section: 'security' } }); }}>
         <Text style={styles.buttonText}>{t("Back up my wallet")}</Text>
       </TouchableOpacity>
     </View>
@@ -624,7 +635,7 @@ export default function ReceiveScreen() {
   if (isPaid) return (
     <View style={[styles.container, styles.centered]}>
       <View style={styles.successCircle}>
-        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel={t("Confirmed")} />
+        <Ionicons name="checkmark" size={50} color={themeColor('successText')} accessibilityLabel={t("Confirmed")} />
       </View>
       <Text style={styles.successTitle}>{t("Payment received")}</Text>
       <Text style={[styles.subtitle, styles.centerText]}>
@@ -689,10 +700,16 @@ export default function ReceiveScreen() {
     }
   };
   let draftSats: number | null = null;
+  let draftAmountError: string | null = null;
   if (network !== 'hedera') {
-    try { draftSats = parseInvoiceAmount(); } catch { /* A partial amount never produces a QR. */ }
+    try { draftSats = parseInvoiceAmount(); } catch (cause) {
+      // A partial amount never produces a QR, including on-chain amount URIs.
+      draftAmountError = receiveAmountError(cause, rates.isLoading);
+    }
   }
   const numericAmount = Number(amountInput.replace(',', '.'));
+  const eurRateMissing = isEur && !!amountInput.trim() &&
+    (rates.updatedAt <= 0 || Date.now() - rates.updatedAt > 300_000 || !(rates.btcToEur > 0));
   const amountLabel = amountInput.trim() && draftSats !== null && draftSats > 0 && Number.isFinite(numericAmount)
     ? `${numericAmount.toLocaleString(appLocale(), { minimumFractionDigits: isEur ? 2 : 0, maximumFractionDigits: isEur ? 2 : 0 })} ${isEur ? '€' : 'Sats'}`
     : null;
@@ -730,6 +747,8 @@ export default function ReceiveScreen() {
       <CloseWalletScreen />
     </View>
     <BackupReminder />
+    {walletReady && network !== 'hedera' &&
+      <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
 
     <TouchableOpacity
       onPress={() => setNetworkPickerOpen(open => !open)}
@@ -753,12 +772,12 @@ export default function ReceiveScreen() {
           backgroundColor: network === item.id ? adaptColor('#2a2924', 'backgroundColor') : 'transparent' }}
       >
         {item.id === 'hedera' ? <AssetIcon asset="hedera" size={21} /> :
-          <Ionicons name={item.icon} size={21} color={network === item.id ? '#ffb000' : adaptColor('#c8c8ce', 'color')} />}
+          <Ionicons name={item.icon} size={21} color={network === item.id ? themeColor('accentText') : adaptColor('#c8c8ce', 'color')} />}
         <View style={{ flex: 1 }}>
           <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 15, fontWeight: '700' }}>{t(item.label)}</Text>
           <Text style={{ color: adaptColor('#aaaab4', 'color'), fontSize: 12, lineHeight: 17, marginTop: 2 }}>{t(item.description)}</Text>
         </View>
-        {network === item.id && <Ionicons name="checkmark" size={19} color="#ffb000" />}
+        {network === item.id && <Ionicons name="checkmark" size={19} color={themeColor('accentText')} />}
       </TouchableOpacity>)}
       {!showAllCoins && network !== 'hedera' && <TouchableOpacity
         onPress={() => setShowAllCoins(true)}
@@ -766,9 +785,9 @@ export default function ReceiveScreen() {
         accessibilityLabel={t('Show all coins')}
         style={{ minHeight: 56, borderRadius: 13, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
       >
-        <Ionicons name="grid-outline" size={21} color="#ffb000" />
-        <Text style={{ color: '#ffb000', fontSize: 15, fontWeight: '700', flex: 1 }}>{t('Show all coins')}</Text>
-        <Ionicons name="chevron-down" size={17} color="#ffb000" />
+        <Ionicons name="grid-outline" size={21} color={themeColor('accentText')} />
+        <Text style={{ color: themeColor('accentText'), fontSize: 15, fontWeight: '700', flex: 1 }}>{t('Show all coins')}</Text>
+        <Ionicons name="chevron-down" size={17} color={themeColor('accentText')} />
       </TouchableOpacity>}
     </View>}
 
@@ -800,20 +819,22 @@ export default function ReceiveScreen() {
           accessibilityLabel={t('Amount (optional)')}
           style={{ color: adaptColor('#fff', 'color'), fontSize: 26, fontWeight: '700', flex: 1, paddingVertical: 6 }}
         />
-        <Text style={{ color: '#ffb000', fontSize: 19, fontWeight: '700' }}>{isEur ? '€' : 'SAT'}</Text>
+        <Text style={{ color: themeColor('accentText'), fontSize: 19, fontWeight: '700' }}>{isEur ? '€' : 'SAT'}</Text>
       </View>
-      {requestError && <Text style={{ color: adaptColor('#ffab97', 'color'), fontSize: 13, marginTop: 8 }}>{requestError}</Text>}
+      {(network === 'lightning' ? requestError : draftAmountError) && <Text style={{
+        color: rates.isLoading ? adaptColor('#aaaab4', 'color') : adaptColor('#ffab97', 'color'), fontSize: 13, marginTop: 8,
+      }}>{network === 'lightning' ? requestError : draftAmountError}</Text>}
     </View>}
 
     <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
-      {qrValue ? <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 22, overflow: 'hidden' }}>
+      {qrValue ? <View style={{ backgroundColor: adaptColor('#fff', 'backgroundColor'), borderRadius: 24, padding: 22, overflow: 'hidden' }}>
         <StableQRCode value={qrValue} size={qrSize} focused={isFocused} onReady={onQrReady} />
       </View> : <View style={{ width: qrSize + 44, height: qrSize + 44, borderRadius: 24, backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), alignItems: 'center', justifyContent: 'center', padding: 22 }}>
         {loading || onchainLoading || (!hederaReady && network === 'hedera') || (!restoreComplete && network === 'lightning')
-          ? <ActivityIndicator color="#ffb000" size="large" />
-          : <Ionicons name="qr-code-outline" size={40} color="#686871" />}
+          ? <ActivityIndicator color={themeColor('accentText')} size="large" />
+          : <Ionicons name="qr-code-outline" size={40} color={themeColor('muted')} />}
         <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', marginTop: 12 }}>
-          {(network === 'lightning' ? requestError : network === 'onchain' ? onchainError : hederaLookupError) || t('Preparing payment code…')}
+          {(network === 'lightning' ? requestError : network === 'onchain' ? draftAmountError || onchainError : hederaLookupError) || t('Preparing payment code…')}
         </Text>
       </View>}
     </View>
@@ -829,7 +850,7 @@ export default function ReceiveScreen() {
       accessibilityLabel={amountLabel ? t('Change amount') : t('Add amount')}
       style={{ alignSelf: 'center', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, paddingHorizontal: 12 }}
     >
-      <Ionicons name={amountLabel ? 'pencil-outline' : 'add'} size={19} color="#ffb000" />
+      <Ionicons name={amountLabel ? 'pencil-outline' : 'add'} size={19} color={themeColor('accentText')} />
       <Text style={{ color: adaptColor('#ffb000', 'color'), fontSize: 15, fontWeight: '700' }}>
         {amountLabel ? `${amountLabel} · ${t('Change')}` : t('Add amount')}
       </Text>
@@ -850,14 +871,26 @@ export default function ReceiveScreen() {
 
     {qrValue && <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
       <TouchableOpacity onPress={() => void copy(displayValue || qrValue)} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
-        <Ionicons name="copy-outline" size={18} color="#ffb000" /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Copy')}</Text>
+        <Ionicons name="copy-outline" size={18} color={themeColor('accentText')} /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Copy')}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => void Share.share({ message: qrValue }).catch(() => Alert.alert(t('Please try again.')))} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
-        <Ionicons name="share-outline" size={18} color="#ffb000" /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Share')}</Text>
+        <Ionicons name="share-outline" size={18} color={themeColor('accentText')} /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Share')}</Text>
       </TouchableOpacity>
     </View>}
-    {requestError && network === 'lightning' && <BitcoinButton label={t('Try again')} secondary onPress={() => { lastInvoiceAttempt.current = null; setRequestError(null); setRetryVersion(value => value + 1); }} />}
-    {onchainError && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => setOnchainError(null)} />}
+    {requestError && network === 'lightning' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
+      lastInvoiceAttempt.current = null;
+      setRequestError(null);
+      setRetryVersion(value => value + 1);
+      if (eurRateMissing) {
+        void rates.refresh();
+      }
+    }} />}
+    {(onchainError || (eurRateMissing && !rates.isLoading)) && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
+      setOnchainError(null);
+      if (eurRateMissing) {
+        void rates.refresh();
+      }
+    }} />}
     {network === 'onchain' && <BitcoinButton label={t('Incoming Bitcoin')} secondary onPress={() => setShowDepositDetails(true)} />}
 
   </ScrollView>;

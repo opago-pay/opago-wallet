@@ -1,4 +1,4 @@
-import { adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import type { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,7 @@ export function AdvancedOptions({ expanded, onChange, disabled, label, children 
         accessibilityState={{ expanded, disabled: !!disabled }}
       >
         <Text style={styles.label}>{title}</Text>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color="#969987" />
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={adaptColor('#969987', 'color')} />
       </TouchableOpacity>
       {expanded && <View style={styles.content}>{children}</View>}
     </View>

@@ -46,11 +46,12 @@ function fixture(data = {}) {
       RefreshControl: 'refresh', ActivityIndicator: 'loading', BackHandler: { addEventListener: () => ({ remove() {} }) },
     },
     '@/components/ui/advanced-options': { AdvancedOptions: 'advanced' },
+    '@/components/history/payment-details': { PaymentDetailsScreen: 'payment-details' },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', Pressable: 'pressable' },
     '@/lib/i18n': { t: (value, values = {}) => value.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match), appLocale: () => 'en' },
     '@/hooks/useLanguage': { useLanguage: () => {} },
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
-    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value },
+    '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     'expo-router': { useRouter: () => ({ push: path => pushes.push(path) }), useFocusEffect: callback => { focusEffects.push(callback); } },
     '@expo/vector-icons': { Ionicons: 'icon' },
     'expo-image': { Image: 'image' },
@@ -67,27 +68,34 @@ function fixture(data = {}) {
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }) },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
-    '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: [] }) },
+    '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
     '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [] } },
-    '@/hooks/usePendingLightningPayments': { usePendingLightningPayments: (_wallet, _enabled, onResolved) => {
+    '@/hooks/usePendingLightningPayments': { usePendingLightningPayments: (_wallet, _scope, _enabled, onResolved) => {
       data.paymentSettled = onResolved;
-      return { pendingCount: 0, hiddenPaymentKeys: data.hiddenPaymentKeys || [] };
+      return { pendingCount: data.pendingCount || 0, hiddenPaymentKeys: data.hiddenPaymentKeys || [] };
     } },
     '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, hbarToEur: 0.1, updatedAt: 1 }) },
-    '@/lib/config': { appConfig: { isMainnet: true, hederaNetwork: 'mainnet' } },
+    '@/lib/config': { appConfig: { isMainnet: true, hederaNetwork: 'mainnet', sparkNetwork: 'MAINNET' } },
+    '@/lib/payment-details': require('../lib/payment-details.ts'),
+    '@/lib/wallet-session': { walletSession: { capture: () => () => {}, captureRuntime: () => () => {} } },
     '@/lib/portfolio-valuation': require('../lib/portfolio-valuation.ts'),
-    '@/lib/wallet-display': { formatEurValue: value => String(value) },
+    '@/lib/wallet-display': {
+      formatEurValue: value => String(value),
+      bitcoinOperationNotice: () => null,
+      paymentHistoryStatus: () => 'Completed',
+      paymentHistoryTitle: () => 'Payment',
+    },
     '@/lib/database': { getTransactionPage: query('local') },
     '@/lib/hedera/account': { loadHederaHistoryPage: async (...args) => ({
       items: await query('hedera history')(...args), next: null,
     }) },
     '@/lib/hedera/mirror': { normalizeHederaTransactionIdForMirror: value => value },
     '@/lib/hedera/payments': { formatTinybars: value => String(value) },
-    '@/lib/hedera/payment-journal-native': { hederaPaymentJournal: {
+    '@/lib/hedera/payment-journal-native': { hederaPaymentJournalFor: () => ({
       list: query('hedera journal'), reconcile: async () => { throw new Error('Recovery must not block history'); },
-    } },
-    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: query('lightning journal') } },
+    }) },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: query('lightning journal') }) },
     '@/lib/lightning/spark-history': { loadSparkTransferPage: async (_wallet, limit, offset) => {
       const transfers = await query('lightning history')(limit, offset);
       return { transfers, next: transfers.length === limit ? offset + limit : null };
@@ -154,8 +162,33 @@ test('Home puts the euro amount above SAT and shows the last saved payment befor
   assert.equal(advanced(screen).props.label, 'More coins');
 });
 
-test('Send is the emphasized middle action with funds; Buy takes the yellow middle position when the displayed balance is zero', () => {
-  for (const [spark, names] of [[107, ['Buy', 'Send', 'Receive']], [0, ['Send', 'Buy', 'Receive']]]) {
+test('latest activity and an unresolved-payment notice open the same details view', async () => {
+  const hash = 'ab'.repeat(32);
+  const app = fixture({ primaryReady: false, pendingCount: 1,
+    local: [record(1, '2026-09-23T10:00:00Z')],
+    'lightning journal': [{ paymentHash: hash, amountSats: 20, state: 'pending', hiddenAt: undefined,
+      createdAt: '2026-09-23T10:00:00Z', requestId: 'request-1' }],
+  });
+  app.render(); app.refocus(); await settle();
+  let screen = app.render();
+  latestRow(screen).props.openTransaction(latestRow(screen).props.transaction);
+  screen = app.render();
+  assert.equal(screen.type, 'payment-details');
+  assert.equal(screen.props.payment.key, 'fixture-1');
+  screen.props.onClose();
+  screen = app.render();
+  const notice = find(screen, node => node.type === 'button' &&
+    find(node, child => child.type === 'text' && child.props.children === 'Payment status unknown'));
+  assert.ok(notice);
+  notice.props.onPress(); await settle();
+  screen = app.render();
+  assert.equal(screen.type, 'payment-details');
+  assert.equal(screen.props.payment.key, 'ln:' + hash);
+  assert.equal(screen.props.payment.requestId, 'request-1');
+});
+
+test('Receive, Send, and Buy keep their positions regardless of balance', () => {
+  for (const spark of [107, 0]) {
     const app = fixture({ spark });
     const screen = app.render();
     const actions = [];
@@ -165,8 +198,8 @@ test('Send is the emphasized middle action with funds; Buy takes the yellow midd
       React.Children.toArray(node.props?.children).forEach(collect);
     };
     collect(screen);
-    assert.deepEqual(actions.map(action => action.label), names);
-    assert.deepEqual(actions.map(action => !!action.primary), spark === 0 ? [false, true, false] : [false, false, false]);
+    assert.deepEqual(actions.map(action => action.label), ['Receive', 'Send', 'Buy']);
+    assert.deepEqual(actions.map(action => !!action.isSend), [false, true, false]);
   }
 });
 

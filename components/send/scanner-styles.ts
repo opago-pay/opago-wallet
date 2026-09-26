@@ -1,7 +1,9 @@
 import { StyleSheet } from 'react-native';
 import { adaptiveStyles } from '@/lib/theme-styles';
 
-export const scannerStyles = adaptiveStyles(StyleSheet.create({
+// Camera imagery uses a dark scrim in both app modes. The manual-entry sheet
+// below it follows the selected app palette.
+export const scannerDarkStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' },
   screenContent: { flex: 1 },
   page: { flexGrow: 1, paddingHorizontal: 22 },
@@ -42,9 +44,9 @@ export const scannerStyles = adaptiveStyles(StyleSheet.create({
   eyebrow: { flex: 1, fontSize: 14, lineHeight: 21, color: '#b6b6be' },
   sheetDescription: { color: '#b7b7be', fontSize: 14, lineHeight: 22 },
   label: { color: '#c3c3ca', fontSize: 13, lineHeight: 20, marginTop: 22, marginBottom: 9 },
-  input: { backgroundColor: '#202023', borderWidth: 1, borderColor: '#54545e', borderRadius: 13, color: '#f8f8fa', fontSize: 16, lineHeight: 24, padding: 14, minHeight: 62, maxHeight: 140, textAlignVertical: 'top', marginBottom: 18 },
+  input: { backgroundColor: '#202023', borderWidth: 1, borderColor: '#54545e', borderRadius: 16, color: '#f8f8fa', fontSize: 16, lineHeight: 24, padding: 16, minHeight: 64, maxHeight: 140, textAlignVertical: 'top', marginBottom: 18 },
   primary: { minHeight: 54, padding: 15, borderRadius: 16, backgroundColor: '#ffb000', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  primaryText: { fontSize: 15, lineHeight: 22, fontWeight: '700', textAlign: 'center', color: '#141008', flexShrink: 1 },
+  primaryText: { fontSize: 16, lineHeight: 22, fontWeight: '600', textAlign: 'center', color: '#141008', flexShrink: 1 },
   secondary: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   secondaryText: { color: '#ceced4', fontSize: 14, lineHeight: 21, textAlign: 'center' },
   disabled: { opacity: 0.45 },
@@ -54,4 +56,6 @@ export const scannerStyles = adaptiveStyles(StyleSheet.create({
   recipientTitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: '#f7f7fa' },
   recipientValue: { fontSize: 12, lineHeight: 18, color: '#b3b3bb' },
   amount: { fontSize: 27, lineHeight: 34, color: '#f9f9fa', fontWeight: '600', letterSpacing: -0.6, marginBottom: 22 },
-}));
+});
+
+export const scannerStyles = adaptiveStyles(scannerDarkStyles);

@@ -64,7 +64,7 @@ export function validateMoonPayConfig(value: unknown): MoonPayConfig | null {
 
 export async function loadMoonPayConfig(): Promise<MoonPayConfig | null> {
   const raw = await fetchJson<unknown>(backendUrl() + '/api/moonpay/config', {},
-    { purpose: 'MoonPay config', timeoutMs: 8_000, maxResponseChars: 8_192 });
+    { purpose: 'MoonPay config', timeoutMs: 8_000, maxResponseChars: 8_192, trustedFixedOrigin: true });
   return validateMoonPayConfig(raw);
 }
 
@@ -119,7 +119,7 @@ export async function signMoonPayCheckout(unsignedUrl: string): Promise<string> 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ unsignedUrl }),
-  }, { purpose: 'MoonPay checkout signature', timeoutMs: 10_000, maxResponseChars: 2_048 });
+  }, { purpose: 'MoonPay checkout signature', timeoutMs: 10_000, maxResponseChars: 2_048, trustedFixedOrigin: true });
   const signature = (response as { signature?: unknown })?.signature;
   if (typeof signature !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(signature)) {
     throw new Error('Invalid MoonPay signature response.');

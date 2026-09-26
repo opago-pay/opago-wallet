@@ -1,4 +1,4 @@
-import { adaptiveStyles } from '@/lib/theme-styles';
+import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useState } from 'react';
@@ -27,7 +27,7 @@ export function BackupPrompt() {
       <WalletActivityBoundary style={styles.overlay}><ScrollView style={styles.card} contentContainerStyle={styles.cardContent}>
         <Text style={styles.title}>{t("Protect your wallet first.")}</Text>
         <Text style={styles.body}>{t("Your recovery words are the only way to restore this wallet. Write them down in order, keep them offline, then check three words before adding money.")}</Text>
-        <TouchableOpacity accessibilityRole="button" style={styles.button} disabled={saving} onPress={() => { beginBackup(); router.replace('/(tabs)/settings'); }}>
+        <TouchableOpacity accessibilityRole="button" style={styles.button} disabled={saving} onPress={() => { beginBackup(); router.replace({ pathname: '/(tabs)/settings', params: { section: 'security' } }); }}>
           <Text style={styles.buttonText}>{t("Back up my wallet")}</Text>
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" style={styles.secondary} disabled={saving} onPress={defer}>
@@ -46,7 +46,7 @@ export function BackupStatusNotice() {
     if (!error && !isInitializing) void loadOrGenerateWallet().catch(() => undefined);
   }, [error, isInitializing, loadOrGenerateWallet]);
   return <View accessibilityLiveRegion="polite">
-    {!error && <ActivityIndicator color="#ffb000" />}
+    {!error && <ActivityIndicator color={adaptColor('#ffb000', 'color')} />}
     <Text style={styles.body}>{t(error ? 'Backup status could not be loaded.' : 'Loading backup status…')}</Text>
     {!!error && <TouchableOpacity accessibilityRole="button" style={styles.secondary} onPress={() => void loadOrGenerateWallet().catch(() => undefined)}>
       <Text style={styles.reminderTitle}>{t('Try again')}</Text>
@@ -60,7 +60,7 @@ export function BackupReminder() {
   const router = useRouter();
   if (backupStatus === 'loading' || backupStatus === 'verified') return null;
   return (
-    <TouchableOpacity accessibilityRole="button" style={styles.reminder} onPress={() => { beginBackup(); router.push('/(tabs)/settings'); }}>
+    <TouchableOpacity accessibilityRole="button" style={styles.reminder} onPress={() => { beginBackup(); router.push({ pathname: '/(tabs)/settings', params: { section: 'security' } }); }}>
       <Text style={styles.reminderTitle}>{t("Back up your wallet")}</Text>
       <Text style={styles.body}>{t("Your recovery backup has not been checked. Protect access to your money.")}</Text>
     </TouchableOpacity>

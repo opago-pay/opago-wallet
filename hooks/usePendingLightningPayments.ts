@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { lightningPaymentJournal } from '@/lib/lightning/payment-journal-native';
+import { lightningPaymentJournalFor } from '@/lib/lightning/payment-journal-native';
 import { lightningPaymentPresentation } from '@/lib/lightning/payment-journal';
 import { reconcileLightningPayments } from '@/lib/lightning/reconcile-native';
 import type { SparkHistoryWalletLike } from '@/lib/lightning/spark-history';
@@ -10,6 +10,7 @@ import { yieldToUi } from '@/lib/ui-ready';
 // remains opt-in, and this hook starts only after the primary balance has settled.
 export function usePendingLightningPayments(
   wallet: SparkHistoryWalletLike | null,
+  scope: { network: 'MAINNET' | 'REGTEST'; publicKey: string } | null,
   enabled: boolean,
   onResolved: () => Promise<unknown>,
   visibilityRevision = 0,
@@ -22,7 +23,9 @@ export function usePendingLightningPayments(
     // A visibility edit invalidates the local snapshot even if the wallet and
     // network readiness are unchanged. Refresh it immediately after the edit.
     void visibilityRevision;
-    if (!wallet || !enabled) return;
+    if (!wallet || !scope || !enabled) return;
+    const paymentScope = scope;
+    const lightningPaymentJournal = lightningPaymentJournalFor(paymentScope.network, paymentScope.publicKey);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function check() {
@@ -34,7 +37,7 @@ export function usePendingLightningPayments(
         if (cancelled) return;
         setPresentation(lightningPaymentPresentation(records));
         if (!before.length) return;
-        const after = await reconcileLightningPayments(wallet!, null, records);
+        const after = await reconcileLightningPayments(wallet!, paymentScope, null, records);
         if (cancelled) return;
         const remaining = after.filter(record => record.state === 'pending').length;
         setPresentation(lightningPaymentPresentation(after));
@@ -47,6 +50,6 @@ export function usePendingLightningPayments(
     }
     void check();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [wallet, enabled, visibilityRevision]));
+  }, [wallet, scope, enabled, visibilityRevision]));
   return presentation;
 }

@@ -12,9 +12,13 @@ require('./register-typescript.cjs');
 
 const {
   LIGHTNING_PAYMENT_JOURNAL_KEY,
-  createLightningPaymentJournal,
+  createLightningPaymentJournal: createScopedLightningPaymentJournal,
+  LIGHTNING_PAYMENT_JOURNAL_V2_PREFIX,
   lightningPaymentPresentation,
 } = require('../lib/lightning/payment-journal.ts');
+const scope = 'REGTEST:' + 'a'.repeat(64);
+const scopedKey = LIGHTNING_PAYMENT_JOURNAL_V2_PREFIX + scope;
+const createLightningPaymentJournal = (storage, now) => createScopedLightningPaymentJournal(storage, scope, now);
 const {
   LIGHTNING_RECEIVE_REQUEST_KEY,
   createLightningReceiveStore,
@@ -58,6 +62,39 @@ test('hiding one pending payment survives restart and preserves its duplicate gu
   assert.deepEqual(await restarted.get(paymentHash), original);
 });
 
+test('Lightning journals isolate wallets and networks; legacy pending sends block new submissions', async () => {
+  const storage = memoryStorage();
+  const first = createLightningPaymentJournal(storage);
+  await first.recordPending(paymentHash, 20);
+  const otherWallet = createScopedLightningPaymentJournal(storage, 'REGTEST:' + 'b'.repeat(64));
+  const otherNetwork = createScopedLightningPaymentJournal(storage, 'MAINNET:' + 'a'.repeat(64));
+  assert.deepEqual(await otherWallet.list(), []);
+  assert.deepEqual(await otherNetwork.list(), []);
+  assert.equal((await first.list()).length, 1);
+  storage.values.set(LIGHTNING_PAYMENT_JOURNAL_KEY, JSON.stringify({
+    version: 1, records: [{ paymentHash, state: 'pending' }],
+  }));
+  await assert.rejects(otherWallet.recordPending('b'.repeat(64), 20), /unscoped/i);
+  await assert.rejects(otherNetwork.recordPending('c'.repeat(64), 20), /unscoped/i);
+  assert.ok(storage.values.has(LIGHTNING_PAYMENT_JOURNAL_KEY));
+});
+
+test('a late Lightning result from an old scope cannot change the new wallet', async () => {
+  const storage = memoryStorage();
+  const oldWallet = createLightningPaymentJournal(storage);
+  const newWallet = createScopedLightningPaymentJournal(storage, 'REGTEST:' + 'b'.repeat(64));
+  await oldWallet.recordPending(paymentHash, 20);
+  await newWallet.recordPending('b'.repeat(64), 30);
+  let release;
+  const checking = oldWallet.reconcile(() => new Promise(resolve => { release = resolve; }));
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  await oldWallet.clear();
+  release({ state: 'confirmed', result: 'PREIMAGE_VERIFIED' });
+  await checking;
+  assert.deepEqual(await oldWallet.list(), []);
+  assert.equal((await newWallet.list())[0].state, 'pending');
+});
+
 test('a concurrent hide does not discard a terminal result and confirmed payments reappear automatically', async () => {
   const journal = createLightningPaymentJournal(memoryStorage());
   await journal.recordPending(paymentHash, 20);
@@ -76,9 +113,9 @@ test('old journals default to visible and malformed hiding metadata fails closed
   const storage = memoryStorage(); const journal = createLightningPaymentJournal(storage);
   await journal.recordPending(paymentHash, 20);
   assert.equal(lightningPaymentPresentation(await journal.list()).pendingCount, 1);
-  const saved = JSON.parse(storage.values.get(LIGHTNING_PAYMENT_JOURNAL_KEY));
+  const saved = JSON.parse(storage.values.get(scopedKey));
   saved.records[0].hiddenAt = 'invalid';
-  storage.values.set(LIGHTNING_PAYMENT_JOURNAL_KEY, JSON.stringify(saved));
+  storage.values.set(scopedKey, JSON.stringify(saved));
   await assert.rejects(journal.recordPending(paymentHash, 20), /invalid record/);
 });
 
@@ -92,7 +129,7 @@ test('persists an unresolved Lightning payment without invoice or preimage mater
   assert.equal(record.state, 'pending');
   assert.equal(record.requestId, 'spark/request+=1');
   assert.equal(record.amountSats, 125);
-  const persisted = storage.values.get(LIGHTNING_PAYMENT_JOURNAL_KEY);
+  const persisted = storage.values.get(scopedKey);
   assert.doesNotMatch(persisted, /lnbc|lnbcrt|preimage|mnemonic|private.?key/i);
   await assert.rejects(journal.recordPending(paymentHash, 125), /already being processed/i);
 });
@@ -129,6 +166,7 @@ test('never evicts unresolved Lightning payments to make room for a new send', a
   const storage = memoryStorage();
   const createdAt = new Date('2026-09-16T10:00:00Z').toISOString();
   const records = Array.from({ length: 100 }, (_, index) => ({
+    scope,
     paymentHash: index.toString(16).padStart(64, '0'),
     amountSats: 1,
     requestId: null,
@@ -138,8 +176,8 @@ test('never evicts unresolved Lightning payments to make room for a new send', a
     updatedAt: createdAt,
   }));
   storage.values.set(
-    LIGHTNING_PAYMENT_JOURNAL_KEY,
-    JSON.stringify({ version: 1, records }),
+    scopedKey,
+    JSON.stringify({ version: 2, scope, records }),
   );
   const journal = createLightningPaymentJournal(storage);
 

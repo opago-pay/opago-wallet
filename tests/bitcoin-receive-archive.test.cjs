@@ -6,13 +6,14 @@ const path = require('node:path');
 const ts = require('typescript');
 require('./register-typescript.cjs');
 function archiveFixture(memory = new Map()) {
-  const checked = [], activity = new Map(); let confirmed = new Set();
+  const checked = [], activity = new Map(); let confirmed = new Set(), failed = new Set();
   const dependencies = {
     '@react-native-async-storage/async-storage': { getItem: async key => memory.get(key) ?? null, setItem: async (key,value) => memory.set(key,value), removeItem: async key => memory.delete(key) },
     '../database': { addTransaction: async (direction,amount,asset,details) => activity.set(details.txId, { direction,amount,asset }) },
     '../lightning/receive-status': { resolveLightningReceiveOutcome: async (_,record) => {
       checked.push(record.requestId);
-      return confirmed.has(record.requestId) ? { state: 'confirmed', amountSats: record.amountSats || 34 } : { state: 'waiting', amountSats: null };
+      return confirmed.has(record.requestId) ? { state: 'confirmed', amountSats: record.amountSats || 34 }
+        : failed.has(record.requestId) ? { state: 'failed', amountSats: null } : { state: 'waiting', amountSats: null };
     } },
     './amount': require('../lib/bitcoin/amount.ts'),
   };
@@ -20,7 +21,7 @@ function archiveFixture(memory = new Map()) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop:true },
   }).outputText;
   const exports = {}; new Function('require','exports',code)(name => dependencies[name] ?? {},exports);
-  return { ...exports, memory, checked, activity, pay: ids => { confirmed = new Set(ids); } };
+  return { ...exports, memory, checked, activity, pay: ids => { confirmed = new Set(ids); }, fail: ids => { failed = new Set(ids); } };
 }
 const request = n => ({ requestId: `request-${n}`, paymentHash: String(n).padStart(64,'0'), amountSats: 20,
   invoice: 'not retained in archive', expiresAt: Date.now()-1000, createdAt: new Date().toISOString() });
@@ -69,6 +70,35 @@ test('bounded polling rotates through every old request and wallet removal erase
   await f.clearBitcoinReceiveArchive();assert.equal(f.memory.size,0);
   await assert.rejects(f.archiveBitcoinRequest('scope',request(8),()=>{throw new Error('locked');}),/locked/);
   assert.equal(f.memory.size,0);
+});
+test('expired requests move to occasional rechecks and provider failures stop polling', async () => {
+  const f = archiveFixture();
+  await f.archiveBitcoinRequest('scope', request(8), () => {});
+  assert.equal(await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {}), 0);
+  assert.deepEqual(f.checked, ['request-8']);
+  await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {});
+  assert.deepEqual(f.checked, ['request-8']);
+  await f.archiveBitcoinRequest('scope', request(9), () => {});
+  f.fail(['request-9']);
+  await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {});
+  await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {});
+  assert.equal(f.checked.filter(id => id === 'request-9').length, 1);
+});
+
+test('a provider-confirmed payment discovered after invoice expiry is still recorded once', async t => {
+  const f = archiveFixture();
+  const expired = request(10);
+  await f.archiveBitcoinRequest('scope', expired, () => {});
+  await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {});
+  const [record] = JSON.parse([...f.memory.values()][0]);
+  assert.equal(record.state, 'waiting');
+  assert.ok(record.nextCheckAt > Date.now());
+
+  f.pay([expired.requestId]);
+  t.mock.method(Date, 'now', () => record.nextCheckAt + 1);
+  assert.equal(await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {}), 1);
+  assert.equal(await f.reconcileArchivedBitcoinRequests({}, 'scope', () => {}), 0);
+  assert.equal(f.activity.get(`ln:${expired.paymentHash}`).amount, 20);
 });
 test('migration discards the old incoming-inclusive preview but keeps rates and HBAR', () => {
   const { parseHomeBalancePreview }=require('../lib/home-balance-preview.ts');

@@ -3,6 +3,7 @@ import { hex } from '@scure/base';
 import { sats } from './amount';
 import { bitcoinNetwork, type BitcoinNetwork } from './destination';
 import { withTimeout } from '../promise-timeout';
+import { readBoundedText, strictFetch } from '../strict-http-transport';
 
 /** Independent transaction data is checked against txid and our exact script.
  * Uses Spark 0.7.12's mainnet Electrs provider; no QR-controlled URL. */
@@ -14,10 +15,11 @@ export async function depositAmount(network: BitcoinNetwork, txid: string, vout:
   const controller = new AbortController();
   try {
     const raw = await withTimeout((async () => {
-      const response = await fetch(`https://mempool.space/api/tx/${txid}/hex`, { signal: controller.signal, redirect: 'error' });
+      const response = await strictFetch(`https://mempool.space/api/tx/${txid}/hex`, { signal: controller.signal }, 8_000_000, true);
       if (!response.ok || response.redirected) throw new Error('Bitcoin transaction verification is unavailable.');
-      const body = await response.text();
-      if (body.length > 8_000_000 || !/^[a-f\d]+$/i.test(body)) throw new Error('Invalid Bitcoin transaction.');
+      const body = await readBoundedText(response, 'Bitcoin transaction verification',
+        8_000_000, controller, 8_000_000);
+      if (!/^[a-f\d]+$/i.test(body)) throw new Error('Invalid Bitcoin transaction.');
       return body;
     })(), 12_000, 'Bitcoin transaction verification timed out.');
     return verifyDepositOutput(raw, txid, vout, address, network);

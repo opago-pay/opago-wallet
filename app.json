@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "opago-wallet",
-    "slug": "opago-wallet",
+    "slug": "wallet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,10 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.opago.wallet"
+      "bundleIdentifier": "com.opago.wallet",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.opago.wallet",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#ffb000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -27,6 +31,11 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -50,9 +59,11 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Allow Opago to unlock your protected recovery phrase."
+          "faceIDPermission": "Allow Opago to unlock your protected recovery phrase.",
+          "configureAndroidBackup": false
         }
       ],
+      "./plugins/with-wallet-backup",
       [
         "expo-local-authentication",
         {
@@ -75,7 +86,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "19a6aa96-1bc9-4ae7-934e-61eed8a14f20"
+        "projectId": "e2fc1c68-5aab-46c9-82e7-1918c7c90f66"
       }
     },
     "owner": "fabcot01"

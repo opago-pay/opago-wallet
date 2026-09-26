@@ -44,7 +44,7 @@ function AppStack() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="buy" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
         </Stack>
         <BackupPrompt />
         </WalletGate>

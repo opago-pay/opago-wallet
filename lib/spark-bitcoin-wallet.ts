@@ -1,4 +1,4 @@
-import { SparkWallet } from '@buildonspark/spark-sdk';
+import { SparkWallet, type ConfigOptions, type InitWalletResponse } from '@buildonspark/spark-sdk';
 import { sats } from './bitcoin/amount';
 import { installSparkLeafSelection } from './spark-leaf-selection';
 import { PaymentScopedSparkSigner } from './spark-signer-cache';
@@ -13,6 +13,22 @@ export class BitcoinSparkWallet extends SparkWallet {
     installSparkLeafSelection(this.leafManager);
     installSparkHtlcPreparation(this.signingService, this.config?.signer);
     this.lightningPipeline = installSparkLightningPipeline(this.transferService, this.lightningService);
+  }
+
+  protected override async initWallet(
+    mnemonicOrSeed?: Uint8Array | string,
+    accountNumber?: number,
+    options: ConfigOptions = {},
+  ): Promise<InitWalletResponse<this>> {
+    try {
+      return await super.initWallet(mnemonicOrSeed, accountNumber, options);
+    } catch (cause) {
+      // The pinned SDK starts native polling before its final sync. Its static
+      // initialize() does not return the instance after a failed sync, so the
+      // caller cannot dispose it. This subclass still owns it at this point.
+      await this.cleanupConnections().catch(() => undefined);
+      throw cause;
+    }
   }
 
   override async payLightningInvoice(input: Parameters<SparkWallet['payLightningInvoice']>[0]) {

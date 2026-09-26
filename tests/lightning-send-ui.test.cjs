@@ -9,17 +9,18 @@ function fixture(options = {}) {
   const calls = [];
   const params = { focused: true, scanResultKey: 'scan-1', ...options };
   const auth = { walletReady: true, sparkWallet: options.wallet || null,
+    hederaPublicKey: 'a'.repeat(64),
     hederaAccount: { accountId: '0.0.456', balanceTinybars: 1000000000n } };
   let localInput;let scanCounter=0;
   const app = hookFixture('app/(tabs)/send.tsx', hooks => ({
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({ remove() {} }) }, BackHandler: { addEventListener: () => ({ remove() {} }) } },
-    '@/hooks/useScannerTabBar': { useScannerTabBar() {} },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => params,
       useFocusEffect: fn => hooks.useEffect(() => params.focused ? fn() : undefined, [fn, params.focused]) },
     'expo-linking': { addEventListener: () => ({ remove() {} }) },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth },
     '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000 }) },
+    '@/lib/config': { appConfig: { sparkNetwork: 'REGTEST' } },
     '@/hooks/useWalletBalances': { useWalletBalances: () => ({ balances: {}, balanceStates: { spark: {}, hedera: {} } }) },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: [], refresh() {} }) },
     '@/lib/payment-scan': { paymentScanInbox: {
@@ -50,8 +51,8 @@ function fixture(options = {}) {
     }},
     '@/lib/payment-errors':{friendlyPaymentMessage:()=> 'Payment unavailable'},
     '@/lib/optional-haptics':{notifyPaymentHaptics:async()=>{}},'expo-haptics':{NotificationFeedbackType:{Success:'success',Error:'error'}},
-    '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async () => [] },
-    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: async () => [] } },
+    '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async () => [], lightningPaymentLifecycle: () => ({}) },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: async () => [] }) },
     '@/components/send/payment-form': { PaymentForm: 'form' },
     '@/components/send/payment-scanner': { PaymentScanner: 'scanner' },
     '@/components/send/hedera-payment-views': { HederaReviewView: 'hbar-review' },

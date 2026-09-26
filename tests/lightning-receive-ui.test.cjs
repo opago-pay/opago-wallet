@@ -25,6 +25,7 @@ function openAmount(app) {
 }
 function fixture(options = {}) {
   const calls = [];
+  const rates = options.rates || { btcToEur: 50000, updatedAt: Date.now(), isLoading: false, refresh: async () => {} };
   const saved = options.saved;
   const cache = options.cache || { address: null };
   const client = {
@@ -45,7 +46,7 @@ function fixture(options = {}) {
     '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({ replace: route => calls.push(['replace', route]) }) }, '@react-navigation/native': { useIsFocused: () => true },
-    '@/hooks/useWalletAuth': { useWalletAuth: () => auth }, '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, updatedAt: Date.now() }) },
+    '@/hooks/useWalletAuth': { useWalletAuth: () => auth }, '@/hooks/useExchangeRates': { useExchangeRates: () => rates },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', TextInput: 'input' },
     '@/components/send/payment-back-button': { PaymentBackButton: 'back' },
     '@expo/vector-icons': { Ionicons: 'icon' }, 'expo-image': { Image: 'image' },
@@ -88,9 +89,31 @@ function fixture(options = {}) {
     'expo-haptics': { NotificationFeedbackType: { Success: 'success' } },
     'expo-notifications': { getPermissionsAsync: async () => ({ granted: false }) },
   }), exports => exports.default());
-  return { ...app, calls, auth, cache };
+  return { ...app, calls, auth, cache, rates };
 }
 const request = expiresAt => ({ scope: 'REGTEST:fixture-scope', requestId: 'synthetic', paymentHash: 'a'.repeat(64), amountSats: 20, invoice: 'lightning:' + invoice(20, Math.floor(expiresAt / 1000) - 3600, { paymentHash: 'a'.repeat(64), expiry: false }), expiresAt, createdAt: new Date().toISOString() });
+
+test('EUR receive amount waits for a fresh price, retries it, and never shows a stale amount QR', async t => {
+  const rates = { btcToEur: 0, updatedAt: 0, isLoading: false, refresh: async () => { rates.isLoading = true; } };
+  const app = fixture({ rates }); t.after(app.unmount);
+  app.render(); await app.settle();
+  let screen = openAmount(app);
+  nodes(screen).find(node => node.type === 'input').props.onChangeText('1');
+  screen = await app.settle();
+  assert.equal(nodes(screen).some(isQr), false);
+  assert.match(text(screen), /exchange rate is unavailable or outdated/);
+  nodes(screen).find(node => node.type === 'bitcoin-button' && node.props.label === 'Try again').props.onPress();
+  screen = app.render();
+  assert.equal(rates.isLoading, true);
+  rates.btcToEur = 50000;
+  rates.updatedAt = Date.now();
+  rates.isLoading = false;
+  app.render();
+  await new Promise(done => setTimeout(done, 550));
+  screen = await app.settle();
+  assert.ok(nodes(screen).some(isQr));
+  assert.ok(app.calls.some(call => Array.isArray(call) && call[0] === 'create' && call[1] === 2000));
+});
 
 test('Receive opens on the QR, with optional amount and payment routes behind small controls', async t => {
   const app = fixture(); t.after(app.unmount);

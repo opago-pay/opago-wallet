@@ -41,7 +41,7 @@ export function BitcoinSendScreen(props: { title?: string; loading?: boolean; on
 
 const styles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' },
-  title: { color: '#fafaf7', fontSize: 29, fontWeight: '600', letterSpacing: -0.6, paddingHorizontal: 24, marginBottom: 24 },
+  title: { color: '#fafaf7', fontSize: 29, lineHeight: 36, fontWeight: '600', letterSpacing: -0.6, paddingHorizontal: 24, marginBottom: 24 },
   scroll: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 16 },
   footer: { paddingHorizontal: 24, paddingTop: 16, backgroundColor: '#09090b' },
 }));

@@ -1,3 +1,5 @@
+import { adaptColor, themeColor } from '@/lib/theme-styles';
+import { useColorMode } from '@/hooks/useColorMode';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PaymentBackButton } from './payment-back-button';
 import { appLocale, t } from '@/lib/i18n';
@@ -28,6 +30,7 @@ export function HederaReviewView(props: {
   onCancel(): void;
 }) {
   useLanguage();
+  useColorMode();
   const insets = useSafeAreaInsets();
   const [showDetails, setShowDetails] = useState(false);
   const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
@@ -46,7 +49,7 @@ export function HederaReviewView(props: {
         <Ionicons
           name={HEDERA_NETWORK === 'mainnet' ? 'shield-checkmark' : 'flask-outline'}
           size={16}
-          color={HEDERA_NETWORK === 'mainnet' ? '#49d17d' : '#b7a8ff'}
+          color={themeColor(HEDERA_NETWORK === 'mainnet' ? 'successText' : 'testnetText')}
         />
         <Text style={styles.networkPillText}>HBAR · {HEDERA_NETWORK_BADGE}</Text>
       </View>
@@ -81,7 +84,7 @@ export function HederaReviewView(props: {
         <Text style={[styles.subtitle, styles.centerText]}>{t("This request does not verify the merchant’s identity. Confirm the recipient with the merchant.")}</Text>
       )}
       <View style={styles.safetyNote}>
-        <Ionicons name="lock-closed-outline" size={17} color="#f2b45d" />
+        <Ionicons name="lock-closed-outline" size={17} color={adaptColor('#f2b45d', 'color')} />
         <Text style={styles.safetyText}>
           {t("Check the amount and recipient. Crypto payments cannot be reversed.")}</Text>
       </View>
@@ -95,7 +98,7 @@ export function HederaReviewView(props: {
         <Text style={styles.detailsToggleText}>
           {showDetails ? t('Hide payment details') : t('Show payment details')}
         </Text>
-        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color="#9b9ba7" />
+        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#9b9ba7', 'color')} />
       </TouchableOpacity>
 
       {showDetails && (
@@ -144,7 +147,7 @@ export function HederaReviewView(props: {
         accessibilityLabel={t('Send {amount} HBAR', { amount: props.payment.amountHbar })}
       >
         {props.loading ? (
-          <ActivityIndicator color="#111" />
+          <ActivityIndicator color={adaptColor('#111', 'color')} />
         ) : (
           <Text style={styles.buttonText}>{t('Send {amount} HBAR', { amount: props.payment.amountHbar })}</Text>
         )}
@@ -169,6 +172,7 @@ export function HederaSuccessView(props: {
   onReset(): void;
 }) {
   useLanguage();
+  useColorMode();
   const [showDetails, setShowDetails] = useState(false);
   return (
     <ScrollView
@@ -176,7 +180,7 @@ export function HederaSuccessView(props: {
       contentContainerStyle={[styles.formContent, styles.centered]}
     >
       <View style={styles.successCircle}>
-        <Ionicons name="checkmark" size={50} color="#49d17d" accessibilityLabel={t("Confirmed")} />
+        <Ionicons name="checkmark" size={50} color={adaptColor('#49d17d', 'color')} accessibilityLabel={t("Confirmed")} />
       </View>
       <Text style={styles.successTitle}>{t("Payment sent")}</Text>
       <Text style={styles.successAmount}>{props.result.amountHbar} HBAR</Text>
@@ -184,7 +188,7 @@ export function HederaSuccessView(props: {
         {t('Complete on {network}. It is now saved in your activity.', { network: HEDERA_NETWORK_LABEL })}
       </Text>
       <View style={styles.successSummary}>
-        <Ionicons name="shield-checkmark-outline" size={19} color="#49d17d" />
+        <Ionicons name="shield-checkmark-outline" size={19} color={adaptColor('#49d17d', 'color')} />
         <Text style={styles.successSummaryText}>{t("Confirmed by Hedera")}</Text>
       </View>
 
@@ -197,7 +201,7 @@ export function HederaSuccessView(props: {
         accessibilityRole="link"
       >
         <View style={styles.buttonContent}>
-          <Ionicons name="receipt-outline" size={18} color="#fff" />
+          <Ionicons name="receipt-outline" size={18} color={adaptColor('#fff', 'color')} />
           <Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("View receipt")}</Text>
         </View>
       </TouchableOpacity>
@@ -211,7 +215,7 @@ export function HederaSuccessView(props: {
         <Text style={styles.detailsToggleText}>
           {showDetails ? t('Hide payment details') : t('Show payment details')}
         </Text>
-        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color="#9b9ba7" />
+        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#9b9ba7', 'color')} />
       </TouchableOpacity>
 
       {showDetails && (
@@ -233,7 +237,7 @@ export function HederaSuccessView(props: {
         >
           <View style={styles.buttonContent}>
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("View smart contract")}</Text>
-            <Ionicons name="open-outline" size={18} color="#fff" />
+            <Ionicons name="open-outline" size={18} color={adaptColor('#fff', 'color')} />
           </View>
         </TouchableOpacity>
       )}

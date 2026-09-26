@@ -18,18 +18,18 @@ export function HederaActivation({ publicKey, network }: { publicKey: string; ne
   }
 
   return <View style={styles.card}>
-    <Ionicons name="wallet-outline" size={30} color="#ffb000" />
+    <Ionicons name="wallet-outline" size={30} color={adaptColor('#ffb000', 'color')} />
     <Text style={styles.title} accessibilityRole="header">{t('Activate HBAR first')}</Text>
     <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR from HashPack.')}</Text>
     <Text style={styles.body}>{t('HashPack requires a numeric account ID for this wallet. It does not accept this wallet’s activation alias.')}</Text>
     <View style={styles.waiting}>
-      <ActivityIndicator size="small" color="#ffb000" />
+      <ActivityIndicator size="small" color={adaptColor('#ffb000', 'color')} />
       <Text style={styles.waitingText}>{t('Waiting for activation on {network}', { network })}</Text>
     </View>
     <Text style={styles.caption}>{t('After activation, your account ID and payment QR will appear here automatically.')}</Text>
     <TouchableOpacity style={styles.detailsButton} accessibilityRole="button" accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails(value => !value)}>
       <Text style={styles.detailsLabel}>{t('Account activation details')}</Text>
-      <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color="#a5a5af" />
+      <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#a5a5af', 'color')} />
     </TouchableOpacity>
     {showDetails && <View>
       <Text style={styles.caption}>{t('Share only this public key with whoever creates your Hedera account. Your recovery words are never needed.')}</Text>

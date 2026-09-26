@@ -1,11 +1,12 @@
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
+import { themeColor } from '@/lib/theme-styles';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Text, } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
-import { hasStoredMnemonic } from '../lib/storage';
+import { getSecureItem, hasStoredMnemonic, WALLET_WIPE_PENDING_KEY } from '../lib/storage';
 
 export default function Index() {
   useLanguage();
@@ -22,6 +23,10 @@ export default function Index() {
       setLoading(true);
       setFailed(false);
       try {
+        if (await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true') {
+          const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+          await resumePendingWalletWipe();
+        }
         const exists = await hasStoredMnemonic();
         if (mounted) setHasWallet(exists);
       } catch {
@@ -47,7 +52,7 @@ export default function Index() {
           alignItems: 'center',
         }}
       >
-        <ActivityIndicator color="#ffb000" />
+        <ActivityIndicator color={themeColor('accentText', mode)} />
       </View>
     );
   }

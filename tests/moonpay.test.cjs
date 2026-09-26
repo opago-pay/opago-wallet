@@ -97,20 +97,15 @@ test('MoonPay client sends the exact SDK URL for backend signing and rejects mal
   await assert.rejects(timedOut.signMoonPayCheckout(unsigned), /timed out/);
 });
 
-test('receive view never offers an amount for HBAR QR and buy requires a verified wallet destination', () => {
+test('receive view never offers an amount for HBAR QR and buying stays unavailable', () => {
   const receive = fs.readFileSync(path.join(__dirname, '..', 'app', '(tabs)', 'receive.tsx'), 'utf8');
   const buy = fs.readFileSync(path.join(__dirname, '..', 'app', 'buy.tsx'), 'utf8');
   assert.match(receive, /network !== 'hedera' && amountEditorOpen && <View/);
   assert.match(receive, /network !== 'hedera' && !amountEditorOpen && <TouchableOpacity/);
   assert.match(receive, /\{t\('Amount \(optional\)'\)\}/);
   assert.match(receive, /buildHederaWalletQrValue\(hederaAccount\.accountId\)/);
-  assert.match(buy, /bitcoinStaticAddressCache\.load\(scope, 'MAINNET', assertCurrent\)/);
-  assert.match(buy, /validateBitcoinAddress\(/);
-  assert.match(buy, /bitcoinDepositWatch\.enable\(scope, assertCurrent\)/);
-  assert.match(buy, /refreshHederaAccount\(\)/);
-  assert.match(buy, /parseHederaAccountId\(account\.accountId\)/);
-  assert.match(buy, /destination\.status !== 'ready' \? null : <MoonPayCheckout/);
-  assert.match(buy, /<AdvancedOptions expanded=\{advancedExpanded\}/);
+  assert.match(buy, /t\('Coming soon'\)/);
+  assert.doesNotMatch(buy, /MoonPayCheckout|loadMoonPayConfig|signMoonPayCheckout/);
 });
 
 test('browser-return notice is wallet scoped and is never treated as purchase proof', async () => {

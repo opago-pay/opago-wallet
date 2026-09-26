@@ -7,7 +7,6 @@ function fixture(options = {}) {
   let locked = false;
   const app = hookFixture('app/(tabs)/send.tsx', hooks => ({
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({remove(){}}) }, BackHandler: { addEventListener: () => ({remove(){}}) } },
-    '@/hooks/useScannerTabBar': { useScannerTabBar() {} },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({ scanResultKey: 'synthetic-scan' }), useFocusEffect: fn => hooks.useEffect(fn, [fn]) },
     'expo-linking': { addEventListener: () => ({remove(){}}) },
@@ -22,10 +21,10 @@ function fixture(options = {}) {
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'synthetic-scope', prepareBitcoinWithdrawal: async (_,__,address,amount,authorize) => {
       authorize(); calls.push(['quote',address,amount]); return { address,amountSats:amount,feeSats:100 };
     }, submitBitcoinWithdrawal:async (_,__,payment,authorize)=>{authorize();calls.push('submit');return options.submit ? options.submit(payment) : {id:'synthetic',amountSats:payment.amountSats,state:'broadcast'};} },
-    '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [] } },
+    '@/lib/bitcoin/store-native': { bitcoinStore: { listActive: async () => [] } },
     '@/lib/payment-authorization': { authorizePayment: async () => { calls.push('authenticate'); return () => { if(locked) throw Error('locked'); }; } },
     '@/lib/lightning/reconcile-native': { reconcileLightningPayments: async () => [] },
-    '@/lib/lightning/payment-journal-native': { lightningPaymentJournal: { list: async () => [] } },
+    '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: async () => [] }) },
     '@/lib/payment-errors': { friendlyPaymentMessage: () => 'Payment unavailable' },
     '@/lib/optional-haptics': { notifyPaymentHaptics: async () => {} }, 'expo-haptics': { NotificationFeedbackType: {Error:'error'} },
     '@/components/send/payment-form': { PaymentForm: 'form' },

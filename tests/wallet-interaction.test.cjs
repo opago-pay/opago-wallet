@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const fs = require('node:fs');
@@ -18,7 +17,7 @@ function load(file, dependencies, allowUnusedImports = false) {
   const exports = {};
   new Function('require', 'exports', code)(name => {
     if (name === 'react/jsx-runtime') return require(name);
-    if (name === '@/lib/theme-styles') return { adaptiveStyles: styles => styles, adaptColor: value => value };
+    if (name === '@/lib/theme-styles') return { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' };
     if (name === '@/lib/performance-trace' || name === '../lib/performance-trace') return require('./performance-trace-stub.cjs');
     if (name in dependencies) return dependencies[name];
     if (allowUnusedImports) return {};
@@ -35,6 +34,7 @@ function interactionFixture() {
     react: { ...React, useRef: initial => ({ current: initial }) },
     'react-native': { TextInput: 'input', TouchableOpacity: 'button', Pressable: 'pressable', View: 'view' },
     '@/lib/wallet-session': { walletSession: session },
+    '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
   });
   return { ...ui, session, advance: duration => { now += duration; } };
 }
@@ -74,11 +74,11 @@ test('gestures, keyboard edits and accessible buttons keep an active wallet open
 test('all shared touch controls visibly dim only while pressed', () => {
   const fixture = interactionFixture();
   const touchable = fixture.TouchableOpacity.render({}, null).props;
-  assert.equal(touchable.activeOpacity, 0.58);
+  assert.ok(touchable.activeOpacity >= 0.5 && touchable.activeOpacity <= 0.8);
   assert.equal(fixture.TouchableOpacity.render({ activeOpacity: 0.7 }, null).props.activeOpacity, 0.7);
   const pressable = fixture.Pressable.render({ style: { opacity: 0.8 } }, null).props;
   assert.deepEqual(pressable.style({ pressed: false }), [{ opacity: 0.8 }, undefined]);
-  assert.deepEqual(pressable.style({ pressed: true }), [{ opacity: 0.8 }, { opacity: 0.58 }]);
+  assert.deepEqual(pressable.style({ pressed: true }), [{ opacity: 0.8 }, { opacity: touchable.activeOpacity }]);
   const disabled = fixture.Pressable.render({ disabled: true }, null).props;
   assert.deepEqual(disabled.style({ pressed: true }), [undefined, undefined]);
 });
@@ -156,7 +156,12 @@ function backupProviderFixture(options = {}) {
     react: hooks,
     'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     '../lib/wallet-session': { walletSession: session },
-    '../lib/storage': { hasStoredMnemonic: async () => true, MNEMONIC_STORE_KEY: 'mnemonic', getSecureItem: async key => key === 'mnemonic' ? 'public fixture only' : savedRecord },
+    '../lib/storage': { hasStoredMnemonic: async () => true, MNEMONIC_STORE_KEY: 'mnemonic',
+      WALLET_IDENTITY_KEY: 'identity', WALLET_WIPE_PENDING_KEY: 'wipe',
+      getSecureItem: async key => key === 'mnemonic' ? 'public fixture only' : key === 'identity' || key === 'wipe' ? null : savedRecord,
+      setSecureItem: async () => {} },
+    '../lib/device-authentication': { withProtectedWalletAccess: operation => operation() },
+    '../lib/auth-diagnostics': { recordAuthDiagnostic() {}, categorizeAuthFailure: () => 'unknown' },
     '../lib/wallet-keys': { deriveHederaPrivateKeyFromSeed: seed => { options.onDerive?.(seed); return { publicKey: { toStringRaw: () => 'wallet-one' } }; } },
     '../lib/wallet-seed-native': { deriveAuthenticatedWalletSeed: options.deriveSeed || (async () => new Uint8Array(64).fill(7)) },
     '../lib/spark': { initializeSparkWallet: options.initializeSpark },

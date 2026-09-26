@@ -3,14 +3,15 @@
   "main": "index.js",
   "version": "1.0.0",
   "scripts": {
+    "postinstall": "node ./scripts/patch-spark-ios-logging.cjs && node ./scripts/patch-spark-xhr-transport.cjs",
+    "eas-build-post-install": "node ./scripts/eas-production-gate.cjs",
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint",
+    "lint": "eslint app components hooks lib styles scripts server demo modules plugins tests metro.config.js --ext .ts,.tsx,.js,.cjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test-isolation=none --test-concurrency=1 --test tests/*.test.cjs",
+    "test": "node --experimental-test-isolation=none --test-concurrency=1 --test tests/*.test.cjs",
     "eid-backend": "node ./server/eid-backend.js",
     "demo:ocp": "node ./demo/ocp-server.js",
     "demo:travel-rule": "node ./demo/travel-rule-merchant.js",
@@ -25,6 +26,7 @@
     "mainnet:config:verify": "node ./scripts/verify-hedera-mainnet-build-config.cjs",
     "lightning:mainnet:config:verify": "node ./scripts/verify-lightning-mainnet-build-config.cjs",
     "production:config:verify": "node ./scripts/verify-production-mainnet-build-config.cjs",
+    "production:eas:verify": "node ./scripts/verify-eas-production-profile.cjs",
     "contract:compile": "node ./scripts/compile-contracts.cjs",
     "contract:test": "node ./scripts/run-contract-tests.cjs",
     "contract:deploy:testnet": "node ./scripts/hedera-deploy-checkout.cjs --network testnet",
@@ -38,6 +40,7 @@
     "@expo/vector-icons": "^15.0.3",
     "@hiero-ledger/sdk": "2.88.0",
     "@moonpay/react-native-moonpay-sdk": "^1.1.8",
+    "@noble/curves": "1.9.7",
     "@noble/hashes": "^1.8.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
@@ -61,6 +64,7 @@
     "expo-image": "~3.0.11",
     "expo-intent-launcher": "~13.0.8",
     "expo-linking": "~8.0.11",
+    "expo-modules-core": "3.0.30",
     "expo-local-authentication": "~17.0.9",
     "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.23",
@@ -74,6 +78,7 @@
     "expo-web-browser": "~15.0.11",
     "fast-text-encoding": "^1.0.6",
     "light-bolt11-decoder": "^3.2.0",
+    "metro-file-map": "0.83.8",
     "qrcode-terminal": "^0.12.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -88,7 +93,10 @@
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "~0.21.0",
     "react-native-webview": "^13.15.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "query-string": "9.5.1",
+    "readable-stream": "2.3.8",
+    "string_decoder": "1.1.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
@@ -96,9 +104,13 @@
     "eslint-config-expo": "~10.0.0",
     "ethers": "6.17.0",
     "hardhat": "3.16.0",
+    "js-base64": "3.7.8",
     "mocha": "11.8.0",
     "solc": "0.8.28",
     "typescript": "~5.9.2"
+  },
+  "engines": {
+    "node": "22.23.1"
   },
   "private": true,
   "overrides": {

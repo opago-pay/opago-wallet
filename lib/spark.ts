@@ -2,8 +2,9 @@ import { appConfig } from './config';
 import { markSparkWalletSynchronized } from './display-spark-balance';
 import { attachSparkSendTiming } from './spark-send-timing';
 
-export async function initializeSparkWallet(seed: Uint8Array) {
+export async function initializeSparkWallet(seed: Uint8Array, signal?: AbortSignal) {
   if (!(seed instanceof Uint8Array) || seed.length !== 64) throw new Error('Invalid BIP39 seed.');
+  if (signal?.aborted) throw new Error('Spark startup was cancelled.');
   // Keep the optional SDK unloaded until the wallet's authenticated startup.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { BitcoinSparkWallet } = require('./spark-bitcoin-wallet');
@@ -20,8 +21,10 @@ export async function initializeSparkWallet(seed: Uint8Array) {
       options: { network: appConfig.sparkNetwork },
     });
     try {
+      if (signal?.aborted) throw new Error('Spark startup was cancelled.');
       attachSparkSendTiming(wallet);
       await wallet.getSparkAddress();
+      if (signal?.aborted) throw new Error('Spark startup was cancelled.');
       markSparkWalletSynchronized(wallet);
       return wallet;
     } catch (cause) {

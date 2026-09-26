@@ -137,7 +137,7 @@ export function useWalletBalances(params: {
       focused.current = false;
       sparkGeneration.current += 1;
     };
-  }, [refreshSparkBalance]));
+  }, [refreshSparkBalance, sparkWallet]));
 
   // Leaving Home invalidates late results. Closing a disclosure only hides its
   // data: keep an in-flight read and reuse successful data for this Home visit.

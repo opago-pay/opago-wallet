@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 14.7.0"
+    "version": ">= 14.7.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -35,6 +36,7 @@
     "mainnet-candidate": {
       "distribution": "internal",
       "environment": "production",
+      "node": "22.23.1",
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
         "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "false",
@@ -53,6 +55,8 @@
     },
     "production": {
       "environment": "production",
+      "node": "22.23.1",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
         "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "true",
@@ -68,6 +72,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6816107766"
+      }
+    }
   }
 }

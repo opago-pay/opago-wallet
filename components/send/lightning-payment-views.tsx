@@ -1,3 +1,4 @@
+import { adaptColor } from '@/lib/theme-styles';
 import { BitcoinButton, BitcoinReview } from '@/components/bitcoin/payment-ui';
 import { BitcoinPaymentProgress } from '@/components/bitcoin/payment-progress';
 import { t } from '@/lib/i18n';
@@ -41,7 +42,7 @@ export function LightningSuccessView(props: {
         <Text style={styles.detailsToggleText}>
           {showDetails ? t('Hide payment details') : t('Show payment details')}
         </Text>
-        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color="#9b9ba7" />
+        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#9b9ba7', 'color')} />
       </TouchableOpacity>
       {showDetails && (
         <View style={styles.technicalDetails}>

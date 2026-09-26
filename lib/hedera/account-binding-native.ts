@@ -58,6 +58,20 @@ export async function resolveHederaWalletAccount(
   return discovered;
 }
 
+/** Manual recovery when several Hedera accounts share this wallet key. The
+ * numeric ID is never trusted until Mirror confirms its exact public key. */
+export async function bindHederaWalletAccount(accountId: string, publicKey: string | PublicKey,
+  assertCurrent: () => void): Promise<HederaAccountSnapshot> {
+  assertCurrent();
+  const normalizedPublicKey = normalizeHederaPublicKey(publicKey);
+  const verified = await loadHederaAccount(accountId, normalizedPublicKey);
+  assertCurrent();
+  if (!verified) throw new Error('Hedera account was not found.');
+  await saveCurrentBinding(verified);
+  assertCurrent();
+  return verified;
+}
+
 export async function clearHederaAccountBindings(): Promise<void> {
   await AsyncStorage.multiRemove([
     getHederaAccountBindingStorageKey('testnet'),

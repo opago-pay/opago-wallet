@@ -27,7 +27,7 @@ export async function startEIdSession(input: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     },
-    { purpose: 'eID session', timeoutMs: 15_000 },
+    { purpose: 'eID session', timeoutMs: 15_000, trustedFixedOrigin: true },
   );
   if (!response.sessionId || !response.tcTokenURL || typeof response.demo !== 'boolean') {
     throw new Error('eID backend returned an invalid session.');
@@ -48,7 +48,7 @@ export async function waitForVerifiedEId(
     const response = await fetchJson<EIdStatusResponse>(
       backendUrl + '/api/eid/session/' + encodeURIComponent(sessionId) + '/status',
       {},
-      { purpose: 'eID verification status', timeoutMs: 10_000 },
+      { purpose: 'eID verification status', timeoutMs: 10_000, trustedFixedOrigin: true },
     );
     if (response.status === 'SUCCESS' && response.payerData) return response.payerData;
     if (response.status === 'FAILED' || response.status === 'EXPIRED') {

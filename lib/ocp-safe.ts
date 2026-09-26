@@ -69,6 +69,10 @@ export async function fetchOcpOptions(apiUrl: string): Promise<OcpResponse> {
     {},
     { purpose: 'OCP quote endpoint' },
   );
+  return validateOcpOptions(data);
+}
+
+export function validateOcpOptions(data: Partial<OcpResponse>): OcpResponse {
   if (
     typeof data.merchantName !== 'string' ||
     !Number.isFinite(data.fiatAmount) ||

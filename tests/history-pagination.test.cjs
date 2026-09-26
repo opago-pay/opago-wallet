@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
-/* global __dirname */
 require('./register-typescript.cjs');
 const { HistoryPager } = require('../lib/history-pagination.ts');
 const { loadSparkTransferPage } = require('../lib/lightning/spark-history.ts');
@@ -119,6 +118,17 @@ test('duplicate next-page taps share a request and only advance the display by t
   assert.equal(pager.snapshot().items.length, 20);
 });
 
+test('a checkout parent on a later HBAR page replaces its child without losing the parent fee', async () => {
+  const child = { ...item(1), key: 'hedera:transaction-1', priority: 0, fee: '0' };
+  const parent = { ...item(2), key: child.key, priority: 1, fee: '10000' };
+  const pager = new HistoryPager([{ id: 'hedera', label: 'HBAR', load: async cursor =>
+    cursor === undefined ? { items: [child], next: 'older' } : { items: [parent], next: null } }]);
+  await pager.load();
+  await pager.load('more');
+  assert.equal(pager.snapshot().items.length, 1);
+  assert.equal(pager.snapshot().items[0].fee, '10000');
+});
+
 test('Spark display loader requests one bounded page and respects the provider continuation/end marker', async () => {
   const calls = [];
   const wallet = { getTransfers: async (limit, offset) => {
@@ -156,11 +166,11 @@ test('HBAR pages use the last inspected timestamp and never hide a failed transa
   const first = await loadHederaHistoryPage('0.0.123');
   assert.equal(first.items.length, 10);
   assert.equal(first.next, records[9].consensus_timestamp);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   const second = await loadHederaHistoryPage('0.0.123', 10, first.next);
   assert.equal(second.items[0].consensusTimestamp, records[10].consensus_timestamp);
   assert.equal(new Set([...first.items, ...second.items].map(x => x.transactionId)).size, 20);
-  assert.ok(calls.slice(2).every(url => url.searchParams.get('timestamp') === 'lt:' + first.next));
+  assert.ok(calls.slice(3).every(url => url.searchParams.get('timestamp') === 'lt:' + first.next));
   assert.ok(calls.every(url => url.searchParams.get('limit') === '10'));
   failType = true;
   await assert.rejects(loadHederaHistoryPage('0.0.123'), /history.*HTTP 400/);

@@ -1,5 +1,4 @@
 'use strict';
-/* global __dirname */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 require('./register-typescript.cjs');
@@ -41,8 +40,8 @@ test('HBAR validation errors explain limits and invalid amounts in every support
 });
 
 test('language defaults recognize supported device regions and fall back to English', () => {
-  assert.deepEqual(SUPPORTED_LANGUAGES, ['en', 'fr', 'es', 'de']);
-  for (const [locale, expected] of [['de-DE','de'], ['fr_CA','fr'], ['es-MX','es'], ['en-US','en'], ['DE_at','de'], ['ja-JP','en'], ['', 'en']]) assert.equal(deviceLanguage(locale), expected);
+  assert.deepEqual(SUPPORTED_LANGUAGES, ['en', 'fr', 'es', 'de', 'it']);
+  for (const [locale, expected] of [['de-DE','de'], ['fr_CA','fr'], ['es-MX','es'], ['it-IT','it'], ['it_CH','it'], ['en-US','en'], ['DE_at','de'], ['ja-JP','en'], ['', 'en']]) assert.equal(deviceLanguage(locale), expected);
 });
 
 test('saved app language survives a new app instance and overrides the device language', async () => {
@@ -95,7 +94,7 @@ test('every translated message preserves placeholders in all supported languages
   const keys = Object.keys(dictionaries.de).sort();
   assert.ok(keys.length >= 330);
   const placeholders = text => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
-  for (const language of ['de', 'fr', 'es']) {
+  for (const language of ['de', 'fr', 'es', 'it']) {
     assert.deepEqual(Object.keys(dictionaries[language]).sort(), keys);
     for (const key of keys) {
       const value = dictionaries[language][key];
@@ -123,7 +122,7 @@ test('static UI messages have translations; only explicit brand names may use th
           if (ts.isCallExpression(node) && node.expression.getText(source) === 't' && node.arguments[0]) {
             for (const key of messages(node.arguments[0])) {
               if (unchangedBrands.has(key)) continue;
-              for (const language of ['de', 'fr', 'es']) {
+              for (const language of ['de', 'fr', 'es', 'it']) {
                 assert.ok(Object.hasOwn(dictionaries[language], key), `${filename}: ${language}: ${key}`);
               }
             }
@@ -151,5 +150,6 @@ test('translations never translate or reinterpret recovery words and payment val
   assert.equal(translate('de', 'Loading balances…'), 'Guthaben werden geladen…');
   assert.equal(translate('fr', 'Send'), 'Envoyer');
   assert.equal(translate('es', 'Language'), 'Idioma');
+  assert.equal(translate('it', 'Language'), 'Lingua');
   assert.equal(translate('en', 'Send'), 'Send');
 });

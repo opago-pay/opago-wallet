@@ -2,6 +2,7 @@ import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
+import { useWalletMotion } from '@/hooks/useWalletMotion';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,6 +10,8 @@ import {
   Animated,
   BackHandler,
   Easing,
+  FlatList,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +21,7 @@ import {
 import { Pressable, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdvancedOptions } from '@/components/ui/advanced-options';
@@ -28,6 +31,8 @@ import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { useHomeBalancePreview } from '@/hooks/useHomeBalancePreview';
 import { usePendingLightningPayments } from '@/hooks/usePendingLightningPayments';
 import { useBitcoinOperations } from '@/hooks/useBitcoinOperations';
+import { BitcoinConnectionStatus } from '@/components/bitcoin/connection-status';
+import { PaymentDetailsScreen } from '@/components/history/payment-details';
 import { bitcoinScope } from '@/lib/bitcoin/onchain';
 import { bitcoinStore } from '@/lib/bitcoin/store-native';
 import { consumeMoonPayReturnNotice } from '@/lib/moonpay-return-native';
@@ -40,10 +45,9 @@ import { loadHederaHistoryPage, loadHederaTransactionStatus } from '@/lib/hedera
 import {
   getHederaTransactionExplorerUrl,
 } from '@/lib/hedera/explorer';
-import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { normalizeHederaTransactionIdForMirror } from '@/lib/hedera/mirror';
-import { hederaPaymentJournal } from '@/lib/hedera/payment-journal-native';
-import { lightningPaymentJournal } from '@/lib/lightning/payment-journal-native';
+import { hederaPaymentJournalFor } from '@/lib/hedera/payment-journal-native';
+import { lightningPaymentJournalFor } from '@/lib/lightning/payment-journal-native';
 import {
   loadSparkTransferPage,
   sparkUserRequestPaymentHash,
@@ -56,12 +60,14 @@ import { HistoryPager } from '@/lib/history-pagination';
 import { operationalHealth } from '@/lib/operational-health-native';
 import { yieldToUi } from '@/lib/ui-ready';
 import { walletSession } from '@/lib/wallet-session';
+import { bitcoinOperationHistoryItem, lightningHashFromPayment, type PaymentHistoryItem } from '@/lib/payment-details';
 import {
   getWalletAssetPresentation,
   walletAssetKeyFromSymbol,
   type WalletAssetKey,
 } from '@/lib/wallet-assets';
 import {
+  bitcoinOperationNotice,
   compactWalletIdentifier,
   formatEurValue,
   paymentHistoryStatus,
@@ -70,20 +76,9 @@ import {
 
 const OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000;
 
-interface DisplayTransaction {
-  key: string;
-  type: 'incoming' | 'outgoing';
-  amountDisplay: string;
-  asset: string;
-  status: string;
-  timestamp: string;
-  txId: string | null;
-  explorerUrl?: string;
-  route?: 'lightning' | 'onchain';
-  explorerLabel?: 'HashScan';
-}
+type DisplayTransaction = PaymentHistoryItem;
 
-function mapHederaJournal(records: Awaited<ReturnType<typeof hederaPaymentJournal.list>>): DisplayTransaction[] {
+function mapHederaJournal(records: Awaited<ReturnType<ReturnType<typeof hederaPaymentJournalFor>['list']>>): DisplayTransaction[] {
   return records.map(item => ({
     key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
     txId: item.transactionId, type: 'outgoing', amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
@@ -101,11 +96,18 @@ export default function HomeScreen() {
   const {
     walletReady,
     sparkWallet,
+    sparkStatus,
+    sparkError,
+    retrySparkConnection,
     hederaPublicKey,
     loadOrGenerateWallet,
     refreshHederaAccount,
     error: walletError,
   } = useWalletAuth();
+  const hederaPaymentJournal = hederaPublicKey ? hederaPaymentJournalFor(appConfig.hederaNetwork, hederaPublicKey) : null;
+  const lightningPaymentJournal = hederaPublicKey ? lightningPaymentJournalFor(appConfig.sparkNetwork, hederaPublicKey) : null;
+  const lightningScope = useMemo(() => hederaPublicKey ?
+    { network: appConfig.sparkNetwork, publicKey: hederaPublicKey } : null, [hederaPublicKey]);
   const rates = useExchangeRates();
   const [moonPayReturn, setMoonPayReturn] = useState(false);
   useEffect(() => setMoonPayReturn(false), [hederaPublicKey]);
@@ -141,6 +143,7 @@ export default function HomeScreen() {
     hbarToEur: rates.hbarToEur > 0 ? rates.hbarToEur : preview?.rates?.hbarToEur ?? 0,
   };
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+  const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
   const transactionsRef = useRef(transactions);
   transactionsRef.current = transactions;
   const hiddenHistoryKeys = useRef<string[]>([]);
@@ -166,6 +169,8 @@ export default function HomeScreen() {
       key: item.txId || 'local:' + item.id, txId: item.txId,
       type: item.type, amountDisplay: item.amount.toLocaleString(appLocale()),
       asset: item.asset, status: item.status, timestamp: item.timestamp,
+      reference: item.reference,
+      route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' : undefined,
     } satisfies DisplayTransaction : null;
   }, []);
 
@@ -207,10 +212,12 @@ export default function HomeScreen() {
             items: page.map(item => ({
             key: item.txId || 'local:' + item.id, txId: item.txId, type: item.type,
             amountDisplay: item.amount.toLocaleString(appLocale()), asset: item.asset,
-            status: item.status, timestamp: item.timestamp,
+            status: item.status, timestamp: item.timestamp, reference: item.reference,
+            route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' as const : undefined,
           })) };
         } },
         { id: 'hedera-journal', label: 'HBAR', load: async () => {
+          if (!hederaPaymentJournal) return { items: [], next: null };
           const records = await hederaPaymentJournal.list();
           hederaHistoryPending.current = records.some(item => item.state === 'pending');
           return { items: mapHederaJournal(records), next: null };
@@ -227,24 +234,25 @@ export default function HomeScreen() {
             type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
             amountDisplay: item.amountHbar, asset: 'HBAR', status: item.result.toLowerCase(),
             timestamp: item.occurredAt, explorerUrl: item.hashscanUrl, explorerLabel: 'HashScan' as const,
+            priority: item.nonce === 0 ? 1 : 0,
           })) };
         } },
         { id: 'lightning-journal', label: 'Bitcoin', load: async () => {
+          if (!lightningPaymentJournal) return { items: [], next: null };
           const records = await lightningPaymentJournal.list();
           return { next: null, items: records.map(item => ({
             key: 'ln:' + item.paymentHash, txId: 'ln:' + item.paymentHash,
             type: 'outgoing' as const, amountDisplay: item.amountSats.toLocaleString(appLocale()),
             asset: 'SAT', status: item.state, timestamp: item.createdAt,
+            route: 'lightning' as const, requestId: item.requestId,
           })) };
         } },
-        { id: 'onchain', label: 'Bitcoin', load: async () => {
+        { id: 'onchain', label: 'Bitcoin', load: async (cursor, limit) => {
           if (!sparkWallet) return { items: [], next: null };
           const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
-          return { next: null, items: (await bitcoinStore.list(scope)).map(item => ({
-            key: item.id, txId: item.txid ?? item.requestId ?? item.id, type: item.kind === 'deposit' ? 'incoming' as const : 'outgoing' as const,
-            amountDisplay: item.amountSats ? item.amountSats.toLocaleString(appLocale()) : '—', asset: 'SAT', status: item.state, timestamp: item.createdAt,
-            route: 'onchain' as const,
-          })) };
+          const page = await bitcoinStore.listHistoryPage(scope, limit, cursor === undefined ? undefined : String(cursor));
+          return { next: page.next, through: page.through,
+            items: page.items.map(item => bitcoinOperationHistoryItem(item, appLocale())) };
         } },
         { id: 'spark', label: 'Bitcoin', load: async (cursor, limit) => {
           if (!sparkWallet) return { items: [], next: null };
@@ -290,7 +298,7 @@ export default function HomeScreen() {
       historyLoadedRef.current = true;
       // Status recovery is independent of loading a display page. It must not
       // leave a spinner/error on a history page that has already loaded.
-      if (hederaHistoryPending.current && !hederaRecovery.current) {
+      if (hederaPaymentJournal && hederaHistoryPending.current && !hederaRecovery.current) {
         const recovery = (async () => {
           const assertSession = walletSession.captureRuntime();
           const records = await hederaPaymentJournal.reconcile(async id => {
@@ -313,7 +321,7 @@ export default function HomeScreen() {
     });
     refreshInProgressRef.current = operation;
     return operation;
-  }, [historyOpen, secondaryDataReady, loadOrGenerateWallet, refreshHederaAccount, sparkWallet, walletReady]);
+  }, [historyOpen, secondaryDataReady, loadOrGenerateWallet, refreshHederaAccount, sparkWallet, walletReady, hederaPaymentJournal, lightningPaymentJournal]);
 
   const refreshSettledPayment = useCallback(async () => {
     const generation = refreshGenerationRef.current;
@@ -327,9 +335,62 @@ export default function HomeScreen() {
     await refreshInProgressRef.current;
     if (generation === refreshGenerationRef.current) await refresh(true);
   }, [historyOpen, loadLatestLocal, refreshBalances, refresh]);
-  const { pendingCount: pendingLightningCount, hiddenPaymentKeys } = usePendingLightningPayments(sparkWallet, secondaryDataReady, refreshSettledPayment, visibilityRevision);
+  const { pendingCount: pendingLightningCount, hiddenPaymentKeys } = usePendingLightningPayments(sparkWallet,
+    lightningScope, secondaryDataReady, refreshSettledPayment, visibilityRevision);
   hiddenHistoryKeys.current = hiddenPaymentKeys;
   const { operations: bitcoinOperations } = useBitcoinOperations(sparkWallet, secondaryDataReady, false, refreshSettledPayment);
+  const selectedKey = selectedTransaction?.key;
+  const selectedStatus = selectedTransaction?.status;
+  useEffect(() => setSelectedTransaction(null), [hederaPublicKey]);
+  useEffect(() => {
+    if (!selectedKey || !hederaPublicKey) return;
+    let cancelled = false;
+    let assertSession: () => void;
+    try { assertSession = walletSession.captureRuntime(); } catch { return; }
+    async function updateDetails() {
+      try {
+        if (selectedKey!.startsWith('withdraw:') || selectedKey!.startsWith('deposit:')) {
+          if (!sparkWallet) return;
+          const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
+          const operation = (await bitcoinStore.list(scope)).find(item => item.id === selectedKey);
+          assertSession();
+          if (!cancelled && operation) setSelectedTransaction(current => {
+            if (!current || current.key !== selectedKey) return current;
+            return current.status !== operation.state || current.operation?.txid !== operation.txid ||
+              current.operation?.actualFeeSats !== operation.actualFeeSats || !current.operation
+              ? bitcoinOperationHistoryItem(operation, appLocale()) : current;
+          });
+        } else if (lightningPaymentJournal && /^ln:[a-f0-9]{64}$/.test(selectedKey!)) {
+          const record = await lightningPaymentJournal.get(selectedKey!.slice(3));
+          assertSession();
+          if (!cancelled && record) setSelectedTransaction(current => {
+            if (!current || current.key !== selectedKey) return current;
+            return current.status !== record.state || current.requestId !== record.requestId
+              ? { ...current, status: record.state, requestId: record.requestId, route: 'lightning' } : current;
+          });
+        }
+      } catch { /* Existing reconciliation retains an unresolved status on read failures. */ }
+    }
+    void updateDetails();
+    const settled = ['confirmed', 'success', 'completed', 'failed', 'aborted'].includes(selectedStatus ?? '');
+    const timer = settled ? null : setInterval(() => void updateDetails(), 4_000);
+    return () => { cancelled = true; if (timer) clearInterval(timer); };
+  }, [selectedKey, selectedStatus, sparkWallet, lightningPaymentJournal, hederaPublicKey]);
+
+  const openPendingLightningNotice = useCallback(async () => {
+    if (!lightningPaymentJournal) { setHistoryOpen(true); return; }
+    try {
+      const assertSession = walletSession.captureRuntime();
+      const records = await lightningPaymentJournal.list();
+      assertSession();
+      const record = records.filter(item => item.state === 'pending' && !item.hiddenAt)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+      if (!record) { setHistoryOpen(true); return; }
+      setSelectedTransaction({ key: 'ln:' + record.paymentHash, txId: 'ln:' + record.paymentHash,
+        type: 'outgoing', amountDisplay: record.amountSats.toLocaleString(appLocale()), asset: 'SAT',
+        status: record.state, timestamp: record.createdAt, route: 'lightning', requestId: record.requestId });
+    } catch { setHistoryOpen(true); }
+  }, [lightningPaymentJournal]);
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
@@ -352,13 +413,13 @@ export default function HomeScreen() {
 
   useEffect(() => setRecentLocal(null), [hederaPublicKey]);
   useEffect(() => {
-    if (!historyOpen) return;
+    if (!historyOpen || selectedTransaction) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       setHistoryOpen(false);
       return true;
     });
     return () => subscription.remove();
-  }, [historyOpen]);
+  }, [historyOpen, selectedTransaction]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -381,48 +442,22 @@ export default function HomeScreen() {
 
   const changePaymentVisibility = useCallback(async (paymentHash: string, hidden: boolean) => {
     try {
+      if (!lightningPaymentJournal) throw new Error('Wallet identity is unavailable.');
       const assertSession = walletSession.capture();
       assertSession();
       await lightningPaymentJournal.setHidden(paymentHash, hidden);
       assertSession();
       setVisibilityRevision(value => value + 1);
+      return true;
     } catch {
       Alert.alert(t('Payment details'), t('The entry could not be updated. Please try again.'));
+      return false;
     }
-  }, []);
+  }, [lightningPaymentJournal]);
 
-  const openTransaction = useCallback(async (transaction: DisplayTransaction) => {
-    if (transaction.type === 'outgoing' && transaction.asset === 'SAT' && transaction.status === 'pending' && /^ln:[0-9a-f]{64}$/.test(transaction.key)) {
-      let record;
-      try { record = await lightningPaymentJournal.get(transaction.key.slice(3)); }
-      catch {
-        Alert.alert(t('Payment details'), t('The entry could not be updated. Please try again.'));
-        return;
-      }
-      if (record?.state === 'pending') {
-        Alert.alert(t('Payment details'),
-          `${transaction.amountDisplay} SAT · ${new Date(transaction.timestamp).toLocaleString(appLocale())}\n\n${t('Hiding this entry removes it from your usual history and dismisses its notice. Its outcome remains unknown. Status checks and protection against sending it again stay active.')}`,
-          [
-            { text: t('Close'), style: 'cancel' },
-            { text: record.hiddenAt ? t('Show entry again') : t('Hide entry'), onPress: () => { void changePaymentVisibility(record.paymentHash, !record.hiddenAt); } },
-          ],
-        );
-        return;
-      }
-    }
-    if (!transaction.explorerUrl) {
-      Alert.alert(t('Payment details'), `${transaction.amountDisplay} ${transaction.asset}\n${t(paymentHistoryStatus(transaction.type, transaction.asset, transaction.status))}\n${transaction.route === 'onchain' ? t('Bitcoin network') : transaction.asset === 'SAT' ? 'Lightning / Spark' : 'Hedera'}\n${transaction.txId ?? ''}`);
-      return;
-    }
-    try {
-      await openHederaExplorerUrl(transaction.explorerUrl);
-    } catch (cause) {
-      Alert.alert(
-        t('Could not open explorer'),
-        t(cause instanceof Error ? cause.message : t('The explorer link is invalid.')),
-      );
-    }
-  }, [changePaymentVisibility]);
+  const openTransaction = useCallback((transaction: DisplayTransaction) => {
+    setSelectedTransaction(transaction);
+  }, []);
 
   const visibleTransactions = useMemo(() => transactions.filter(
     item => item.status !== 'pending' || !hiddenPaymentKeys.includes(item.key),
@@ -456,11 +491,11 @@ export default function HomeScreen() {
     : sparkPriorityTimedOut && displayBalances.spark === null ? t('Bitcoin balance unavailable')
       : previewRates && !rates.isLoading ? t('Last known exchange rates')
         : totalEur === null && !rates.isLoading ? t('EUR estimate unavailable') : null;
-  const buyPrimary = displayBalances.spark === 0 || (totalEur !== null && totalEur < 0.005);
   const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
     ? t(!(rates.hbarToEur > 0) || !(rates.updatedAt > 0) || Date.now() - rates.updatedAt > 300_000
       ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatEurValue(displayRates.hbarToEur) })
     : t(rates.isLoading ? 'Loading HBAR price…' : 'HBAR price unavailable');
+  const bitcoinNotice = bitcoinOperationNotice(bitcoinOperations);
 
   const localVisible = recentLocal && (recentLocal.status !== 'pending' || !hiddenPaymentKeys.includes(recentLocal.key))
     ? recentLocal : null;
@@ -471,6 +506,18 @@ export default function HomeScreen() {
 
   if (!startupComplete && !initialBalanceReady && !startupTimedOut && !balanceError) {
     return <StartupLoadingScreen />;
+  }
+
+  if (selectedTransaction) {
+    const hash = lightningHashFromPayment(selectedTransaction);
+    return <PaymentDetailsScreen payment={selectedTransaction} onClose={() => setSelectedTransaction(null)}
+      onHide={hash && selectedTransaction.type === 'outgoing' && selectedTransaction.status === 'pending'
+        ? () => { void changePaymentVisibility(hash, true).then(changed => {
+          if (changed) setSelectedTransaction(null);
+        }); } : undefined}
+      onReviewDeposit={selectedTransaction.operation?.kind === 'deposit' && selectedTransaction.status === 'action_required'
+        ? () => { setSelectedTransaction(null); router.push('/bitcoin-deposits' as Href); } : undefined}
+    />;
   }
 
   if (historyOpen) return <HistoryPage
@@ -496,7 +543,7 @@ export default function HomeScreen() {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 28 }]}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#ffb000" />
+        <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={adaptColor('#ffb000', 'color')} />
       }
     >
       <View style={styles.header}>
@@ -509,14 +556,14 @@ export default function HomeScreen() {
         />
         <Pressable
           style={({ pressed }) => [styles.settingsButton, pressed && styles.settingsButtonPressed]}
-          onPress={() => { markNavigationStart('settings'); router.push('/(tabs)/settings'); }}
+          onPress={() => { markNavigationStart('settings'); router.push({ pathname: '/(tabs)/settings', params: { section: 'overview' } }); }}
           hitSlop={10}
           android_ripple={{ color: 'rgba(255,176,0,0.18)' }}
           accessibilityRole="button"
-          accessibilityLabel={t('Security')}
+          accessibilityLabel={t('Settings')}
         >
           <View pointerEvents="none">
-            <Ionicons name="menu-outline" size={32} color={mode === 'light' ? '#18181d' : '#fff'} />
+            <Ionicons name="settings-outline" size={28} color={mode === 'light' ? '#18181d' : '#fff'} />
           </View>
         </Pressable>
       </View>
@@ -545,26 +592,22 @@ export default function HomeScreen() {
         {!!balanceCaveat && <Text style={styles.balanceCaveat}>{balanceCaveat}</Text>}
       </View>
 
+      {walletReady && <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
       <View style={styles.quickActions}>
-        {buyPrimary ? <>
-          <QuickAction icon="scan-outline" label={t('Send')} isSend onPress={() => { markNavigationStart('send'); router.push('/(tabs)/send'); }} />
-          <QuickAction icon="card-outline" label={t('Buy')} primary onPress={() => { markNavigationStart('buy'); setMoonPayReturn(false); router.push('../buy'); }} />
-        </> : <>
-          <QuickAction icon="card-outline" label={t('Buy')} onPress={() => { markNavigationStart('buy'); setMoonPayReturn(false); router.push('../buy'); }} />
-          <QuickAction icon="scan-outline" label={t('Send')} isSend onPress={() => { markNavigationStart('send'); router.push('/(tabs)/send'); }} />
-        </>}
         <QuickAction
           icon="qr-code-outline"
           label={t('Receive')}
           onPress={() => { markNavigationStart('receive'); router.push('/(tabs)/receive'); }}
         />
+        <QuickAction icon="scan-outline" label={t('Send')} isSend onPress={() => { markNavigationStart('send'); router.push('/(tabs)/send'); }} />
+        <QuickAction icon="card-outline" label={t('Buy')} onPress={() => { markNavigationStart('buy'); router.push('../buy'); }} />
       </View>
 
       {moonPayReturn && <View accessibilityRole="alert" style={{ backgroundColor: adaptColor('#242018', 'backgroundColor'), borderRadius: 16, padding: 16, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text style={{ color: adaptColor('#f4d38a', 'color'), flex: 1, lineHeight: 20 }}>{t('Check your purchase with MoonPay. Your wallet balance will update after the deposit is confirmed.')}</Text>
+        <Text style={{ color: adaptColor('#f4d38a', 'color'), flex: 1, lineHeight: 20 }}>{t('Closing MoonPay does not confirm a purchase. Check its order status there. If Bitcoin arrives, Opago will show the deposit and any claim needed.')}</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')} onPress={() => setMoonPayReturn(false)}
           style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="close" size={20} color="#f4d38a" />
+          <Ionicons name="close" size={20} color={adaptColor('#f4d38a', 'color')} />
         </TouchableOpacity>
       </View>}
 
@@ -587,19 +630,35 @@ export default function HomeScreen() {
         accessibilityLabel={t('Show all activity')}
       >
         <Text style={styles.historyButtonText}>{t('Show all activity')}</Text>
-        <Ionicons name="arrow-forward-outline" size={19} color="#a3a3ad" />
+        <Ionicons name="arrow-forward-outline" size={19} color={adaptColor('#a3a3ad', 'color')} />
       </Pressable>
       {pendingLightningCount > 0 && (
-        <TouchableOpacity style={styles.pendingPaymentNotice} accessibilityRole="button" onPress={() => setHistoryOpen(true)}>
+         <TouchableOpacity style={styles.pendingPaymentNotice} accessibilityRole="button" onPress={() => void openPendingLightningNotice()}>
           <Text style={styles.pendingPaymentTitle}>{t('Payment status unknown')}</Text>
           <Text style={styles.pendingPaymentText} accessibilityLiveRegion="polite">
             {t('We cannot yet confirm whether this payment completed. Do not send it again. We will keep checking automatically.')}
           </Text>
         </TouchableOpacity>
       )}
-      {(bitcoinIncoming ?? 0) > 0 && <View style={styles.paymentNotice}><Text style={styles.balanceLabel}>{t('{amount} SAT incoming', { amount: bitcoinIncoming! })}</Text><Text style={styles.balanceSubtitle}>{t('Not included in your available balance yet.')}</Text></View>}
-      {bitcoinOperations.some(item => item.state !== 'confirmed') && <TouchableOpacity style={styles.paymentNotice} accessibilityRole="button" onPress={() => router.push('/(tabs)/receive')}>
-        <Text style={styles.balanceLabel}>{t('Bitcoin is on its way')}</Text><Text style={styles.balanceSubtitle}>{t('Open Receive to review deposits. Pending withdrawals are checked automatically.')}</Text>
+      {(bitcoinIncoming ?? 0) > 0 && <TouchableOpacity style={styles.paymentNotice} accessibilityRole="button" onPress={() => {
+        const operation = bitcoinOperations.filter(item => item.kind === 'deposit')
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+        if (operation) setSelectedTransaction(bitcoinOperationHistoryItem(operation, appLocale()));
+        else router.push('/bitcoin-deposits' as Href);
+      }}><Text style={styles.balanceLabel}>{t('{amount} SAT incoming', { amount: bitcoinIncoming! })}</Text><Text style={styles.balanceSubtitle}>{t('Not included in your available balance yet.')}</Text></TouchableOpacity>}
+      {bitcoinNotice && <TouchableOpacity style={styles.paymentNotice} accessibilityRole="button" onPress={() => {
+        const kind = bitcoinNotice.destination === 'deposits' ? 'deposit' : 'withdrawal';
+        const applicableStates = bitcoinNotice.title === 'Payment status unknown' ? ['checking', 'pending']
+          : bitcoinNotice.title === 'Broadcast to the Bitcoin network' ? ['broadcast']
+            : bitcoinNotice.title === 'Bitcoin deposit needs your approval' ? ['action_required']
+              : ['prepared', 'checking', 'pending', 'broadcast'];
+        const operation = bitcoinOperations.filter(item => item.kind === kind && applicableStates.includes(item.state))
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+        if (operation) setSelectedTransaction(bitcoinOperationHistoryItem(operation, appLocale()));
+        else if (kind === 'deposit') router.push('/bitcoin-deposits' as Href);
+        else setHistoryOpen(true);
+      }}>
+        <Text style={styles.balanceLabel}>{t(bitcoinNotice.title)}</Text><Text style={styles.balanceSubtitle}>{t(bitcoinNotice.description)}</Text>
       </TouchableOpacity>}
 
       <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} label={t('More coins')}>
@@ -620,7 +679,7 @@ export default function HomeScreen() {
       </AdvancedOptions>
       {!!balanceError && (
         <View style={styles.errorNotice}>
-          <Ionicons name="cloud-offline-outline" size={18} color="#f2b45d" />
+          <Ionicons name="cloud-offline-outline" size={18} color={adaptColor('#f2b45d', 'color')} />
           <Text style={styles.error}>{t("Some balances could not be refreshed. Pull down to try again.")}</Text>
         </View>
       )}
@@ -630,22 +689,32 @@ export default function HomeScreen() {
 
 function StartupLoadingScreen() {
   useLanguage();
+  const motionAllowed = useWalletMotion();
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
-    ]));
+    pulse.setValue(0);
+    if (!motionAllowed) return;
+    const animation = Animated.loop(Animated.timing(pulse, {
+      toValue: 1, duration: 1600, easing: Easing.linear,
+      useNativeDriver: Platform.OS !== 'web', isInteraction: false,
+    }));
     animation.start();
     return () => animation.stop();
-  }, [pulse]);
+  }, [motionAllowed, pulse]);
   return <View style={styles.startupScreen} accessibilityLiveRegion="polite">
-    <Image source={require('@/assets/images/logo_new.svg')} style={styles.startupLogo} contentFit="contain" accessibilityLabel="Opago" />
+    <Animated.View style={[styles.startupLogo, motionAllowed && {
+      transform: [
+        { translateY: pulse.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -6, -10, -6, 0] }) },
+        { scale: pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.06, 1] }) },
+        { rotate: pulse.interpolate({ inputRange: [0, 0.25, 0.75, 1], outputRange: ['0deg', '-4deg', '4deg', '0deg'] }) },
+      ],
+    }]}>
+      <Image source={require('@/assets/images/logo_new.svg')} style={styles.startupLogoImage} contentFit="contain" accessibilityLabel="Opago" />
+    </Animated.View>
     <Text style={styles.startupTitle}>{t('Your wallet is getting ready')}</Text>
     <View style={styles.startupTrack} accessibilityRole="progressbar" accessibilityLabel={t('Loading Bitcoin balance…')}>
       <Animated.View style={[styles.startupPulse, {
-        opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
-        transform: [{ scaleX: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.24, 1] }) }],
+        transform: [{ translateX: motionAllowed ? pulse.interpolate({ inputRange: [0, 1], outputRange: [-48, 144] }) : 48 }],
       }]} />
     </View>
   </View>;
@@ -653,10 +722,10 @@ function StartupLoadingScreen() {
 
 function TransactionRow({ transaction, openTransaction }: {
   transaction: DisplayTransaction;
-  openTransaction(transaction: DisplayTransaction): Promise<void>;
+  openTransaction(transaction: DisplayTransaction): void;
 }) {
   useLanguage();
-  const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status);
+  const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
   const title = friendlyStatus === 'Completed'
     ? transaction.asset === 'SAT'
       ? t(transaction.type === 'incoming' ? 'Bitcoin received' : 'Bitcoin sent')
@@ -670,7 +739,7 @@ function TransactionRow({ transaction, openTransaction }: {
   });
   return <TouchableOpacity
     style={styles.transaction}
-    onPress={() => void openTransaction(transaction)}
+    onPress={() => openTransaction(transaction)}
     accessibilityRole="button"
     accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${t(friendlyStatus)}`}
   >
@@ -690,7 +759,7 @@ function TransactionRow({ transaction, openTransaction }: {
       <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
         {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
       </Text>
-      {transaction.explorerUrl && <Ionicons name="chevron-forward" size={16} color="#5f5f6b" />}
+      {transaction.explorerUrl && <Ionicons name="chevron-forward" size={16} color={adaptColor('#5f5f6b', 'color')} />}
     </View>
   </TouchableOpacity>;
 }
@@ -699,16 +768,22 @@ function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError
   hasMore, loadingMore, historyErrors, onLoadMore, onRetry, onClose, onRefresh, refreshing }: {
   insets: { top: number; bottom: number };
   transactions: DisplayTransaction[]; loading: boolean; waitingForSpark: boolean; loadError: string | null;
-  openTransaction(transaction: DisplayTransaction): Promise<void>;
+   openTransaction(transaction: DisplayTransaction): void;
   hasMore: boolean; loadingMore: boolean; historyErrors: string[]; onLoadMore(): void; onRetry(): void;
   onClose(): void; onRefresh(): void; refreshing: boolean;
 }) {
   useLanguage();
-  return <ScrollView
+  return <FlatList
     style={styles.container}
     contentContainerStyle={[styles.historyContent, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 28 }]}
-    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffb000" />}
-  >
+    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={adaptColor('#ffb000', 'color')} />}
+    data={transactions}
+    keyExtractor={(transaction) => transaction.key}
+    renderItem={({ item }) => <TransactionRow transaction={item} openTransaction={openTransaction} />}
+    initialNumToRender={12}
+    maxToRenderPerBatch={12}
+    windowSize={7}
+    ListHeaderComponent={<>
     <View style={styles.historyHeader}>
       <Text style={styles.historyTitle}>{t('Activity')}</Text>
       <Pressable onPress={onClose} style={styles.historyClose} accessibilityRole="button" accessibilityLabel={t('Close')}>
@@ -716,14 +791,15 @@ function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError
       </Pressable>
     </View>
     {waitingForSpark && transactions.length === 0 && <Text style={styles.waitingText}>{t('Loading Bitcoin balance first…')}</Text>}
-    {loading && transactions.length === 0 && !waitingForSpark && <View style={styles.historyLoading}><ActivityIndicator color="#ffb000" /><Text style={styles.waitingText}>{t('Loading…')}</Text></View>}
+    {loading && transactions.length === 0 && !waitingForSpark && <View style={styles.historyLoading}><ActivityIndicator color={adaptColor('#ffb000', 'color')} /><Text style={styles.waitingText}>{t('Loading…')}</Text></View>}
     {!loading && !waitingForSpark && transactions.length === 0 && !hasMore && !historyErrors.length && !loadError &&
       <View style={styles.empty}>
-        <Ionicons name="receipt-outline" size={28} color="#5f5f6b" />
+        <Ionicons name="receipt-outline" size={28} color={adaptColor('#5f5f6b', 'color')} />
         <Text style={styles.emptyTitle}>{t('No payments yet')}</Text>
         <Text style={styles.emptyText}>{t('Payments you send or receive will appear here.')}</Text>
       </View>}
-    {transactions.map(transaction => <TransactionRow key={transaction.key} transaction={transaction} openTransaction={openTransaction} />)}
+    </>}
+    ListFooterComponent={<>
     {!!loadError && <Text style={styles.error}>{t('Transaction history could not be fully loaded. Pull down to retry.')}</Text>}
     {historyErrors.length > 0 && <View style={styles.historyRetry}>
       <Text style={styles.waitingText}>{t('Could not load {sources} history.', { sources: historyErrors.map(label => t(label)).join(', ') })}</Text>
@@ -736,9 +812,10 @@ function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError
       accessibilityState={{ disabled: loading, busy: loadingMore }} accessibilityLabel={t('Load earlier payments')}
     >
       <Text style={styles.loadEarlierText}>{t(loadingMore ? 'Loading…' : 'Load earlier')}</Text>
-      {loadingMore ? <ActivityIndicator color="#ffb000" size="small" /> : <Ionicons name="chevron-down" size={20} color="#ffb000" />}
+      {loadingMore ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" /> : <Ionicons name="chevron-down" size={20} color={adaptColor('#ffb000', 'color')} />}
     </TouchableOpacity>}
-  </ScrollView>;
+    </>}
+  />;
 }
 
 function BalanceCard(props: {
@@ -780,10 +857,10 @@ function BalanceCard(props: {
         </Text>
       </View>
       <View style={styles.balanceTrailing}>
-        {props.loading && <ActivityIndicator color="#ffb000" size="small" />}
+        {props.loading && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" />}
         <Text style={styles.balanceValue}>{props.value}</Text>
         {props.fiatValue && <Text style={styles.balanceSubtitle}>{props.fiatValue}</Text>}
-        {props.onCopy && <Ionicons name="copy-outline" size={16} color="#8f8f9d" />}
+        {props.onCopy && <Ionicons name="copy-outline" size={16} color={adaptColor('#8f8f9d', 'color')} />}
       </View>
     </TouchableOpacity>
   );
@@ -792,7 +869,6 @@ function BalanceCard(props: {
 function QuickAction(props: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
-  primary?: boolean;
   isSend?: boolean;
   accessibilityHint?: string;
   onPress(): void;
@@ -808,11 +884,11 @@ function QuickAction(props: {
       accessibilityHint={props.accessibilityHint}
     >
       <View style={styles.quickActionIconSlot}>
-        <View style={[styles.quickActionIcon, props.isSend && styles.quickActionIconEmphasized, props.primary && styles.quickActionIconPrimary]}>
-          <Ionicons name={props.icon} size={props.isSend ? 34 : 28} color={props.primary ? '#111111' : mode === 'light' ? '#18181d' : '#fff'} />
+        <View style={[styles.quickActionIcon, props.isSend && styles.quickActionIconEmphasized]}>
+          <Ionicons name={props.icon} size={props.isSend ? 34 : 28} color={mode === 'light' ? '#18181d' : '#fff'} />
         </View>
       </View>
-      <Text style={[styles.quickActionText, props.isSend && styles.quickActionTextEmphasized, props.primary && styles.quickActionTextPrimary]}>{props.label}</Text>
+      <Text style={[styles.quickActionText, props.isSend && styles.quickActionTextEmphasized]}>{props.label}</Text>
     </TouchableOpacity>
   );
 }
@@ -833,9 +909,10 @@ const styles = adaptiveStyles(StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 40 },
   startupScreen: { flex: 1, backgroundColor: '#0a0a0c', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   startupLogo: { width: 76, height: 76, marginBottom: 30 },
-  startupTitle: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  startupTrack: { width: 120, height: 3, borderRadius: 2, backgroundColor: '#27231a', overflow: 'hidden', marginTop: 30 },
-  startupPulse: { width: '100%', height: 3, borderRadius: 2, backgroundColor: '#ffb000' },
+  startupLogoImage: { width: '100%', height: '100%' },
+  startupTitle: { color: '#fff', fontSize: 22, lineHeight: 29, fontWeight: '600', textAlign: 'center' },
+  startupTrack: { width: 144, height: 4, borderRadius: 2, backgroundColor: '#27231a', overflow: 'hidden', marginTop: 30 },
+  startupPulse: { width: 48, height: 4, borderRadius: 2, backgroundColor: '#ffb000' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   settingsButton: {
     width: 58,
@@ -877,14 +954,12 @@ const styles = adaptiveStyles(StyleSheet.create({
     justifyContent: 'center',
   },
   quickActionIconEmphasized: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#242428', borderColor: '#64646b', borderWidth: 1.5 },
-  quickActionIconPrimary: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#ffb000', borderColor: '#ffb000' },
   paymentNotice: { backgroundColor: '#141416', borderRadius: 16, padding: 16, gap: 6, marginTop: 12 },
   pendingPaymentNotice: { backgroundColor: '#211b0f', borderColor: '#66501d', borderWidth: 1, borderRadius: 16, padding: 16, gap: 6, marginTop: 12 },
   pendingPaymentTitle: { color: '#ffb000', fontSize: 15, fontWeight: '700' },
   pendingPaymentText: { color: '#e6ddc8', fontSize: 13, lineHeight: 20 },
   quickActionText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   quickActionTextEmphasized: { fontSize: 15, fontWeight: '700' },
-  quickActionTextPrimary: { color: '#ffb000', fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -892,7 +967,7 @@ const styles = adaptiveStyles(StyleSheet.create({
     marginTop: 26,
     marginBottom: 12,
   },
-  sectionTitle: { color: '#fff', fontSize: 19, fontWeight: '800' },
+  sectionTitle: { color: '#fff', fontSize: 19, lineHeight: 25, fontWeight: '600' },
   emptyLatest: { minHeight: 76, borderRadius: 16, backgroundColor: '#121216', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 },
   emptyLatestText: { color: '#9b9ba5', fontSize: 14 },
   historyButton: { minHeight: 48, marginTop: 2, paddingHorizontal: 2, flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start' },
@@ -900,7 +975,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   historyButtonText: { color: '#a3a3ad', fontSize: 14, fontWeight: '600' },
   historyContent: { paddingHorizontal: 20, flexGrow: 1 },
   historyHeader: { minHeight: 58, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  historyTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
+  historyTitle: { color: '#fff', fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.5 },
   historyClose: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   historyLoading: { alignItems: 'center', gap: 12, paddingTop: 44 },
   loadEarlier: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 20, marginTop: 8, borderRadius: 18, backgroundColor: '#161619', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
@@ -921,10 +996,10 @@ const styles = adaptiveStyles(StyleSheet.create({
   },
   balanceDetails: { flex: 1, minWidth: 0 },
   balanceTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7 },
-  balanceLabel: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  balanceSubtitle: { color: '#7f7f8b', fontSize: 12, marginTop: 4 },
+  balanceLabel: { color: '#fff', fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  balanceSubtitle: { color: '#a3a3ad', fontSize: 12, marginTop: 4 },
   balanceTrailing: { alignItems: 'flex-end', gap: 5, maxWidth: '44%' },
-  balanceValue: { color: '#fff', fontWeight: '800', fontSize: 14, textAlign: 'right' },
+  balanceValue: { color: '#fff', fontWeight: '600', fontSize: 14, lineHeight: 20, fontVariant: ['tabular-nums'], textAlign: 'right' },
   networkBadge: {
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 6,
@@ -944,17 +1019,17 @@ const styles = adaptiveStyles(StyleSheet.create({
     gap: 11,
   },
   transactionBody: { flex: 1, minWidth: 0 },
-  transactionTitle: { color: '#fff', fontWeight: '700' },
+  transactionTitle: { color: '#fff', fontSize: 14, lineHeight: 20, fontWeight: '600' },
   transactionMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 5 },
-  transactionMeta: { color: '#777783', fontSize: 11 },
+  transactionMeta: { color: '#a3a3ad', fontSize: 12, lineHeight: 17 },
   transactionTrailing: { alignItems: 'flex-end', gap: 7, maxWidth: '40%' },
-  transactionAmount: { color: '#fff', fontWeight: '800', fontSize: 12, marginLeft: 6 },
+  transactionAmount: { color: '#fff', fontWeight: '600', fontSize: 14, lineHeight: 20, fontVariant: ['tabular-nums'], marginLeft: 6 },
   incoming: { color: '#49d17d' },
   statusPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
   statusPillSuccess: { backgroundColor: 'rgba(73,209,125,0.12)' },
   statusPillPending: { backgroundColor: 'rgba(255,176,0,0.12)' },
   statusPillError: { backgroundColor: 'rgba(255,102,102,0.14)' },
-  statusPillText: { color: '#b8b8c2', fontSize: 9, fontWeight: '700' },
+  statusPillText: { color: '#b8b8c2', fontSize: 11, lineHeight: 15, fontWeight: '600' },
   empty: {
     backgroundColor: '#121216',
     borderRadius: 16,
@@ -962,7 +1037,7 @@ const styles = adaptiveStyles(StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 10 },
-  emptyText: { color: '#777783', fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center', paddingHorizontal: 16 },
+  emptyText: { color: '#a3a3ad', fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center', paddingHorizontal: 16 },
   errorNotice: {
     flexDirection: 'row',
     alignItems: 'center',

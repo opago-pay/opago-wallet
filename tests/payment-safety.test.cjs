@@ -18,7 +18,7 @@ const {
   normalizeLightningInput,
   resolveInvoiceAmount,
 } = require('../lib/lightning.ts');
-const { assertSafeRemoteUrl, resolveMaxLightningFeeSats } = require('../lib/config.ts');
+const { assertSafeRemoteUrl, isPrivateDevelopmentHost, resolveMaxLightningFeeSats } = require('../lib/config.ts');
 const {
   payDecodedSparkInvoice,
   sparkTransferMatchesInvoice,
@@ -176,6 +176,14 @@ test('records a Spark payment only after a matching proof and propagates failure
     }, details),
     /proof does not match/i,
   );
+});
+
+test('classifies mapped IPv6 and special IPv4 literals as private payment targets', () => {
+  for (const host of ['[::ffff:127.0.0.1]', '[fe90::1]', '[2001:db8::1]', '100.64.1.1', '192.0.2.1', '198.18.0.1']) {
+    assert.equal(isPrivateDevelopmentHost(new URL('https://' + host + '/').hostname), true, host);
+  }
+  assert.equal(isPrivateDevelopmentHost('8.8.8.8'), false);
+  assert.equal(isPrivateDevelopmentHost('example.com'), false);
 });
 
 test('keeps a proof-backed Spark success authoritative when local indexing fails', async () => {
