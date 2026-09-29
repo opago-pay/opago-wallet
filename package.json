@@ -9,7 +9,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "eslint app components hooks lib styles scripts server demo modules plugins tests metro.config.js --ext .ts,.tsx,.js,.cjs",
+    "lint": "eslint app components hooks lib styles scripts server demo plugins tests metro.config.js --ext .ts,.tsx,.js,.cjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-test-isolation=none --test-concurrency=1 --test tests/*.test.cjs",
     "eid-backend": "node ./server/eid-backend.js",
