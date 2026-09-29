@@ -7,7 +7,9 @@ const { hookFixture } = require('./react-hooks-fixture.cjs');
 const { invoice } = require('./lightning-invoice-fixture.cjs');
 function nodes(node) {
   if (!node || typeof node !== 'object') return [];
-  return [node, ...React.Children.toArray(node.props?.children).flatMap(nodes)];
+  const children = typeof node.props?.children === 'function'
+    ? node.props.children(action => action()) : node.props?.children;
+  return [node, ...React.Children.toArray(children).flatMap(nodes)];
 }
 const text = node => nodes(node).filter(item => item.type === 'text').map(item => React.Children.toArray(item.props.children).filter(value => typeof value === 'string').join('')).join(' ');
 const isQr = node => node.type === 'qr' || node.type?.type === 'qr';
@@ -52,6 +54,10 @@ function fixture(options = {}) {
     '@expo/vector-icons': { Ionicons: 'icon' }, 'expo-image': { Image: 'image' },
     'expo-clipboard': { setStringAsync: async value => { calls.push(['copied', value]); } },
     '@/components/receive/wallet-qr-code': { WalletQrCode: 'qr' },
+    '@/components/receive/payment-network-icon': { PaymentNetworkIcon: 'network-icon' },
+    '@/components/ui/payment-success-motion': {
+      PaymentSuccessIcon: 'success-icon', PaymentSuccessMotionView: 'success-motion',
+    },
     '@/styles/send-styles': { sendStyles: {} }, '@/lib/wallet-assets': require('../lib/wallet-assets.ts'),
     '@/lib/config': { appConfig: { isMainnet: false, hederaNetwork: 'testnet', sparkNetwork: 'REGTEST' } },
     '@/lib/lightning': require('../lib/lightning.ts'), '@/lib/promise-timeout': require('../lib/promise-timeout.ts'),
@@ -112,6 +118,7 @@ test('EUR receive amount waits for a fresh price, retries it, and never shows a 
   await new Promise(done => setTimeout(done, 550));
   screen = await app.settle();
   assert.ok(nodes(screen).some(isQr));
+  assert.equal(nodes(screen).find(isQr).props.logo, 'lightning');
   assert.ok(app.calls.some(call => Array.isArray(call) && call[0] === 'create' && call[1] === 2000));
 });
 
@@ -163,6 +170,7 @@ test('switching between Lightning and Bitcoin keeps the same unpaid request and 
   selectRoute(app, 'Bitcoin network');
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address');
+  assert.equal(nodes(screen).find(isQr).props.logo, 'bitcoin');
   selectRoute(app, 'Lightning');
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, lightningCode);
@@ -308,6 +316,7 @@ test('Show all coins reveals HBAR in the network picker and opens its account QR
   nodes(screen).find(node => node.type === 'button' && text(node).startsWith('HBAR')).props.onPress();
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, '0.0.123456');
+  assert.equal(nodes(screen).find(isQr).props.logo, 'hedera');
   assert.match(text(screen), /Enter the amount in the sending wallet/);
   assert.equal(nodes(screen).some(node => node.type === 'button' && node.props.accessibilityLabel === 'Add amount'), false);
 });

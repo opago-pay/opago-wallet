@@ -25,7 +25,7 @@ export function LegacyPaymentReview() {
   useEffect(() => { void load(); }, [load]);
   if (issues?.length === 0 && !failed) return null;
   return <View style={{ padding: 18, borderRadius: 18, borderWidth: 1,
-    borderColor: adaptColor('#66501d', 'borderColor'), backgroundColor: adaptColor('#211b0f', 'backgroundColor'), marginTop: 18 }}>
+    borderColor: adaptColor('#66501d', 'borderColor'), backgroundColor: adaptColor('#211b0f', 'backgroundColor') }}>
     <Text style={{ color: adaptColor('#f4d38a', 'color'), fontWeight: '700', fontSize: 17 }}>{t('Older payments need review')}</Text>
     {issues === null && !failed && <ActivityIndicator color={adaptColor('#ffb000', 'color')} />}
     {(issues || []).map(issue => <Text key={issue.network} style={{ color: adaptColor('#e6ddc8', 'color'), lineHeight: 21, marginTop: 8 }}>
@@ -37,13 +37,18 @@ export function LegacyPaymentReview() {
     <Text style={{ color: adaptColor('#e6ddc8', 'color'), lineHeight: 21, marginTop: 10 }}>
       {t('These older records do not identify their wallet or network. Do not send the payment again. Contact Opago support with the reference and your payment receipt; never share recovery words. Support must verify the original wallet, network and final payment result before the block can be resolved.')}
     </Text>
-    <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(OPAGO_LINKS.contact)
-      .catch(() => Alert.alert(t('Could not open this page'), t('Please try again.')))}
-      style={{ minHeight: 48, justifyContent: 'center' }}>
-      <Text style={{ color: adaptColor('#ffca54', 'color'), fontWeight: '700' }}>{t('Contact support')}</Text>
-    </TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" onPress={() => void load()} style={{ minHeight: 48, justifyContent: 'center' }}>
-      <Text style={{ color: adaptColor('#ffca54', 'color'), fontWeight: '700' }}>{t('Check again')}</Text>
-    </TouchableOpacity>
+    <View style={{ gap: 10, marginTop: 14 }}>
+      <TouchableOpacity accessibilityRole="link" onPress={() => void Linking.openURL(OPAGO_LINKS.contact)
+        .catch(() => Alert.alert(t('Could not open this page'), t('Please try again.')))}
+        style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 14,
+          borderWidth: 1, borderColor: adaptColor('#66501d', 'borderColor') }}>
+        <Text style={{ color: adaptColor('#ffca54', 'color'), fontWeight: '700' }}>{t('Contact support')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={() => void load()}
+        style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 14,
+          borderWidth: 1, borderColor: adaptColor('#66501d', 'borderColor') }}>
+        <Text style={{ color: adaptColor('#ffca54', 'color'), fontWeight: '700' }}>{t('Check again')}</Text>
+      </TouchableOpacity>
+    </View>
   </View>;
 }

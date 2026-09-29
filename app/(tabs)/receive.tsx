@@ -24,7 +24,7 @@ import { CloseWalletScreen } from '@/components/navigation/close-wallet-screen';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { WalletQrCode } from '@/components/receive/wallet-qr-code';
-import { AssetIcon } from '@/components/ui/asset-icon';
+import { PaymentNetworkIcon } from '@/components/receive/payment-network-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { BackupReminder, BackupStatusNotice } from '@/components/security/backup-prompt';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -62,6 +62,7 @@ import { validateBitcoinAddress } from '@/lib/bitcoin/destination';
 import { satsToBtc } from '@/lib/bitcoin/amount';
 import { bitcoinDepositWatch, bitcoinStaticAddressCache } from '@/lib/bitcoin/store-native';
 import { beginPerformanceSpan, markNavigationReady, measurePerformance, recordPerformanceDuration } from '@/lib/performance-trace';
+import { PaymentSuccessIcon, PaymentSuccessMotionView, type SuccessExit } from '@/components/ui/payment-success-motion';
 
 type ReceiveNetwork = 'lightning' | 'onchain' | 'hedera';
 // Polling and amount edits rerender Receive frequently; QR encoding is only
@@ -75,9 +76,9 @@ function receiveAmountError(cause: unknown, rateLoading: boolean): string {
     : message);
 }
 
-export default function ReceiveScreen() {
+export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {}) {
   useLanguage();
-  useColorMode();
+  const { mode } = useColorMode();
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -120,8 +121,12 @@ export default function ReceiveScreen() {
   const [receiveStatus, setReceiveStatus] = useState<LightningReceiveState | 'checking' | 'offline'>('checking');
   const [amountInput, setAmountInput] = useState('');
   const [isEur, setIsEur] = useState(true);
+  const [copyFeedback, setCopyFeedback] = useState<{ value: string; copied: boolean } | null>(null);
+  const copyAttempt = useRef(0);
+  const copyFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
+  const successExit = useRef<SuccessExit>(action => action());
   const paymentDetectedAt = useRef<number | null>(null);
   const [paidNetwork, setPaidNetwork] = useState<'lightning' | 'hedera' | null>(null);
   const [receivedDescription, setReceivedDescription] = useState('');
@@ -133,6 +138,10 @@ export default function ReceiveScreen() {
   const [hederaMissing, setHederaMissing] = useState(false);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const pollingEnabled = isFocused && appIsActive;
+  useEffect(() => () => {
+    copyAttempt.current += 1;
+    if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
+  }, []);
   useEffect(() => {
     if (backupStatus !== 'loading' && backupStatus !== 'verified' && backupStatus !== 'deferred') markNavigationReady('receive');
   }, [backupStatus]);
@@ -505,8 +514,9 @@ export default function ReceiveScreen() {
 
   const returnHomeAfterReceive = useCallback(() => {
     finishReceiving();
-    routerRef.current.replace('/(tabs)');
-  }, [finishReceiving]);
+    if (modal && routerRef.current.canGoBack()) routerRef.current.back();
+    else routerRef.current.replace('/(tabs)');
+  }, [finishReceiving, modal]);
 
   useEffect(() => {
     if (!isPaid) return;
@@ -514,7 +524,7 @@ export default function ReceiveScreen() {
       recordPerformanceDuration('receive.confirm_to_screen', performance.now() - paymentDetectedAt.current);
       paymentDetectedAt.current = null;
     }
-    const timer = setTimeout(returnHomeAfterReceive, 3_000);
+    const timer = setTimeout(() => successExit.current(returnHomeAfterReceive), 3_000);
     return () => clearTimeout(timer);
   }, [isPaid, returnHomeAfterReceive]);
 
@@ -538,8 +548,21 @@ export default function ReceiveScreen() {
   }, [invoiceExpiresAt, isPaid]);
 
   async function copy(value: string) {
-    await Clipboard.setStringAsync(value);
-    Alert.alert(t('Copied'), t('Payment information copied to your clipboard.'));
+    const attempt = ++copyAttempt.current;
+    if (copyFeedbackTimer.current) clearTimeout(copyFeedbackTimer.current);
+    setCopyFeedback(null);
+    try {
+      await Clipboard.setStringAsync(value);
+      if (attempt !== copyAttempt.current) return;
+      setCopyFeedback({ value, copied: true });
+    } catch {
+      if (attempt !== copyAttempt.current) return;
+      setCopyFeedback({ value, copied: false });
+    }
+    copyFeedbackTimer.current = setTimeout(() => {
+      if (attempt === copyAttempt.current) setCopyFeedback(null);
+      copyFeedbackTimer.current = null;
+    }, 2_000);
   }
 
   async function openReceivedTransaction() {
@@ -617,13 +640,13 @@ export default function ReceiveScreen() {
   }, [sparkWallet, walletReady, ownerKey, onchainAddress?.ownerKey, onchainError, pollingEnabled, shouldPrefetchOnchain]);
 
   if (backupStatus === 'loading') return <View style={[styles.container, styles.centered]}>
-    <CloseWalletScreen style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
+    <CloseWalletScreen dismiss={modal} style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
     <BackupStatusNotice />
   </View>;
 
   if (backupStatus !== 'verified' && backupStatus !== 'deferred') return (
     <View style={[styles.container, styles.centered]}>
-      <CloseWalletScreen style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
+      <CloseWalletScreen dismiss={modal} style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
       <Text style={styles.successTitle}>{t("Back up before adding money")}</Text>
       <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Settings > Security and backup.")}</Text>
       <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push({ pathname: '/(tabs)/settings', params: { section: 'security' } }); }}>
@@ -633,34 +656,40 @@ export default function ReceiveScreen() {
   );
 
   if (isPaid) return (
-    <View style={[styles.container, styles.centered]}>
-      <View style={styles.successCircle}>
-        <Ionicons name="checkmark" size={50} color={themeColor('successText')} accessibilityLabel={t("Confirmed")} />
-      </View>
-      <Text style={styles.successTitle}>{t("Payment received")}</Text>
-      <Text style={[styles.subtitle, styles.centerText]}>
-        {receivedDescription || t('The payment is complete and saved in your activity.')}
-      </Text>
-      <TouchableOpacity
-        style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
-        onPress={returnHomeAfterReceive}
-      >
-        <Text style={styles.buttonText}>{t("Done")}</Text>
-      </TouchableOpacity>
-      {receivedExplorerUrl && (
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton, styles.fullWidthButton]}
-          onPress={() => void openReceivedTransaction()}
-          accessibilityRole="link"
-          accessibilityLabel={t("View payment receipt")}
-        >
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("View receipt")}</Text>
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity style={styles.textButton} onPress={finishReceiving}>
-        <Text style={styles.textButtonText}>{t("Request another payment")}</Text>
-      </TouchableOpacity>
-    </View>
+    <PaymentSuccessMotionView style={[styles.container, styles.centered]}>
+      {exit => {
+        successExit.current = exit;
+        return <>
+          <PaymentSuccessIcon style={{ marginBottom: 16 }} accessibilityLabel={t("Confirmed")} />
+          <Text style={styles.successTitle}>{t("Payment received")}</Text>
+          <Text style={[styles.subtitle, styles.centerText]}>
+            {receivedDescription || t('The payment is complete and saved in your activity.')}
+          </Text>
+          <TouchableOpacity
+            style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
+            onPress={() => exit(returnHomeAfterReceive)}
+          >
+            <Text style={styles.buttonText}>{t("Done")}</Text>
+          </TouchableOpacity>
+          {receivedExplorerUrl && (
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton, styles.fullWidthButton]}
+              onPress={() => void openReceivedTransaction()}
+              accessibilityRole="link"
+              accessibilityLabel={t("View payment receipt")}
+            >
+              <Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("View receipt")}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.textButton}
+            onPress={() => exit(finishReceiving)}
+          >
+            <Text style={styles.textButtonText}>{t("Request another payment")}</Text>
+          </TouchableOpacity>
+        </>;
+      }}
+    </PaymentSuccessMotionView>
   );
 
   if (showDepositDetails) return <BitcoinDepositScreen wallet={sparkWallet} onBack={() => setShowDepositDetails(false)} />;
@@ -728,12 +757,12 @@ export default function ReceiveScreen() {
     : network === 'onchain' && draftSats === 0 ? onchainAddress?.address : qrValue;
   // Leave 22 px of white card around the QR, in addition to its encoded quiet zone.
   const qrSize = Math.max(160, Math.min(300, width - 90));
-  const receiveRoutes: { id: ReceiveNetwork; label: string; description: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-    { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet.', icon: 'flash-outline' },
-    { id: 'onchain', label: 'Bitcoin network', description: 'Receive to a Bitcoin address, for example from an exchange.', icon: 'logo-bitcoin' },
+  const receiveRoutes: { id: ReceiveNetwork; label: string; description: string }[] = [
+    { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet.' },
+    { id: 'onchain', label: 'Bitcoin network', description: 'Receive to a Bitcoin address, for example from an exchange.' },
   ];
   if (showAllCoins || network === 'hedera') receiveRoutes.push({
-    id: 'hedera', label: 'HBAR', description: 'Receive to your Hedera account.', icon: 'wallet-outline',
+    id: 'hedera', label: 'HBAR', description: 'Receive to your Hedera account.',
   });
 
   return <ScrollView
@@ -744,7 +773,7 @@ export default function ReceiveScreen() {
   >
     <View style={styles.header}>
       <Text style={bitcoinStyles.title}>{t(network === 'hedera' ? 'Receive HBAR' : 'Receive Bitcoin')}</Text>
-      <CloseWalletScreen />
+      <CloseWalletScreen dismiss={modal} />
     </View>
     <BackupReminder />
     {walletReady && network !== 'hedera' &&
@@ -771,8 +800,7 @@ export default function ReceiveScreen() {
         style={{ minHeight: 68, borderRadius: 13, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12,
           backgroundColor: network === item.id ? adaptColor('#2a2924', 'backgroundColor') : 'transparent' }}
       >
-        {item.id === 'hedera' ? <AssetIcon asset="hedera" size={21} /> :
-          <Ionicons name={item.icon} size={21} color={network === item.id ? themeColor('accentText') : adaptColor('#c8c8ce', 'color')} />}
+        <PaymentNetworkIcon network={item.id === 'onchain' ? 'bitcoin' : item.id} size={24} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 15, fontWeight: '700' }}>{t(item.label)}</Text>
           <Text style={{ color: adaptColor('#aaaab4', 'color'), fontSize: 12, lineHeight: 17, marginTop: 2 }}>{t(item.description)}</Text>
@@ -827,8 +855,16 @@ export default function ReceiveScreen() {
     </View>}
 
     <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
-      {qrValue ? <View style={{ backgroundColor: adaptColor('#fff', 'backgroundColor'), borderRadius: 24, padding: 22, overflow: 'hidden' }}>
-        <StableQRCode value={qrValue} size={qrSize} focused={isFocused} onReady={onQrReady} />
+      {qrValue ? <View style={mode === 'light'
+        ? { backgroundColor: '#fff', borderRadius: 20, padding: 12, overflow: 'hidden' }
+        : { backgroundColor: '#fff', borderRadius: 24, padding: 20, overflow: 'hidden' }}>
+        <StableQRCode
+          value={qrValue}
+          size={qrSize}
+          focused={isFocused}
+          onReady={onQrReady}
+          logo={network === 'onchain' ? 'bitcoin' : network}
+        />
       </View> : <View style={{ width: qrSize + 44, height: qrSize + 44, borderRadius: 24, backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), alignItems: 'center', justifyContent: 'center', padding: 22 }}>
         {loading || onchainLoading || (!hederaReady && network === 'hedera') || (!restoreComplete && network === 'lightning')
           ? <ActivityIndicator color={themeColor('accentText')} size="large" />
@@ -871,7 +907,10 @@ export default function ReceiveScreen() {
 
     {qrValue && <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
       <TouchableOpacity onPress={() => void copy(displayValue || qrValue)} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
-        <Ionicons name="copy-outline" size={18} color={themeColor('accentText')} /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Copy')}</Text>
+        <Ionicons name={copyFeedback?.copied && copyFeedback.value === (displayValue || qrValue) ? 'checkmark' : 'copy-outline'} size={18} color={themeColor('accentText')} />
+        <Text accessibilityLiveRegion="polite" style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>
+          {copyFeedback?.value === (displayValue || qrValue) ? t(copyFeedback.copied ? 'Copied' : 'Try again') : t('Copy')}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => void Share.share({ message: qrValue }).catch(() => Alert.alert(t('Please try again.')))} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
         <Ionicons name="share-outline" size={18} color={themeColor('accentText')} /><Text style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>{t('Share')}</Text>

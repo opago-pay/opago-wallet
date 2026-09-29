@@ -1,0 +1,28 @@
+{
+  "version": "0.1.0",
+  "source_plan_sha256": "baa9ded791d1034434abb036c372e7bca64d3b802b605b0f101457c09e96ce3c",
+  "files": {
+    "acceptance.json": "45f7e6f6ff1f27eb7abd070f00e933f1a3930786eab62cb508f043f399913d3b",
+    "decisions.md": "8186306aa56615f6abfd244bd9dba3a80f50ea13377714c013de6ec77633c619",
+    "fixtures/hpke-key-document-vectors.json": "abef1f69c77becd0e2a3c48e7c6a0b1d447fefab0f66f3309b78a710cc0f2c89",
+    "fixtures/hpke-vectors.json": "f9ae621aefaab0a20c19986ae68ab51dd9474878e7c6040fd8a9459f3ee69341",
+    "fixtures/observation-vectors.json": "3c89fa146439aa8f5c74fb6b881b688ab05ea9b7878cc4d026ecbaa05fcf4d42",
+    "fixtures/schema-cases.json": "646917773c653ed5265f96da955830fd21f775a41291dd789ad94917a2842c4d",
+    "fixtures/wallet-auth-vectors.json": "7125860965a1ff408fcf2052ede3df6b730e69871fdcd96fcaa6ba59ebec89e0",
+    "openapi-helper.json": "36cf120ac5dc22d2995fe6ea8323d9fa0f889ef273217cc658856b617a115df8",
+    "openapi-internal.json": "7434bdf842f5e85a1e7d97d7d83408bf94c2372424a527b9e8dd9e881b902bea",
+    "openapi-public.json": "bd618f6737ccf6119507fb4914347adba325b1046970681bc91e0d54bb9e1f64",
+    "protocol.md": "aa0fd93e5b3ab1dbbdf38b3a4d7da52bb49d6f1aea1754853afefa37b2eca2e8",
+    "README.md": "dd69a0acc4d8daebc2b7a4e6dc31b2aa075e8438f017c00102697e241206d5e3",
+    "route-map.json": "13b7a0ca672fcb031e0e212c525eae4790850c94bbf54ff2f75e20b28bbfb87c",
+    "schemas.json": "e91bbdd6b93b9732be26ceaf765ff282abbbffe57f0d2135b8ca159fffc965f4",
+    "TEAM-HANDOFF.md": "0c7ee6b830ee1eaa8c051888d476c2ce280a8124b0cd0be129067f5caec2f9d8",
+    "tools/build_contracts.py": "93f18992f2bf17d01d310465381a5ce07224eb3b96e00b6d560ee0fff08e4e18",
+    "tools/build_fixtures.py": "52f20176fe6acb6352691eced99686acc4fd600763f56db62e41567c8a8fbe5b",
+    "tools/package.json": "de927346e4315a8f9bd3dc3c05c21dc16ab1914a5fa467b6803466a60a3c2b2f",
+    "tools/requirements-validation.txt": "9ed064c2d3000638a5aeaeb3f853680d8729462601369c44193f5e4693bf994c",
+    "tools/validate_contracts.py": "244106ac31026f0ecf01dd2e1ac595321ade159947da342da9ef634ff7b5145c",
+    "tools/verify-fixtures.cjs": "e98a37b72794e8518c58213a6233e18e348b5d13fd8e0ac3bfa5221e7be6275a",
+    "validation-report.json": "c83ca8573890d37c910918b46a53cbac67f33ee4d43e7c179247a96f5d740a13"
+  }
+}

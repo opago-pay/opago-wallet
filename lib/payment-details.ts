@@ -4,6 +4,8 @@ export interface PaymentHistoryItem {
   key: string;
   type: 'incoming' | 'outgoing';
   amountDisplay: string;
+  /** Numeric amount in the displayed asset unit (SAT or HBAR). */
+  amountValue?: number;
   asset: string;
   status: string;
   timestamp: string;
@@ -15,6 +17,8 @@ export interface PaymentHistoryItem {
   reference?: string | null;
   requestId?: string | null;
   operation?: BitcoinOperation;
+  btcEurRate?: number | null;
+  btcEurRateAt?: string | null;
 }
 
 export function bitcoinOperationHistoryItem(operation: BitcoinOperation, locale: string): PaymentHistoryItem {
@@ -23,12 +27,37 @@ export function bitcoinOperationHistoryItem(operation: BitcoinOperation, locale:
     txId: operation.txid ?? operation.requestId ?? operation.id,
     type: operation.kind === 'deposit' ? 'incoming' : 'outgoing',
     amountDisplay: operation.amountSats > 0 ? operation.amountSats.toLocaleString(locale) : '—',
+    amountValue: operation.amountSats > 0 ? operation.amountSats : undefined,
     asset: 'SAT',
     status: operation.state,
     timestamp: operation.createdAt,
     route: 'onchain',
     operation,
+    btcEurRate: operation.btcEurRate,
+    btcEurRateAt: operation.btcEurRateAt,
   };
+}
+
+export type PaymentEurQuote = {
+  eurValue: number;
+  eurPerAsset: number;
+  rateAsset: 'BTC' | 'HBAR';
+  historical: boolean;
+};
+
+/** Only a rate captured for this payment may be presented as its historical value. */
+export function paymentEurQuote(item: PaymentHistoryItem, rates?: { hbarToEur: number }): PaymentEurQuote | null {
+  const amount = item.operation?.amountSats && item.operation.amountSats > 0
+    ? item.operation.amountSats : item.amountValue;
+  if (amount === undefined || !Number.isFinite(amount) || amount <= 0) return null;
+  const rate = item.btcEurRate ?? item.operation?.btcEurRate;
+  if (item.asset === 'SAT' && typeof rate === 'number' && Number.isFinite(rate) && rate > 0 && rate <= 1e12) {
+    return { eurValue: amount / 100_000_000 * rate, eurPerAsset: rate, rateAsset: 'BTC', historical: true };
+  }
+  if (item.asset === 'HBAR' && rates && Number.isFinite(rates.hbarToEur) && rates.hbarToEur > 0) {
+    return { eurValue: amount * rates.hbarToEur, eurPerAsset: rates.hbarToEur, rateAsset: 'HBAR', historical: false };
+  }
+  return null;
 }
 
 export function lightningHashFromPayment(item: PaymentHistoryItem): string | null {

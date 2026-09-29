@@ -7,10 +7,11 @@ import { t } from '@/lib/i18n';
 import { markNavigationStart } from '@/lib/performance-trace';
 
 /** Leave a wallet screen without clearing its saved payment/request state. */
-export function CloseWalletScreen({ disabled = false, style }: { disabled?: boolean; style?: StyleProp<ViewStyle> }) {
+export function CloseWalletScreen({ disabled = false, dismiss = false, style }: { disabled?: boolean; dismiss?: boolean; style?: StyleProp<ViewStyle> }) {
   const router = useRouter();
   return <TouchableOpacity
-    onPress={() => { markNavigationStart('home'); Keyboard.dismiss(); router.replace('/(tabs)'); }}
+    onPress={() => { markNavigationStart('home'); Keyboard.dismiss();
+      if (dismiss && router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
     disabled={disabled}
     accessibilityRole="button"
     accessibilityLabel={t('Home')}

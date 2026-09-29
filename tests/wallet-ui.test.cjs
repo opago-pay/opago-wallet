@@ -50,6 +50,9 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
   const send = readSource('components', 'send', 'payment-form.tsx');
   const receive = readSource('app', '(tabs)', 'receive.tsx');
+  const networkIcon = readSource('components', 'receive', 'payment-network-icon.tsx');
+  const qr = readSource('components', 'receive', 'wallet-qr-code.tsx');
+  const deposit = readSource('components', 'bitcoin', 'deposit-screen.tsx');
 
   assert.match(icon, /accessibilityRole="image"/);
   assert.match(icon, /props\.asset === 'lightning'/);
@@ -63,7 +66,14 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   assert.doesNotMatch(portfolio, /Your HBAR is live/);
   assert.doesNotMatch(portfolio, /Test HBAR has no real-world value/);
   assert.match(send, /<AssetIcon asset=\{item\.asset\}/);
-  assert.match(receive, /<AssetIcon asset="hedera"/);
+  assert.match(receive, /<PaymentNetworkIcon network=/);
+  assert.match(networkIcon, /LightningLogo/);
+  assert.match(networkIcon, /BitcoinLogo/);
+  assert.match(networkIcon, /hedera-logo\.png/);
+  assert.match(qr, /<PaymentNetworkIcon network=\{logo\}/);
+  assert.match(qr, /position: 'absolute'/);
+  assert.doesNotMatch(qr, /logoSVG=/);
+  assert.match(deposit, /logo="bitcoin"/);
   assert.doesNotMatch(portfolio, /assetDot/);
 });
 
@@ -126,12 +136,14 @@ test('uses graphical confirmation states instead of prototype OK text', () => {
     readSource('app', '(tabs)', 'receive.tsx'),
     readSource('components', 'send', 'hedera-payment-views.tsx'),
     readSource('components', 'bitcoin', 'payment-progress.tsx'),
+    readSource('components', 'bitcoin', 'transfer-result.tsx'),
   ];
 
   for (const source of sources) {
-    assert.match(source, /name="checkmark"/);
+    assert.match(source, /PaymentSuccessIcon/);
     assert.doesNotMatch(source, />OK<\/Text>/);
   }
+  assert.match(readSource('components', 'ui', 'payment-success-motion.tsx'), /name="checkmark"/);
   const lightning = readSource('components', 'send', 'lightning-payment-views.tsx');
   assert.match(lightning, /<BitcoinPaymentProgress phase="success"/);
   assert.doesNotMatch(lightning, />OK<\/Text>/);
@@ -153,7 +165,7 @@ test('keeps send and request focused on the first consumer decision', () => {
   assert.match(send, /sourceSelected/);
   assert.match(receive, /Receive Bitcoin/);
   assert.match(receive, /createLightningInvoice/);
-  assert.match(receive, /<StableQRCode value=\{qrValue\}/);
+  assert.match(receive, /<StableQRCode[\s\S]*?value=\{qrValue\}/);
   assert.doesNotMatch(receive, />Invoice amount</);
   assert.doesNotMatch(receive, />Create 10-minute invoice</);
 });

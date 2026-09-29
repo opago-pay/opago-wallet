@@ -38,6 +38,7 @@ function fixture(file, overrides = {}) {
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
+    '@/lib/exchange-rate-snapshot': { rememberBitcoinRate: () => {} },
     'expo-router': { useRouter: () => ({}) },
     '@react-navigation/native': { useIsFocused: () => true },
     '@expo/vector-icons': { Ionicons: 'icon' },

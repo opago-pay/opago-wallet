@@ -2,7 +2,8 @@ import { withTimeout } from './promise-timeout';
 
 export const HISTORY_PAGE_SIZE = 10;
 export type HistoryCursor = string | number;
-export interface HistoryEntry { key: string; timestamp: string; status: string; priority?: number }
+export interface HistoryEntry { key: string; timestamp: string; status: string; priority?: number;
+  btcEurRate?: number | null; btcEurRateAt?: string | null }
 export interface HistoryPage<T> {
   items: T[];
   next: HistoryCursor | null;
@@ -37,7 +38,10 @@ export class HistoryPager<T extends HistoryEntry> {
       if (existing?.status === 'action_required') continue;
       if (existing && ['confirmed', 'success', 'failed'].includes(existing.status) && ['pending', 'checking', 'prepared'].includes(item.status)) continue;
       if (existing && existing.priority !== undefined && item.priority !== undefined && existing.priority > item.priority) continue;
-      byId.set(item.key, item);
+      // Spark/provider rows can supersede a local row's status, but the
+      // locally captured exchange rate must survive that deduplication.
+      byId.set(item.key, existing?.btcEurRate && !item.btcEurRate
+        ? { ...item, btcEurRate: existing.btcEurRate, btcEurRateAt: existing.btcEurRateAt } : item);
     }
     return [...byId.values()].filter(this.visible).sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp) || a.key.localeCompare(b.key));
   }

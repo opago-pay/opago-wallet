@@ -8,6 +8,7 @@ import { useColorMode } from '@/hooks/useColorMode';
 import { useLanguage } from '@/hooks/useLanguage';
 import { t } from '@/lib/i18n';
 import { markNavigationReady } from '@/lib/performance-trace';
+import { themeColor } from '@/lib/theme-styles';
 
 export default function BuyScreen() {
   useLanguage();
@@ -18,10 +19,10 @@ export default function BuyScreen() {
   useEffect(() => { markNavigationReady('buy'); }, []);
 
   return (
-    <View style={[styles.screen, { backgroundColor: light ? '#fff' : '#0a0a0c', paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
+    <View style={[styles.screen, { backgroundColor: themeColor('canvas', mode), paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={[styles.title, { color: light ? '#18181d' : '#fff' }]}>{t('Buy crypto')}</Text>
-        <CloseWalletScreen />
+        <CloseWalletScreen dismiss />
       </View>
       <View style={styles.message}>
         <View style={[styles.iconCircle, { backgroundColor: light ? '#f3f3f5' : '#1b1b20' }]}>

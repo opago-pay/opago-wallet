@@ -14,7 +14,7 @@ export const themePalette = {
     border: '#39393e', strongBorder: '#64646b',
   },
   light: {
-    canvas: '#ffffff', surface: '#f4f4f6', raised: '#e9e9ed', selected: '#fff0c2',
+    canvas: '#fafafa', surface: '#ffffff', raised: '#f2f2f5', selected: '#fff0c2',
     text: '#18181d', secondary: '#4c4c55', muted: '#60606a',
     accentText: '#775000', accentFill: '#ffb000', onAccent: '#15150e',
     successText: '#176b49', errorText: '#a33d32', warningText: '#805300',
@@ -122,6 +122,7 @@ const specialLightColors: Partial<Record<ColorProperty, Readonly<Record<string, 
   },
   borderColor: {
     '#87ddbd10': '#b9dccb', '#87ddbd38': '#a6d4bc', '#ffb0000e': '#e9d5a4',
+    'rgba(73,209,125,0.12)': '#b9dccb',
     '#ffb00016': '#dcc18a', '#ffffff13': '#d2d2d9', '#ffffff14': '#d2d2d9',
     'rgba(255,255,255,0.08)': '#d2d2d9', 'rgba(255,255,255,0.10)': '#d2d2d9',
     'rgba(255,255,255,0.09)': '#d2d2d9', 'rgba(255,255,255,0.12)': '#d2d2d9',

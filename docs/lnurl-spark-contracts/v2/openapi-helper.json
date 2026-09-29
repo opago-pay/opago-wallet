@@ -1,0 +1,447 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "OPAGO Spark invoice helper",
+    "version": "0.2.0",
+    "description": "Implementation contract based on OPAGO plan V7. NOT a deployed API. Read protocol.md and decisions.md; x-opago-* fields are normative."
+  },
+  "servers": [
+    {
+      "url": "https://spark-helper.opago-internal.invalid",
+      "description": "Deployment placeholder, no public ingress."
+    }
+  ],
+  "paths": {
+    "/internal/spark/invoices": {
+      "post": {
+        "operationId": "createHelperInvoice",
+        "summary": "createHelperInvoice",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HelperOperation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Helper error",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Only svc-spark-helper. Durable execution and fencing semantics in protocol.md; missing row is unknown, never proof of not_executed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/HelperInvoiceRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/spark/operations/{operation_id}": {
+      "get": {
+        "operationId": "getHelperOperation",
+        "summary": "getHelperOperation",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HelperOperation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Helper error",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Only svc-spark-helper. Durable execution and fencing semantics in protocol.md; missing row is unknown, never proof of not_executed."
+      }
+    },
+    "/internal/spark/operations/{operation_id}/fence": {
+      "post": {
+        "operationId": "fenceHelperOperation",
+        "summary": "fenceHelperOperation",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HelperOperation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Helper error",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Only svc-spark-helper. Durable execution and fencing semantics in protocol.md; missing row is unknown, never proof of not_executed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/FenceOperation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/spark/wallets/{pubkey}/transfers": {
+      "get": {
+        "operationId": "getHelperTransfers",
+        "summary": "getHelperTransfers",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pubkey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "network",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Transfers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Helper error",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Only svc-spark-helper. Durable execution and fencing semantics in protocol.md; missing row is unknown, never proof of not_executed."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "WalletBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Internal-issued wallet access token, scoped to one wallet and installation."
+      },
+      "AccountBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Keycloak account access token; issuer/audience/auth_time and party are verified internally."
+      },
+      "PosBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Device credential restricted to the registered POS."
+      },
+      "DeletionReceiptBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Opaque receipt only for the corresponding deletion status."
+      },
+      "ServiceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Service credential; never substitutes end-user authorization."
+      }
+    }
+  }
+}

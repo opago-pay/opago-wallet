@@ -45,17 +45,21 @@ function MenuRow(props: {
   onPress(): void;
   divider?: boolean;
   accent?: boolean;
+  success?: boolean;
   disabled?: boolean;
 }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${props.title}. ${props.detail}`}
     accessibilityState={{ disabled: !!props.disabled }} disabled={props.disabled}
     activeOpacity={0.72} onPress={props.onPress} style={styles.row}>
-    <View style={[styles.icon, props.accent && styles.accentIcon]} accessible={false}>
-      <Ionicons name={props.icon} size={22} color={themeColor(props.accent ? 'accentText' : 'secondary')} />
+    <View style={[styles.icon, props.accent && styles.accentIcon,
+      props.success && { backgroundColor: themeColor('successSurface') }]} accessible={false}>
+      <Ionicons name={props.icon} size={22}
+        color={themeColor(props.success ? 'successText' : props.accent ? 'accentText' : 'secondary')} />
     </View>
     <View style={styles.rowCopy}>
       <Text style={styles.rowTitle}>{props.title}</Text>
-      <Text style={[styles.rowDetail, props.accent && styles.accentText]}>{props.detail}</Text>
+      <Text style={[styles.rowDetail, props.accent && styles.accentText,
+        props.success && { color: themeColor('successText') }]}>{props.detail}</Text>
     </View>
     <Ionicons name="chevron-forward" size={18} color={themeColor('muted')} accessible={false} />
     {props.divider && <View style={styles.divider} />}
@@ -75,7 +79,8 @@ export function SettingsMenu(props: {
     <MenuGroup title={t('Wallet')}>
       {props.backupLoading ? <View style={styles.loading}><BackupStatusNotice /></View> :
         <MenuRow title={t('Security and backup')} detail={props.backupChecked ? t('Backup checked') : t('Backup needed')}
-          icon={props.backupChecked ? 'shield-checkmark-outline' : 'shield-outline'} accent={!props.backupChecked}
+          icon={props.backupChecked ? 'checkmark-circle' : 'shield-outline'} accent={!props.backupChecked}
+          success={props.backupChecked}
           disabled={props.disabled} onPress={() => props.onSelect('security')} />}
     </MenuGroup>
     <MenuGroup title={t('Preferences')}>

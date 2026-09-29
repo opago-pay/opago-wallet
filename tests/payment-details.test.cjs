@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 require('./register-typescript.cjs');
 const { bitcoinOperationHistoryItem, lightningHashFromPayment, paymentDetailStatus,
-  paymentDetailReferences, bitcoinExplorerUrl, paymentMethodLabel } = require('../lib/payment-details.ts');
+  paymentDetailReferences, bitcoinExplorerUrl, paymentMethodLabel, paymentEurQuote } = require('../lib/payment-details.ts');
 const { assertBitcoinOperation } = require('../lib/bitcoin/store.ts');
 
 const txid = 'ab'.repeat(32);
@@ -14,7 +14,8 @@ const operation = {
 };
 
 test('Bitcoin details retain the saved recipient, quote ceiling, references and validated explorer target', () => {
-  const completed = { ...operation, txid, state: 'confirmed', actualFeeSats: 2 };
+  const completed = { ...operation, txid, state: 'confirmed', actualFeeSats: 2,
+    btcEurRate: 80000, btcEurRateAt: operation.createdAt };
   assert.doesNotThrow(() => assertBitcoinOperation(completed));
   assert.throws(() => assertBitcoinOperation({ ...completed, actualFeeSats: 4 }));
   assert.throws(() => assertBitcoinOperation({ ...completed, state: 'pending' }));
@@ -23,6 +24,9 @@ test('Bitcoin details retain the saved recipient, quote ceiling, references and 
   assert.equal(payment.operation.feeSats, 3);
   assert.equal(payment.operation.actualFeeSats, 2);
   assert.equal(paymentDetailStatus(payment), 'Completed');
+  assert.deepEqual(paymentEurQuote(payment, { hbarToEur: 0 }), {
+    eurValue: 0.016, eurPerAsset: 80000, rateAsset: 'BTC', historical: true,
+  });
   assert.equal(bitcoinExplorerUrl(payment), `https://mempool.space/tx/${txid}`);
   assert.deepEqual(paymentDetailReferences(payment), [
     { label: 'Transaction ID', value: txid },
@@ -31,6 +35,21 @@ test('Bitcoin details retain the saved recipient, quote ceiling, references and 
   ]);
   assert.equal(bitcoinExplorerUrl(bitcoinOperationHistoryItem({ ...operation, network: 'REGTEST', txid }, 'en-US')), null);
   assert.equal(bitcoinExplorerUrl(bitcoinOperationHistoryItem({ ...operation, txid: 'invalid' }, 'en-US')), null);
+});
+
+test('payment EUR quote uses the asset amount and does not invent unavailable rates', () => {
+  const payment = { key: 'hedera:1', txId: '1', type: 'incoming', amountDisplay: '12.5', amountValue: 12.5,
+    asset: 'HBAR', status: 'success', timestamp: operation.createdAt };
+  assert.deepEqual(paymentEurQuote(payment, { btcToEur: 80000, hbarToEur: 0.2 }), {
+    eurValue: 2.5, eurPerAsset: 0.2, rateAsset: 'HBAR', historical: false,
+  });
+  assert.equal(paymentEurQuote(payment, { btcToEur: 80000, hbarToEur: 0 }), null);
+  assert.equal(paymentEurQuote({ ...payment, amountValue: undefined }, { btcToEur: 80000, hbarToEur: 0.2 }), null);
+  const oldBitcoin = { ...payment, asset: 'SAT', amountValue: 100_000 };
+  assert.equal(paymentEurQuote(oldBitcoin, { btcToEur: 80000, hbarToEur: 0.2 }), null);
+  assert.deepEqual(paymentEurQuote({ ...oldBitcoin, btcEurRate: 70000 }, { btcToEur: 80000, hbarToEur: 0.2 }), {
+    eurValue: 70, eurPerAsset: 70000, rateAsset: 'BTC', historical: true,
+  });
 });
 
 test('restored Bitcoin operations do not invent recipient, amount, fee or explorer target', () => {

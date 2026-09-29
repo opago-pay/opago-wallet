@@ -4,6 +4,7 @@ import { hex } from '@scure/base';
 import { readBitcoinBalance, sats } from './amount';
 import { bitcoinNetwork, validateBitcoinAddress, type BitcoinNetwork } from './destination';
 import { withTimeout } from '../promise-timeout';
+import { currentBitcoinRateSnapshot } from '../exchange-rate-snapshot';
 import type { BitcoinRequestCursor } from './request-cursor';
 import type { BitcoinOperation, BitcoinStore, ProviderWithdrawalMerge } from './store';
 
@@ -112,10 +113,12 @@ export async function submitBitcoinWithdrawal(wallet: OnchainWallet, store: Bitc
   if (sats(approved.amountSats + approved.feeSats) !== approved.totalSats || approved.totalSats > balance) {
     throw new Error('Insufficient Bitcoin balance for amount and fee.');
   }
+  const rate = currentBitcoinRateSnapshot();
   const operation: BitcoinOperation = {
     id: `withdraw:${approved.quoteId}`, scope: approved.scope, network: approved.network, kind: 'withdrawal',
     address: approved.address, amountSats: approved.amountSats, feeSats: approved.feeSats,
     quoteId: approved.quoteId, state: 'prepared', createdAt: new Date().toISOString(),
+    ...(rate ? { btcEurRate: rate.btcEur, btcEurRateAt: new Date(rate.fetchedAt).toISOString() } : {}),
   };
   await store.begin(operation, assertAuthorized);
   // Once this marker is durable, any interruption is ambiguous, including the

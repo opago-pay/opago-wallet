@@ -15,6 +15,8 @@ export interface BitcoinOperation {
   actualFeeSats?: number;
   state: BitcoinOperationState;
   createdAt: string;
+  btcEurRate?: number;
+  btcEurRateAt?: string;
   quoteId?: string;
   requestId?: string;
   txid?: string;
@@ -56,6 +58,10 @@ export function assertBitcoinOperation(record: BitcoinOperation): void {
     throw new Error('Bitcoin payment storage is unavailable.');
   }
   if (record.recoveredFromProvider !== undefined && record.recoveredFromProvider !== true) {
+    throw new Error('Bitcoin payment storage is unavailable.');
+  }
+  if (record.btcEurRate !== undefined && (!Number.isFinite(record.btcEurRate) || record.btcEurRate <= 0 ||
+      record.btcEurRate > 1e12 || !record.btcEurRateAt || !Number.isFinite(Date.parse(record.btcEurRateAt)))) {
     throw new Error('Bitcoin payment storage is unavailable.');
   }
   sats(record.amountSats);

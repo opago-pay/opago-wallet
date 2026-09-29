@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import { fetchJson } from '@/lib/http';
 import { measurePerformance } from '@/lib/performance-trace';
+import { rememberBitcoinRate } from '@/lib/exchange-rate-snapshot';
 
 // Reopening Send/Receive within a few minutes must not compete with Spark
 // requests just to refresh a display-only fiat estimate.
@@ -71,6 +72,7 @@ async function requestRates(): Promise<ExchangeRates> {
     }
     cachedRates = nextRates;
     lastFetch = Date.now();
+    rememberBitcoinRate(nextRates.btcToEur, lastFetch);
     subscribers.forEach((notify) => notify());
     return cachedRates;
   })();

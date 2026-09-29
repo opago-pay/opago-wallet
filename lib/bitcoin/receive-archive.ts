@@ -88,7 +88,8 @@ export async function reconcileArchivedBitcoinRequests(wallet: SparkReceiveWalle
         return;
       }
       // Activity and archive can be replayed: payment hash is the unique key.
-      await addTransaction('incoming', confirmedAmount, 'SAT', { txId: `ln:${current.paymentHash}`, reference: current.requestId, status: 'confirmed' });
+      await addTransaction('incoming', confirmedAmount, 'SAT', { txId: `ln:${current.paymentHash}`, reference: current.requestId,
+        status: 'confirmed', captureFiatRate: false });
       assertCurrent();
       current.amountSats = confirmedAmount;
       current.state = 'confirmed';

@@ -199,7 +199,6 @@ test('Receive, Send, and Buy keep their positions regardless of balance', () => 
     };
     collect(screen);
     assert.deepEqual(actions.map(action => action.label), ['Receive', 'Send', 'Buy']);
-    assert.deepEqual(actions.map(action => !!action.isSend), [false, true, false]);
   }
 });
 

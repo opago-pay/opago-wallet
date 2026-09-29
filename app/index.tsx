@@ -47,7 +47,7 @@ export default function Index() {
       <View
         style={{
           flex: 1,
-          backgroundColor: mode === 'light' ? '#fff' : '#0a0a0c',
+          backgroundColor: themeColor('canvas', mode),
           justifyContent: 'center',
           alignItems: 'center',
         }}
@@ -58,7 +58,7 @@ export default function Index() {
   }
 
   if (failed) return (
-    <View style={{ flex: 1, backgroundColor: mode === 'light' ? '#fff' : '#0a0a0c', justifyContent: 'center', padding: 28 }}>
+    <View style={{ flex: 1, backgroundColor: themeColor('canvas', mode), justifyContent: 'center', padding: 28 }}>
       <Text style={{ color: mode === 'light' ? '#18181d' : '#fff', fontSize: 22, marginBottom: 20 }}>{t("Your secure wallet storage is temporarily unavailable.")}</Text>
       <TouchableOpacity accessibilityRole="button" onPress={() => setAttempt(value => value + 1)} style={{ padding: 20, backgroundColor: '#ffb000', borderRadius: 18 }}>
         <Text style={{ color: '#111', textAlign: 'center', fontWeight: '700' }}>{t("Try again")}</Text>

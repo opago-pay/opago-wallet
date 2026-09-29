@@ -19,6 +19,8 @@ const gates = [
     args: ['scripts/patch-spark-ios-logging.cjs', '--check'] },
   { label: 'Spark React Native XHR transport', command: process.execPath,
     args: ['scripts/patch-spark-xhr-transport.cjs', '--check'] },
+  { label: 'React Native iOS TurboModule exception handling', command: process.execPath,
+    args: ['scripts/patch-react-native-ios-turbomodule.cjs', '--check'] },
   { label: 'EAS production configuration', command: process.execPath,
     args: ['scripts/verify-eas-production-profile.cjs'] },
   { label: 'TypeScript', command: process.execPath, args: [npmCli, 'run', 'typecheck'] },

@@ -7,12 +7,14 @@ import { Pressable } from '@/components/ui/wallet-interaction';
 import { useLanguage } from '@/hooks/useLanguage';
 import { appLocale, t } from '@/lib/i18n';
 import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
+import { formatEurValue } from '@/lib/wallet-display';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { bitcoinExplorerUrl, lightningHashFromPayment, paymentDetailReferences, paymentDetailStatus, paymentMethodLabel,
-  type PaymentHistoryItem } from '@/lib/payment-details';
+  paymentEurQuote, type PaymentHistoryItem } from '@/lib/payment-details';
 
-export function PaymentDetailsScreen({ payment, onClose, onHide, onReviewDeposit }: {
+export function PaymentDetailsScreen({ payment, rates, onClose, onHide, onReviewDeposit }: {
   payment: PaymentHistoryItem;
+  rates: { hbarToEur: number };
   onClose(): void;
   onHide?: () => void;
   onReviewDeposit?: () => void;
@@ -40,6 +42,7 @@ export function PaymentDetailsScreen({ payment, onClose, onHide, onReviewDeposit
   const references = paymentDetailReferences(payment);
   const amount = payment.amountDisplay === '—' ? '—' :
     `${payment.type === 'incoming' ? '+' : '−'}${payment.amountDisplay} ${payment.asset}`;
+  const eurQuote = paymentEurQuote(payment, rates);
 
   async function copy(label: string, value: string) {
     try { await Clipboard.setStringAsync(value); setCopied(label); }
@@ -78,6 +81,12 @@ export function PaymentDetailsScreen({ payment, onClose, onHide, onReviewDeposit
       <Field label={t('Direction')} value={t(payment.type === 'incoming' ? 'Receive' : 'Send')} />
       {dateLabel && <Field label={t('Date and time')} value={dateLabel} />}
       <Field label={t('Payment method')} value={route} />
+      {(payment.asset === 'SAT' || payment.asset === 'HBAR') && <>
+        <Field label={t(payment.asset === 'SAT' ? 'Transaction value at payment time' : 'Current transaction value in EUR')}
+          value={eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}` : t(payment.asset === 'SAT' ? 'Historical EUR value unavailable' : 'EUR estimate unavailable')} />
+        <Field label={t(payment.asset === 'SAT' ? 'Exchange rate at payment time' : 'Current exchange rate')}
+          value={eurQuote ? `${formatEurValue(eurQuote.eurPerAsset)} / ${eurQuote.rateAsset}` : t(payment.asset === 'SAT' ? 'Historical exchange rate unavailable' : 'Exchange rate unavailable')} />
+      </>}
       {!!recipient && <Field label={t('Recipient')} value={recipient} selectable />}
       {!!receivingAddress && <Field label={t('Receiving address')} value={receivingAddress} selectable />}
       {operation?.state === 'confirmed' && operation.actualFeeSats !== undefined &&

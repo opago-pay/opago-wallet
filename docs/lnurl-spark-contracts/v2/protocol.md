@@ -1,0 +1,199 @@
+# OPAGO Wallet wire protocol and state rules
+
+Contract 0.2.0. MUST/SHALL rules below supplement the JSON schemas. All times are UTC whole seconds `YYYY-MM-DDTHH:mm:ssZ`. JSON is UTF-8, rejects duplicate property names, non-finite numbers and unsafe integers. Amounts are integer millisatoshis; invoice requests must be positive whole satoshis. Environment/network is verified from server-owned configuration and wallet records.
+
+## Auth
+
+Public API origin: `https://api.opago.com`. Lightning address discovery and UMA public metadata: `https://opago.com`. Callback origin is exactly `https://api.opago.com`. Staging has its own trusted configuration, roots, audiences, tokens and name registry; no production credentials or wallet data. Deployment URLs ending `.invalid` in OpenAPI are explicit configuration placeholders, never runtime destinations.
+
+Keycloak account authentication uses an external browser, Authorization Code + PKCE S256, unpredictable `state` and OIDC `nonce`, exact registered redirect URI, issuer/audience/signature/expiry verification and a verified contact email. The native app is a public client with no client secret. OIDC tokens are distinct from wallet tokens. API authorization uses an access token, never an ID token. Fresh means trusted `auth_time` no older than 300 seconds; silently refreshing an access token does not constitute fresh authentication. The Keycloak session/key revocation and account tombstone are checked for critical actions.
+
+The API does not implement a second password/reset service. `AppConfig.oidc` identifies the provisioned realm/client. The app only accepts configured trusted issuers and redirect URIs; a remotely changed value outside its allowlist is rejected.
+
+| Auth policy | Exact authorization |
+|---|---|
+| `none` | No end-user bearer; refresh/logout authenticate their encrypted refresh token; public LNURL uses an unpredictable context and protocol checks. |
+| `conditional` | Challenge/verify: unbound bootstrap login and explicit `onboarding_restart` may be anonymous. Bound-wallet login requires its owner's AccountBearer. `wallet_bind` and `wallet_restore` require fresh AccountBearer. Other actions require the valid wallet bearer as described below. |
+| `bootstrap` | Internal-issued token scoped to one unbound enrollment wallet and installation; only its own initial photo-match intake. |
+| `wallet` | Wallet bearer scoped to the bound wallet and installation. Readiness/ownership checks still apply for the particular operation. |
+| `wallet_or_bootstrap` | Only the corresponding wallet/enrollment snapshot. |
+| `account`, `account_fresh` | Verified account bearer; latter additionally requires fresh authentication. No WalletBearer substitute. |
+| `owner` | Before binding: the bootstrap wallet that created the submission. After binding: the owning account or its bound wallet. Cross-party IDs return generic 404. |
+| `wallet_or_pos` | Own wallet or device's assigned POS. A wallet ID supplied in JSON cannot nominate an arbitrary recipient. |
+| `operator`, `operator_fresh` | Account with backend-verified management authority over this POS; latter fresh. |
+| `receipt` | Random 256-bit opaque receipt token, hashed at rest, bound to one deletion ID, seven-day expiry, status only, no personal data. |
+
+For other challenge actions the public and internal specifications allow WalletBearer as well as AccountBearer where appropriate; the action/ownership check is mandatory, not optional authentication. The server never trusts a token type solely because of the name of an OpenAPI security scheme. It validates issuer, audience, scopes, installation, wallet, account generation and object ownership.
+
+New `action=wallet_bind` signs `{party_id,account_generation}` and records the authenticated account subject on the challenge. First binding requires an intake enrollment owned by the same wallet and contact confirmation by the authenticated subject. An email match alone never binds a wallet or an existing Keycloak account. A second wallet may reuse that party's active approval, but requires fresh account authentication and a new wallet signature. Binding a wallet already owned by another party returns `account_mismatch`; no reassignment is performed. Existing emails do not create another user or disclose account existence: the user authenticates to the existing account before linking.
+
+Unknown keys create an enrollment record, not a fabricated identified party. A wallet record remains `unbound` until explicit binding. The token's `scope=onboarding` cannot request payment registration, UMA identity data or an active address. `/wallet/me` describes this state.
+
+Challenge message is exactly these lines in this order, LF-separated, no final LF:
+
+```text
+opago-wallet-auth
+domain: api.opago.com
+network: <mainnet|regtest>
+wallet_pubkey: <lowercase 66 hex compressed key>
+nonce: <lowercase 64 hex random nonce>
+issued_at: <UTC time>
+expires_at: <UTC time>
+action: <action>
+action_params_sha256: <sha256 of JCS action_params>
+```
+
+The app signs `SHA256(UTF8(message))` using BIP-340 and its Spark identity key. Verify against x-only public key; compressed-key identity must be validated consistently and not permit an alternate prefix to register the same x-only identity twice. Fixtures use public test keys. Proving Spark SDK 0.7.12 applies exactly this hashing rule is an F2 acceptance requirement, not a claim made by this package. Nonces are cryptographically random, 5-minute lifetime, single-use, maximum five outstanding per wallet. The API also rate-limits by network source and wallet to prevent unauthenticated enrollment/nonce exhaustion.
+
+`verify` returns **either** `WalletSession` for login **or** `ActionProof` for an action. Action proofs are one-use, 300-second, scope-bound, hashed at rest and consumed atomically with the target mutation. They never confer normal wallet rights. Session access lifetime is 900 seconds; rotating refresh families expire at most 30 days after creation, are bound to installation, and are revoked on logout, wallet close or account deletion. Refresh retry with the same idempotency key returns the same rotation result; a used refresh token with a different operation key is rejected and its family revoked. Fresh HPKE protects every retry.
+
+Local seed restoration is independent of OPAGO login. A new server session for an already bound wallet needs the owning account plus seed signature; a closed wallet returns `wallet_closed` to normal login. Restore uses AccountBearer, `wallet_restore` proof and `/wallet/restore`, independent of any normal wallet session. It returns a session with the address still deactivated. Reactivation is a separate action. Deleted accounts cannot be restored by signing: explicit new onboarding creates a new party/service relationship and never reactivates an old name.
+
+For that explicit restart only, `action=onboarding_restart` is available after the prior account is fully deleted. It returns a one-use proof, consumed by `/wallet/onboarding/restart` to issue a new enrollment-only session. The new enrollment has no access to old party data, transactions in OPAGO, previous approval or reserved names. It cannot be used on a merely closed wallet, an active account or a pending deletion to evade its controls. The local Spark wallet/key is unchanged; historic service relationships stay restricted and a new enrollment/service generation is created. Retries recover the same enrollment rather than adding another one.
+
+## Facade and route forwarding
+
+`route-map.json` maps methods and paths exactly. Strip all client-supplied `X-Opago-User-*`, service identity and forwarding-authority headers before setting trusted forwarding metadata. The facade uses `Authorization: Bearer <service-token>` to internal, and passes the original user's full `Bearer ...` credential in `X-Opago-User-Authorization`. Internal independently verifies it, and requires the authorized service client plus NetworkPolicy/TLS. Public anonymous routes do not acquire a fake user principal. `X-Request-Id` is generated/validated as a UUID and propagated.
+
+The facade decrypts, bounds and forwards; internal owns all business checks, OCR, account changes and payment orchestration. Internal returns ordinary bounded JSON errors/statuses. The facade re-encrypts per request, preserving business status/code and never caching an HPKE ciphertext for another request. No side-effecting automatic retries in the facade. No tokens, pictures, PII, complete signed envelopes or raw UMA messages in logs.
+
+Cloudflare exceptions are generated from the explicit public operations, including the newly defined account and non-custodial registration routes. Do not exempt an entire `/api/*` prefix. Registration routes verify wallet/device principal and non-custodial target in internal before any action. Legacy merchant login and custodial routes retain Access and existing gates. Wallet/operator POS routes need both their route-specific credentials and business rights; internet reachability does not make them anonymous.
+
+## HPKE transport
+
+This retains the V6/V7 replacement of the earlier login-only format, not wire compatible with it. Suite: RFC 9180 Base mode, DHKEM X25519/HKDF-SHA256 (0x0020), HKDF-SHA256 (0x0001), AES-256-GCM (0x0002). One fresh sender context per HTTP request, first seal at sequence 0; never reuse an encapsulated context. All base64url is canonical, no padding, no whitespace; verify decoded lengths. Signing roots, UMA keys and HPKE keys are independent.
+
+Exact `info` = ASCII `opago-api:hpke:v1` + zero byte + UTF-8 audience + zero byte + UTF-8 kid. Audience is the configured HTTPS origin without trailing slash. Exporter contexts are exact ASCII `opago-response` and `opago-photo`, each exporting 32 bytes. These strings have no terminating zero or newline.
+
+AAD is UTF-8 JCS of exactly:
+
+```json
+{"method":"POST","path":"/api/v2/onboarding/kyc","query":[],"kid":"test-key","nonce":"AAAAAAAAAAAAAAAAAAAAAA","issued_at":"2026-09-28T12:00:00Z","audience":"https://api.opago.com","idempotency_key":"00000000-0000-4000-8000-000000000001"}
+```
+
+Method uppercase. Path is the original public path with concrete IDs, before forwarding; reject dot segments, double slashes, encoded slashes/backslashes and ambiguous decoding. Query is a list of `[key,value]` strings: strict percent-decode as UTF-8, percent-encode RFC 3986 unreserved form with uppercase hex, then lexicographically sort by encoded key and value. Reject duplicate parameter names and unexpected parameters. `+` is not a space. Empty query is `[]`. IDs never come from untrusted proxy rewrite headers. Absent `Idempotency-Key` is explicit JSON null. All writes in this package require the UUID header, including verify/refresh/logout; reads do not.
+
+For POST/PUT JSON, send `HpkeRequest` as body. For GET/DELETE send base64url of its JCS JSON in `X-Opago-Envelope`; decrypted body is `{}` and non-sensitive query fields are bound in AAD. Photos use the special form below. `nonce` is 16 random bytes for replay detection, distinct from an AEAD IV. At authenticated envelope acceptance, require `now-300s <= issued_at <= now+30s`; atomically claim `(audience,kid,nonce)` in shared Redis for 331 seconds, before business execution. Invalid ciphertext never executes or reserves a business idempotency outcome. Replay-store failure fails closed.
+
+Responses, including errors after a valid envelope, use AES-256-GCM with HPKE `Export("opago-response",32)`, fresh random 12-byte IV and AAD = JCS `{"request_aad":<original AAD object>,"http_status":<integer>}`. Wire `HpkeResponse` contains `encryption`, IV as `nonce`, and base64url ciphertext including the 16-byte tag. Decrypt before trusting a status-specific body. Authentication/replay failures after context setup can be encrypted; malformed/unopenable requests and upstream gateway failures may return only generic plaintext errors. Such plaintext must never trigger a business success or a silent security downgrade.
+
+Transport limits: 64 KiB decrypted ordinary JSON; 512 KiB ingest; corresponding ciphertext/base64 overhead plus 4 KiB envelope. Header envelope maximum 16 KiB. Error messages are bounded and omit input echoes. Total ordinary request budget 10s; callback facade 9.5s/internal 8s/helper 6s with propagated remaining deadline. End-to-end photo upload 120s, facade 115s, internal 110s; incomplete uploads do not produce a successful document record. Rate and concurrency limits are configured separately.
+
+Photo upload: `X-Opago-Envelope` is an ordinary authenticated HpkeRequest whose plaintext is `PhotoDescriptor`. Submission ID and revision/side must exactly match route/query; hash, content type, length and edit version are authenticated. HTTP body is `12-byte IV || AES-GCM ciphertext || 16-byte tag` with key `Export("opago-photo",32)` and AAD = JCS `{"request_aad":<AAD>,"document":<PhotoDescriptor>}`. Thus both the descriptor and raw photo are bound to this operation. Replay is claimed once for the entire upload. Plaintext maximum 10 MiB; JPEG/PNG only, HEIC converted locally; shortest dimension at least 480 pixels, longest at most 10000, at most 24 million pixels. Read dimensions and reject resource excess before full decode. Worker decode memory budget 256 MiB and 10s decode CPU/wall cutoff; sandbox media parsing and scan content. Strip EXIF, normalize stored image, report original and stored hashes separately. Store only encrypted internal document bytes with per-document key version and access audit. Interrupted temporary bytes are erased within 24h unless an approved shorter policy applies; no external file URL or PII enters Airtable, SharePoint or HubSpot.
+
+Signed key discovery: Ed25519 over JCS `document`, exactly as KeyDocument schema. Reject unknown fields, duplicate kids, a missing active kid, revoked roots/kids, wrong audience, expired key, future issue time beyond 300s or a rollback below the locally persisted latest issue time. Check signature against pinned environment root/backup. Config comes from pinned/trusted HTTPS origin with `Cache-Control: no-store`; maximum usable cache age 300s and never past `valid_until`. Critical HPKE calls require fresh config; on expiry/fetch failure local Spark remains available but no backend mutation starts. Initial fallback HPKE key is usable only while unexpired and a fresh trusted config does not revoke it. A claimed build number is client metadata, not remote attestation; minimum-build checks cannot prove arbitrary clients are running uncompromised software.
+
+## Idempotency
+
+One persistent UUID per intended mutation; retain through timeout, restart and envelope renewal. Scope = environment + stable authorized principal + uppercase method + route template + concrete path parameters + idempotency key. Hash input over canonical query and full decrypted semantic JSON (or authenticated photo descriptor/hash). The same UUID on another route is a separate operation; different photo content or a genuine new edit uses a new UUID. Never generate a new key merely to evade a conflict. Installation identifies the ingest stream, not a substitute identity for account-level deduplication.
+
+Execute authorization, compare/claim key, consume proof and commit business effect atomically. Identical retries return the existing outcome; changed input yields `idempotency_conflict`. Store outcomes durably before returning and an outbox for external actions. Cache serialized business response for 24h, but retain operation identity/input hash and resource/result reference for the resource's approved lifetime. Never re-execute because the cache expired. Reconstruct a receipt/status response from durable state. Token/credential responses have their shorter credential lifetime; expired retry outcomes require a new explicit login, not reuse of an old consumed signature. Account deletion replays may return only the same deletion receipt after verifying original credential signature, expiry, fresh auth and same immutable principal/key; a revoked credential grants no other access.
+
+For refresh, exact retries of the original rotation are recognized before refresh-family reuse detection. The refresh family remains time-limited; retries cannot extend it. For transient errors, business idempotency tracks running/unknown versus terminal outcomes; never cache a timeout as a permanent instruction to repeat a side effect. `upstream_pending` and timeout recovery inspect the existing operation.
+
+## Photo-match intake and activation
+
+The historical route name `/onboarding/kyc` is retained for compatibility with the plan. `approved` here means only `assurance=photo_data_match_only`, with `match_result=passed`; no human Full-KYC step is implied. Server derives all statuses; client-provided `approved`, `identified`, custody or approval IDs are rejected by schemas.
+
+Required minimal fields: given/family name, date of birth, document number/expiry, ISO alpha-3 nationality and contact email. `document_type` selects passport (front) or identity card (front and back); it is a technical input, not another identity claim. Each write includes the expected edit version where applicable. Reads return it; compare-and-swap conflict is `revision_conflict`.
+
+Revision 1 starts `draft`. Fields and each photo update it and increment edit_version. `/submit` seals an immutable revision and creates exactly one durable worker job for `(submission_id,revision)`. Response 202 identifies submitted revision; queued/processing/retrying/failed is separate from comparison result. Outages do not turn into mismatch or approval. A matching client OCR result is never authoritative.
+
+First submit also schedules idempotent party/Keycloak provisioning and contact verification using an internal outbox. A pre-existing email prompts authentication to that existing subject, never automatic ownership assignment. Provisioning retries are bound to enrollment and account generation; the verification message contains no wallet secrets. The app uses the configured OIDC flow after contact confirmation. No public arbitrary-user creation/password-setting API is introduced. Later contact-email edits do not change the account's verified login email without the identity provider's separate verification flow.
+
+Only internal worker may set `submitted -> in_review -> approved|correction_requested|rejected`. `mismatch` and `unreadable` lead to correction with explicit allowed fields/sides; an internal infrastructure error stays retryable and alarms after an hour. Rules for matching are versioned and deterministic: names NFC, trim/collapse whitespace and case-fold, plus documented ICAO MRZ transliteration when the document source is MRZ; no fuzzy pass. Dates/nationality exact after format normalization; document number uppercase with only document-defined filler/separators removed. Required field absent, inconsistent OCR/MRZ, unreadable or failed available MRZ check digits cannot pass. OCR confidence thresholds and document templates must be versioned deployment configuration and tested on supported documents; account cannot become active without complete authoritative comparison. This is still not authenticity, liveness or holder verification.
+
+For `correction_requested`, `/revisions` explicitly clones the prior immutable revision into `n+1` draft, records the allowed correction mask and increments edit version. Only flagged fields/photos may differ; reference the unchanged internal photo when allowed, without creating another external copy. For `approved`, the same route creates a new draft; the prior active approval remains until an explicit recorded result/policy action changes it. Full data updates to the wrong revision or changes outside the mask fail. Both correction and post-approval revision creation require AccountBearer; the user completes contact verification first. The old `correction_requested` revision is never edited or resubmitted in place.
+
+Successful new matching revision atomically advances active_approval_revision; failed/inconclusive revision does not silently revoke the previous approval. An explicit security/compliance restriction is a separate audited state. Create/update/submit operations cannot create a second party on retries. An existing bound account can access its pending/rejected status; rejection requires support, not an automatic loop that bypasses it.
+
+Automatic photo approval alone does not activate an unbound enrollment. Activation is the conjunction of verified account contact, explicit signature binding to that account, active approval revision, active wallet and no deletion/restriction. This prevents an asynchronous OCR result activating someone else's account. Normalization/availability checks do not reserve a name; PUT atomically reserves it. One active/current address per wallet; shared normalized name uniqueness across Spark/POS/LNbits. Name suggestion may use the owner's pending submitted fields. Old names remain inactive; changing a name or recipient invalidates prior unpaid contexts. The app renders the returned canonical `qr_payload` only for an active address, without treating pending_kyc as receivable.
+
+## Payment registration and helper safety
+
+Discovery checks server-owned provider/custody, photo readiness, active binding/address and network; it creates a random 32-byte opaque context (base64url) valid 600s. Snapshot recipient, address/POS binding version, exact metadata bytes and SHA-256, min/max, network and expiry. Ordinary LNURL metadata contains description and `text/identifier`; no mandatory payerData. Stable QR encodes the discovery URL as uppercase bech32 LNURL with `lightning:` prefix; each scan obtains a new context. A context reference is not an account credential.
+
+First valid callback atomically binds a context to one amount and one registration. Validation occurs before binding. Concurrent differing amounts have one winner; the other receives `amount_mismatch` and must rediscover. Same amount recovers the existing operation; it never creates another registration. Amount must fit min/max and the safe integer range, divisible by 1000; use exact arithmetic. For non-custodial maxSendable comes from technical/provider/operator limits, with **no EUR threshold**. Public clients cannot set custody. Every helper result is checked for amount, network, description hash, recipient correlation, payment hash and expiry before release.
+
+Internal is the sole orchestration/recovery owner. A registration may return `open` with invoice=null after an unknown outcome; never expose `creation_unknown` as success/payment confirmation. A current unexpired unpaid invoice is reused. Refresh only after confirmed expiry and reauthorization; the new attempt is serialized. A context-expired callback never reissues even if the longer-lived registration exists. Only an authorized owner/POS may use registration endpoints after that, and address/binding/gates are rechecked. Before helper dispatch persist immutable operation and fingerprint. Before releasing its result recheck deletion, address/POS binding version, registration state, allowed attempt and expiry.
+
+Helper `POST /invoices` must atomically insert-or-read operation ID, operation generation and fingerprint. Fingerprint = SHA256(JCS of HelperInvoiceRequest excluding operation_id)); same ID with any changed field is `operation_conflict`. SDK invocation occurs only for the first authorized durable operation. Lease owner, monotonically increasing lease generation and lease expiry protect commits across replicas. Lease takeover does not invoke SDK again under the same operation ID. A resumed stale worker can record a late result as orphan evidence, never as a deliverable current result.
+
+`GET /operations/{id}` on missing record returns `unknown`, generation from the caller's intended generation is not assumed verified. `/fence` atomically inserts a `not_executed` tombstone when absent, or fences an expired owner into `interrupted`; a currently valid owner returns `in_progress`. The fence persists and rejects every later create with that operation ID, including a delayed first POST. For a completed operation it returns `created`, never overwrites the result. An interrupted/ambiguous upstream call may have created a provider invoice: capture late results as orphaned. A replacement uses a new operation ID and next attempt only after the old generation cannot deliver. At most three proven interrupted attempts; unresolved provider correlation halts automatic replacement and alarms. Do not infer `not_executed` from absence, timeout or restart alone.
+
+Cancellation disables offering invoices, not their payability on Lightning. All invoices and actual later settlements stay recorded, with paid_after_cancel/expiry/deactivation or paid_orphan and duplicate_payment flags as appropriate. Distinct payment hashes represent distinct actual payments; never merge money movements because amount and recipient match. Custodial routes and future transfer adapters preserve their existing gates and are outside this new public wallet scope.
+
+## TME policy and evidence
+
+The normative [V7 TME amendment](tme-v7.md) defines mode switching, decision freshness, release authorization, retries, evidence attribution and aggregation. It supersedes any unconditional non-custodial shadow assumption in 0.1.0. No new public policy-control route exists.
+
+## Transaction observations and cursor
+
+Ingest reports observations, not authoritative settlement or payer identification. A forged `settled` field never overrides provider evidence. Payment identity is `payment_hash` for Lightning, `spark_transfer_id` for Spark, and a documented stable provider_event_id for onchain/onramp. Reject missing/ambiguous identity. Network + wallet + economic payment identity is unique for transaction consolidation. Wipe generates a new installation_id and starts seq at 1; no new global wallet identity is created.
+
+Define LP(x) = four-byte unsigned big-endian length followed by UTF-8 bytes. Family hash = SHA256 of concatenated LP values: `opago-observation-family-v1`, network, lowercase compressed wallet key, identity kind (`payment_hash`, `spark_transfer_id`, `provider_event_id`), identity value, type, direction, status. `event_version` = SHA256(JCS of Observation excluding event_id, observation_family_id, event_version, seq, supersedes_event_id and correction_reason). `event_id` = SHA256(LP(`opago-observation-v1`) || LP(family hex) || LP(version hex)). Thus identical factual observations survive reinstallation and two devices; changed facts at the same status have a new deterministic version. A correction references its previous event and explains the change; preserve both. The server recomputes all hashes and checks semantic identities. The correction relation cannot cross wallets or payment identities or form a cycle. Competing valid observations are retained; precedence is evidence-based, not whichever client timestamp or counter is largest.
+
+Per-installation seq is allocated and persisted together with queued payload before sending, never reused with different content. Max 100 observations per batch. Cursor advances only across contiguous accepted/duplicate or explicitly closed rejected seq values. Later accepted entries are saved but cannot skip a gap. Return the first 1000 missing seq values plus truncation indicator; re-fetch after filling them. Each permanent rejection returns an opaque closure_token bound to wallet, installation, seq, event hash and rejection. `/close-rejected` requires that token and records an audited closure; it cannot close a never-received or retryable gap. A client must durably retain diagnostic reason before closing. A reduced retry batch uses a new batch UUID but unchanged event IDs/seq. `/batches/{key}` is scoped to the authenticated wallet and installation.
+
+## UMA boundary
+
+External protocol is UMA 1.0 with official Python `uma-sdk==1.6.0` / JS `@uma-sdk/core==1.5.0`. It is not OPAGO's HPKE or wallet BIP-340 format. Use SDK serialization, signatures and ECIES rather than inventing a parallel signed JSON format. The concrete public UMA schemas describe OPAGO's Lightning/BTC-only MVP profile. The bounded raw body must also pass the pinned SDK's version, signature, replay and semantic validation before any side effect. Incoming OPAGO pay requests use `convert=BTC`, amount as a decimal msat string, BTC decimals=8/multiplier=1000, zero conversion fee, default Lightning settlement. Other settlement/currency requests are unsupported. External peers may use broader SDK schemas in the raw-response intermediary routes; their actual invoice amount/network and the negotiated currency conversion must still be verified. `umaVersion` is mandatory during discovery; do not require a top-level pay-request/pay-response version field that the pinned Python SDK omits. Ordinary discovery remains LUD-06 compatible.
+
+For a photo-only sender/receiver, emit official `kycStatus=NOT_VERIFIED`. Public certificates are DER encoded as lowercase hex strings; accompanying public keys are uncompressed SEC1 hex as produced by the pinned SDK. `uma-configuration` is OPAGO informational capability metadata; signed discovery determines negotiation, never that unsigned informational response alone. IVMS payloads use `IVMS@101.2023`; missing mandatory identity fields cause explicit exchange failure and must never be invented. The provider formatter and official SDK interop fixtures are required implementation acceptance work.
+
+Incoming signed IVMS data with `NOT_VERIFIED`, `PENDING` or `UNKNOWN` must not set full `identification_status=identified` or satisfy the custodial gate. Protocol signature validity authenticates the declaring provider, not document authenticity or holder identity. Store source, declared assurance and cryptographic validation separately; `travel_rule_exchange=complete` only means the required exchange was verified, never that a payment settled or that missing KYC was performed.
+
+Invoice description binding differs between ordinary LNURL and the pinned UMA SDK: Python UMA 1.6.0's `get_pay_req_response` appends its serialized payerData to the metadata passed to the invoice creator. Therefore preserve both discovery_metadata_hash and effective invoice_description_hash. For incoming UMA capture the **exact invoice-creator metadata bytes supplied by the SDK**, persist their hash before helper dispatch, and use that hash for invoice creation/verification; do not always pass SHA256(discovery metadata). Same-context repeats with materially different UMA payer data fail `operation_conflict`. The outgoing verifier returns the verified invoice_description_hash, and the app checks it against BOLT11. Cross-language serialization must pass the pinned Python/JS interop gate; ordinary LNURL retains the plain discovery metadata hash. No assumption of universal current LUD-18 hash concatenation is made.
+
+Where a protocol message contains `utxoCallback`, use the actual bounded route `/api/v2/uma/settlement/{context_ref}` and bind its unguessable reference to that exchange and peer. Verify the official callback signature, domain, timestamp and replay state before recording. A callback's `COMPLETED` field remains a peer observation, not an independently confirmed Spark settlement. Empty UTXO arrays are permitted when unknown; no invented UTXOs or node key. Duplicate byte-identical callback retransmission is acknowledged without another effect. This endpoint is plain HTTPS/JSON, not HPKE.
+
+The app calls `/uma-discovery` with an address. Internal creates an exchange bound to wallet, sender party, network and normalized recipient, then returns the signed GET URL. Private VASP keys never enter the app. `/uma-discovery/verify` receives exact response bytes plus request URL/status, revalidates target, peer key and protocol fields and stores metadata/callback bindings. The backend performs independent safe peer/discovery checks where necessary; app-supplied URLs and headers are never sufficient evidence. An exchange expires in 600s. Subsequent steps carry exchange_id and cannot replace its target.
+
+`/uma-pay-request` checks approved own party and amount, binds amount once, builds the official encrypted sender data and returns exact POST bytes with a request_id. Optional OPAGO payer_proof is consumed internally and never included in the external request. For a photo-match-only customer, UMA must not claim full verified KYC. Request only available/needed payee data; never fabricate address, birth place, node key or UTXOs. Unsupported peer mandatory requirements produce a protocol failure, not invented fields. Exact required external fields/SDK fixtures are part of the UMA implementation gate.
+
+The app sends these bytes through its native safe transport. `/uma-pay-response` receives exact remote bytes; internal checks peer signature, nonce, timestamp, requested receiver/data, callback/exchange binding and invoice. `complete` is written only after that verification, never on a client 'sent' flag. Nonces are persisted across replicas/retries. The app independently verifies invoice and user-confirmed amount/network before Spark payment. Any URL lookup on app or backend checks DNS/IP, redirects, TLS hostname, body size and timeout; forbid private/link-local/local/reserved destinations, rebinding and credential-bearing URLs. No forwarded authorization headers to external peers.
+
+For failed UMA an ordinary non-custodial LNURL attempt may be started explicitly with a fresh ordinary discovery and `travel_rule_exchange=none`; it still enforces destination, TLS, invoice, amount and network checks. It does not reuse unverified UMA bytes or silently mark exchange complete. Public `$name` is an alias in the same registry, not a separately claimable address. UMA key/configuration responses follow the pinned SDK/protocol. No custodial fallback is introduced.
+
+## POS binding
+
+Existing POS provisioning stays authoritative. An operator with backend-verified authority creates a binding intent naming the intended wallet and expected current binding version. Server records operator consent, freezes target and issues a 5-minute intent. The intended wallet owner confirms using a `pos_bind` action proof over POS ID, intent ID and next binding version. Commit only if both consents, wallet readiness and old version still match. A target/intent cannot change after either consent. Only the device's registered credential can issue its payments; random pos_id knowledge is insufficient. A new binding invalidates prior unpaid contexts; old actual payments remain attributed to their original recipient.
+
+## Deletion and retention
+
+Account deletion uses AccountBearer + fresh auth, works with zero wallets and commits generation increment, tombstone, session revocation and address disabling before 202. Receipt status is limited and remains usable after Keycloak deletion; `deleted` means identity account removal and access revocation, not a claim that legally retained data is erased. Every worker checks the generation/tombstone before state activation; external effects are reconciled after timeouts. Late OCR results cannot resurrect an account.
+
+Legal/retention rules are server configuration with approved policy version, category, start event, duration, restriction, hold and deletion method. No fixed 5/10-year catch-all is shipped here. Missing approved production matrix blocks readiness. Backups have a documented maximum expiration and restore tombstone replay before service access. Legal hold extends only the affected category with recorded authority; expiry jobs delete/anonymize both data and references. Optional Airtable tasks contain only opaque action ID, status, expiry and authorized internal link, never document/photos/full wallet history. Discarding an unsubmitted draft requires owner auth and deletes temporary photos under the draft policy; it does not delete an established account.
+
+## Error and retry contract
+
+All business errors use `Error`; status and code are preserved through facade encryption. Plain LNURL business errors use HTTP 200 with `{"status":"ERROR","reason":"<code>: <safe explanation>"}`; malformed transport/rate-limit may use HTTP 400/429/5xx. Apps must handle both. No raw stack traces, wallet existence oracle, document contents or peer responses in messages.
+
+| Code | HTTP | Retry with same logical operation |
+|---|---:|---|
+| invalid_request, amount_invalid, envelope_binding_invalid | 400 | No; correct input or implementation |
+| invalid_hpke_credentials | 400 | Refresh trusted config/key once if appropriate, new envelope; no downgrade |
+| challenge_invalid, signature_invalid, action_mismatch | 401 | No; obtain appropriate new proof |
+| session_expired | 401 | Refresh then retry original mutation |
+| refresh_invalid | 401 | New authenticated login |
+| reproof_required | 401 | Fresh account auth/action proof; begin explicit new operation if old proof input changes |
+| account_mismatch, forbidden | 403 | No |
+| kyc_required, address_pending_kyc | 403 | Wait for readiness; no blind retry |
+| custodial_not_licensed, kyc_level_insufficient, travel_rule_unidentified | 403 | Custodial only; no non-custodial EUR gate |
+| tme_rejected | 403 | No automatic retry; enforcing applies to API-issued non-custodial invoices too |
+| tme_pending, tme_unavailable | 503 | Same registration/context and logical key; bounded retry, no replacement invoice |
+| address_not_found, registration_not_found, not_found | 404 | No |
+| idempotency_conflict, operation_conflict, revision_conflict, amount_mismatch, address_changed, kyc_state_invalid, registration_paid | 409 | No; inspect current state/new discovery as appropriate |
+| hpke_replay | 409 | Fresh envelope, same operation key |
+| wallet_closed, account_deleted, address_deactivated, payment_context_expired, registration_cancelled | 410 | No blind retry; explicit recovery/new discovery where allowed |
+| payload_too_large | 413 | Reduce input; a changed batch is a new operation |
+| name_invalid, name_reserved, document_invalid, document_rejected, kyc_mismatch, amount_out_of_range, travel_rule_payload_invalid | 422 | Correct input; failed UMA is never automatically accepted as LNURL |
+| name_taken | 409 | Choose another name |
+| app_build_unsupported | 426 | Update app |
+| rate_limited, rename_rate_limited | 429 | Honor Retry-After or next_allowed_at |
+| upstream_pending | 503 | Inspect/retry the existing operation, never create a replacement merely on this code |
+| hpke_unavailable, upstream_unavailable | 503 | Same logical key, new envelope |
+| upstream_timeout | 504 | Outcome unknown; recover existing operation |
+| internal_error | 500 | Same logical key; side effects may already have committed |
+
+Retry schedule is 1/2/4/8/16 seconds with jitter, at most five attempts, honoring a longer Retry-After. Persist unfinished intent for user-visible later recovery. Never retry a non-retryable business error because its HTTP response was encrypted. A generic framework 5xx or malformed response must not be treated as proof of non-execution.

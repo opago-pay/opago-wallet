@@ -21,6 +21,7 @@ import {
 } from '@/lib/hedera/config';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PendingHederaPayment } from './types';
+import { PaymentSuccessIcon, PaymentSuccessMotionScrollView } from '@/components/ui/payment-success-motion';
 
 export function HederaReviewView(props: {
   payment: PendingHederaPayment;
@@ -175,13 +176,12 @@ export function HederaSuccessView(props: {
   useColorMode();
   const [showDetails, setShowDetails] = useState(false);
   return (
-    <ScrollView
+    <PaymentSuccessMotionScrollView
       style={styles.scrollContainer}
       contentContainerStyle={[styles.formContent, styles.centered]}
     >
-      <View style={styles.successCircle}>
-        <Ionicons name="checkmark" size={50} color={adaptColor('#49d17d', 'color')} accessibilityLabel={t("Confirmed")} />
-      </View>
+      {exit => <>
+      <PaymentSuccessIcon style={{ marginBottom: 16 }} accessibilityLabel={t("Confirmed")} />
       <Text style={styles.successTitle}>{t("Payment sent")}</Text>
       <Text style={styles.successAmount}>{props.result.amountHbar} HBAR</Text>
       <Text style={[styles.subtitle, styles.centerText]}>
@@ -192,7 +192,7 @@ export function HederaSuccessView(props: {
         <Text style={styles.successSummaryText}>{t("Confirmed by Hedera")}</Text>
       </View>
 
-      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={props.onDashboard}>
+      <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={() => exit(props.onDashboard)}>
         <Text style={styles.buttonText}>{t("Done")}</Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -243,10 +243,11 @@ export function HederaSuccessView(props: {
       )}
       <TouchableOpacity
         style={styles.textButton}
-        onPress={props.onReset}
+        onPress={() => exit(props.onReset)}
       >
         <Text style={styles.textButtonText}>{t("Send another payment")}</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </>}
+    </PaymentSuccessMotionScrollView>
   );
 }

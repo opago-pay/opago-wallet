@@ -78,11 +78,15 @@ import type {
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : t('Payment failed.');
 
-export default function SendScreen() {
+export default function SendScreen({ modal = false }: { modal?: boolean } = {}) {
   useLanguage();
   useColorMode();
   useEffect(() => { markNavigationReady('send'); }, []);
   const router = useRouter();
+  const closeToHome = () => {
+    if (modal && router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
   const { hederaRequest, hederaRequestKey, scanResultKey, manualEntryKey } = useLocalSearchParams<{
     hederaRequest?: string | string[];
     hederaRequestKey?: string | string[];
@@ -566,7 +570,7 @@ export default function SendScreen() {
     amountSats={(pendingLightning ?? pendingBitcoin)!.amountSats} />;
 
   if (bitcoinResult) return <BitcoinTransferResult operation={bitcoinTracking.operations.find(item => item.id === bitcoinResult.id) ?? bitcoinResult}
-    onRefresh={bitcoinTracking.refresh} onDashboard={() => { reset(); router.replace('/(tabs)'); }} />;
+    onRefresh={bitcoinTracking.refresh} onDashboard={() => { reset(); closeToHome(); }} />;
   if (pendingBitcoin) return <BitcoinReview amountSats={pendingBitcoin.amountSats} feeSats={pendingBitcoin.feeSats} route="onchain"
     recipient={pendingBitcoin.address} label={bitcoinDestination?.label} expiresAt={pendingBitcoin.expiresAt}
     networkFeeSats={pendingBitcoin.networkFeeSats} serviceFeeSats={pendingBitcoin.serviceFeeSats}
@@ -590,7 +594,7 @@ export default function SendScreen() {
               }
             : undefined
         }
-        onDashboard={() => router.replace('/(tabs)')}
+        onDashboard={closeToHome}
         onReset={reset}
       />
     );
@@ -624,7 +628,7 @@ export default function SendScreen() {
       <LightningSuccessView
         amountSats={lightningResult.amountSats}
         reference={lightningResult.reference}
-        onDashboard={() => router.replace('/(tabs)')}
+        onDashboard={closeToHome}
         onReset={reset}
       />
     );
@@ -650,7 +654,7 @@ export default function SendScreen() {
     label={reviewPreparation.label} onCancel={cancelPayment} />;
 
   if (entryMode === 'scan') return <PaymentScanner
-    onCancel={() => router.replace('/(tabs)')}
+    onCancel={closeToHome}
     onDetected={value => {
       const key = paymentScanInbox.save(value);
       setDestination(value.trim());

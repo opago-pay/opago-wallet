@@ -9,6 +9,7 @@ import { TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { Ionicons } from '@expo/vector-icons';
 import { sendStyles as styles } from '@/styles/send-styles';
 import type { PendingLightningPayment } from './types';
+import { PaymentSuccessMotionView } from '@/components/ui/payment-success-motion';
 
 export function LightningReviewView(props: {
   payment: PendingLightningPayment;
@@ -31,8 +32,10 @@ export function LightningSuccessView(props: {
   useLanguage();
   const [showDetails, setShowDetails] = useState(false);
   return (
-    <BitcoinPaymentProgress phase="success" amountSats={props.amountSats} onBack={props.onDashboard}
-      footer={<BitcoinButton label={t('Done')} onPress={props.onDashboard} />}>
+    <PaymentSuccessMotionView style={{ flex: 1 }}>
+    {exit => <BitcoinPaymentProgress phase="success" amountSats={props.amountSats}
+      onBack={() => exit(props.onDashboard)}
+      footer={<BitcoinButton label={t('Done')} onPress={() => exit(props.onDashboard)} />}>
       <TouchableOpacity
         style={styles.detailsToggle}
         onPress={() => setShowDetails(value => !value)}
@@ -50,6 +53,11 @@ export function LightningSuccessView(props: {
           <Text style={styles.proofText} selectable>{props.reference}</Text>
         </View>
       )}
+      <TouchableOpacity style={styles.textButton} onPress={() => exit(props.onReset)}>
+        <Text style={styles.textButtonText}>{t('Send another payment')}</Text>
+      </TouchableOpacity>
     </BitcoinPaymentProgress>
+    }
+    </PaymentSuccessMotionView>
   );
 }

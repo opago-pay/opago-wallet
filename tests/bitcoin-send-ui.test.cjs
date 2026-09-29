@@ -59,7 +59,10 @@ test('a locked onchain preparation never reaches the signing SDK adapter', async
 test('wallet removal drains prior history writes and rejects stale writes waiting on initialization', async () => {
   let opened;const pending=new Promise(resolve=>{opened=resolve});const writes=[];
   const database={execAsync:async sql=>{if(sql==='DELETE FROM transactions')writes.push('wipe')},getAllAsync:async()=>[],runAsync:async()=>writes.push('insert')};
-  const fixture=hookFixture('lib/database.ts',()=>({'expo-sqlite':{openDatabaseAsync:()=>pending}}),exports=>exports);
+  const fixture=hookFixture('lib/database.ts',()=>({
+    'expo-sqlite':{openDatabaseAsync:()=>pending},
+    './exchange-rate-snapshot':{currentBitcoinRateSnapshot:()=>null},
+  }),exports=>exports);
   const db=fixture.render();const stale=db.addTransaction('incoming',20,'SAT');const clear=db.wipeTransactions();opened(database);
   await Promise.all([stale,clear]);assert.deepEqual(writes,['wipe']);await db.addTransaction('incoming',30,'SAT');assert.deepEqual(writes,['wipe','insert']);
 });

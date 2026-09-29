@@ -50,6 +50,17 @@ test('mixed history shows ten, preserves ordering/deduplication and fetches cont
   assert.deepEqual(requests, [[0, 10], [10, 10], [20, 10]]);
 });
 
+test('provider status does not discard the payment-time rate saved locally', async () => {
+  const local = { ...item(1, 'pending'), btcEurRate: 70_000, btcEurRateAt: '2026-09-24T10:00:00.000Z' };
+  const pager = new HistoryPager([
+    { id: 'local', label: 'Saved', load: async () => ({ items: [local], next: null }) },
+    { id: 'spark', label: 'Bitcoin', load: async () => ({ items: [item(1, 'confirmed')], next: null }) },
+  ]);
+  await pager.load();
+  assert.equal(pager.snapshot().items[0].status, 'confirmed');
+  assert.equal(pager.snapshot().items[0].btcEurRate, 70_000);
+});
+
 test('filtered non-payment records advance the frontier without scanning more pages automatically', async () => {
   let reads = 0;
   const pager = new HistoryPager([

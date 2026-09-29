@@ -42,8 +42,10 @@ function AppStack() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="send-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
+          <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="buy" options={{ headerShown: false }} />
+          <Stack.Screen name="buy" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
         </Stack>
         <BackupPrompt />

@@ -50,7 +50,10 @@ test('amount sheet clears input on unit changes and fixed invoices have no edita
  const app=hookFixture('components/bitcoin/amount-sheet.tsx',()=>({...base,'./payment-ui':{BitcoinPaymentActions:'actions',bitcoinStyles:{}}}),e=>e.BitcoinAmountSheet(props));t.after(app.unmount);
  let tree=await app.settle();assert.equal(tree.type,'screen');assert.equal(nodes(tree).some(n=>n.type==='input'),false);
  assert.equal(nodes(tree).filter(n=>/^[0-9]$/.test(n.props.accessibilityLabel)).length,10);
- assert.equal(nodes(tree).some(n=>n.props.accessibilityLabel==='Decimal separator'),false);
+ assert.equal(nodes(tree).some(n=>n.props.accessibilityLabel==='Decimal separator'),true);
+ nodes(tree).find(n=>n.props.accessibilityLabel==='Decimal separator').props.onPress();
+ assert.deepEqual(calls,[['amount','20']]);
+ calls.length=0;
  nodes(tree).find(n=>n.props.accessibilityLabel==='EUR').props.onPress();assert.deepEqual(calls,[['amount',''],['currency','EUR']]);
  props.fixedAmount=50;tree=app.render();assert.equal(nodes(tree).some(n=>n.type==='input'),false);assert.match(text(tree),/50 SAT/);
  assert.equal(nodes(tree).some(n=>n.props.accessibilityLabel==='Delete last digit'),false);

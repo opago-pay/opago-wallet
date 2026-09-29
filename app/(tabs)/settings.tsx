@@ -567,10 +567,12 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>}
 
-      {showAdvanced && <View>
+      {showAdvanced && <View style={styles.advancedContent}>
         <LegacyPaymentReview />
-        <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 17, marginBottom: 10 }}>{t('How your Bitcoin balance works')}</Text>
-        <Text style={{ color: adaptColor('#aaaab3', 'color'), fontSize: 14, lineHeight: 22, marginBottom: 18 }}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
+        <View style={styles.advancedIntro}>
+          <Text style={styles.advancedIntroTitle}>{t('How your Bitcoin balance works')}</Text>
+          <Text style={styles.advancedIntroBody}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
+        </View>
         <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t("Networks")}</Text>
           <Text style={styles.body}>Bitcoin · {appConfig.isMainnet ? 'Lightning Mainnet' : 'Regtest'}</Text>
@@ -660,7 +662,11 @@ const styles = adaptiveStyles(StyleSheet.create({
   lockButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#39393e', borderRadius: 15, minHeight: 54, padding: 15, marginTop: 18 },
   dangerButton: { minHeight: 54, padding: 16, borderRadius: 15, borderWidth: 1, borderColor: '#4c3535', alignItems: 'center', justifyContent: 'center', marginTop: 18 },
   dangerText: { color: '#ffab97', fontSize: 15, fontWeight: '600', textAlign: 'center' },
-  advancedSection: { padding: 18, borderRadius: 18, backgroundColor: '#151518' },
+  advancedContent: { gap: 20 },
+  advancedIntro: { gap: 10 },
+  advancedIntroTitle: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  advancedIntroBody: { color: '#aaaab3', fontSize: 14, lineHeight: 22 },
+  advancedSection: { padding: 18, borderRadius: 18, backgroundColor: '#151518', borderWidth: 1, borderColor: '#2d2d31' },
   publicKey: { color: '#d5d5dc', fontSize: 14, lineHeight: 22, marginTop: 14 },
   disabledButton: { opacity: 0.45 },
   modalKeyboardView: { flex: 1 },

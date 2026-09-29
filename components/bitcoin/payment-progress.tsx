@@ -1,8 +1,8 @@
-import { adaptiveStyles, themeColor } from '@/lib/theme-styles';
+import { adaptiveStyles } from '@/lib/theme-styles';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { AssetIcon } from '@/components/ui/asset-icon';
+import { PaymentSuccessIcon } from '@/components/ui/payment-success-motion';
 import { BitcoinSendScreen } from './send-sheet';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -31,21 +31,23 @@ export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amou
   return <BitcoinSendScreen loading={!success} onBack={props.onBack} footer={props.footer}>
     <View style={styles.content}>
       <View style={[styles.hero, success && styles.successHero]} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Animated.View style={[styles.halo, success && styles.successHalo, moving && {
+        {success ? <PaymentSuccessIcon /> : <>
+        <Animated.View style={[styles.halo, moving && {
           opacity: rotation.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.45, 1, 0.45] }),
           transform: [{ scale: rotation.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.9, 1.04, 0.9] }) }],
         }]} />
-        <Animated.View style={[styles.orbit, success && styles.successOrbit, {
+        <Animated.View style={[styles.orbit, {
           transform: [{ rotate: rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
         }]} />
-        <Animated.View style={[styles.center, success && styles.successCenter, moving && {
+        <Animated.View style={[styles.center, moving && {
           transform: [
             { translateY: rotation.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -5, -8, -5, 0] }) },
             { rotate: rotation.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-5deg', '5deg', '-5deg'] }) },
           ],
         }]}>
-          {success ? <Ionicons name="checkmark" size={50} color={themeColor('successText')} /> : <AssetIcon asset="bitcoin" size={70} />}
+          <AssetIcon asset="bitcoin" size={70} />
         </Animated.View>
+        </>}
       </View>
       <View style={styles.summary} accessible accessibilityLiveRegion="polite" accessibilityState={{ busy: !success }}>
         <Text accessibilityRole="header" style={[styles.heading, width < 360 && styles.headingCompact]}>{heading}</Text>
@@ -64,9 +66,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   orbit: { position: 'absolute', width: 182, height: 182, borderRadius: 91, borderWidth: 3, borderColor: '#ffb00016', borderTopColor: '#ffb000', borderRightColor: '#ffb00070' },
   center: { width: 126, height: 126, borderRadius: 63, backgroundColor: '#1d190f', alignItems: 'center', justifyContent: 'center' },
   successHero: { width: 132, height: 132 },
-  successHalo: { width: 132, height: 132, borderRadius: 66, backgroundColor: '#87ddbd08', borderColor: '#87ddbd10' },
-  successOrbit: { width: 112, height: 112, borderRadius: 56, borderWidth: 1, borderColor: '#87ddbd38', borderTopColor: '#87ddbd38', borderRightColor: '#87ddbd38' },
-  successCenter: { width: 92, height: 92, borderRadius: 46, backgroundColor: 'rgba(73,209,125,0.16)' },
   summary: { gap: 12, alignItems: 'center', width: '100%' },
   heading: { color: '#fafaf7', fontSize: 28, lineHeight: 34, fontWeight: '600', textAlign: 'center', letterSpacing: -0.5 },
   headingCompact: { fontSize: 24, lineHeight: 30 },

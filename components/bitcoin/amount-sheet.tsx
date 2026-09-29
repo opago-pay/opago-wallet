@@ -46,7 +46,7 @@ export function BitcoinAmountSheet(props: {
           </TouchableOpacity>)}
         </View>
         <View style={amountStyles.keypad}>
-          {['123', '456', '789', `${props.currency === 'EUR' ? separator : ' '}0⌫`].map((row, rowIndex) =>
+          {['123', '456', '789', `${separator}0⌫`].map((row, rowIndex) =>
             <View key={rowIndex} style={amountStyles.keyRow}>
               {Array.from(row).map(key => key === ' ' ? <View key={key} style={amountStyles.emptyKey} /> :
                 <TouchableOpacity key={key} style={[amountStyles.key, { minHeight: keyHeight }]} disabled={props.loading}

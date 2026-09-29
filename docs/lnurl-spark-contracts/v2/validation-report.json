@@ -1,0 +1,57 @@
+{
+  "contract_version": "0.2.0",
+  "result": "passed",
+  "checked_at": "2026-09-28T20:02:18.800980+00:00",
+  "checks": {
+    "schemas": 73,
+    "openapi_documents": 3,
+    "operation_ids": 96,
+    "path_parameters": 96,
+    "references": 425,
+    "schema_examples": 65,
+    "forwarding": 45,
+    "service_auth": 45,
+    "user_auth": 45,
+    "security_invariants": 4,
+    "wallet_auth_bytes": 8,
+    "wallet_auth_signatures": 4,
+    "wallet_auth_negative": 16,
+    "hpke_canonical_bytes": 4,
+    "hpke_decryption": 4,
+    "hpke_independent_key_schedule": 4,
+    "hpke_exporter": 4,
+    "hpke_response": 4,
+    "hpke_negative_aad": 20,
+    "hpke_negative_status": 4,
+    "photo_exporter": 1,
+    "photo_decryption": 1,
+    "photo_negative_binding": 1,
+    "key_document": 1,
+    "key_document_signature": 1,
+    "key_document_negative": 2,
+    "observation_hashes": 9,
+    "observation_semantics": 3,
+    "acceptance_catalog": 1
+  },
+  "total_checks": 989,
+  "public_operations": 47,
+  "internal_operations": 45,
+  "helper_operations": 4,
+  "implementation_scenarios": {
+    "count": 48,
+    "status": "NOT_EXECUTED"
+  },
+  "not_proven": [
+    "Spark SDK F2 behavior",
+    "Python/JavaScript UMA interoperability",
+    "Android/iOS native HPKE execution",
+    "deployed services, concurrency and device acceptance",
+    "legal retention approval"
+  ],
+  "javascript_verification": {
+    "result": "passed",
+    "checks": 44,
+    "node": "v24.18.1",
+    "scope": "Node reference fixtures; not Android/iOS runtime or Spark SDK"
+  }
+}

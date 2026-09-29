@@ -1,0 +1,29 @@
+{
+  "warning": "PUBLIC TEST ROOT ONLY",
+  "test_root_private_key_hex": "0707070707070707070707070707070707070707070707070707070707070707",
+  "root_public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "signed_bytes_hex": "7b226163746976655f6b6964223a22746573742d68706b652d3230323630393238222c2261756469656e6365223a2268747470733a2f2f6170692e746573742e696e76616c6964222c226973737565645f6174223a22323032362d30392d32385431323a30303a30305a222c226b657973223a5b7b226b6964223a22746573742d68706b652d3230323630393238222c226e6f745f6166746572223a22323032362d31302d32385431323a30303a30305a222c227075626c69635f6b6579223a2273664734514e35364d6b47774a306a506d77573354636a46364555536d484f4946373132716f362d6a4373227d5d7d",
+  "response": {
+    "document": {
+      "audience": "https://api.test.invalid",
+      "issued_at": "2026-09-28T12:00:00Z",
+      "active_kid": "test-hpke-20260928",
+      "keys": [
+        {
+          "kid": "test-hpke-20260928",
+          "public_key": "sfG4QN56MkGwJ0jPmwW3TcjF6EUSmHOIF712qo6-jCs",
+          "not_after": "2026-10-28T12:00:00Z"
+        }
+      ]
+    },
+    "signing_key_id": "test-root",
+    "signature": "Uy4CjmRoVvWBoD53Dk2eMtXj_jrSowXmlKaks1awKcphD_c6j8b07nG4cjCPUSrTSqvy8vnwCkhszW0qx2CiBw"
+  },
+  "policy": {
+    "now": "2026-09-28T12:00:00Z",
+    "expected_audience": "https://api.test.invalid",
+    "last_issued_at": "2026-09-28T12:00:00Z",
+    "revoked_kids": [],
+    "revoked_signing_key_ids": []
+  }
+}

@@ -543,6 +543,10 @@
   "Direction": "Sens",
   "Date and time": "Date et heure",
   "Payment method": "Mode de paiement",
+  "Current transaction value in EUR": "Valeur actuelle de la transaction en EUR",
+  "Current exchange rate": "Taux de conversion actuel",
+  "EUR estimate unavailable": "Estimation en EUR indisponible",
+  "Exchange rate unavailable": "Taux de conversion indisponible",
   "Receiving address": "Adresse de réception",
   "Fee paid": "Frais réellement payés",
   "Details": "Détails techniques",
@@ -693,5 +697,9 @@
   "After MoonPay sends Bitcoin, network confirmation and a separate claim may be required before it is available here. A claim fee is deducted from the deposit; review the exact fee in Opago before approving.": "Après l'envoi des bitcoins par MoonPay, une confirmation du réseau et une récupération distincte peuvent être nécessaires avant leur disponibilité. Les frais de récupération sont déduits du dépôt ; vérifiez leur montant exact dans Opago avant de les approuver.",
   "Copy diagnostic report": "Copier le rapport de diagnostic",
   "Diagnostics copied": "Diagnostic copié",
-  "Paste the report into our chat. It contains no recovery words, addresses or payment details.": "Collez le rapport dans notre discussion. Il ne contient ni mots de récupération, ni adresses, ni détails de paiement."
+  "Paste the report into our chat. It contains no recovery words, addresses or payment details.": "Collez le rapport dans notre discussion. Il ne contient ni mots de récupération, ni adresses, ni détails de paiement.",
+  "Transaction value at payment time": "Valeur de la transaction au moment du paiement",
+  "Exchange rate at payment time": "Taux de change au moment du paiement",
+  "Historical EUR value unavailable": "Valeur historique en EUR indisponible",
+  "Historical exchange rate unavailable": "Taux de change historique indisponible"
 }

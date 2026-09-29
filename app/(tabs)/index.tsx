@@ -82,6 +82,7 @@ function mapHederaJournal(records: Awaited<ReturnType<ReturnType<typeof hederaPa
   return records.map(item => ({
     key: 'hedera:' + normalizeHederaTransactionIdForMirror(item.transactionId),
     txId: item.transactionId, type: 'outgoing', amountDisplay: formatTinybars(BigInt(item.amountTinybars)),
+    amountValue: Number(item.amountTinybars) / 100_000_000,
     asset: 'HBAR', status: item.state, timestamp: item.createdAt,
     explorerUrl: getHederaTransactionExplorerUrl(item.transactionId), explorerLabel: 'HashScan',
   }));
@@ -168,8 +169,10 @@ export default function HomeScreen() {
     return item ? {
       key: item.txId || 'local:' + item.id, txId: item.txId,
       type: item.type, amountDisplay: item.amount.toLocaleString(appLocale()),
+      amountValue: item.amount,
       asset: item.asset, status: item.status, timestamp: item.timestamp,
       reference: item.reference,
+      btcEurRate: item.btcEurRate, btcEurRateAt: item.btcEurRateAt,
       route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' : undefined,
     } satisfies DisplayTransaction : null;
   }, []);
@@ -212,7 +215,9 @@ export default function HomeScreen() {
             items: page.map(item => ({
             key: item.txId || 'local:' + item.id, txId: item.txId, type: item.type,
             amountDisplay: item.amount.toLocaleString(appLocale()), asset: item.asset,
+            amountValue: item.amount,
             status: item.status, timestamp: item.timestamp, reference: item.reference,
+            btcEurRate: item.btcEurRate, btcEurRateAt: item.btcEurRateAt,
             route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' as const : undefined,
           })) };
         } },
@@ -233,6 +238,7 @@ export default function HomeScreen() {
             txId: item.transactionId,
             type: item.direction === 'received' ? 'incoming' as const : 'outgoing' as const,
             amountDisplay: item.amountHbar, asset: 'HBAR', status: item.result.toLowerCase(),
+            amountValue: Number(item.amountHbar),
             timestamp: item.occurredAt, explorerUrl: item.hashscanUrl, explorerLabel: 'HashScan' as const,
             priority: item.nonce === 0 ? 1 : 0,
           })) };
@@ -243,6 +249,7 @@ export default function HomeScreen() {
           return { next: null, items: records.map(item => ({
             key: 'ln:' + item.paymentHash, txId: 'ln:' + item.paymentHash,
             type: 'outgoing' as const, amountDisplay: item.amountSats.toLocaleString(appLocale()),
+            amountValue: item.amountSats,
             asset: 'SAT', status: item.state, timestamp: item.createdAt,
             route: 'lightning' as const, requestId: item.requestId,
           })) };
@@ -273,6 +280,7 @@ export default function HomeScreen() {
                 key, txId: key,
                 type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' as const : 'outgoing' as const,
                 amountDisplay: amount.toLocaleString(appLocale()), asset: 'SAT', status: 'confirmed', route: hash ? 'lightning' as const : undefined,
+                amountValue: amount,
                 timestamp: transfer.createdTime ? new Date(transfer.createdTime).toISOString() : new Date().toISOString(),
               }];
             }) };
@@ -388,6 +396,7 @@ export default function HomeScreen() {
       if (!record) { setHistoryOpen(true); return; }
       setSelectedTransaction({ key: 'ln:' + record.paymentHash, txId: 'ln:' + record.paymentHash,
         type: 'outgoing', amountDisplay: record.amountSats.toLocaleString(appLocale()), asset: 'SAT',
+        amountValue: record.amountSats,
         status: record.state, timestamp: record.createdAt, route: 'lightning', requestId: record.requestId });
     } catch { setHistoryOpen(true); }
   }, [lightningPaymentJournal]);
@@ -510,7 +519,8 @@ export default function HomeScreen() {
 
   if (selectedTransaction) {
     const hash = lightningHashFromPayment(selectedTransaction);
-    return <PaymentDetailsScreen payment={selectedTransaction} onClose={() => setSelectedTransaction(null)}
+    return <PaymentDetailsScreen payment={selectedTransaction} rates={displayRates}
+      onClose={() => setSelectedTransaction(null)}
       onHide={hash && selectedTransaction.type === 'outgoing' && selectedTransaction.status === 'pending'
         ? () => { void changePaymentVisibility(hash, true).then(changed => {
           if (changed) setSelectedTransaction(null);
@@ -597,9 +607,9 @@ export default function HomeScreen() {
         <QuickAction
           icon="qr-code-outline"
           label={t('Receive')}
-          onPress={() => { markNavigationStart('receive'); router.push('/(tabs)/receive'); }}
+          onPress={() => { markNavigationStart('receive'); router.push('/receive-flow' as Href); }}
         />
-        <QuickAction icon="scan-outline" label={t('Send')} isSend onPress={() => { markNavigationStart('send'); router.push('/(tabs)/send'); }} />
+        <QuickAction icon="scan-outline" label={t('Send')} onPress={() => { markNavigationStart('send'); router.push('/send-flow' as Href); }} />
         <QuickAction icon="card-outline" label={t('Buy')} onPress={() => { markNavigationStart('buy'); router.push('../buy'); }} />
       </View>
 
@@ -869,7 +879,6 @@ function BalanceCard(props: {
 function QuickAction(props: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
-  isSend?: boolean;
   accessibilityHint?: string;
   onPress(): void;
 }) {
@@ -884,11 +893,11 @@ function QuickAction(props: {
       accessibilityHint={props.accessibilityHint}
     >
       <View style={styles.quickActionIconSlot}>
-        <View style={[styles.quickActionIcon, props.isSend && styles.quickActionIconEmphasized]}>
-          <Ionicons name={props.icon} size={props.isSend ? 34 : 28} color={mode === 'light' ? '#18181d' : '#fff'} />
+        <View style={styles.quickActionIcon}>
+          <Ionicons name={props.icon} size={28} color={mode === 'light' ? '#18181d' : '#fff'} />
         </View>
       </View>
-      <Text style={[styles.quickActionText, props.isSend && styles.quickActionTextEmphasized]}>{props.label}</Text>
+      <Text style={styles.quickActionText}>{props.label}</Text>
     </TouchableOpacity>
   );
 }
@@ -953,13 +962,11 @@ const styles = adaptiveStyles(StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickActionIconEmphasized: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#242428', borderColor: '#64646b', borderWidth: 1.5 },
   paymentNotice: { backgroundColor: '#141416', borderRadius: 16, padding: 16, gap: 6, marginTop: 12 },
   pendingPaymentNotice: { backgroundColor: '#211b0f', borderColor: '#66501d', borderWidth: 1, borderRadius: 16, padding: 16, gap: 6, marginTop: 12 },
   pendingPaymentTitle: { color: '#ffb000', fontSize: 15, fontWeight: '700' },
   pendingPaymentText: { color: '#e6ddc8', fontSize: 13, lineHeight: 20 },
   quickActionText: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  quickActionTextEmphasized: { fontSize: 15, fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

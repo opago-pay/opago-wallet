@@ -27,7 +27,7 @@ test('day and night mode persist without changing wallet state and update existi
   const styles = adaptiveStyles({ screen: { backgroundColor: '#0a0a0c', color: '#fff' } });
   assert.equal(styles.screen.backgroundColor, '#0a0a0c');
   await colorModePreference.setMode('light');
-  assert.equal(styles.screen.backgroundColor, '#ffffff');
+  assert.equal(styles.screen.backgroundColor, '#fafafa');
   assert.equal(styles.screen.color, '#18181d');
   assert.equal(adaptColor('#ffb000', 'backgroundColor'), '#ffb000');
   await colorModePreference.setMode('dark');
@@ -50,7 +50,7 @@ test('Home loaded in light mode can switch back to true dark colors', async () =
   assert.ok(styleStart >= 0);
   const makeStyles = new Function('adaptiveStyles', 'StyleSheet', source.slice(styleStart) + '\nreturn styles;');
   const home = makeStyles(adaptiveStyles, { create: styles => styles });
-  assert.equal(home.container.backgroundColor, '#ffffff');
+  assert.equal(home.container.backgroundColor, '#fafafa');
   assert.equal(home.total.color, '#18181d');
   await colorModePreference.setMode('dark');
   assert.equal(home.container.backgroundColor, '#0a0a0c');
