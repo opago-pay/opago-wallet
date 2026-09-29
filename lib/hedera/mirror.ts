@@ -4,6 +4,7 @@ import {
   parseHederaAccountId,
 } from './config';
 import { retryWithBackoff } from '../retry';
+import { readBoundedText, strictFetch } from '../strict-http-transport';
 
 export interface MirrorAccountRecord {
   account?: string | null;
@@ -40,6 +41,7 @@ export interface MirrorTransactionRecord {
 
 interface MirrorAccountsResponse {
   accounts?: MirrorAccountRecord[];
+  links?: { next?: string | null };
 }
 
 interface MirrorTransactionsResponse {
@@ -49,6 +51,7 @@ interface MirrorTransactionsResponse {
 const HEDERA_HISTORY_TRANSACTION_TYPES = [
   'CRYPTOTRANSFER',
   'ETHEREUMTRANSACTION',
+  'CONTRACTCALL',
 ] as const;
 
 const EXACT_INTEGER_FIELDS = /("(?:amount|balance|charged_tx_fee|max_fee)"\s*:\s*)(-?\d+)(?=\s*[,}\]])/g;
@@ -59,7 +62,7 @@ function preserveExactIntegers(rawJson: string): string {
 
 function mirrorErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== 'object') return fallback;
-  const status = (body as { _status?: { messages?: Array<{ message?: unknown }> } })._status;
+  const status = (body as { _status?: { messages?: { message?: unknown }[] } })._status;
   const message = status?.messages?.find(item => typeof item.message === 'string')?.message;
   return typeof message === 'string' ? message : fallback;
 }
@@ -73,11 +76,11 @@ async function fetchMirrorJson<T>(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url.toString(), {
+      const response = await strictFetch(url.toString(), {
         headers: { accept: 'application/json' },
         redirect: 'error',
         signal: controller.signal,
-      });
+      }, 2_097_152, true);
       if (response.redirected) throw new Error(purpose + ' redirected unexpectedly.');
       if (allowNotFound && response.status === 404) return null;
 
@@ -85,10 +88,7 @@ async function fetchMirrorJson<T>(
       if (!contentType.toLowerCase().includes('application/json')) {
         throw new Error(purpose + ' returned an unexpected content type.');
       }
-      const rawBody = await response.text();
-      if (rawBody.length > 524_288) {
-        throw new Error(purpose + ' returned an oversized response.');
-      }
+      const rawBody = await readBoundedText(response, purpose, 524_288, controller);
 
       let parsed: unknown;
       try {
@@ -122,15 +122,38 @@ function mirrorUrl(pathname: string): URL {
 export async function findMirrorAccountsByPublicKey(
   publicKey: string,
 ): Promise<MirrorAccountRecord[]> {
-  const url = mirrorUrl('/api/v1/accounts');
+  let url = mirrorUrl('/api/v1/accounts');
   url.searchParams.set('account.publickey', publicKey);
   url.searchParams.set('balance', 'true');
   url.searchParams.set('limit', '100');
-  const response = await fetchMirrorJson<MirrorAccountsResponse>(
-    url,
-    HEDERA_NETWORK_LABEL + ' account lookup',
-  );
-  return response?.accounts || [];
+  const origin = url.origin;
+  const seen = new Set<string>();
+  const accounts: MirrorAccountRecord[] = [];
+  for (let page = 0; page < 20; page++) {
+    if (seen.has(url.toString())) throw new Error('Hedera account lookup cursor repeated.');
+    seen.add(url.toString());
+    const response = await fetchMirrorJson<MirrorAccountsResponse>(
+      url, HEDERA_NETWORK_LABEL + ' account lookup',
+    );
+    if (!response || !Array.isArray(response.accounts)) throw new Error('Hedera account lookup is unavailable.');
+    accounts.push(...response.accounts);
+    const next = response.links?.next;
+    if (!next) {
+      if (response.accounts.length === 100 && response.links === undefined) {
+        throw new Error('Hedera account lookup may be incomplete. Enter the account ID manually.');
+      }
+      return accounts;
+    }
+    const continuation = new URL(next, url);
+    if (continuation.origin !== origin || continuation.pathname !== '/api/v1/accounts' ||
+        continuation.searchParams.get('account.publickey') !== publicKey ||
+        continuation.searchParams.get('balance') !== 'true' ||
+        continuation.searchParams.get('limit') !== '100') {
+      throw new Error('Hedera account lookup returned an invalid continuation.');
+    }
+    url = continuation;
+  }
+  throw new Error('Hedera account lookup has more pages. Enter the account ID manually.');
 }
 
 export async function getMirrorAccountById(
@@ -148,7 +171,10 @@ export async function getMirrorAccountById(
 export async function listMirrorTransactions(
   rawAccountId: string,
   limit = 25,
+  before?: string,
+  requireAllTypes = false,
 ): Promise<MirrorTransactionRecord[]> {
+  if (before !== undefined && !/^\d+\.\d{1,9}$/.test(before)) throw new Error('Invalid history timestamp.');
   const accountId = parseHederaAccountId(rawAccountId);
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
   const results = await Promise.allSettled(
@@ -158,6 +184,7 @@ export async function listMirrorTransactions(
       url.searchParams.set('transactiontype', transactionType);
       url.searchParams.set('limit', String(safeLimit));
       url.searchParams.set('order', 'desc');
+      if (before) url.searchParams.set('timestamp', 'lt:' + before);
       const response = await fetchMirrorJson<MirrorTransactionsResponse>(
         url,
         HEDERA_NETWORK_LABEL + ' ' + transactionType.toLowerCase() + ' history',
@@ -169,7 +196,7 @@ export async function listMirrorTransactions(
     .filter((result): result is PromiseFulfilledResult<MirrorTransactionRecord[]> =>
       result.status === 'fulfilled')
     .map(result => result.value);
-  if (responses.length === 0) {
+  if (responses.length === 0 || (requireAllTypes && responses.length !== results.length)) {
     const failure = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
     throw failure.reason;
   }

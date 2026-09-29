@@ -79,6 +79,11 @@ async function fetchJson(url, options, purpose) {
 }
 
 function loadBuildInfo() {
+  const debugFile = ARTIFACT_PATH.replace(/\.json$/, '.dbg.json');
+  if (fs.existsSync(debugFile)) {
+    const debug = JSON.parse(fs.readFileSync(debugFile, 'utf8'));
+    return JSON.parse(fs.readFileSync(path.resolve(path.dirname(debugFile), debug.buildInfo), 'utf8'));
+  }
   const directory = path.join(ROOT, 'artifacts', 'build-info');
   const candidates = fs.existsSync(directory)
     ? fs.readdirSync(directory).filter(name => name.endsWith('.json'))

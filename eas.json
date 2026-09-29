@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 14.7.0"
+    "version": ">= 14.7.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -8,6 +9,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "false",
+        "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "regtest",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
@@ -20,6 +23,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "false",
+        "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "regtest",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
@@ -31,8 +36,11 @@
     "mainnet-candidate": {
       "distribution": "internal",
       "environment": "production",
+      "node": "22.23.1",
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "false",
+        "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "regtest",
         "EXPO_PUBLIC_ENABLE_HEDERA_MAINNET": "true",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "mainnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "mainnet",
@@ -47,19 +55,27 @@
     },
     "production": {
       "environment": "production",
+      "node": "22.23.1",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
+        "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "true",
+        "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "mainnet",
         "EXPO_PUBLIC_ENABLE_HEDERA_MAINNET": "true",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "mainnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "mainnet",
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://mainnet.mirrornode.hedera.com",
-        "EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR": "1",
+        "EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR": "balance",
         "EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID": "0.0.10850063",
         "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6816107766"
+      }
+    }
   }
 }

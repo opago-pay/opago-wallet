@@ -1,13 +1,18 @@
 import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
 import 'react-native-reanimated';
-import { View, Text } from 'react-native';
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
-import { PrivyProvider } from '@privy-io/expo';
 import { WalletProvider } from '@/hooks/useWalletAuth';
-import { appConfig } from '@/lib/config';
+import { WalletGate } from '@/components/security/wallet-gate';
+import { BackupPrompt } from '@/components/security/backup-prompt';
+import { LanguageProvider } from '@/hooks/useLanguage';
+import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
+import { startEventLoopMonitor } from '@/lib/performance-trace';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -24,49 +29,33 @@ export const unstable_settings = {
 };
 
 function AppStack() {
+  const { mode } = useColorMode();
+  useEffect(() => {
+    const stop = startEventLoopMonitor(() => AppState.currentState === 'active');
+    return stop;
+  }, []);
   return (
     <WalletProvider>
-      <ThemeProvider value={DarkTheme}>
+      <ThemeProvider value={mode === 'light' ? DefaultTheme : DarkTheme}>
+        <WalletGate>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="send-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
+          <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
+          <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="buy" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
+          <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style="light" />
+        <BackupPrompt />
+        </WalletGate>
+        <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </WalletProvider>
   );
 }
 
 export default function RootLayout() {
-  if (!appConfig.importSolanaKeyToPrivy) return <AppStack />;
-
-  const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
-  const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID;
-
-  if (!appId || !clientId) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#0a0a0c',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-        }}
-      >
-        <Text style={{ color: '#fff', textAlign: 'center' }}>
-          Wallet configuration is incomplete. Set EXPO_PUBLIC_PRIVY_APP_ID and
-          EXPO_PUBLIC_PRIVY_CLIENT_ID.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <PrivyProvider appId={appId} clientId={clientId}>
-      <AppStack />
-    </PrivyProvider>
-  );
+  return <LanguageProvider><ColorModeProvider><AppStack /></ColorModeProvider></LanguageProvider>;
 }

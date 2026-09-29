@@ -1,25 +1,25 @@
 # Security status
 
-Last reviewed: 2026-09-16
+Last reviewed: 2026-09-17
 
 This repository is a public hackathon and grant codebase. It has not received an independent mobile, key-lifecycle, dependency, or smart-contract audit. A capped, standalone Android candidate has completed internal real-HBAR Mainnet acceptance, but that evidence is not a public-production, custody, regulatory, or app-store readiness claim. Do not distribute it as a production wallet or process third-party funds or identities without the dedicated reviews and release controls listed below.
 
 ## Dependency audit
 
-The lockfile contains targeted same-major overrides for previously remediated `brace-expansion`, `postcss`, and supported `ws` lines. On 16 September 2026, the Hiero SDK was updated from `2.84.0` to `2.88.0` and npm's non-breaking audit fixes were applied. No forced or major-version `npm audit fix` was applied.
+The lockfile pins Hiero SDK `2.88.0` and Spark `0.7.12`. On 17 September 2026, targeted overrides updated Metro's complete `0.83` family to `0.83.8` and patched the affected build-tool dependencies. The vulnerable query-string decoder chain was replaced by `query-string 9.5.1`; a small Metro adapter preserves Expo Router 6's named CommonJS interface. Encoding compatibility is covered by regression tests. No `npm audit fix --force` was used.
 
-The npm advisory report captured from the resulting 2026-09-16 lockfile is:
+Fresh `npm audit --json` and `npm audit --omit=dev --json` reports for the resulting 2026-09-17 lockfile are:
 
 | Scope | Critical | High | Moderate | Low | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Production dependency tree | 0 | 14 | 25 | 0 | 39 |
-| Complete tree including development tools | 0 | 19 | 27 | 11 | 57 |
+| Production dependency tree | 0 | 0 | 0 | 0 | 0 |
+| Complete tree including development tools | 0 | 0 | 0 | 0 | 0 |
 
-These numbers count affected packages and dependency paths, not independent exploitable defects. The previous direct Hiero advisory is removed by `2.88.0`. The remaining production report is dominated by unresolved transitive findings propagated through Expo/React Native, Privy, Solana, Atomiq, and Spark. Some npm suggestions would downgrade Expo or force incompatible major versions; those were deliberately rejected rather than presenting a broken dependency tree as a security fix.
+`npx expo install --check` passes for SDK 54. This is an advisory and declared-version check, not proof that the native artifact or wallet is secure. The Metro/query parser overrides also require Android bundling, deep-link and navigation acceptance. Rerun both audits for every public candidate; reports become stale as advisories change.
 
-`npm ci` succeeds with the pinned lockfile. Hiero SDK `2.88.0` currently emits upstream peer-metadata warnings for the exact `ansi-styles` and `protobufjs` versions requested by its proto package; the application tests and Android bundle pass without overriding those dependencies to older versions.
+The lockfile was updated with `npm install --ignore-scripts`. A fresh isolated `npm ci --ignore-scripts` installed 1,276 packages successfully with zero advisories on 17 September 2026; the temporary dependency copy was removed afterward. An isolated native release build from a clean reviewed commit remains a separate gate. Hiero SDK `2.88.0` emits upstream peer-metadata warnings for the exact `ansi-styles` and `protobufjs` versions requested by its proto package; these have not been suppressed with older dependencies.
 
-Phase 3 adds Hardhat, Ethers, and the pinned Solidity compiler as development-only dependencies. They are not bundled into the mobile app, but their toolchain has additional advisories through packages including `adm-zip`, `serialize-javascript`, `tmp`, `undici`, and `uuid`. Contract tooling must run only on trusted source and in a restricted development environment.
+Contract tests now use Hardhat `3.16.0`, Ethers and Mocha as development-only dependencies. Compilation uses the exact local Solidity `0.8.28` package through `scripts/compile-contracts.cjs`, with the original CRLF source convention, optimizer 200 and Paris target. All nine contract tests pass and the generated runtime SHA-256 remains `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8`, matching the verified deployment. No contract was changed or redeployed. Toolchain changes still require independent review.
 
 Before any release:
 
@@ -30,6 +30,8 @@ Before any release:
 - do not approve unrestricted public distribution while reachable high-severity findings or independent-review blockers remain unresolved.
 
 ## Smart-contract boundaries
+
+The internal production profile explicitly uses `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=balance`, approved by the owner on 17 September 2026. HBAR payment review and the refreshed pre-signing check require the amount plus the mode-specific maximum network fee to fit the available balance. Direct transfers retain their 0.1 HBAR fee ceiling; merchant checkout retains 0.75 HBAR. The amount remains an exact positive signed-int64 tinybar value. Device authorization and the final session guard remain mandatory in the app. Numeric transfer caps remain available for limited test/grant builds; an absent Mainnet policy still fails configuration.
 
 `OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or production security review.
 
@@ -47,23 +49,43 @@ The checkout contract cryptographically binds the network, contract, merchant ad
 
 Hedera SDK operations use bounded request/deadline/attempt settings. Once the SDK returns a transaction ID, the app persists a non-secret journal record as `pending` before waiting for the receipt. Only an explicit `SUCCESS` receipt or Mirror Node result promotes it to `confirmed`; known non-success results become `failed`, and unavailable or unknown results remain `pending`. This state survives process death and prevents an unresolved payment from being shown as successful.
 
-Native Solana payments use exact `bigint` lamports or token base units throughout validation, construction, balance checks, history, and display formatting. The app verifies the RPC genesis hash, validates the selected USDC mint and associated token accounts, obtains the current blockhash and fee, simulates the signed transaction, and persists its public signature as `pending` before broadcast. A payment is shown as confirmed only after authoritative Solana RPC confirmation; ambiguous timeout, offline, or restart states remain pending and are reconciled later. Explorer links are restricted to the configured cluster. The journal contains public payment metadata only and never stores a recovery phrase, private key, or serialized signed transaction.
-
-Devnet SOL and USDC have no monetary value and are excluded from the dashboard's fiat total. Development builds enforce configurable per-transfer ceilings. Mainnet enablement remains a separate build-time decision and requires reviewed RPC infrastructure plus independent mobile, dependency, and key-management audits.
-
 Physical Phase 4 acceptance on 12 August 2026 covered offline operation, timeout, force-stop after submission, restart reconciliation, expired and altered checkout data, wrong amounts, and an on-chain replay rejection. The redacted app-process Logcat review found no recovery/private-key labels, complete signed-transaction payloads, or fatal exceptions. Public transaction links and aggregate counts are recorded in [PHASE4_ACCEPTANCE.md](PHASE4_ACCEPTANCE.md); raw device logs are intentionally not retained.
 
 ## Wallet recovery and provisioning safeguards
 
 On 2026-08-12, physical Android acceptance provisioned testnet account `0.0.10030291`, displayed its `2 HBAR` balance, deleted the local wallet, restored it from the paper backup, and rediscovered the same account and balance. This is testnet evidence only.
 
-Local wallet deletion is disabled until three randomly selected paper-backup words match the phrase held in device-bound secure storage. The challenge asks for one word at a time, blocks screen capture, never transmits the phrase, and clears deletion authorization when the app backgrounds. Recovery display and entry also block screen capture and clear phrase state on backgrounding.
+Local wallet deletion is disabled until three randomly selected paper-backup words match the phrase held in device-bound secure storage. The challenge asks for one word at a time, blocks screen capture, never transmits the phrase, and clears deletion authorization when the app backgrounds. Recovery display and entry also block screen capture and clear phrase state on backgrounding. The explicit reveal uses numbered native text at 20 points, adapting to one column on narrow screens or large font settings. Assistive technology can read one focused word at a time after reveal; the full phrase is never automatically announced. The displayed backup status uses the persisted wallet-bound record, independently of temporary deletion permission. Until that record has loaded, Home shows no missing-backup warning; Security and Request show a neutral loading state with retry on failure.
 
 The testnet provisioning script derives the submitted operator public key and compares it with the configured operator account's Mirror Node key before submitting an account-creation transaction. A mismatch fails locally with no transaction submitted. Operator credentials remain process-local and are removed after the script exits.
 
 ## Remaining wallet-key limitations
 
-The recovery phrase is stored with Expo SecureStore using device-only, when-unlocked storage. Biometric access control is requested when the platform reports it is available. Derived signing keys necessarily exist in JavaScript runtime memory while the wallet is open, and the current payment confirmation screen does not constitute a separate hardware-backed transaction signature. The same recovery phrase also derives the experimental Hedera, Solana, and Lightning identities in this hackathon repository. These are explicit reasons why the internal candidate is not a public app-store release and why a production fork requires an independent mobile/key-lifecycle review, transaction-time authentication decision, and clean-device recovery acceptance.
+The recovery phrase is stored with Expo SecureStore using device-only, when-unlocked storage. Biometric access control is requested when the platform reports it is available. Existing protected keys can become inaccessible after a biometric enrollment change; users must have an offline backup before changing device security. A missing protected phrase is an error and must never silently generate a replacement wallet.
+
+The app starts locked when a wallet exists, locks immediately on backgrounding, and expires after two minutes without interaction. Locking unmounts sensitive screens, drops the retained Hedera key and disposes Spark connections/timers. Late Spark startups are disposed before a later session can initialize. JavaScript strings and SDK internals cannot be guaranteed to be zeroized; releasing references does not make this a hardware signing wallet.
+
+Both HBAR and Lightning require a separate payment review and system-device authentication immediately before submission. Android 11+ accepts strong biometrics or the device screen-lock credential (PIN, pattern or password); iOS and older Android retain the strong-biometric path. Approval is bound to the current unlocked session and checked again after the durable journal write, before network submission. Optional haptic failure cannot turn a confirmed payment into a failed payment.
+
+Android 11+ devices without strong biometrics can now create, restore and authorize payments using the system credential prompt. Recovery-word reveal and backup verification also require fresh system authentication. The app never receives the PIN. Weak face recognition alone remains excluded by `biometricsSecurityLevel: strong`. A device without a configured screen lock is rejected. Android 10 and older do not support the strong-biometric/device-credential combination used here, so PIN-only users receive a compatibility error; see [Android authentication requirements](https://developer.android.com/identity/sign-in/biometric-auth).
+
+A bounded authentication attempt can preserve an unlocked session only while its exact Android system prompt is outstanding. The wallet UI remains hidden while inactive, the two-minute idle expiry still applies, and no approval can be issued or used while the app is backgrounded. A new prompt invalidates previous action approvals. Failed/cancelled prompts that backgrounded the app lock the session; completion after a lock, another unlock, or expiry fails. Normal app backgrounding still locks and disposes SDK resources. Foreground gesture capture, keyboard edits/submission, modal interaction and accessible button/tab activation renew the inactivity deadline. Rendering, network polling and programmatic input value changes do not renew it; events cannot revive an expired session. SDK startup is tied to the wallet session rather than the action-approval generation, so a PIN prompt cannot permanently break optional Lightning startup.
+
+On PIN-only devices, SecureStore still encrypts the phrase using the platform keystore, while access is gated by the app's system-authenticated session. This is not a claim that those keys have a hardware-enforced per-use PIN binding. Existing biometric-protected keys are not rewrapped or downgraded, so their original biometric access restrictions still apply. Physical creation/restore/payment, cancellation, Home/app switching, process death and enrollment-change acceptance remain required.
+
+Before receiving, users must check three paper-backup words or explicitly acknowledge postponing the backup. A reminder stays visible until verification. The persisted status is bound to the wallet public key; permission to delete the local wallet still requires a fresh per-session backup check. The same phrase derives both assets; clean-device Mainnet recovery of both remains a release gate.
+
+## First public release scope
+
+The agreed scope is HBAR and Bitcoin over Lightning/Spark. The Home Swap action shows only a localized coming-soon notice; swap execution remains disabled and onboarding does not promise it. eID/Travel Rule payment paths fail closed before starting identity sessions or sending payer data; setting a backend URL does not enable them. Reference servers remain development code. External native links only admit bounded canonical Hedera checkout reviews, never recovery, creation or direct signing routes. Checkout explicitly does not verify merchant identity.
+
+Implementation and outstanding external evidence are tracked in [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md). No independent audit or public-release approval has been obtained by these code changes.
+
+Lightning payments use a non-secret local journal before submission. Unknown SDK outcomes remain pending across process death and are reconciled through the opaque Spark request ID or paginated outgoing history when opening Send or expanding Home activity. A collapsed Home does not scan history at startup. Confirmation requires a returned preimage whose SHA-256 equals the invoice payment hash. Privacy-sensitive incoming invoice state uses device-protected SecureStore and persists only until completion, expiry, replacement, or wallet deletion. Local service health stores aggregate timestamps, failure counts, and broad categories only.
+
+Home may display a clearly labelled last-known balance preview after unlocking and identifying the wallet key. The preview is stored in device-protected SecureStore, scoped to the public key and both networks, expires after seven days, and is deleted with the wallet. It is not used for payment preparation, authorization or signing. Local startup timing can be enabled for internal builds; its markers contain only fixed stage names and elapsed milliseconds.
+
+Startup computes the existing BIP39 seed once and shares it between Hedera and Spark. Android uses system PBKDF2-HMAC-SHA512 with the unchanged 2048 iterations, 64-byte result and empty passphrase. The local native module validates the canonical input shape, checks its provider with a public known-answer vector, and never logs or stores seed material. JavaScript checks the phrase checksum before invoking it. Temporary app-owned seed buffers are erased after startup/failure and on lock; a late native result is erased without use. An in-flight SDK operation owns a separate input copy until it settles, and the existing session resource disposes a late wallet. Garbage-collected strings and SDK/provider-managed copies are outside explicit zeroization guarantees. Keys are neither persisted in a new cache nor retained across sessions to speed up unlocking. Synthetic regression tests compare Hedera signing and all Spark key families with the preceding derivation.
 
 ## Reporting
 

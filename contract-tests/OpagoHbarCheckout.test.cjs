@@ -1,7 +1,15 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { ethers } = require('hardhat');
+const { ethers } = require('../scripts/contract-test-runtime.cjs');
+
+function rejectsWith(contract, transaction, expectedName) {
+  return assert.rejects(transaction, error => {
+    assert.equal(error.code, 'CALL_EXCEPTION');
+    assert.equal(contract.interface.parseError(error.data)?.name, expectedName);
+    return true;
+  });
+}
 
 async function fixture() {
   const [payer, merchant, replayPayer] = await ethers.getSigners();
@@ -61,14 +69,14 @@ describe('OpagoHbarCheckout', function () {
   it('rejects a wrong amount', async function () {
     const { checkout, payer, merchant, expires } = await fixture();
     const item = await request(checkout, 'wrong', merchant.address, 100n, expires);
-    await assert.rejects(pay(checkout, payer, item, 99n), /IncorrectAmount/);
+    await rejectsWith(checkout, pay(checkout, payer, item, 99n), 'IncorrectAmount');
   });
 
   it('rejects an expired payment', async function () {
     const { checkout, payer, merchant } = await fixture();
     const block = await ethers.provider.getBlock('latest');
     const item = await request(checkout, 'expired', merchant.address, 1n, block.timestamp);
-    await assert.rejects(pay(checkout, payer, item), /CheckoutExpired/);
+    await rejectsWith(checkout, pay(checkout, payer, item), 'CheckoutExpired');
   });
 
   it('rejects a duplicate paymentId without changing the original record', async function () {
@@ -76,7 +84,7 @@ describe('OpagoHbarCheckout', function () {
     const item = await request(checkout, 'duplicate', merchant.address, 1n, expires);
     await (await pay(checkout, payer, item)).wait();
     const original = await checkout.payment(item.paymentId);
-    await assert.rejects(pay(checkout, payer, item), /PaymentAlreadyProcessed/);
+    await rejectsWith(checkout, pay(checkout, payer, item), 'PaymentAlreadyProcessed');
     const after = await checkout.payment(item.paymentId);
     assert.deepEqual(Array.from(after), Array.from(original));
     assert.equal(await checkout.paymentCount(), 1n);
@@ -86,7 +94,7 @@ describe('OpagoHbarCheckout', function () {
     const { checkout, payer, merchant, replayPayer, expires } = await fixture();
     const item = await request(checkout, 'replay', merchant.address, 1n, expires);
     await (await pay(checkout, payer, item)).wait();
-    await assert.rejects(pay(checkout, replayPayer, item), /PaymentAlreadyProcessed/);
+    await rejectsWith(checkout, pay(checkout, replayPayer, item), 'PaymentAlreadyProcessed');
   });
 
   it('cryptographically binds paymentId to nonce, contract, merchant, amount, and expiry', async function () {
@@ -97,22 +105,22 @@ describe('OpagoHbarCheckout', function () {
     const changedAmount = { ...item, amount: 11n };
     const changedExpiry = { ...item, expires: expires + 1n };
 
-    await assert.rejects(pay(checkout, payer, changedNonce), /PaymentIdMismatch/);
-    await assert.rejects(pay(checkout, payer, changedMerchant), /PaymentIdMismatch/);
-    await assert.rejects(pay(checkout, payer, changedAmount), /PaymentIdMismatch/);
-    await assert.rejects(pay(checkout, payer, changedExpiry), /PaymentIdMismatch/);
+    await rejectsWith(checkout, pay(checkout, payer, changedNonce), 'PaymentIdMismatch');
+    await rejectsWith(checkout, pay(checkout, payer, changedMerchant), 'PaymentIdMismatch');
+    await rejectsWith(checkout, pay(checkout, payer, changedAmount), 'PaymentIdMismatch');
+    await rejectsWith(checkout, pay(checkout, payer, changedExpiry), 'PaymentIdMismatch');
   });
 
   it('rejects invalid payment identifiers, amounts, and merchants', async function () {
     const { checkout, payer, merchant, expires } = await fixture();
     const zero = ethers.ZeroHash;
-    await assert.rejects(
+    await rejectsWith(checkout,
       checkout.pay(zero, hash('nonce'), merchant.address, 1n, expires, { value: 1n }),
-      /InvalidPaymentId/,
+      'InvalidPaymentId',
     );
 
     const zeroAmount = await request(checkout, 'zero-amount', merchant.address, 0n, expires);
-    await assert.rejects(pay(checkout, payer, zeroAmount, 0n), /InvalidAmount/);
+    await rejectsWith(checkout, pay(checkout, payer, zeroAmount, 0n), 'InvalidAmount');
 
     for (const invalidMerchant of [
       ethers.ZeroAddress,
@@ -120,7 +128,7 @@ describe('OpagoHbarCheckout', function () {
       await checkout.getAddress(),
     ]) {
       const item = await request(checkout, 'invalid:' + invalidMerchant, invalidMerchant, 1n, expires);
-      await assert.rejects(pay(checkout, payer, item), /InvalidMerchant/);
+      await rejectsWith(checkout, pay(checkout, payer, item), 'InvalidMerchant');
     }
   });
 
@@ -135,7 +143,7 @@ describe('OpagoHbarCheckout', function () {
       7n,
       expires,
     );
-    await assert.rejects(pay(checkout, payer, item), /ForwardingFailed/);
+    await rejectsWith(checkout, pay(checkout, payer, item), 'ForwardingFailed');
     assert.equal(await checkout.isPaymentProcessed(item.paymentId), false);
     assert.equal(await checkout.paymentCount(), 0n);
     assert.equal(await checkout.totalTinybarVolume(), 0n);

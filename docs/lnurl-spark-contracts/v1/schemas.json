@@ -1,0 +1,4476 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Empty": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "details"
+          ],
+          "additionalProperties": false
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "error",
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "Ok": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "HpkeRequest": {
+      "type": "object",
+      "properties": {
+        "encryption": {
+          "const": "hpke-v1"
+        },
+        "kid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "enc": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 22,
+          "pattern": "^[A-Za-z0-9_-]{22}$"
+        },
+        "issued_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 750000,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "required": [
+        "encryption",
+        "kid",
+        "enc",
+        "nonce",
+        "issued_at",
+        "ciphertext"
+      ],
+      "additionalProperties": false
+    },
+    "HpkeResponse": {
+      "type": "object",
+      "properties": {
+        "encryption": {
+          "const": "hpke-v1"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[A-Za-z0-9_-]{16}$"
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 750000,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "required": [
+        "encryption",
+        "nonce",
+        "ciphertext"
+      ],
+      "additionalProperties": false
+    },
+    "KeyDocument": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "type": "object",
+          "properties": {
+            "audience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "issued_at": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            "active_kid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "public_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 43,
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "not_after": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30,
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+                  }
+                },
+                "required": [
+                  "kid",
+                  "public_key",
+                  "not_after"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 8
+            }
+          },
+          "required": [
+            "audience",
+            "issued_at",
+            "active_kid",
+            "keys"
+          ],
+          "additionalProperties": false
+        },
+        "signing_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$"
+        }
+      },
+      "required": [
+        "document",
+        "signing_key_id",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "AppConfig": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "const": "0.1.0"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "issued_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "valid_until": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "cache_max_age": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "min_supported_build": {
+          "type": "object",
+          "properties": {
+            "ios": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "android": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "ios",
+            "android"
+          ],
+          "additionalProperties": false
+        },
+        "revoked_signing_key_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "maxItems": 100
+        },
+        "revoked_kids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "maxItems": 100
+        },
+        "oidc": {
+          "type": "object",
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "client_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "redirect_uris": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "maxItems": 4
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "openid",
+                  "email",
+                  "profile"
+                ]
+              },
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "issuer",
+            "client_id",
+            "redirect_uris",
+            "scopes"
+          ],
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "min_sendable_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "max_sendable_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "photo_bytes": {
+              "const": 10485760
+            },
+            "photo_pixels": {
+              "const": 24000000
+            }
+          },
+          "required": [
+            "min_sendable_msat",
+            "max_sendable_msat",
+            "photo_bytes",
+            "photo_pixels"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "contract_version",
+        "audience",
+        "issued_at",
+        "valid_until",
+        "cache_max_age",
+        "min_supported_build",
+        "revoked_signing_key_ids",
+        "revoked_kids",
+        "oidc",
+        "limits"
+      ],
+      "additionalProperties": false
+    },
+    "ChallengeRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "login"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {},
+              "required": [],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "onboarding_restart"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {},
+              "required": [],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "wallet_bind"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "party_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "account_generation": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "party_id",
+                "account_generation"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "address_bind"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 32,
+                  "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "address_rename"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 32,
+                  "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "address_deactivate"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "address_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "address_id"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "address_reactivate"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "address_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "address_id"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "wallet_close"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "wallet_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "wallet_id"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "wallet_restore"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "wallet_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "party_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "account_generation": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "wallet_id",
+                "party_id",
+                "account_generation"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "pos_bind"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "pos_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 14,
+                  "pattern": "^pos-[a-z2-7]{10}$"
+                },
+                "binding_intent_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "binding_version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "pos_id",
+                "binding_intent_id",
+                "binding_version"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "payer_proof"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "context_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 43,
+                  "pattern": "^[A-Za-z0-9_-]{43}$"
+                },
+                "amount_msat": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 9007199254740991,
+                  "multipleOf": 1000
+                }
+              },
+              "required": [
+                "context_ref",
+                "amount_msat"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Challenge": {
+      "type": "object",
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "challenge_id",
+        "message",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "VerifyRequest": {
+      "type": "object",
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[0-9a-f]{128}$"
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "challenge_id",
+        "signature",
+        "installation_id"
+      ],
+      "additionalProperties": false
+    },
+    "WalletSession": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "session"
+        },
+        "access_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "access_expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "refresh_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "refresh_expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "onboarding",
+            "wallet"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "access_token",
+        "access_expires_at",
+        "refresh_token",
+        "refresh_expires_at",
+        "wallet_id",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "ActionProof": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "proof"
+        },
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "onboarding_restart",
+            "wallet_bind",
+            "address_bind",
+            "address_rename",
+            "address_deactivate",
+            "address_reactivate",
+            "wallet_close",
+            "wallet_restore",
+            "pos_bind",
+            "payer_proof"
+          ]
+        },
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "kind",
+        "proof_token",
+        "action",
+        "wallet_id",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "VerifyResponse": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/WalletSession"
+        },
+        {
+          "$ref": "#/$defs/ActionProof"
+        }
+      ]
+    },
+    "RefreshRequest": {
+      "type": "object",
+      "properties": {
+        "refresh_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "refresh_token",
+        "installation_id"
+      ],
+      "additionalProperties": false
+    },
+    "ProofRequest": {
+      "type": "object",
+      "properties": {
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "proof_token"
+      ],
+      "additionalProperties": false
+    },
+    "WalletBindingRequest": {
+      "type": "object",
+      "properties": {
+        "wallet_pubkey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 66,
+          "pattern": "^0[23][0-9a-f]{64}$"
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "regtest"
+          ]
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "party_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "account_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "submission_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "wallet_pubkey",
+        "network",
+        "installation_id",
+        "party_id",
+        "account_generation",
+        "proof_token"
+      ],
+      "additionalProperties": false
+    },
+    "Account": {
+      "type": "object",
+      "properties": {
+        "party_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "account_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "email_verified": {
+          "type": "boolean"
+        },
+        "wallets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "wallet_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 36,
+                "format": "uuid"
+              },
+              "network": {
+                "type": "string",
+                "enum": [
+                  "mainnet",
+                  "regtest"
+                ]
+              },
+              "wallet_pubkey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 66,
+                "pattern": "^0[23][0-9a-f]{64}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "closed",
+                  "deleted"
+                ]
+              }
+            },
+            "required": [
+              "wallet_id",
+              "network",
+              "wallet_pubkey",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "wallet_photo_match_status": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pending",
+            "passed",
+            "mismatch",
+            "unreadable"
+          ]
+        },
+        "identification_status": {
+          "type": "string",
+          "enum": [
+            "identified",
+            "unidentified"
+          ]
+        },
+        "identification_source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "full_kyc",
+                "opago_kyb"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "party_id",
+        "account_generation",
+        "email_verified",
+        "wallets",
+        "wallet_photo_match_status",
+        "identification_status",
+        "identification_source"
+      ],
+      "additionalProperties": false
+    },
+    "Wallet": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "regtest"
+          ]
+        },
+        "wallet_pubkey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 66,
+          "pattern": "^0[23][0-9a-f]{64}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "unbound",
+            "active",
+            "closed",
+            "deleted"
+          ]
+        },
+        "party_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "address": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Address"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "photo_match": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhotoMatchSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "wallet_id",
+        "network",
+        "wallet_pubkey",
+        "status",
+        "party_id",
+        "address",
+        "photo_match"
+      ],
+      "additionalProperties": false
+    },
+    "RestoreRequest": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "wallet_id",
+        "proof_token",
+        "installation_id"
+      ],
+      "additionalProperties": false
+    },
+    "DeletionReceipt": {
+      "type": "object",
+      "properties": {
+        "deletion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "const": "deletion_pending"
+        },
+        "requested_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "receipt_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "receipt_expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "deletion_id",
+        "status",
+        "requested_at",
+        "receipt_token",
+        "receipt_expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "DeletionStatus": {
+      "type": "object",
+      "properties": {
+        "deletion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "deletion_pending",
+            "deleted"
+          ]
+        },
+        "access_revoked_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "identity_account_deleted_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retained_data": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "deletion_id",
+        "status",
+        "access_revoked_at",
+        "identity_account_deleted_at",
+        "retained_data"
+      ],
+      "additionalProperties": false
+    },
+    "PhotoMatchFields": {
+      "type": "object",
+      "properties": {
+        "given_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "family_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "date_of_birth": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "format": "date"
+        },
+        "document_number": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "document_expiry": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "format": "date"
+        },
+        "nationality": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3,
+          "pattern": "^[A-Z]{3}$"
+        },
+        "contact_email": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 254,
+          "format": "email"
+        },
+        "document_type": {
+          "type": "string",
+          "enum": [
+            "passport",
+            "identity_card"
+          ]
+        }
+      },
+      "required": [
+        "given_name",
+        "family_name",
+        "date_of_birth",
+        "document_number",
+        "document_expiry",
+        "nationality",
+        "contact_email",
+        "document_type"
+      ],
+      "additionalProperties": false
+    },
+    "PhotoMatchSummary": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "submitted",
+            "in_review",
+            "approved",
+            "correction_requested",
+            "rejected"
+          ]
+        },
+        "active_approval_revision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assurance": {
+          "const": "photo_data_match_only"
+        },
+        "match_result": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "passed",
+                "mismatch",
+                "unreadable"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processing_status": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "queued",
+            "processing",
+            "retrying",
+            "completed",
+            "failed"
+          ]
+        },
+        "correction_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "given_name",
+              "family_name",
+              "date_of_birth",
+              "document_number",
+              "document_expiry",
+              "nationality",
+              "contact_email",
+              "document_type",
+              "front",
+              "back"
+            ]
+          },
+          "maxItems": 11
+        },
+        "updated_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "submission_id",
+        "revision",
+        "status",
+        "active_approval_revision",
+        "assurance",
+        "match_result",
+        "processing_status",
+        "correction_fields",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "PhotoMatch": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "submitted",
+            "in_review",
+            "approved",
+            "correction_requested",
+            "rejected"
+          ]
+        },
+        "active_approval_revision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assurance": {
+          "const": "photo_data_match_only"
+        },
+        "match_result": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "passed",
+                "mismatch",
+                "unreadable"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processing_status": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "queued",
+            "processing",
+            "retrying",
+            "completed",
+            "failed"
+          ]
+        },
+        "correction_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "given_name",
+              "family_name",
+              "date_of_birth",
+              "document_number",
+              "document_expiry",
+              "nationality",
+              "contact_email",
+              "document_type",
+              "front",
+              "back"
+            ]
+          },
+          "maxItems": 11
+        },
+        "updated_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "fields": {
+          "$ref": "#/$defs/PhotoMatchFields"
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "document_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 36,
+                "format": "uuid"
+              },
+              "side": {
+                "type": "string",
+                "enum": [
+                  "front",
+                  "back"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "original_sha256": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "stored_sha256": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "received_at": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "format": "date-time",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            },
+            "required": [
+              "document_id",
+              "side",
+              "revision",
+              "original_sha256",
+              "stored_sha256",
+              "received_at"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 2
+        },
+        "edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "contact_verification_required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "submission_id",
+        "revision",
+        "status",
+        "active_approval_revision",
+        "assurance",
+        "match_result",
+        "processing_status",
+        "correction_fields",
+        "updated_at",
+        "fields",
+        "documents",
+        "edit_version",
+        "contact_verification_required"
+      ],
+      "additionalProperties": false
+    },
+    "CreatePhotoMatch": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "fields": {
+          "$ref": "#/$defs/PhotoMatchFields"
+        }
+      },
+      "required": [
+        "submission_id",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "UpdatePhotoMatch": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expected_edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "$ref": "#/$defs/PhotoMatchFields"
+        }
+      },
+      "required": [
+        "revision",
+        "expected_edit_version",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "NewRevision": {
+      "type": "object",
+      "properties": {
+        "base_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expected_edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "base_revision",
+        "expected_edit_version"
+      ],
+      "additionalProperties": false
+    },
+    "SubmitPhotoMatch": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expected_edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "revision",
+        "expected_edit_version"
+      ],
+      "additionalProperties": false
+    },
+    "PhotoDescriptor": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "side": {
+          "type": "string",
+          "enum": [
+            "front",
+            "back"
+          ]
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "image/jpeg",
+            "image/png"
+          ]
+        },
+        "plaintext_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760
+        },
+        "original_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expected_edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "submission_id",
+        "revision",
+        "side",
+        "content_type",
+        "plaintext_length",
+        "original_sha256",
+        "expected_edit_version"
+      ],
+      "additionalProperties": false
+    },
+    "PhotoUploadResult": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "submission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "side": {
+          "type": "string",
+          "enum": [
+            "front",
+            "back"
+          ]
+        },
+        "original_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stored_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "edit_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "document_id",
+        "submission_id",
+        "revision",
+        "side",
+        "original_sha256",
+        "stored_sha256",
+        "edit_version"
+      ],
+      "additionalProperties": false
+    },
+    "Address": {
+      "type": "object",
+      "properties": {
+        "address_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending_kyc",
+            "active",
+            "deactivated",
+            "inactive"
+          ]
+        },
+        "bound_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "next_rename_allowed_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lnurl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "qr_payload": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4106
+        }
+      },
+      "required": [
+        "address_id",
+        "name",
+        "address",
+        "status",
+        "bound_at",
+        "next_rename_allowed_at",
+        "lnurl",
+        "qr_payload"
+      ],
+      "additionalProperties": false
+    },
+    "AddressSuggestion": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+        },
+        "available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "available"
+      ],
+      "additionalProperties": false
+    },
+    "AddressAvailability": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "name_taken",
+                "name_reserved",
+                "name_invalid"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "available",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "SetAddress": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^(?!.*\\.\\.)[a-z0-9][a-z0-9._-]*[a-z0-9]$"
+        },
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observation_family_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "event_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "supersedes_event_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correction_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "lightning",
+            "spark_transfer",
+            "onchain",
+            "onramp"
+          ]
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "incoming",
+            "outgoing"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "settled",
+            "failed"
+          ]
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "fee_msat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "asset": {
+          "const": "BTC"
+        },
+        "payment_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spark_transfer_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_event_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bolt11": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counterparty": {
+          "type": "object",
+          "properties": {
+            "lightning_address": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 320
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "node_pubkey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 66,
+                  "pattern": "^0[23][0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spark_pubkey": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 66,
+                  "pattern": "^0[23][0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1024
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "signed_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "settled_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "event_id",
+        "observation_family_id",
+        "event_version",
+        "supersedes_event_id",
+        "correction_reason",
+        "seq",
+        "type",
+        "direction",
+        "status",
+        "amount_msat",
+        "fee_msat",
+        "asset",
+        "payment_hash",
+        "spark_transfer_id",
+        "provider_event_id",
+        "bolt11",
+        "counterparty",
+        "description",
+        "created_at",
+        "signed_at",
+        "settled_at"
+      ],
+      "additionalProperties": false
+    },
+    "IngestRequest": {
+      "type": "object",
+      "properties": {
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "maxItems": 100,
+          "minItems": 1
+        }
+      },
+      "required": [
+        "installation_id",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "IngestResult": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "seq": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "result": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "duplicate",
+                  "rejected_retryable",
+                  "rejected_permanent"
+                ]
+              },
+              "transaction_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 36,
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "closure_token": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "event_id",
+              "seq",
+              "result",
+              "transaction_id",
+              "code",
+              "closure_token"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "last_acknowledged_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "missing_seq": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxItems": 1000
+        },
+        "missing_seq_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "results",
+        "last_acknowledged_seq",
+        "missing_seq",
+        "missing_seq_truncated"
+      ],
+      "additionalProperties": false
+    },
+    "Cursor": {
+      "type": "object",
+      "properties": {
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "last_acknowledged_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "missing_seq": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxItems": 1000
+        },
+        "missing_seq_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "installation_id",
+        "last_acknowledged_seq",
+        "missing_seq",
+        "missing_seq_truncated"
+      ],
+      "additionalProperties": false
+    },
+    "CloseRejectedEvents": {
+      "type": "object",
+      "properties": {
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "seq": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "event_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "closure_token": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8192
+              }
+            },
+            "required": [
+              "seq",
+              "event_id",
+              "closure_token"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100,
+          "minItems": 1
+        }
+      },
+      "required": [
+        "installation_id",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "Invoice": {
+      "type": "object",
+      "properties": {
+        "bolt11": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "payment_hash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "paid",
+            "expired",
+            "voided",
+            "orphaned"
+          ]
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "bolt11",
+        "payment_hash",
+        "seq",
+        "status",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "Registration": {
+      "type": "object",
+      "properties": {
+        "registration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "invoice_issued",
+            "expired_awaiting_refresh",
+            "paid",
+            "cancelled",
+            "rejected"
+          ]
+        },
+        "custodial": {
+          "type": "boolean"
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "pre_check_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "unavailable"
+          ]
+        },
+        "pre_check_valid_until": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invoice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Invoice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refreshed": {
+          "type": "boolean"
+        },
+        "cancel_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "user",
+                "license_disabled",
+                "address_changed",
+                "address_deactivated",
+                "wallet_closed",
+                "account_deleted"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "registration_id",
+        "status",
+        "custodial",
+        "amount_msat",
+        "pre_check_id",
+        "pre_check_status",
+        "pre_check_valid_until",
+        "invoice",
+        "refreshed",
+        "cancel_reason",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "CreateRegistration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "amount_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "wallet_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount_msat",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "amount_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "pos_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 14,
+              "pattern": "^pos-[a-z2-7]{10}$"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount_msat",
+            "pos_id",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "LnurlDiscovery": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "const": "payRequest"
+        },
+        "callback": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "minSendable": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "maxSendable": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "metadata": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "tag",
+        "callback",
+        "minSendable",
+        "maxSendable",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "LnurlError": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "ERROR"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "LnurlInvoice": {
+      "type": "object",
+      "properties": {
+        "pr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "routes": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "pr",
+        "routes"
+      ],
+      "additionalProperties": false
+    },
+    "LnurlDiscoveryResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LnurlDiscovery"
+        },
+        {
+          "$ref": "#/$defs/LnurlError"
+        }
+      ]
+    },
+    "LnurlCallbackResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LnurlInvoice"
+        },
+        {
+          "$ref": "#/$defs/LnurlError"
+        }
+      ]
+    },
+    "LnurlQuery": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[1-9][0-9]*$"
+        }
+      },
+      "required": [
+        "amount"
+      ],
+      "additionalProperties": false
+    },
+    "RawHttpsResponse": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "http_status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "content_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "body_base64url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 350000,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "required": [
+        "url",
+        "http_status",
+        "content_type",
+        "body_base64url"
+      ],
+      "additionalProperties": false
+    },
+    "UmaDiscoveryStart": {
+      "type": "object",
+      "properties": {
+        "receiver_address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320,
+          "pattern": "^\\$?[a-zA-Z0-9._-]+@[^/@:?#]+$"
+        }
+      },
+      "required": [
+        "receiver_address"
+      ],
+      "additionalProperties": false
+    },
+    "UmaExchange": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "request": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "const": "GET"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri",
+              "pattern": "^https://"
+            }
+          },
+          "required": [
+            "method",
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "exchange_id",
+        "expires_at",
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "UmaDiscoveryVerify": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "response": {
+          "$ref": "#/$defs/RawHttpsResponse"
+        }
+      },
+      "required": [
+        "exchange_id",
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "UmaDiscoveryVerified": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "uma_supported",
+            "lnurl_only"
+          ]
+        },
+        "callback": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "min_sendable_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "max_sendable_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "metadata": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "exchange_id",
+        "status",
+        "callback",
+        "min_sendable_msat",
+        "max_sendable_msat",
+        "metadata",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayRequestInput": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "payer_proof": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "exchange_id",
+        "amount_msat"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayRequestOutput": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "request": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "const": "POST"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "content_type": {
+              "const": "application/json"
+            },
+            "body_base64url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 350000,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          "required": [
+            "method",
+            "url",
+            "content_type",
+            "body_base64url"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "exchange_id",
+        "request_id",
+        "expires_at",
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayResponseInput": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "response": {
+          "$ref": "#/$defs/RawHttpsResponse"
+        }
+      },
+      "required": [
+        "exchange_id",
+        "request_id",
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayResponseOutput": {
+      "type": "object",
+      "properties": {
+        "exchange_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "travel_rule_exchange": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "failed"
+          ]
+        },
+        "bolt11": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payment_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "regtest"
+          ]
+        },
+        "invoice_description_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure_code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "exchange_id",
+        "travel_rule_exchange",
+        "bolt11",
+        "payment_hash",
+        "amount_msat",
+        "network",
+        "invoice_description_hash",
+        "expires_at",
+        "failure_code"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayerData": {
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "email": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 254
+        },
+        "compliance": {
+          "type": "object",
+          "properties": {
+            "signature": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 144,
+              "pattern": "^[0-9a-f]+$"
+            },
+            "signatureNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "signatureTimestamp": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "kycStatus": {
+              "type": "string",
+              "enum": [
+                "VERIFIED",
+                "NOT_VERIFIED",
+                "PENDING",
+                "UNKNOWN"
+              ]
+            },
+            "utxos": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "maxItems": 100
+            },
+            "nodePubKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "utxoCallback": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "encryptedTravelRuleInfo": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 131072
+            },
+            "travelRuleFormat": {
+              "const": "IVMS@101.2023"
+            }
+          },
+          "required": [
+            "signature",
+            "signatureNonce",
+            "signatureTimestamp",
+            "kycStatus",
+            "utxoCallback"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "identifier",
+        "compliance"
+      ],
+      "additionalProperties": true
+    },
+    "UmaPayRequest": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "convert": {
+          "const": "BTC"
+        },
+        "umaVersion": {
+          "const": "1.0"
+        },
+        "payerData": {
+          "$ref": "#/$defs/UmaPayerData"
+        },
+        "payeeData": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "mandatory": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mandatory"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "amount",
+        "convert",
+        "payerData"
+      ],
+      "additionalProperties": false
+    },
+    "UmaCurrency": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "const": "BTC"
+        },
+        "name": {
+          "const": "Bitcoin"
+        },
+        "symbol": {
+          "const": "BTC"
+        },
+        "multiplier": {
+          "const": 1000
+        },
+        "decimals": {
+          "const": 8
+        },
+        "convertible": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "symbol",
+        "multiplier",
+        "decimals",
+        "convertible"
+      ],
+      "additionalProperties": false
+    },
+    "UmaDiscoveryResponse": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "const": "payRequest"
+        },
+        "callback": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "minSendable": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "maxSendable": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "metadata": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "umaVersion": {
+          "const": "1.0"
+        },
+        "currencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UmaCurrency"
+          },
+          "maxItems": 1,
+          "minItems": 1
+        },
+        "payerData": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "mandatory": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mandatory"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "compliance": {
+          "type": "object",
+          "properties": {
+            "signature": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 144,
+              "pattern": "^[0-9a-f]+$"
+            },
+            "signatureNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "signatureTimestamp": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "kycStatus": {
+              "type": "string",
+              "enum": [
+                "VERIFIED",
+                "NOT_VERIFIED",
+                "PENDING",
+                "UNKNOWN"
+              ]
+            },
+            "isSubjectToTravelRule": {
+              "type": "boolean"
+            },
+            "receiverIdentifier": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 320
+            }
+          },
+          "required": [
+            "signature",
+            "signatureNonce",
+            "signatureTimestamp",
+            "kycStatus",
+            "isSubjectToTravelRule",
+            "receiverIdentifier"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "tag",
+        "callback",
+        "minSendable",
+        "maxSendable",
+        "metadata",
+        "umaVersion",
+        "currencies",
+        "payerData",
+        "compliance"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPayResponse": {
+      "type": "object",
+      "properties": {
+        "pr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "routes": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "umaVersion": {
+          "const": "1.0"
+        },
+        "converted": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "currencyCode": {
+              "const": "BTC"
+            },
+            "multiplier": {
+              "const": 1000
+            },
+            "decimals": {
+              "const": 8
+            },
+            "fee": {
+              "const": 0
+            },
+            "exchangeFeesMillisatoshi": {
+              "const": 0
+            }
+          },
+          "required": [
+            "amount",
+            "currencyCode",
+            "multiplier",
+            "decimals",
+            "fee"
+          ],
+          "additionalProperties": false
+        },
+        "payeeData": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 320
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "compliance": {
+              "type": "object",
+              "properties": {
+                "signature": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 144,
+                  "pattern": "^[0-9a-f]+$"
+                },
+                "signatureNonce": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "signatureTimestamp": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "utxos": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "maxItems": 100
+                },
+                "nodePubKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 66,
+                  "pattern": "^0[23][0-9a-f]{64}$"
+                },
+                "utxoCallback": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048,
+                  "format": "uri",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "signature",
+                "signatureNonce",
+                "signatureTimestamp",
+                "utxos",
+                "utxoCallback"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "identifier",
+            "compliance"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "pr",
+        "routes",
+        "converted",
+        "payeeData"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPostTx": {
+      "type": "object",
+      "properties": {
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 144,
+          "pattern": "^[0-9a-f]+$"
+        },
+        "signatureNonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "signatureTimestamp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "vaspDomain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "utxos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "utxo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "amountMsats": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "utxo",
+              "amountMsats"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "transactionStatus": {
+          "type": "string",
+          "enum": [
+            "COMPLETED",
+            "FAILED"
+          ]
+        },
+        "errorCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "errorReason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "signature",
+        "signatureNonce",
+        "signatureTimestamp",
+        "vaspDomain",
+        "utxos"
+      ],
+      "additionalProperties": false
+    },
+    "UmaPublicKeys": {
+      "type": "object",
+      "properties": {
+        "signingCertChain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32768,
+            "pattern": "^[0-9a-f]+$"
+          },
+          "maxItems": 8,
+          "minItems": 1
+        },
+        "encryptionCertChain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32768,
+            "pattern": "^[0-9a-f]+$"
+          },
+          "maxItems": 8,
+          "minItems": 1
+        },
+        "signingPubKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 130,
+          "pattern": "^04[0-9a-f]{128}$"
+        },
+        "encryptionPubKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 130,
+          "pattern": "^04[0-9a-f]{128}$"
+        },
+        "expirationTimestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "signingCertChain",
+        "encryptionCertChain",
+        "signingPubKey",
+        "encryptionPubKey"
+      ],
+      "additionalProperties": false
+    },
+    "UmaConfiguration": {
+      "type": "object",
+      "properties": {
+        "uma_major_versions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          },
+          "maxItems": 1
+        }
+      },
+      "required": [
+        "uma_major_versions"
+      ],
+      "additionalProperties": false,
+      "description": "OPAGO informational capability document; not a replacement for signed UMA negotiation."
+    },
+    "PosBindingIntentRequest": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "expected_binding_version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "wallet_id",
+        "expected_binding_version"
+      ],
+      "additionalProperties": false
+    },
+    "PosBindingIntent": {
+      "type": "object",
+      "properties": {
+        "binding_intent_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "pos_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 14
+        },
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "binding_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "operator_confirmed": {
+          "type": "boolean"
+        },
+        "recipient_confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "binding_intent_id",
+        "pos_id",
+        "wallet_id",
+        "binding_version",
+        "expires_at",
+        "operator_confirmed",
+        "recipient_confirmed"
+      ],
+      "additionalProperties": false
+    },
+    "PosBindingConfirm": {
+      "type": "object",
+      "properties": {
+        "binding_intent_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "binding_intent_id",
+        "proof_token"
+      ],
+      "additionalProperties": false
+    },
+    "Pos": {
+      "type": "object",
+      "properties": {
+        "pos_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 14
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "binding_version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "wallet_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "unbound",
+            "active",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "pos_id",
+        "address",
+        "binding_version",
+        "wallet_id",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "HelperInvoiceRequest": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "registration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "attempt_seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "operation_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "receiver_identity_pubkey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 66,
+          "pattern": "^0[23][0-9a-f]{64}$"
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991,
+          "multipleOf": 1000
+        },
+        "description_hash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expiry_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "regtest"
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "registration_id",
+        "attempt_seq",
+        "operation_generation",
+        "receiver_identity_pubkey",
+        "amount_msat",
+        "description_hash",
+        "expiry_seconds",
+        "network"
+      ],
+      "additionalProperties": false
+    },
+    "HelperOperation": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "operation_generation": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "created",
+            "in_progress",
+            "interrupted",
+            "not_executed",
+            "unknown",
+            "unresolved"
+          ]
+        },
+        "input_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lease_generation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lease_until": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bolt11": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payment_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_invoice_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fenced": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operation_id",
+        "operation_generation",
+        "status",
+        "input_fingerprint",
+        "lease_generation",
+        "lease_until",
+        "bolt11",
+        "payment_hash",
+        "provider_invoice_id",
+        "expires_at",
+        "fenced"
+      ],
+      "additionalProperties": false
+    },
+    "FenceOperation": {
+      "type": "object",
+      "properties": {
+        "expected_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "request_outcome_unknown",
+            "lease_expired"
+          ]
+        }
+      },
+      "required": [
+        "expected_generation",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Transfers": {
+      "type": "object",
+      "properties": {
+        "network": {
+          "type": "string",
+          "enum": [
+            "mainnet",
+            "regtest"
+          ]
+        },
+        "wallet_pubkey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 66,
+          "pattern": "^0[23][0-9a-f]{64}$"
+        },
+        "coverage": {
+          "type": "string",
+          "enum": [
+            "available",
+            "unsupported",
+            "privacy_restricted"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "provider_transfer_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "payment_hash": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amount_msat": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "settled",
+                  "failed"
+                ]
+              },
+              "occurred_at": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "format": "date-time",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            },
+            "required": [
+              "provider_transfer_id",
+              "payment_hash",
+              "amount_msat",
+              "status",
+              "occurred_at"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 500
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "network",
+        "wallet_pubkey",
+        "coverage",
+        "items",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

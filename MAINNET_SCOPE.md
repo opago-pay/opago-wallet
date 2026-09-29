@@ -23,7 +23,7 @@ The repository is not an AI product, RWA tokenization platform, or DeFi liquidit
 
 ## Current grant candidate
 
-The grant candidate is a standalone internal Android build with a `1 HBAR` per-payment cap. It enables real funds only for Hedera Mainnet, while Solana remains on devnet, Lightning remains on regtest, and swaps remain disabled. One Opago-controlled consumer account completed direct and contract payments to a separate Opago-controlled merchant/deployment account.
+The grant candidate is a standalone internal Android build with a `1 HBAR` per-payment cap. It enables real funds only for Hedera Mainnet, while Lightning remains on regtest. One Opago-controlled consumer account completed direct and contract payments to a separate Opago-controlled merchant/deployment account.
 
 The candidate is locally signed, not published through an app store, not independently audited, and not offered as unrestricted public production software. The merchant QR page is a local reference service. It binds payment data to the contract but does not authenticate an official Opago merchant identity.
 

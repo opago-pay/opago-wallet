@@ -1,0 +1,7 @@
+{
+  "name": "opago-lnurl-contract-validation",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Offline test-fixture verification only, not app runtime code",
+  "dependencies": { "@noble/curves": "1.9.7" }
+}

@@ -4,7 +4,7 @@
 
 ## Grant scope
 
-This runbook supports Thrive Milestone 2: deploy the Opago HBAR checkout contract on Hedera Mainnet, bind the existing Android Hedera flow to the verified deployment, execute a real HBAR canary payment, and preserve public evidence. This repository remains the public multi-chain hackathon project. Solana, USDC, Lightning, and swap functionality are not removed or represented as production-ready by this Hedera milestone.
+This runbook supports Thrive Milestone 2: deploy the Opago HBAR checkout contract on Hedera Mainnet, bind the existing Android Hedera flow to the verified deployment, execute a real HBAR canary payment, and preserve public evidence. Lightning remains a separate development-network capability and is not represented as production-ready by this Hedera milestone.
 
 The Hedera path uses HBAR, Hedera Smart Contract Service, consensus receipts, and the official Mainnet Mirror Node. HTS and HCS are not required by this checkout use case and must not be added only to inflate the integration claim.
 
@@ -124,7 +124,7 @@ Set-Location C:\dev\opago-wallet
 npm run android:mainnet-candidate
 ```
 
-This creates and installs a standalone arm64 internal candidate under a separate package ID. It enables only Hedera Mainnet with a `1 HBAR` per-transaction cap and keeps Solana on devnet, Lightning on regtest, and swaps disabled. It is locally signed for physical acceptance and is not a Play Store release.
+This creates and installs a standalone arm64 internal candidate under a separate package ID. It enables only Hedera Mainnet with a `1 HBAR` per-transaction cap and keeps Lightning on regtest. It is locally signed for physical acceptance and is not a Play Store release.
 
 1. visible Hedera Mainnet status and real HBAR balance;
 2. a freshly generated merchant request with a small amount;

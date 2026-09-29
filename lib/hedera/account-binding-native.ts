@@ -9,6 +9,7 @@ import {
 } from './account-binding';
 import { HEDERA_NETWORK } from './config';
 import { normalizeHederaPublicKey } from './keys';
+import { isTransientNetworkError } from '../retry';
 
 async function removeCurrentBinding(): Promise<void> {
   await AsyncStorage.removeItem(getHederaAccountBindingStorageKey(HEDERA_NETWORK));
@@ -42,7 +43,10 @@ export async function resolveHederaWalletAccount(
       );
       const verified = await loadHederaAccount(binding.accountId, normalizedPublicKey);
       if (verified) return verified;
-    } catch {
+    } catch (cause) {
+      // A connection failure does not invalidate the binding. Rediscovery would
+      // repeat the same failing network request and delay the balance again.
+      if (isTransientNetworkError(cause)) throw cause;
       // Cached account metadata is never trusted for signing. A malformed,
       // stale, or mismatched binding is discarded and rediscovered on-chain.
     }
@@ -52,6 +56,20 @@ export async function resolveHederaWalletAccount(
   const discovered = await findHederaAccount(normalizedPublicKey);
   if (discovered) await saveCurrentBinding(discovered);
   return discovered;
+}
+
+/** Manual recovery when several Hedera accounts share this wallet key. The
+ * numeric ID is never trusted until Mirror confirms its exact public key. */
+export async function bindHederaWalletAccount(accountId: string, publicKey: string | PublicKey,
+  assertCurrent: () => void): Promise<HederaAccountSnapshot> {
+  assertCurrent();
+  const normalizedPublicKey = normalizeHederaPublicKey(publicKey);
+  const verified = await loadHederaAccount(accountId, normalizedPublicKey);
+  assertCurrent();
+  if (!verified) throw new Error('Hedera account was not found.');
+  await saveCurrentBinding(verified);
+  assertCurrent();
+  return verified;
 }
 
 export async function clearHederaAccountBindings(): Promise<void> {

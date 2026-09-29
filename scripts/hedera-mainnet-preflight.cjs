@@ -1,7 +1,6 @@
 'use strict';
 
 const fs = require('node:fs');
-const path = require('node:path');
 const { AccountId, PublicKey } = require('@hiero-ledger/sdk');
 const {
   NETWORKS,
@@ -9,7 +8,6 @@ const {
   sha256,
 } = require('./hedera-deploy-checkout.cjs');
 
-const ROOT = path.resolve(__dirname, '..');
 const TINYBARS_PER_HBAR = 100_000_000n;
 const CONTRACT_GAS_LIMIT = 1_500_000n;
 

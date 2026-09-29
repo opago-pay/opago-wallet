@@ -45,7 +45,7 @@ No external public-pilot feedback is claimed for this milestone. The recorded ac
 
 ### Additional context
 
-> This public repository intentionally remains the multi-chain Opago hackathon project. Thrive Milestone 2 covers the Hedera Mainnet consumer-wallet and contract-checkout path; it does not claim production readiness for the repository's experimental Solana, USDC, Lightning, swap, eID, or Travel Rule demonstrations. The merchant QR page used in the video is a separate reference service and is not bundled into the consumer wallet. Opago does not sponsor customer account activation or custody user funds.
+> Thrive Milestone 2 covers the Hedera Mainnet consumer-wallet and contract-checkout path; it does not claim production readiness for the repository's Lightning, eID, or Travel Rule demonstrations. The merchant QR page used in the video is a separate reference service and is not bundled into the consumer wallet. Opago does not sponsor customer account activation or custody user funds.
 
 ## Evidence checklist
 

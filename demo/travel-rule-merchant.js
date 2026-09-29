@@ -111,6 +111,11 @@ async function verifyPayerData(payerData) {
     Buffer.from(compliance.signature, 'hex'),
   );
   if (!valid) throw new Error('Invalid eIDAS signature.');
+  const expectedReference = process.env.EIDAS_DEMO_TRANSACTION_REFERENCE ||
+    'lnurl:' + publicBaseUrl() + '/lnurl-eidas';
+  if (payload.transactionReference !== expectedReference) {
+    throw new Error('Identity proof is for another merchant or payment.');
+  }
   if (usedProofs.has(compliance.signature)) throw new Error('Identity proof was already used.');
   return compliance.signature;
 }
@@ -182,9 +187,12 @@ const server = http.createServer(async (req, res) => {
       }
       const payerData = JSON.parse(raw);
       const proofId = await verifyPayerData(payerData);
+      // A second verification can finish while the first waits on the key
+      // service. Reserve synchronously before waiting for an invoice.
+      if (usedProofs.has(proofId)) throw new Error('Identity proof was already used.');
+      usedProofs.set(proofId, Number(payerData.expiresAt));
       const invoice = await obtainInvoice();
       if (!/^(lnbc|lntb|lnbcrt|lnsb)/i.test(invoice)) throw new Error('Invoice provider returned invalid BOLT11 data.');
-      usedProofs.set(proofId, Number(payerData.expiresAt));
       console.log('[eIDAS demo] Verified one signed identity proof; no personal data was logged.');
       return sendJson(res, 200, { pr: invoice });
     }

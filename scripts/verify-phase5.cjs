@@ -15,6 +15,14 @@ const commonEnvironment = {
 };
 
 const gates = [
+  { label: 'Spark iOS native logging', command: process.execPath,
+    args: ['scripts/patch-spark-ios-logging.cjs', '--check'] },
+  { label: 'Spark React Native XHR transport', command: process.execPath,
+    args: ['scripts/patch-spark-xhr-transport.cjs', '--check'] },
+  { label: 'React Native iOS TurboModule exception handling', command: process.execPath,
+    args: ['scripts/patch-react-native-ios-turbomodule.cjs', '--check'] },
+  { label: 'EAS production configuration', command: process.execPath,
+    args: ['scripts/verify-eas-production-profile.cjs'] },
   { label: 'TypeScript', command: process.execPath, args: [npmCli, 'run', 'typecheck'] },
   { label: 'ESLint', command: process.execPath, args: [npmCli, 'run', 'lint'] },
   { label: 'Application tests', command: process.execPath, args: [npmCli, 'test'] },
@@ -41,11 +49,6 @@ const gates = [
     args: ['--check', 'demo/hedera-checkout-merchant.cjs'],
   },
   {
-    label: 'Solana devnet funding syntax',
-    command: process.execPath,
-    args: ['--check', 'scripts/solana-fund-devnet.cjs'],
-  },
-  {
     label: 'Hedera provisioning syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-provision-testnet.cjs'],
@@ -64,6 +67,16 @@ const gates = [
     label: 'Hedera verification syntax',
     command: process.execPath,
     args: ['--check', 'scripts/hedera-verify-checkout.cjs'],
+  },
+  {
+    label: 'Lightning Mainnet configuration verifier syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/verify-lightning-mainnet-build-config.cjs'],
+  },
+  {
+    label: 'Production Mainnet configuration verifier syntax',
+    command: process.execPath,
+    args: ['--check', 'scripts/verify-production-mainnet-build-config.cjs'],
   },
 ];
 

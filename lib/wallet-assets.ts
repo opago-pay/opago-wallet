@@ -1,12 +1,14 @@
-export type WalletAssetKey = 'lightning' | 'solana' | 'usdc' | 'hedera';
+// 'lightning' remains an alias for old navigation/storage clients, never a
+// second asset. New presentation code uses bitcoin; journal keys are unchanged.
+export type WalletAssetKey = 'bitcoin' | 'lightning' | 'hedera';
 
 export interface WalletAssetPresentation {
   name: string;
-  symbol: 'SAT' | 'SOL' | 'USDC' | 'HBAR';
+  symbol: 'SAT' | 'HBAR';
   accent: string;
   description: string;
   networkLabel: string;
-  networkBadge: 'MAINNET' | 'REGTEST' | 'DEVNET' | 'TESTNET';
+  networkBadge: '' | 'MAINNET' | 'REGTEST' | 'TESTNET';
 }
 
 const BASE_ASSETS = {
@@ -14,19 +16,7 @@ const BASE_ASSETS = {
     name: 'Bitcoin',
     symbol: 'SAT',
     accent: '#f7931a',
-    description: 'Fast payments with Lightning',
-  },
-  solana: {
-    name: 'Solana',
-    symbol: 'SOL',
-    accent: '#14f195',
-    description: 'SOL on the Solana network',
-  },
-  usdc: {
-    name: 'USDC',
-    symbol: 'USDC',
-    accent: '#2775ca',
-    description: 'Digital dollars on Solana',
+    description: 'One balance. Two payment routes.',
   },
   hedera: {
     name: 'HBAR',
@@ -41,7 +31,7 @@ export function getWalletAssetPresentation(
   mainnetEnabled: boolean,
   hederaNetwork: 'testnet' | 'mainnet' = 'testnet',
 ): WalletAssetPresentation {
-  const base = BASE_ASSETS[asset];
+  const base = BASE_ASSETS[asset === 'bitcoin' ? 'lightning' : asset];
   if (asset === 'hedera') {
     return {
       ...base,
@@ -49,23 +39,17 @@ export function getWalletAssetPresentation(
       networkBadge: hederaNetwork === 'mainnet' ? 'MAINNET' : 'TESTNET',
     };
   }
-  if (asset === 'lightning') {
+  if (asset === 'lightning' || asset === 'bitcoin') {
     return {
       ...base,
-      networkLabel: mainnetEnabled ? 'Bitcoin Lightning' : 'Bitcoin regtest',
-      networkBadge: mainnetEnabled ? 'MAINNET' : 'REGTEST',
+      networkLabel: mainnetEnabled ? 'Bitcoin' : 'Bitcoin regtest',
+      networkBadge: mainnetEnabled ? '' : 'REGTEST',
     };
   }
-  return {
-    ...base,
-    networkLabel: mainnetEnabled ? 'Solana mainnet' : 'Solana devnet',
-    networkBadge: mainnetEnabled ? 'MAINNET' : 'DEVNET',
-  };
+  throw new Error('Unsupported wallet asset.');
 }
 
 export function walletAssetKeyFromSymbol(symbol: string): WalletAssetKey {
-  if (symbol === 'SOL') return 'solana';
-  if (symbol === 'USDC') return 'usdc';
   if (symbol === 'HBAR') return 'hedera';
-  return 'lightning';
+  return 'bitcoin';
 }

@@ -24,19 +24,11 @@ const {
   MAX_HEDERA_CHECKOUT_FEE_TINYBARS,
   MAX_HEDERA_DIRECT_TRANSFER_FEE_TINYBARS,
 } = require('../lib/hedera/config.ts');
-const {
-  buildHederaReceiveRequest,
-  buildHederaWalletQrValue,
-  findNewConfirmedIncomingHederaTransaction,
-  findHederaTestnetAccount,
-  formatTinybars,
-  loadHederaHistory,
-  loadHederaTransactionStatus,
-  normalizeHederaPublicKey,
-  parseHbarToTinybars,
-  parseHederaPaymentRequest,
-  parseHederaTestTransferTinybars,
-} = require('../lib/hedera.ts');
+const { findNewConfirmedIncomingHederaTransaction, findHederaTestnetAccount,
+  loadHederaHistory, loadHederaTransactionStatus } = require('../lib/hedera/account.ts');
+const { normalizeHederaPublicKey } = require('../lib/hedera/keys.ts');
+const { buildHederaReceiveRequest, buildHederaWalletQrValue, formatTinybars,
+  parseHbarToTinybars, parseHederaPaymentRequest, parseHederaTestTransferTinybars } = require('../lib/hedera/payments.ts');
 const {
   assertOperatorKeyMatchesAccount,
   parseOperatorKey,
@@ -47,6 +39,7 @@ const MNEMONIC =
 const RAW_PUBLIC_KEY =
   '793af21fd5a0a7cc1076195263717fab12600496dfc7ad49e902acdd0bf22331';
 const DER_PUBLIC_KEY = '302a300506032b6570032100' + RAW_PUBLIC_KEY;
+const { listHederaAccountsForKey } = require('../lib/hedera/account.ts');
 
 test('activation alias preserves the recovered Ed25519 key through SDK transfer serialization', () => {
   const { buildHederaActivationAlias } = require('../lib/hedera/keys.ts');
@@ -230,6 +223,52 @@ test('builds and validates explicit Hedera testnet receive requests', () => {
   );
 });
 
+test('Hedera account picker follows same-origin pages and rejects a foreign continuation', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  const urls = [];
+  const account = number => ({ account: `0.0.${number}`, deleted: false,
+    balance: { balance: '100000000' }, key: { _type: 'ED25519', key: DER_PUBLIC_KEY } });
+  global.fetch = async input => {
+    const url = new URL(String(input));
+    urls.push(url);
+    const body = url.searchParams.has('page')
+      ? { accounts: [account(102)], links: { next: null } }
+      : { accounts: [account(101)], links: {
+        next: `/api/v1/accounts?account.publickey=${RAW_PUBLIC_KEY}&balance=true&limit=100&page=2`,
+      } };
+    return { redirected: false, ok: true, status: 200,
+      headers: { get: name => name === 'content-type' ? 'application/json' : null },
+      text: async () => JSON.stringify(body) };
+  };
+  const matches = await listHederaAccountsForKey(RAW_PUBLIC_KEY);
+  assert.deepEqual(matches.map(value => value.accountId), ['0.0.101', '0.0.102']);
+  assert.equal(urls.length, 2);
+  global.fetch = async () => ({ redirected: false, ok: true, status: 200,
+    headers: { get: name => name === 'content-type' ? 'application/json' : null },
+    text: async () => JSON.stringify({ accounts: [account(101)],
+      links: { next: 'https://example.org/api/v1/accounts' } }) });
+  await assert.rejects(listHederaAccountsForKey(RAW_PUBLIC_KEY), /invalid continuation/);
+});
+
+test('multiple matching Hedera accounts can be listed without selecting one silently', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async input => ({
+    redirected: false, url: String(input), ok: true, status: 200,
+    headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+    text: async () => JSON.stringify({ accounts: [
+      { account: '0.0.123456', deleted: false, balance: { balance: 100 }, key: { key: DER_PUBLIC_KEY } },
+      { account: '0.0.123457', deleted: false, balance: { balance: 200 }, key: { key: DER_PUBLIC_KEY } },
+      { account: '0.0.123458', deleted: true, balance: { balance: 300 }, key: { key: DER_PUBLIC_KEY } },
+    ] }),
+  });
+  const matches = await listHederaAccountsForKey(RAW_PUBLIC_KEY);
+  assert.deepEqual(matches.map(account => account.accountId), ['0.0.123456', '0.0.123457']);
+  assert.deepEqual(matches.map(account => account.balanceTinybars), [100n, 200n]);
+  await assert.rejects(findHederaTestnetAccount(RAW_PUBLIC_KEY), /more than one/i);
+});
+
 test('builds a third-party-wallet-compatible Hedera QR value', () => {
   assert.equal(buildHederaWalletQrValue(' 0.0.123456 '), '0.0.123456');
   assert.throws(() => buildHederaWalletQrValue('hedera:0.0.123456'), /account ID/i);
@@ -320,7 +359,7 @@ test('loads MetaMask HBAR receipts from Ethereum transactions', async t => {
   };
 
   const history = await loadHederaHistory('0.0.9960666', 10);
-  assert.deepEqual(requestedTypes, new Set(['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION']));
+  assert.deepEqual(requestedTypes, new Set(['CRYPTOTRANSFER', 'ETHEREUMTRANSACTION', 'CONTRACTCALL']));
   assert.equal(history.length, 1);
   assert.equal(history[0].direction, 'received');
   assert.equal(history[0].amountTinybars, 100_000n);
@@ -385,4 +424,61 @@ test('reports pending and final Mirror Node transaction states', async t => {
   const status = await loadHederaTransactionStatus(id);
   assert.equal(status.state, 'success');
   assert.equal(status.result, 'SUCCESS');
+  global.fetch = async () => ({
+    redirected: false,
+    ok: true,
+    status: 200,
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify({ transactions: [{
+      consensus_timestamp: '1700000001.000000002', name: 'CRYPTOTRANSFER', nonce: 0,
+      result: 'UNKNOWN', transaction_id: '0.0.123456-1700000000-123456789', transfers: [],
+    }] }),
+  });
+  const unknown = await loadHederaTransactionStatus(id);
+  assert.equal(unknown.state, 'pending');
+  assert.equal(unknown.result, null);
+});
+
+test('includes a native checkout child transfer received through a contract call', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async input => {
+    const kind = new URL(String(input)).searchParams.get('transactiontype');
+    const body = { transactions: kind === 'CONTRACTCALL' ? [{
+      charged_tx_fee: '0', consensus_timestamp: '1786353644.290689104',
+      name: 'CONTRACTCALL', nonce: 1, result: 'SUCCESS', scheduled: false,
+      transaction_id: '0.0.7314364-1786353637-092830345',
+      transfers: [{ account: '0.0.9960666', amount: '100000' }, { account: '0.0.7314364', amount: '-100000' }],
+    }] : [] };
+    return { redirected: false, ok: true, status: 200,
+      headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+      text: async () => JSON.stringify(body) };
+  };
+  const history = await loadHederaHistory('0.0.9960666', 10);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].direction, 'received');
+  assert.equal(history[0].amountTinybars, 100_000n);
+});
+
+test('prefers the checkout parent fee when parent and child both contain the payer', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async input => {
+    const kind = new URL(String(input)).searchParams.get('transactiontype');
+    const base = { name: 'CONTRACTCALL', result: 'SUCCESS', scheduled: false,
+      transaction_id: '0.0.7314364-1786353637-092830345' };
+    const body = { transactions: kind === 'CONTRACTCALL' ? [
+      { ...base, nonce: 1, consensus_timestamp: '1786353644.290689105', charged_tx_fee: '0',
+        transfers: [{ account: '0.0.7314364', amount: '-100000' }, { account: '0.0.9960666', amount: '100000' }] },
+      { ...base, nonce: 0, consensus_timestamp: '1786353644.290689104', charged_tx_fee: '10000',
+        transfers: [{ account: '0.0.7314364', amount: '-110000' }, { account: '0.0.9960666', amount: '100000' }, { account: '0.0.3', amount: '10000' }] },
+    ] : [] };
+    return { redirected: false, ok: true, status: 200,
+      headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+      text: async () => JSON.stringify(body) };
+  };
+  const history = await loadHederaHistory('0.0.7314364', 10);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].amountTinybars, 100_000n);
+  assert.equal(history[0].feeTinybars, 10_000n);
 });

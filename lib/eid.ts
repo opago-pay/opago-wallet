@@ -1,5 +1,6 @@
 import { assertSafeRemoteUrl, requireEIdBackendUrl } from './config';
 import { fetchJson } from './http';
+import { requireIdentityPayments } from './product-capabilities';
 
 export interface EIdSession {
   sessionId: string;
@@ -17,6 +18,7 @@ export async function startEIdSession(input: {
   walletIdentifier: string;
   transactionReference: string;
 }): Promise<EIdSession> {
+  requireIdentityPayments();
   const backendUrl = requireEIdBackendUrl();
   const response = await fetchJson<EIdSession>(
     backendUrl + '/api/eid/session',
@@ -25,7 +27,7 @@ export async function startEIdSession(input: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     },
-    { purpose: 'eID session', timeoutMs: 15_000 },
+    { purpose: 'eID session', timeoutMs: 15_000, trustedFixedOrigin: true },
   );
   if (!response.sessionId || !response.tcTokenURL || typeof response.demo !== 'boolean') {
     throw new Error('eID backend returned an invalid session.');
@@ -37,6 +39,7 @@ export async function waitForVerifiedEId(
   sessionId: string,
   timeoutMs = 120_000,
 ): Promise<Record<string, unknown>> {
+  requireIdentityPayments();
   if (!/^[a-f0-9-]{20,}$/i.test(sessionId)) throw new Error('Invalid eID session identifier.');
   const backendUrl = requireEIdBackendUrl();
   const deadline = Date.now() + timeoutMs;
@@ -45,7 +48,7 @@ export async function waitForVerifiedEId(
     const response = await fetchJson<EIdStatusResponse>(
       backendUrl + '/api/eid/session/' + encodeURIComponent(sessionId) + '/status',
       {},
-      { purpose: 'eID verification status', timeoutMs: 10_000 },
+      { purpose: 'eID verification status', timeoutMs: 10_000, trustedFixedOrigin: true },
     );
     if (response.status === 'SUCCESS' && response.payerData) return response.payerData;
     if (response.status === 'FAILED' || response.status === 'EXPIRED') {

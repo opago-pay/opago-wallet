@@ -1,0 +1,365 @@
+{
+  "version": "0.1.0",
+  "routes": [
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/auth/challenge",
+      "internal_path": "/api/wallet/auth/challenge",
+      "auth": "conditional",
+      "transport": "hpke",
+      "operation_id": "createWalletChallenge"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/auth/verify",
+      "internal_path": "/api/wallet/auth/verify",
+      "auth": "conditional",
+      "transport": "hpke",
+      "operation_id": "verifyWalletChallenge"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/auth/refresh",
+      "internal_path": "/api/wallet/auth/refresh",
+      "auth": "none",
+      "transport": "hpke",
+      "operation_id": "refreshWalletSession"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/auth/logout",
+      "internal_path": "/api/wallet/auth/logout",
+      "auth": "none",
+      "transport": "hpke",
+      "operation_id": "logoutWalletSession"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/onboarding/restart",
+      "internal_path": "/api/wallet/onboarding/restart",
+      "auth": "none",
+      "transport": "hpke",
+      "operation_id": "restartDeletedAccountOnboarding"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/account",
+      "internal_path": "/api/account",
+      "auth": "account",
+      "transport": "hpke",
+      "operation_id": "getAccount"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/account/wallets",
+      "internal_path": "/api/account/wallets",
+      "auth": "account_fresh",
+      "transport": "hpke",
+      "operation_id": "bindWalletToAccount"
+    },
+    {
+      "method": "DELETE",
+      "public_path": "/api/v2/account",
+      "internal_path": "/api/account",
+      "auth": "account_fresh",
+      "transport": "hpke",
+      "operation_id": "deleteAccount"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/account/deletions/{deletion_id}",
+      "internal_path": "/api/account/deletions/{deletion_id}",
+      "auth": "receipt",
+      "transport": "hpke",
+      "operation_id": "getAccountDeletion"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/wallet/me",
+      "internal_path": "/api/wallet/me",
+      "auth": "wallet_or_bootstrap",
+      "transport": "hpke",
+      "operation_id": "getWallet"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/close",
+      "internal_path": "/api/wallet/close",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "closeWallet"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/restore",
+      "internal_path": "/api/wallet/restore",
+      "auth": "account_fresh",
+      "transport": "hpke",
+      "operation_id": "restoreWallet"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/onboarding/kyc",
+      "internal_path": "/api/onboarding/kyc",
+      "auth": "bootstrap",
+      "transport": "hpke",
+      "operation_id": "createPhotoMatch"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}",
+      "internal_path": "/api/onboarding/kyc/{submission_id}",
+      "auth": "owner",
+      "transport": "hpke",
+      "operation_id": "getPhotoMatch"
+    },
+    {
+      "method": "PUT",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}",
+      "internal_path": "/api/onboarding/kyc/{submission_id}",
+      "auth": "owner",
+      "transport": "hpke",
+      "operation_id": "updatePhotoMatch"
+    },
+    {
+      "method": "DELETE",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}",
+      "internal_path": "/api/onboarding/kyc/{submission_id}",
+      "auth": "owner",
+      "transport": "hpke",
+      "operation_id": "discardPhotoMatchDraft"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}/revisions",
+      "internal_path": "/api/onboarding/kyc/{submission_id}/revisions",
+      "auth": "account",
+      "transport": "hpke",
+      "operation_id": "createPhotoMatchRevision"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}/submit",
+      "internal_path": "/api/onboarding/kyc/{submission_id}/submit",
+      "auth": "owner",
+      "transport": "hpke",
+      "operation_id": "submitPhotoMatch"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/onboarding/kyc/{submission_id}/documents",
+      "internal_path": "/api/onboarding/kyc/{submission_id}/documents",
+      "auth": "owner",
+      "transport": "photo",
+      "operation_id": "uploadPhoto"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/wallet/address/suggestion",
+      "internal_path": "/api/wallet/address/suggestion",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "suggestAddress"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/wallet/address/availability",
+      "internal_path": "/api/wallet/address/availability",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "checkAddress"
+    },
+    {
+      "method": "PUT",
+      "public_path": "/api/v2/wallet/address",
+      "internal_path": "/api/wallet/address",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "setAddress"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/address/deactivate",
+      "internal_path": "/api/wallet/address/deactivate",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "deactivateAddress"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/address/reactivate",
+      "internal_path": "/api/wallet/address/reactivate",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "reactivateAddress"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/transactions",
+      "internal_path": "/api/wallet/transactions",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "ingestObservations"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/wallet/transactions/cursor",
+      "internal_path": "/api/wallet/transactions/cursor",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "getIngestCursor"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/wallet/transactions/batches/{idempotency_key}",
+      "internal_path": "/api/wallet/transactions/batches/{idempotency_key}",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "getIngestBatch"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/transactions/close-rejected",
+      "internal_path": "/api/wallet/transactions/close-rejected",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "closeRejectedObservations"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/payments/registrations",
+      "internal_path": "/api/payments/registrations",
+      "auth": "wallet_or_pos",
+      "transport": "hpke",
+      "operation_id": "createPaymentRegistration"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/payments/registrations/{registration_id}",
+      "internal_path": "/api/payments/registrations/{registration_id}",
+      "auth": "wallet_or_pos",
+      "transport": "hpke",
+      "operation_id": "getPaymentRegistration"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/payments/registrations/{registration_id}/invoice",
+      "internal_path": "/api/payments/registrations/{registration_id}/invoice",
+      "auth": "wallet_or_pos",
+      "transport": "hpke",
+      "operation_id": "getOrRefreshInvoice"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/payments/registrations/{registration_id}/cancel",
+      "internal_path": "/api/payments/registrations/{registration_id}/cancel",
+      "auth": "wallet_or_pos",
+      "transport": "hpke",
+      "operation_id": "cancelRegistration"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/travel-rule/uma-discovery",
+      "internal_path": "/api/travel-rule/uma/discovery",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "startUmaDiscovery"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/travel-rule/uma-discovery/verify",
+      "internal_path": "/api/travel-rule/uma/discovery/verify",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "verifyUmaDiscovery"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/travel-rule/uma-pay-request",
+      "internal_path": "/api/travel-rule/uma/pay-request",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "createUmaPayRequest"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/wallet/travel-rule/uma-pay-response",
+      "internal_path": "/api/travel-rule/uma/pay-response",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "verifyUmaPayResponse"
+    },
+    {
+      "method": "GET",
+      "public_path": "/api/v2/pos/{pos_id}",
+      "internal_path": "/api/pos/{pos_id}",
+      "auth": "operator",
+      "transport": "hpke",
+      "operation_id": "getPos"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/pos/{pos_id}/binding-intents",
+      "internal_path": "/api/pos/{pos_id}/binding-intents",
+      "auth": "operator_fresh",
+      "transport": "hpke",
+      "operation_id": "createPosBindingIntent"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/pos/{pos_id}/bindings",
+      "internal_path": "/api/pos/{pos_id}/bindings",
+      "auth": "wallet",
+      "transport": "hpke",
+      "operation_id": "confirmPosBinding"
+    },
+    {
+      "method": "GET",
+      "public_path": "/.well-known/lnurlp/{name}",
+      "internal_path": "/api/lightning-addresses/{name}/discovery",
+      "auth": "none",
+      "transport": "lnurl",
+      "operation_id": "discoverLnurl"
+    },
+    {
+      "method": "GET",
+      "public_path": "/lnurlp/cb/{context_ref}",
+      "internal_path": "/api/lightning-addresses/contexts/{context_ref}/invoice",
+      "auth": "none",
+      "transport": "lnurl",
+      "operation_id": "getLnurlInvoice"
+    },
+    {
+      "method": "POST",
+      "public_path": "/lnurlp/cb/{context_ref}",
+      "internal_path": "/api/lightning-addresses/contexts/{context_ref}/invoice",
+      "auth": "none",
+      "transport": "lnurl",
+      "operation_id": "postUmaInvoice"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/uma/settlement/{context_ref}",
+      "internal_path": "/api/travel-rule/uma/settlement/{context_ref}",
+      "auth": "none",
+      "transport": "plain",
+      "operation_id": "recordUmaSettlementObservation"
+    },
+    {
+      "method": "GET",
+      "public_path": "/.well-known/lnurlpubkey",
+      "internal_path": "/api/travel-rule/uma/keys",
+      "auth": "none",
+      "transport": "plain",
+      "operation_id": "getUmaKeys"
+    },
+    {
+      "method": "GET",
+      "public_path": "/.well-known/uma-configuration",
+      "internal_path": "/api/travel-rule/uma/configuration",
+      "auth": "none",
+      "transport": "plain",
+      "operation_id": "getUmaConfig"
+    }
+  ]
+}

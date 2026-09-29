@@ -111,8 +111,6 @@ $qualitySettings = @{
   EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR = '1'
   EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID = '0.0.9972670'
   EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
-  EXPO_PUBLIC_SOLANA_RPC_URL = 'https://api.devnet.solana.com'
-  EXPO_PUBLIC_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
   EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
 }
 $buildSettings = @{
@@ -128,8 +126,6 @@ $buildSettings = @{
   EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR = '1'
   EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID = $expectedContractId
   EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 = $expectedRuntimeSha256
-  EXPO_PUBLIC_SOLANA_RPC_URL = 'https://api.devnet.solana.com'
-  EXPO_PUBLIC_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
   EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'false'
 }
 $savedEnvironment = @{}
@@ -218,9 +214,7 @@ try {
     hederaCheckoutFeeCeilingHbar = '0.75'
     checkoutContractId = $expectedContractId
     runtimeBytecodeSha256 = $expectedRuntimeSha256
-    solanaNetwork = 'devnet'
     lightningNetwork = 'regtest'
-    swapsEnabled = $false
     apkSha256 = $apkHash
     apkBytes = (Get-Item -LiteralPath $targetApk).Length
     deviceSerial = $DeviceSerial
@@ -235,7 +229,7 @@ try {
   Write-Host "APK: $targetApk"
   Write-Host "APK SHA-256: $apkHash"
   Write-Host "Package: $packageId"
-  Write-Host 'Only Hedera uses Mainnet. Solana remains devnet, Lightning remains regtest, and swaps remain blocked.'
+  Write-Host 'Hedera uses Mainnet and Lightning remains on regtest.'
 } finally {
   foreach ($name in $managedNames) {
     [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')

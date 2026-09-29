@@ -4,10 +4,10 @@ This plan covers interface quality only. It does not claim that the complete mul
 
 ## 1. Asset identity and consistency - complete
 
-- Use one presentation model for Lightning, Solana, USDC, and Hedera.
+- Use one presentation model for Lightning and Hedera.
 - Show recognizable, scalable asset icons in Portfolio, Send, Receive, activity, and checkout selection.
 - Show the active network next to every asset so a logo can never hide a testnet, devnet, or regtest context.
-- Keep every asset's actual build-time network visible; the guarded Hedera candidate shows `MAINNET`, while Solana and Lightning remain visibly restricted to development networks.
+- Keep every asset's actual build-time network visible; the guarded Hedera candidate shows `MAINNET`, while Lightning remains visibly restricted to its development network.
 
 ## 2. Information hierarchy - complete
 
@@ -48,7 +48,7 @@ The following broader app-store checks remain deliberately open:
 
 1. dynamic text and screen-reader coverage beyond the recorded path;
 2. German and other localized string overflow;
-3. the complete Lightning, Solana, and USDC visual matrix on multiple screen sizes;
+3. the complete Lightning and Hedera visual matrix on multiple screen sizes;
 4. iOS layout and app-store screenshot acceptance.
 
 ## Deliberately deferred

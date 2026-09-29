@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "supersedes": "0.1.0",
+  "source_plan_sha256": "65cac3ea62246c980883da3e1ea6c224efe054e3db36736c2edd16559f54fbf7",
+  "files": {
+    "acceptance.json": "f81dd2bb9c22f396de14290b31162fe07d57ef7200b5faa375aeba438bd1135d",
+    "CHANGELOG.md": "aa66e0ed1c662771449d544ceebcf5eeb581b2e02967b04b7af1a1c008dd4e9a",
+    "decisions.md": "be01bd01a54263ff4ffc64bf34fd3cacc60bf2d7b32f758ecb6ef4d6cdf64867",
+    "fixtures/hpke-key-document-vectors.json": "abef1f69c77becd0e2a3c48e7c6a0b1d447fefab0f66f3309b78a710cc0f2c89",
+    "fixtures/hpke-vectors.json": "f9ae621aefaab0a20c19986ae68ab51dd9474878e7c6040fd8a9459f3ee69341",
+    "fixtures/observation-vectors.json": "3c89fa146439aa8f5c74fb6b881b688ab05ea9b7878cc4d026ecbaa05fcf4d42",
+    "fixtures/schema-cases.json": "c249ac1a80a4b6cf5733dcfea09c9d02cfe706c50b655323c6dd892a520bd9b8",
+    "fixtures/wallet-auth-vectors.json": "7125860965a1ff408fcf2052ede3df6b730e69871fdcd96fcaa6ba59ebec89e0",
+    "openapi-helper.json": "5903cd0a565562e275260b8d92802c92b338dcb2f71e30e86063b230407388e7",
+    "openapi-internal.json": "f5e75c157775a9e367aa6e35a37e77d9816c2adde5585462c9b9bf5a03351bf1",
+    "openapi-public.json": "d7e169849346d898ad1bf7a02fcc52b0a0d53f0e701bb3b566cd19b66cc9bc26",
+    "protocol.md": "118ce846eb5131f08287e8d7bfa8b794a053aa8bfe192b6df44037d737a38ce5",
+    "README.md": "b6727f93c0e2a9bf8817b713779e96b90d5360969245c9c3016f7f4724636e72",
+    "route-map.json": "87fe614a99d65ab446a14d5db99663f229f690f4697536b8057abe857dee2bcc",
+    "schemas.json": "f92af5f621b28e6e1e896d66ee4d47493c9bb057e461bbfda94cf6d8936c9600",
+    "TEAM-HANDOFF.md": "739b81bccbf0cde1c63660db5638f0033db3edc35ac828bea31a2aeb0ddd54dc",
+    "tme-v7.md": "e0a25c935aa2bef490efd85e9d79dfbfda75aba67eda1000e9df11314d503d10",
+    "tools/build_contracts.py": "27435a16b9b0c16f539fe1607c182e9455cb90f541bb79d00072f8cb5d450b9b",
+    "tools/build_fixtures.py": "5044a07750467747d3eb977a9233b7362acc0d2a4db4e6e1d413545284005b4c",
+    "tools/package.json": "bec84e0a3822538375aaf70ec75053f8d9a15ccbf6f74e73c71f7d94aa653ba5",
+    "tools/requirements-validation.txt": "9ed064c2d3000638a5aeaeb3f853680d8729462601369c44193f5e4693bf994c",
+    "tools/validate_contracts.py": "1776acfee94984ae2a4ae9efe6f8671da3de0812122795d05e7ed9f1f3005260",
+    "tools/verify-fixtures.cjs": "70865de20d6a7342fa4b3e5883b0e44f95563890150c9a604b42cf023cd6a129",
+    "validation-report.json": "a15e43d009041e5428ca920a48216cfd15416c87c1c099e00d8b248c8321e21d"
+  }
+}
