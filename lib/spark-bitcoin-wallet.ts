@@ -4,6 +4,7 @@ import { installSparkLeafSelection } from './spark-leaf-selection';
 import { PaymentScopedSparkSigner } from './spark-signer-cache';
 import { installSparkHtlcPreparation } from './spark-htlc-preparation';
 import { installSparkLightningPipeline } from './spark-lightning-pipeline';
+import type { WalletAuthChallenge, WalletAuthIntent } from './wallet-auth-proof';
 
 /** Bitcoin payment reads must not wait for unrelated Spark-token services. */
 export class BitcoinSparkWallet extends SparkWallet {
@@ -36,6 +37,19 @@ export class BitcoinSparkWallet extends SparkWallet {
     return signer instanceof PaymentScopedSparkSigner
       ? signer.withSendKeyCache(() => super.payLightningInvoice(input))
       : super.payLightningInvoice(input);
+  }
+
+  /** Sign only a challenge that exactly matches the requested F3 login or account binding. */
+  async signOpagoWalletChallenge(
+    challenge: WalletAuthChallenge,
+    intent: WalletAuthIntent,
+    network: 'mainnet' | 'regtest',
+    installationId: string,
+  ) {
+    // Keep F3-only code out of existing wallet startup and payment paths.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { signWalletAuthChallenge } = require('./wallet-auth-proof') as typeof import('./wallet-auth-proof');
+    return signWalletAuthChallenge(this.config.signer, challenge, intent, network, installationId);
   }
 
   override async cleanupConnections() {
