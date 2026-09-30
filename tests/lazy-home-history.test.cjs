@@ -310,6 +310,42 @@ test('Home shows the newest HBAR receipt before Activity opens, using a small fi
   assert.equal(latestRow(screen).props.transaction.asset, 'HBAR');
 });
 
+test('pull-to-refresh updates Home HBAR activity and rates without opening all activity', async () => {
+  const data = { 'hedera history': [] };
+  const app = fixture(data);
+  app.render(); app.refocus(); await settle();
+  data['hedera history'] = [{ transactionId: '0.0.123@100.000000001', direction: 'received',
+    amountHbar: '2', result: 'SUCCESS', occurredAt: '2026-09-30T10:00:00Z' }];
+  app.reads.length = 0;
+  let release;
+  data.balances = () => new Promise(resolve => { release = resolve; });
+  app.render().props.refreshControl.props.onRefresh();
+  await settle();
+  assert.equal(app.render().props.refreshControl.props.refreshing, true);
+  release(); await settle();
+  const screen = app.render();
+  assert.equal(screen.type, 'scroll');
+  assert.equal(latestRow(screen).props.transaction.asset, 'HBAR');
+  assert.ok(app.reads.includes('balances'));
+  assert.ok(app.reads.includes('hedera history'));
+  assert.ok(app.reads.includes('rates'));
+  assert.equal(screen.props.refreshControl.props.refreshing, false);
+  app.blur();
+});
+
+test('pull-to-refresh releases the spinner after balance or exchange-rate failure', async () => {
+  for (const service of ['balances', 'rates']) {
+    const data = {};
+    const app = fixture(data);
+    app.render(); app.refocus(); await settle();
+    data[service] = async () => { throw new Error('temporary service outage'); };
+    app.render().props.refreshControl.props.onRefresh();
+    await settle();
+    assert.equal(app.render().props.refreshControl.props.refreshing, false, service);
+    app.blur();
+  }
+});
+
 test('A hidden pending payment is absent from the latest card and history', async () => {
   const key = 'ln:' + 'a'.repeat(64);
   const app = fixture({ hiddenPaymentKeys: [key], local: [
