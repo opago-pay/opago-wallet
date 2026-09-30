@@ -19,9 +19,10 @@ export function useWalletBalances(params: {
   enableSpark?: boolean;
   enableHedera?: boolean;
   prioritizeSpark?: boolean;
+  allowHederaBeforeSpark?: boolean;
   refreshHederaAccount(): Promise<HederaAccountSnapshot | null>;
 }) {
-  const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableSpark = true, enableHedera = true, prioritizeSpark = false } = params;
+  const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableSpark = true, enableHedera = true, prioritizeSpark = false, allowHederaBeforeSpark = false } = params;
   const isFocused = useIsFocused();
   const [sparkSnapshot, setSparkSnapshot] = useState(() => ({ wallet: sparkWallet, state: unknownBalance<number>() }));
   const [incomingSnapshot, setIncomingSnapshot] = useState<{ wallet: SparkBalanceReader | null; value: number | null }>({ wallet: sparkWallet, value: null });
@@ -148,13 +149,15 @@ export function useWalletBalances(params: {
   }, [isFocused, sparkWallet, refreshHederaBalance]);
 
   useEffect(() => {
-    if (isFocused && enableHedera && secondaryDataReady) void refreshHederaBalance(false);
-  }, [isFocused, sparkWallet, enableHedera, secondaryDataReady, refreshHederaBalance]);
+    if (isFocused && enableHedera && (secondaryDataReady || allowHederaBeforeSpark)) void refreshHederaBalance(false);
+  }, [isFocused, sparkWallet, enableHedera, secondaryDataReady, allowHederaBeforeSpark, refreshHederaBalance]);
 
   const refreshBalances = useCallback(async () => {
+    const independentHedera = allowHederaBeforeSpark && hederaEnabled.current ? refreshHederaBalance() : null;
     const result = await refreshSparkBalance();
-    if (result.current && hederaEnabled.current && (!prioritizeSpark || result.settled || priorityExpired)) await refreshHederaBalance();
-  }, [refreshSparkBalance, refreshHederaBalance, prioritizeSpark, priorityExpired]);
+    if (!independentHedera && result.current && hederaEnabled.current && (!prioritizeSpark || result.settled || priorityExpired)) await refreshHederaBalance();
+    await independentHedera;
+  }, [refreshSparkBalance, refreshHederaBalance, prioritizeSpark, priorityExpired, allowHederaBeforeSpark]);
 
   return {
     balances: { spark: spark.value, hbarTinybars: hedera.value },

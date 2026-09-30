@@ -6,6 +6,7 @@ import { useWalletMotion } from '@/hooks/useWalletMotion';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Animated,
   BackHandler,
@@ -54,7 +55,9 @@ import {
 } from '@/lib/lightning/spark-history';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { appConfig } from '@/lib/config';
-import { calculateBitcoinEur } from '@/lib/portfolio-valuation';
+import { calculateBitcoinEur, calculateHederaEur } from '@/lib/portfolio-valuation';
+import { formatBtcBalance } from '@/lib/bitcoin/amount';
+import { pendingOnchainDepositSats } from '@/lib/bitcoin/holdings';
 import { withTimeout } from '@/lib/promise-timeout';
 import { HistoryPager } from '@/lib/history-pagination';
 import { operationalHealth } from '@/lib/operational-health-native';
@@ -70,13 +73,23 @@ import {
   bitcoinOperationNotice,
   compactWalletIdentifier,
   formatEurValue,
+  formatCoinUnitPrice,
   paymentHistoryStatus,
   paymentHistoryTitle,
 } from '@/lib/wallet-display';
 
 const OPTIONAL_ASSET_REFRESH_TIMEOUT_MS = 8_000;
+const RECENT_ACTIVITY_REFRESH_MS = 20_000;
 
 type DisplayTransaction = PaymentHistoryItem;
+
+function savedHistoryKey(item: { asset: string; txId?: string | null; id: number }): string {
+  if (item.asset === 'HBAR' && item.txId) {
+    try { return 'hedera:' + normalizeHederaTransactionIdForMirror(item.txId); }
+    catch { /* Keep a legacy local entry readable if it has no network ID. */ }
+  }
+  return item.txId || 'local:' + item.id;
+}
 
 function mapHederaJournal(records: Awaited<ReturnType<ReturnType<typeof hederaPaymentJournalFor>['list']>>): DisplayTransaction[] {
   return records.map(item => ({
@@ -126,7 +139,8 @@ export default function HomeScreen() {
   const [startupComplete, setStartupComplete] = useState(false);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const { balances, balanceStates, bitcoinIncoming, secondaryDataReady, sparkPriorityTimedOut, refreshBalances } = useWalletBalances({
-    walletReady, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: advancedExpanded, prioritizeSpark: true,
+    walletReady, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: advancedExpanded,
+    prioritizeSpark: true, allowHederaBeforeSpark: true,
   });
   const preview = useHomeBalancePreview({
     publicKey: hederaPublicKey, spark: balances.spark, hedera: balances.hbarTinybars,
@@ -143,13 +157,17 @@ export default function HomeScreen() {
     btcToEur: rates.btcToEur > 0 ? rates.btcToEur : preview?.rates?.btcToEur ?? 0,
     hbarToEur: rates.hbarToEur > 0 ? rates.hbarToEur : preview?.rates?.hbarToEur ?? 0,
   };
-  const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+  const [activitySnapshot, setActivitySnapshot] = useState<{ identity: string | null; items: DisplayTransaction[] }>({ identity: hederaPublicKey, items: [] });
+  const transactions = useMemo(() => activitySnapshot.identity === hederaPublicKey ? activitySnapshot.items : [], [activitySnapshot, hederaPublicKey]);
+  const setTransactions = useCallback((items: DisplayTransaction[]) => setActivitySnapshot({ identity: hederaPublicKey, items }), [hederaPublicKey]);
   const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
   const transactionsRef = useRef(transactions);
   transactionsRef.current = transactions;
   const hiddenHistoryKeys = useRef<string[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [recentLocal, setRecentLocal] = useState<DisplayTransaction | null>(null);
+  const [localSnapshot, setLocalSnapshot] = useState<{ identity: string | null; item: DisplayTransaction | null }>({ identity: hederaPublicKey, item: null });
+  const recentLocal = localSnapshot.identity === hederaPublicKey ? localSnapshot.item : null;
+  const setRecentLocal = useCallback((item: DisplayTransaction | null) => setLocalSnapshot({ identity: hederaPublicKey, item }), [hederaPublicKey]);
   const historyLoadedRef = useRef(false);
   const historyPagerRef = useRef<HistoryPager<DisplayTransaction> | null>(null);
   const hederaHistoryPending = useRef(false);
@@ -167,7 +185,7 @@ export default function HomeScreen() {
     const item = records.find(record => record.status !== 'pending' ||
       !hiddenHistoryKeys.current.includes(record.txId || 'local:' + record.id));
     return item ? {
-      key: item.txId || 'local:' + item.id, txId: item.txId,
+      key: savedHistoryKey(item), txId: item.txId,
       type: item.type, amountDisplay: item.amount.toLocaleString(appLocale()),
       amountValue: item.amount,
       asset: item.asset, status: item.status, timestamp: item.timestamp,
@@ -178,21 +196,12 @@ export default function HomeScreen() {
   }, []);
 
   const refresh = useCallback(async (force = false, mode: 'initial' | 'more' | 'retry' = 'initial') => {
-    // Home needs only the locally saved latest payment. Remote pages start
-    // when the user opens Activity, never during balance startup or a pull.
-    if (!historyOpen) return;
+    // Home reads one small page per asset, independently of the Activity view.
+    // Older pages remain explicitly requested by the full-history footer.
     if (!walletReady) {
-      try { await loadOrGenerateWallet(); }
-      catch (cause) { setLoadError(cause instanceof Error ? cause.message : t('Wallet initialization failed.')); }
       return;
     }
-    // The first history page starts only after the Bitcoin balance is ready.
-    // The latest saved payment is shown independently while this runs.
     if (force) historyLoadedRef.current = false;
-    if (!secondaryDataReady) {
-      if (force) historyPagerRef.current = null;
-      return;
-    }
     if (refreshInProgressRef.current) return refreshInProgressRef.current;
     if (mode === 'initial' && !force && historyLoadedRef.current) return;
     if (force) historyPagerRef.current = null;
@@ -213,7 +222,7 @@ export default function HomeScreen() {
           return { next: records.length > limit ? page.at(-1)!.id : null,
             through: page.length ? Date.parse(page.at(-1)!.timestamp) : undefined,
             items: page.map(item => ({
-            key: item.txId || 'local:' + item.id, txId: item.txId, type: item.type,
+            key: savedHistoryKey(item), txId: item.txId, type: item.type,
             amountDisplay: item.amount.toLocaleString(appLocale()), asset: item.asset,
             amountValue: item.amount,
             status: item.status, timestamp: item.timestamp, reference: item.reference,
@@ -255,14 +264,14 @@ export default function HomeScreen() {
           })) };
         } },
         { id: 'onchain', label: 'Bitcoin', load: async (cursor, limit) => {
-          if (!sparkWallet) return { items: [], next: null };
+          if (!sparkWallet || !secondaryDataReady) return { items: [], next: null };
           const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
           const page = await bitcoinStore.listHistoryPage(scope, limit, cursor === undefined ? undefined : String(cursor));
           return { next: page.next, through: page.through,
             items: page.items.map(item => bitcoinOperationHistoryItem(item, appLocale())) };
         } },
         { id: 'spark', label: 'Bitcoin', load: async (cursor, limit) => {
-          if (!sparkWallet) return { items: [], next: null };
+          if (!sparkWallet || !secondaryDataReady) return { items: [], next: null };
           try {
             const page = await measurePerformance('history.spark', () =>
               loadSparkTransferPage(sparkWallet, limit, Number(cursor ?? 0)));
@@ -290,7 +299,7 @@ export default function HomeScreen() {
           }
         } },
       ], OPTIONAL_ASSET_REFRESH_TIMEOUT_MS, transactionsRef.current,
-        item => item.status !== 'pending' || !hiddenHistoryKeys.current.includes(item.key), 20);
+        item => item.status !== 'pending' || !hiddenHistoryKeys.current.includes(item.key), historyOpen ? 20 : 5);
       }
       const pager = historyPagerRef.current;
       const publish = () => {
@@ -329,7 +338,7 @@ export default function HomeScreen() {
     });
     refreshInProgressRef.current = operation;
     return operation;
-  }, [historyOpen, secondaryDataReady, loadOrGenerateWallet, refreshHederaAccount, sparkWallet, walletReady, hederaPaymentJournal, lightningPaymentJournal]);
+  }, [historyOpen, secondaryDataReady, refreshHederaAccount, sparkWallet, walletReady, hederaPaymentJournal, lightningPaymentJournal, setTransactions]);
 
   const refreshSettledPayment = useCallback(async () => {
     const generation = refreshGenerationRef.current;
@@ -339,10 +348,10 @@ export default function HomeScreen() {
       if (generation === refreshGenerationRef.current) setRecentLocal(item);
     });
     await Promise.all([balance, latest]);
-    if (!historyOpen || generation !== refreshGenerationRef.current) return;
+    if (generation !== refreshGenerationRef.current) return;
     await refreshInProgressRef.current;
     if (generation === refreshGenerationRef.current) await refresh(true);
-  }, [historyOpen, loadLatestLocal, refreshBalances, refresh]);
+  }, [loadLatestLocal, refreshBalances, refresh, setRecentLocal]);
   const { pendingCount: pendingLightningCount, hiddenPaymentKeys } = usePendingLightningPayments(sparkWallet,
     lightningScope, secondaryDataReady, refreshSettledPayment, visibilityRevision);
   hiddenHistoryKeys.current = hiddenPaymentKeys;
@@ -403,7 +412,7 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => {
     let cancelled = false;
-    // The wallet must start on Home even while remote history remains lazy.
+    // Paint the locally saved latest payment while small remote pages load.
     // Otherwise a fresh unlock waits until Send, Receive or Security is opened.
     if (!walletReady && !walletError) void loadOrGenerateWallet().catch(() => undefined);
     if (walletReady) void loadLatestLocal().then(item => {
@@ -411,16 +420,30 @@ export default function HomeScreen() {
       setRecentLocal(item);
     }).catch(() => undefined);
     void refresh();
+    const timer = historyOpen ? null : setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void refresh(true);
+        if (secondaryDataReady) void refreshBalances();
+      }
+    }, RECENT_ACTIVITY_REFRESH_MS);
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active' && !historyOpen) {
+        void refresh(true);
+        if (secondaryDataReady) void refreshBalances();
+      }
+    });
     return () => {
       cancelled = true;
+      if (timer) clearInterval(timer);
+      appState.remove();
       refreshGenerationRef.current += 1;
       refreshInProgressRef.current = null;
       historyLoadedRef.current = false;
       historyPagerRef.current = null;
     };
-  }, [refresh, loadLatestLocal, loadOrGenerateWallet, walletReady, walletError]));
+  }, [refresh, loadLatestLocal, loadOrGenerateWallet, walletReady, walletError, historyOpen, secondaryDataReady, refreshBalances, setRecentLocal]));
 
-  useEffect(() => setRecentLocal(null), [hederaPublicKey]);
+  useEffect(() => setRecentLocal(null), [setRecentLocal]);
   useEffect(() => {
     if (!historyOpen || selectedTransaction) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -441,7 +464,7 @@ export default function HomeScreen() {
       await refreshBalances();
       const latest = await loadLatestLocal();
       setRecentLocal(latest);
-      if (historyOpen) await refresh(true);
+      await Promise.all([refresh(true), rates.refresh()]);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
@@ -473,6 +496,7 @@ export default function HomeScreen() {
   ), [transactions, hiddenPaymentKeys]);
 
   const totalEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
+  const hederaEur = calculateHederaEur(displayBalances.hbarTinybars, displayRates.hbarToEur);
   const balanceError = balanceStates.spark.error;
   const initialBalanceReady = walletReady && displayBalances.spark !== null
     && (displayRates.btcToEur > 0 || !rates.isLoading);
@@ -502,9 +526,20 @@ export default function HomeScreen() {
         : totalEur === null && !rates.isLoading ? t('EUR estimate unavailable') : null;
   const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
     ? t(!(rates.hbarToEur > 0) || !(rates.updatedAt > 0) || Date.now() - rates.updatedAt > 300_000
-      ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatEurValue(displayRates.hbarToEur) })
+      ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatCoinUnitPrice(displayRates.hbarToEur, 'hedera') })
     : t(rates.isLoading ? 'Loading HBAR price…' : 'HBAR price unavailable');
+  const bitcoinPriceText = Number.isFinite(displayRates.btcToEur) && displayRates.btcToEur > 0
+    ? t(!(rates.btcToEur > 0) || !(rates.updatedAt > 0) || Date.now() - rates.updatedAt > 300_000
+      ? '1 BTC = {price} · last known' : '1 BTC = {price}', { price: formatEurValue(displayRates.btcToEur) })
+    : t(rates.isLoading ? 'Loading BTC price…' : 'BTC price unavailable');
   const bitcoinNotice = bitcoinOperationNotice(bitcoinOperations);
+  const pendingDeposits = pendingOnchainDepositSats(bitcoinOperations);
+  const bitcoinNotes = [
+    ...(bitcoinIncoming !== null && bitcoinIncoming !== undefined && bitcoinIncoming > 0
+      ? [t('Incoming Bitcoin: {amount} BTC', { amount: formatBtcBalance(bitcoinIncoming, appLocale()) })] : []),
+    ...(pendingDeposits !== null && pendingDeposits > 0
+      ? [t('Onchain deposits awaiting credit: {amount} BTC', { amount: formatBtcBalance(pendingDeposits, appLocale()) })] : []),
+  ];
 
   const localVisible = recentLocal && (recentLocal.status !== 'pending' || !hiddenPaymentKeys.includes(recentLocal.key))
     ? recentLocal : null;
@@ -632,6 +667,8 @@ export default function HomeScreen() {
             <Text style={styles.emptyLatestText}>{historyErrors.length || loadError
               ? t('Payments are temporarily unavailable') : t('No payments yet')}</Text>
           </View>}
+        {!!latestTransaction && (historyErrors.length > 0 || !!loadError) &&
+          <Text style={styles.balanceSubtitle} accessibilityLiveRegion="polite">{t('Some activity could not be refreshed. Pull down to retry.')}</Text>}
       </>}
       <Pressable
         style={({ pressed }) => [styles.historyButton, pressed && styles.historyButtonPressed]}
@@ -672,12 +709,27 @@ export default function HomeScreen() {
         <Text style={styles.balanceLabel}>{t(bitcoinNotice.title)}</Text><Text style={styles.balanceSubtitle}>{t(bitcoinNotice.description)}</Text>
       </TouchableOpacity>}
 
-      <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} label={t('More coins')}>
-        {!secondaryDataReady && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance first…')}</Text>}
+      <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} label={t('All coins')}>
+        {!secondaryDataReady && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance…')}</Text>}
+        <BalanceCard
+          asset="bitcoin"
+          subtitle={bitcoinPriceText}
+          description={t('One balance. Two payment routes.')}
+          notes={bitcoinNotes}
+          value={displayBalances.spark === null ? '— BTC' : formatBtcBalance(displayBalances.spark, appLocale()) + ' BTC'}
+          fiatValue={totalEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(totalEur)}
+          loading={balanceStates.spark.status === 'loading'}
+          statusText={balanceStates.spark.status === 'error'
+            ? displayBalances.spark === null ? t('Balance unavailable') : t('Last known balance')
+            : balanceStates.spark.status === 'loading'
+              ? displayBalances.spark === null ? t('Loading balance…') : t('Last known balance · updating…')
+              : undefined}
+        />
         <BalanceCard
           asset="hedera"
           subtitle={hederaPriceText}
           value={displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR'}
+          fiatValue={hederaEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(hederaEur)}
           loading={balanceStates.hedera.status === 'loading'}
           statusText={
             balanceStates.hedera.status === 'error'
@@ -843,6 +895,8 @@ function BalanceCard(props: {
   fiatValue?: string;
   statusText?: string;
   subtitle?: string;
+  description?: string;
+  notes?: readonly string[];
   onCopy?: () => void;
 }) {
   useLanguage();
@@ -859,26 +913,31 @@ function BalanceCard(props: {
       disabled={!props.onCopy}
       activeOpacity={props.onCopy ? 0.72 : 1}
       accessibilityRole={props.onCopy ? 'button' : 'summary'}
-      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.statusText || ''}, ${props.subtitle ?? (props.identifier ? compactWalletIdentifier(props.identifier) : t(presentation.description))}${props.onCopy ? ', ' + t('Tap to copy address') : ''}`}
+      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.fiatValue || ''}, ${props.statusText || ''}, ${props.subtitle ?? (props.identifier ? compactWalletIdentifier(props.identifier) : t(presentation.description))}, ${props.notes?.join(', ') || ''}${props.onCopy ? ', ' + t('Tap to copy address') : ''}`}
     >
-      <AssetIcon asset={props.asset} size={44} />
-      <View style={styles.balanceDetails}>
-        <View style={styles.balanceTitleRow}>
-          <Text style={styles.balanceLabel}>{presentation.name}</Text>
-          <NetworkBadge label={presentation.networkBadge} />
+      <View style={styles.balanceCardMain}>
+        <AssetIcon asset={props.asset} size={44} />
+        <View style={styles.balanceDetails}>
+          <View style={styles.balanceTitleRow}>
+            <Text style={styles.balanceLabel}>{presentation.name}</Text>
+            <NetworkBadge label={presentation.networkBadge} />
+          </View>
+          <Text style={styles.balanceSubtitle} numberOfLines={props.subtitle ? undefined : 1}>
+            {props.subtitle || (props.identifier
+              ? compactWalletIdentifier(props.identifier)
+              : t(presentation.description))}
+          </Text>
+          {!!props.description && <Text style={styles.balanceSubtitle}>{props.description}</Text>}
+          {!!props.statusText && <Text style={styles.balanceSubtitle} accessibilityLiveRegion="polite">{props.statusText}</Text>}
         </View>
-        <Text style={styles.balanceSubtitle} numberOfLines={props.statusText || props.subtitle ? undefined : 1}>
-          {props.statusText || props.subtitle || (props.identifier
-            ? compactWalletIdentifier(props.identifier)
-            : t(presentation.description))}
-        </Text>
+        <View style={styles.balanceTrailing}>
+          {props.loading && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" />}
+          <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{props.value}</Text>
+          {props.fiatValue && <Text style={styles.balanceSubtitle}>{props.fiatValue}</Text>}
+          {props.onCopy && <Ionicons name="copy-outline" size={16} color={adaptColor('#8f8f9d', 'color')} />}
+        </View>
       </View>
-      <View style={styles.balanceTrailing}>
-        {props.loading && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" />}
-        <Text style={styles.balanceValue}>{props.value}</Text>
-        {props.fiatValue && <Text style={styles.balanceSubtitle}>{props.fiatValue}</Text>}
-        {props.onCopy && <Ionicons name="copy-outline" size={16} color={adaptColor('#8f8f9d', 'color')} />}
-      </View>
+      {props.notes?.map(note => <Text key={note} style={styles.balanceSubtitle}>{note}</Text>)}
     </TouchableOpacity>
   );
 }
@@ -1004,10 +1063,10 @@ const styles = adaptiveStyles(StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 6,
+    marginBottom: 10,
   },
+  balanceCardMain: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' },
   balanceDetails: { flex: 1, minWidth: 0 },
   balanceTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7 },
   balanceLabel: { color: '#fff', fontSize: 16, lineHeight: 22, fontWeight: '600' },

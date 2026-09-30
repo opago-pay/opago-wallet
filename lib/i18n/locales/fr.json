@@ -708,5 +708,9 @@
   "Reopen the app afterwards and check Sentry for the native test report.": "Rouvrez ensuite l’application et vérifiez dans Sentry la réception du rapport de test natif.",
   "Run crash test": "Lancer le test de plantage",
   "Diagnostics unavailable": "Diagnostic indisponible",
-  "Crash reporting is disabled or could not start.": "Le signalement des plantages est désactivé ou n’a pas pu démarrer."
+  "Crash reporting is disabled or could not start.": "Le signalement des plantages est désactivé ou n’a pas pu démarrer.",
+  "All coins": "Toutes les cryptos",
+  "Incoming Bitcoin: {amount} BTC": "Bitcoin entrant : {amount} BTC",
+  "Onchain deposits awaiting credit: {amount} BTC": "Dépôts onchain en attente de crédit : {amount} BTC",
+  "Some activity could not be refreshed. Pull down to retry.": "Certaines activités n’ont pas pu être actualisées. Tirez vers le bas pour réessayer."
 }

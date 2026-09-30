@@ -20,6 +20,8 @@ function fixture(data = {}) {
   const focusEffects = [];
   let cleanups = [];
   const pushes = [];
+  const intervals = new Map();
+  const appStateListeners = new Set();
   const hooks = { ...React,
     useState: initial => {
       const i = cursor++;
@@ -44,6 +46,9 @@ function fixture(data = {}) {
     'react-native': {
       StyleSheet: { create: value => value }, ScrollView: 'scroll', Text: 'text', View: 'view',
       RefreshControl: 'refresh', ActivityIndicator: 'loading', BackHandler: { addEventListener: () => ({ remove() {} }) },
+      AppState: { get currentState() { return data.appState ?? 'active'; }, addEventListener: (_event, listener) => {
+        appStateListeners.add(listener); return { remove: () => appStateListeners.delete(listener) };
+      } },
     },
     '@/components/ui/advanced-options': { AdvancedOptions: 'advanced' },
     '@/components/ui/asset-icon': { AssetIcon: 'asset-icon' },
@@ -59,41 +64,45 @@ function fixture(data = {}) {
     'expo-haptics': { impactAsync: async () => {}, ImpactFeedbackStyle: { Light: 'light' } },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '@/hooks/useWalletAuth': { useWalletAuth: () => ({
-      walletReady: data.walletReady !== false, sparkWallet: {}, hederaPublicKey: 'public fixture',
+      walletReady: data.walletReady !== false, sparkWallet: {}, hederaPublicKey: data.publicKey ?? 'public fixture',
       loadOrGenerateWallet: async () => { reads.push('wallet init'); },
       refreshHederaAccount: async () => { reads.push('account'); return { accountId: '0.0.123' }; }, error: null,
     }) },
     '@/hooks/useWalletBalances': { useWalletBalances: () => ({
-      balances: { spark: data.spark === undefined ? 107 : data.spark, hbarTinybars: 0n },
-      balanceStates: { spark: { status: 'ready', updatedAt: 1 }, hedera: { status: 'ready', updatedAt: 1 } },
+      balances: { spark: data.spark === undefined ? 107 : data.spark, hbarTinybars: data.hbarTinybars ?? 0n },
+      balanceStates: { spark: { status: data.sparkStatus ?? 'ready', updatedAt: 1, error: data.sparkError }, hedera: { status: data.hederaStatus ?? 'ready', updatedAt: 1 } },
+      bitcoinIncoming: data.bitcoinIncoming ?? null,
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }) },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
-    '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [] } },
+    '@/lib/bitcoin/store-native': { bitcoinStore: { list: async () => [], listHistoryPage: async () => ({ items: [], next: null }) } },
+    '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
+    '@/lib/bitcoin/holdings': require('../lib/bitcoin/holdings.ts'),
     '@/hooks/usePendingLightningPayments': { usePendingLightningPayments: (_wallet, _scope, _enabled, onResolved) => {
       data.paymentSettled = onResolved;
       return { pendingCount: data.pendingCount || 0, hiddenPaymentKeys: data.hiddenPaymentKeys || [] };
     } },
-    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, hbarToEur: 0.1, updatedAt: 1 }) },
+    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: data.btcRate ?? 50000, hbarToEur: data.hbarRate ?? 0.1, updatedAt: data.ratesAt ?? Date.now(), refresh: query('rates') }) },
     '@/lib/config': { appConfig: { isMainnet: true, hederaNetwork: 'mainnet', sparkNetwork: 'MAINNET' } },
     '@/lib/payment-details': require('../lib/payment-details.ts'),
     '@/lib/wallet-session': { walletSession: { capture: () => () => {}, captureRuntime: () => () => {} } },
     '@/lib/portfolio-valuation': require('../lib/portfolio-valuation.ts'),
     '@/lib/wallet-display': {
       formatEurValue: value => String(value),
+      formatCoinUnitPrice: value => String(value),
       bitcoinOperationNotice: () => null,
       paymentHistoryStatus: () => 'Completed',
       paymentHistoryTitle: () => 'Payment',
     },
-    '@/lib/wallet-assets': { walletAssetKeyFromSymbol: value => value },
+    '@/lib/wallet-assets': require('../lib/wallet-assets.ts'),
     '@/lib/database': { getTransactionPage: query('local') },
     '@/lib/hedera/account': { loadHederaHistoryPage: async (...args) => ({
       items: await query('hedera history')(...args), next: null,
     }) },
-    '@/lib/hedera/mirror': { normalizeHederaTransactionIdForMirror: value => value },
-    '@/lib/hedera/payments': { formatTinybars: value => String(value) },
+    '@/lib/hedera/mirror': require('../lib/hedera/mirror.ts'),
+    '@/lib/hedera/payments': { formatTinybars: value => String(Number(value) / 100_000_000) },
     '@/lib/hedera/payment-journal-native': { hederaPaymentJournalFor: () => ({
       list: query('hedera journal'), reconcile: async () => { throw new Error('Recovery must not block history'); },
     }) },
@@ -117,13 +126,17 @@ function fixture(data = {}) {
     jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText;
   const exports = {};
-  new Function('require', 'exports', 'requestAnimationFrame', 'cancelAnimationFrame', code)(
+  new Function('require', 'exports', 'requestAnimationFrame', 'cancelAnimationFrame', 'setInterval', 'clearInterval', code)(
     name => deps[name] || {}, exports, callback => setImmediate(callback), clearImmediate,
+    (callback, ms) => { const id={};intervals.set(id,{callback,ms});return id; }, id=>intervals.delete(id),
   );
   const render = () => { cursor = 0; focusEffects.length = 0; return exports.default(); };
   const blur = () => { cleanups.forEach(cleanup => cleanup?.()); cleanups = []; };
   const refocus = () => { blur(); cleanups = focusEffects.map(focus => focus()); };
-  return { reads, requests, pushes, render, refocus, blur };
+  return { reads, requests, pushes, render, refocus, blur,
+    poll: () => { for(const {callback} of [...intervals.values()])callback(); },
+    appState: state => { data.appState=state;for(const listener of appStateListeners)listener(state); },
+  };
 }
 
 function find(node, predicate) {
@@ -146,11 +159,12 @@ const openHistory = app => {
   return page;
 };
 
-test('Home puts the euro amount above SAT and shows the last saved payment before remote history loads', async () => {
+test('Home keeps its primary balance and reads HBAR activity without waiting for Bitcoin', async () => {
   const app = fixture({ primaryReady: false, local: [record(1, '2026-09-23T10:00:00Z')] });
   let screen = app.render(); app.refocus(); await settle(); screen = app.render();
   assert.equal(latestRow(screen).props.transaction.key, 'fixture-1');
-  assert.deepEqual(app.reads, ['local']);
+  assert.ok(app.reads.includes('hedera history'));
+  assert.equal(app.reads.includes('lightning history'),false);
   const texts = [];
   const collect = node => {
     if (!node || typeof node !== 'object') return;
@@ -161,7 +175,7 @@ test('Home puts the euro amount above SAT and shows the last saved payment befor
   assert.ok(texts.includes('107 Sats'));
   assert.ok(texts.includes('Latest activity'));
   assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);
-  assert.equal(advanced(screen).props.label, 'More coins');
+  assert.equal(advanced(screen).props.label, 'All coins');
 });
 
 test('activity rows show the same EUR quote or unavailable message as payment details', async () => {
@@ -238,7 +252,7 @@ test('Home starts wallet initialization immediately while remote history remains
   assert.deepEqual(app.reads, ['wallet init']);
 });
 
-test('History waits for Bitcoin, then shows twenty mixed-asset payments and loads older rows at the footer', async () => {
+test('History loads other assets while waiting for Bitcoin, then pages twenty payments at a time', async () => {
   const transfers = Array.from({ length: 45 }, (_, i) => ({
     id: 'transfer-' + i, status: 'COMPLETED', totalValue: 10, transferDirection: 'INCOMING',
     createdTime: new Date(1800000000000 - i * 1000).toISOString(),
@@ -247,7 +261,8 @@ test('History waits for Bitcoin, then shows twenty mixed-asset payments and load
   const app = fixture(data);
   let page = openHistory(app); app.refocus(); await settle();
   assert.equal(page.props.waitingForSpark, true);
-  assert.deepEqual(app.reads, ['local']);
+  assert.ok(app.reads.includes('hedera history'));
+  assert.equal(app.reads.includes('lightning history'),false);
   data.primaryReady = true;
   page = app.render(); app.refocus(); await settle(); page = app.render();
   assert.equal(page.props.waitingForSpark, false);
@@ -263,7 +278,7 @@ test('History waits for Bitcoin, then shows twenty mixed-asset payments and load
     [['lightning history', 20, 0], ['lightning history', 20, 20], ['lightning history', 20, 40]]);
 });
 
-test('Home avoids remote history until Activity opens, then orders HBAR and local payments', async () => {
+test('Home shows the newest HBAR receipt before Activity opens, using a small first page', async () => {
   const app = fixture({
     local: [record(1, '2026-09-21T08:00:00Z')],
     'hedera history': [{ transactionId: '0.0.123@100.000000001', direction: 'received', amountHbar: '2',
@@ -271,9 +286,11 @@ test('Home avoids remote history until Activity opens, then orders HBAR and loca
   });
   app.render(); app.refocus(); await settle();
   let screen = app.render();
-  assert.equal(latestRow(screen).props.transaction.asset, 'SAT');
+  assert.equal(latestRow(screen).props.transaction.asset, 'HBAR');
   assert.equal(advanced(screen).props.expanded, false);
-  assert.equal(app.reads.includes('hedera history'), false);
+  assert.equal(app.reads.includes('hedera history'), true);
+  assert.equal(app.requests.find(item=>item[0]==='hedera history')[2],5);
+  assert.equal(app.requests.find(item=>item[0]==='lightning history')[1],5);
   openHistory(app); app.refocus(); await settle();
   const page = app.render();
   assert.deepEqual(page.props.transactions.map(item => item.asset), ['HBAR', 'SAT']);
@@ -312,7 +329,7 @@ test('The history page opens from one large button and closes without changing w
   let screen = app.render();
   const button = historyButton(screen);
   assert.ok(button);
-  assert.equal(advanced(screen).props.label, 'More coins');
+  assert.equal(advanced(screen).props.label, 'All coins');
   button.props.onPress();
   const page = app.render();
   assert.equal(page.type.name, 'HistoryPage');
@@ -320,4 +337,84 @@ test('The history page opens from one large button and closes without changing w
   screen = app.render();
   assert.equal(screen.type, 'scroll');
   assert.deepEqual(app.pushes, []);
+});
+
+test('Home polls for new HBAR receipts, pauses in background, refreshes on resume and stops on blur', async () => {
+  const receipt=time=>({transactionId:'0.0.123@100.000000001',direction:'received',amountHbar:'2',result:'SUCCESS',occurredAt:time});
+  const data={'hedera history':[]};const app=fixture(data);
+  app.render();app.refocus();await settle();
+  data['hedera history']=[receipt('2026-09-30T10:00:00Z')];
+  app.appState('background');const reads=app.reads.length;
+  app.poll();await settle();assert.equal(app.reads.length,reads);
+  app.appState('active');await settle();
+  assert.equal(latestRow(app.render()).props.transaction.asset,'HBAR');
+  data['hedera history']=[receipt('2026-09-30T11:00:00Z')];
+  app.poll();await settle();
+  assert.equal(latestRow(app.render()).props.transaction.timestamp,'2026-09-30T11:00:00Z');
+  app.blur();const stopped=app.reads.length;
+  app.poll();app.appState('active');await settle();assert.equal(app.reads.length,stopped);
+});
+
+test('a failed HBAR refresh preserves the last known receipt while another asset succeeds', async () => {
+  const data={'hedera history':[{transactionId:'0.0.123@100.000000001',direction:'received',amountHbar:'2',result:'SUCCESS',occurredAt:'2026-09-30T10:00:00Z'}]};
+  const app=fixture(data);app.render();app.refocus();await settle();app.render();
+  data['hedera history']=async()=>{throw Error('temporary mirror outage');};
+  app.poll();await settle();
+  assert.equal(latestRow(app.render()).props.transaction.asset,'HBAR');
+  app.blur();
+});
+
+test('a local HBAR payment and its mirror receipt deduplicate across SDK and mirror ID formats', async () => {
+  const app=fixture({local:[{...record(1,'2026-09-30T10:00:01Z','HBAR'),txId:'0.0.123@100.000000001'}],
+    'hedera history':[{transactionId:'0.0.123-100-000000001',direction:'received',amountHbar:'2',result:'SUCCESS',occurredAt:'2026-09-30T10:00:00Z'}]});
+  app.render();app.refocus();await settle();
+  openHistory(app);app.refocus();await settle();
+  assert.equal(app.render().props.transactions.length,1);
+  assert.equal(app.render().props.transactions[0].key,'hedera:0.0.123-100-000000001');
+  app.blur();
+});
+
+test('All coins shows available BTC and HBAR holdings, EUR values, unit prices and separate incoming amounts', async () => {
+  const app=fixture({spark:150_000_000,hbarTinybars:2_000_000_000n,bitcoinIncoming:100,
+    bitcoinOperations:[{id:'pending-deposit',kind:'deposit',state:'action_required',amountSats:200}],
+  });
+  let screen=app.render();
+  assert.equal(advanced(screen).props.label,'All coins');
+  const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+  const hbar=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera');
+  assert.equal(btc.props.value,'1.5 BTC');assert.equal(btc.props.fiatValue,'≈ 75000');
+  assert.equal(btc.props.subtitle,'1 BTC = 50000');
+  assert.deepEqual(btc.props.notes,['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']);
+  assert.equal(hbar.props.value,'20 HBAR');assert.equal(hbar.props.fiatValue,'≈ 2');
+  assert.equal(hbar.props.subtitle,'1 HBAR = 0.1');
+  const unavailable=fixture({spark:null,btcRate:0,hbarRate:0,sparkStatus:'error',sparkError:'unavailable'});screen=unavailable.render();
+  const unknown=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+  assert.equal(unknown.props.value,'— BTC');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
+});
+
+test('coin cards keep the unit price visible while their balance is updating',()=>{
+  const app=fixture({sparkStatus:'loading'});const screen=app.render();
+  const card=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+  const rendered=card.type(card.props);
+  assert.ok(find(rendered,node=>node.type==='text'&&node.props.children==='1 BTC = 50000'));
+  assert.ok(find(rendered,node=>node.type==='text'&&node.props.children==='Last known balance · updating…'));
+});
+
+test('a known HBAR receipt stays visible while a slower fresh page is still loading',async()=>{
+  const receipt={transactionId:'0.0.123@100.000000001',direction:'received',amountHbar:'2',result:'SUCCESS',occurredAt:'2026-09-30T10:00:00Z'};
+  const data={'hedera history':[receipt]};const app=fixture(data);
+  app.render();app.refocus();await settle();app.render();
+  let release;data['hedera history']=()=>new Promise(resolve=>{release=resolve;});
+  app.poll();await settle();
+  assert.equal(latestRow(app.render()).props.transaction.asset,'HBAR');
+  release([receipt]);await settle();app.blur();
+});
+
+test('changing wallet identity does not expose the previous wallet latest activity',async()=>{
+  const data={publicKey:'first wallet',local:[record(1,'2026-09-30T10:00:00Z')]};const app=fixture(data);
+  app.render();app.refocus();await settle();
+  assert.equal(latestRow(app.render()).props.transaction.key,'fixture-1');
+  data.publicKey='second wallet';data.local=[];
+  assert.equal(latestRow(app.render()),null);
+  app.refocus();await settle();assert.equal(latestRow(app.render()),null);app.blur();
 });

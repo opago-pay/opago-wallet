@@ -708,5 +708,9 @@
   "Reopen the app afterwards and check Sentry for the native test report.": "Después, vuelve a abrir la aplicación y comprueba en Sentry que llegó el informe de prueba nativo.",
   "Run crash test": "Iniciar prueba de fallo",
   "Diagnostics unavailable": "Diagnóstico no disponible",
-  "Crash reporting is disabled or could not start.": "Los informes de fallos están desactivados o no han podido iniciarse."
+  "Crash reporting is disabled or could not start.": "Los informes de fallos están desactivados o no han podido iniciarse.",
+  "All coins": "Todas las monedas",
+  "Incoming Bitcoin: {amount} BTC": "Bitcoin entrante: {amount} BTC",
+  "Onchain deposits awaiting credit: {amount} BTC": "Depósitos onchain pendientes de abono: {amount} BTC",
+  "Some activity could not be refreshed. Pull down to retry.": "No se han podido actualizar algunas actividades. Desliza hacia abajo para volver a intentarlo."
 }

@@ -6,8 +6,9 @@ import { reconcileLightningPayments } from '@/lib/lightning/reconcile-native';
 import type { SparkHistoryWalletLike } from '@/lib/lightning/spark-history';
 import { yieldToUi } from '@/lib/ui-ready';
 
-// Only unresolved submissions need automatic network checks. Ordinary history
-// remains opt-in, and this hook starts only after the primary balance has settled.
+// Only unresolved submissions need status reconciliation. Home separately
+// refreshes a small recent-activity page; older history pages remain explicit.
+// This hook starts only after the primary balance has settled.
 export function usePendingLightningPayments(
   wallet: SparkHistoryWalletLike | null,
   scope: { network: 'MAINNET' | 'REGTEST'; publicKey: string } | null,

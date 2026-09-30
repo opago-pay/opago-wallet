@@ -705,5 +705,9 @@
   "Reopen the app afterwards and check Sentry for the native test report.": "Riapri poi l’app e verifica in Sentry la ricezione del rapporto di test nativo.",
   "Run crash test": "Avvia test di arresto",
   "Diagnostics unavailable": "Diagnostica non disponibile",
-  "Crash reporting is disabled or could not start.": "La segnalazione degli arresti è disattivata o non è stato possibile avviarla."
+  "Crash reporting is disabled or could not start.": "La segnalazione degli arresti è disattivata o non è stato possibile avviarla.",
+  "All coins": "Tutte le monete",
+  "Incoming Bitcoin: {amount} BTC": "Bitcoin in arrivo: {amount} BTC",
+  "Onchain deposits awaiting credit: {amount} BTC": "Depositi onchain in attesa di accredito: {amount} BTC",
+  "Some activity could not be refreshed. Pull down to retry.": "Non è stato possibile aggiornare alcune attività. Trascina verso il basso per riprovare."
 }
