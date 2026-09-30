@@ -78,6 +78,7 @@ function fixture(t) {
     './storage': { ...secure, WALLET_WIPE_PENDING_KEY: markerKey,
       MNEMONIC_STORE_KEY: 'synthetic-mnemonic', WALLET_IDENTITY_KEY: 'synthetic-identity' },
     './database': { wipeTransactions: noop },
+    './transaction-rates-native': { transactionRateStore: { clear: noop } },
     './home-balance-preview-native': { homeBalancePreviewStore: { clear: noop } },
     './hedera/account-binding-native': { clearHederaAccountBindings: noop },
     './hedera/payment-journal-native': { clearAllHederaPaymentJournals: noop },
@@ -97,6 +98,7 @@ function fixture(t) {
       if (name === '@react-native-async-storage/async-storage') return storage;
       if (name === 'expo-sqlite') return { openDatabaseAsync: async () => db };
       if (parent?.filename === nativePath && name === '../storage') return secure;
+      if (parent?.filename === nativePath && name === '../transaction-rates-native') return { observeBitcoinOperationRate: () => {} };
       if (parent?.filename === wipePath) {
         if (name === './bitcoin/store-native') return native;
         if (Object.hasOwn(wipeMocks, name)) return wipeMocks[name];

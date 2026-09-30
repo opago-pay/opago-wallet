@@ -22,6 +22,8 @@ function fixture(data = {}) {
   const pushes = [];
   const intervals = new Map();
   const appStateListeners = new Set();
+  const rateListeners = new Set();
+  const savedQuotes = data.transactionQuotes || {};
   const hooks = { ...React,
     useState: initial => {
       const i = cursor++;
@@ -112,6 +114,14 @@ function fixture(data = {}) {
       return { transfers, next: transfers.length === limit ? offset + limit : null };
     }, sparkUserRequestPaymentHash: item => item?.invoice?.paymentHash || null },
     '@/lib/history-pagination': require('../lib/history-pagination.ts'),
+    '@/lib/transaction-rates': require('../lib/transaction-rates.ts'),
+    '@/lib/transaction-rates-native': { transactionRates: {
+      subscribe: listener => { rateListeners.add(listener); return () => rateListeners.delete(listener); },
+      process: async () => {},
+      enrich: async (items, _identity, assertCurrent) => {
+        assertCurrent();return items.map(item=>({...item,transactionRate:savedQuotes[item.key]||null,transactionRatePending:!savedQuotes[item.key]}));
+      },
+    } },
     '@/lib/ui-ready': { yieldToUi: async () => {} },
     '@/lib/startup-timing': { recordWalletStartupStage: () => {} },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
@@ -134,6 +144,7 @@ function fixture(data = {}) {
   const blur = () => { cleanups.forEach(cleanup => cleanup?.()); cleanups = []; };
   const refocus = () => { blur(); cleanups = focusEffects.map(focus => focus()); };
   return { reads, requests, pushes, render, refocus, blur,
+    storeRate: (key,quote) => { savedQuotes[key]=quote;for(const listener of rateListeners)listener(); },
     poll: () => { for(const {callback} of [...intervals.values()])callback(); },
     appState: state => { data.appState=state;for(const listener of appStateListeners)listener(state); },
   };
@@ -179,7 +190,7 @@ test('Home keeps its primary balance and reads HBAR activity without waiting for
 });
 
 test('activity rows show the same EUR quote or unavailable message as payment details', async () => {
-  const bitcoin = fixture({ primaryReady: false, local: [
+  const bitcoin = fixture({ primaryReady: false, transactionQuotes: { 'fixture-1': { asset:'BTC',eurPerCoin:50000 } }, local: [
     { ...record(1, '2026-09-23T10:00:00Z'), btcEurRate: 50_000 },
   ] });
   bitcoin.render(); bitcoin.refocus(); await settle();
@@ -188,7 +199,7 @@ test('activity rows show the same EUR quote or unavailable message as payment de
   assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '≈ 0.01'));
   assert.match(rendered.props.accessibilityLabel, /≈ 0\.01/);
 
-  const hedera = fixture({ primaryReady: false, local: [record(2, '2026-09-23T10:00:00Z', 'HBAR')] });
+  const hedera = fixture({ primaryReady: false, transactionQuotes: { 'hedera:fixture-2': { asset:'HBAR',eurPerCoin:0.1 }, 'fixture-2': { asset:'HBAR',eurPerCoin:0.1 } }, local: [record(2, '2026-09-23T10:00:00Z', 'HBAR')] });
   hedera.render(); hedera.refocus(); await settle();
   row = latestRow(hedera.render());
   rendered = row.type(row.props);
@@ -198,7 +209,7 @@ test('activity rows show the same EUR quote or unavailable message as payment de
   oldBitcoin.render(); oldBitcoin.refocus(); await settle();
   row = latestRow(oldBitcoin.render());
   rendered = row.type(row.props);
-  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === 'Historical EUR value unavailable'));
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === 'Historical rate is being retrieved'));
 });
 
 test('latest activity and an unresolved-payment notice open the same details view', async () => {
@@ -417,4 +428,18 @@ test('changing wallet identity does not expose the previous wallet latest activi
   data.publicKey='second wallet';data.local=[];
   assert.equal(latestRow(app.render()),null);
   app.refocus();await settle();assert.equal(latestRow(app.render()),null);app.blur();
+});
+
+test('a historical HBAR quote arriving later updates an already opened detail view and stays fixed when today price changes', async () => {
+  const data={primaryReady:false,local:[record(7,'2026-09-23T10:00:00Z','HBAR')]};
+  const app=fixture(data);app.render();app.refocus();await settle();
+  const row=latestRow(app.render());row.props.openTransaction(row.props.transaction);
+  let details=app.render();assert.equal(details.type,'payment-details');
+  assert.equal(details.props.payment.transactionRatePending,true);
+  const key=details.props.payment.key;
+  app.storeRate(key,{asset:'HBAR',eurPerCoin:0.05});await settle();
+  data.hbarRate=100;details=app.render();
+  assert.equal(require('../lib/payment-details.ts').paymentEurQuote(details.props.payment,details.props.rates).eurValue,1);
+  assert.equal(details.props.payment.transactionRatePending,false);
+  app.blur();
 });

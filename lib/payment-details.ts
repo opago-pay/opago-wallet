@@ -1,4 +1,5 @@
 import type { BitcoinOperation } from './bitcoin/store';
+import type { TransactionRate } from './transaction-rates';
 
 export interface PaymentHistoryItem {
   key: string;
@@ -19,6 +20,10 @@ export interface PaymentHistoryItem {
   operation?: BitcoinOperation;
   btcEurRate?: number | null;
   btcEurRateAt?: string | null;
+  transactionRate?: TransactionRate | null;
+  transactionRatePending?: boolean;
+  rateTimeBasis?: 'recorded' | 'network';
+  rateTimeUnknown?: boolean;
 }
 
 export function bitcoinOperationHistoryItem(operation: BitcoinOperation, locale: string): PaymentHistoryItem {
@@ -64,13 +69,19 @@ export function paymentEurQuote(item: PaymentHistoryItem, rates?: { hbarToEur: n
   const amount = item.operation?.amountSats && item.operation.amountSats > 0
     ? item.operation.amountSats : item.amountValue;
   if (amount === undefined || !Number.isFinite(amount) || amount <= 0) return null;
+  const saved = item.transactionRate;
+  if (saved && saved.asset === (item.asset === 'HBAR' ? 'HBAR' : 'BTC') &&
+      Number.isFinite(saved.eurPerCoin) && saved.eurPerCoin > 0) {
+    return { eurValue: (item.asset === 'SAT' ? amount / 100_000_000 : amount) * saved.eurPerCoin,
+      eurPerAsset: saved.eurPerCoin, rateAsset: saved.asset, historical: true };
+  }
+  if (item.transactionRatePending) return null;
   const rate = item.btcEurRate ?? item.operation?.btcEurRate;
   if (item.asset === 'SAT' && typeof rate === 'number' && Number.isFinite(rate) && rate > 0 && rate <= 1e12) {
     return { eurValue: amount / 100_000_000 * rate, eurPerAsset: rate, rateAsset: 'BTC', historical: true };
   }
-  if (item.asset === 'HBAR' && rates && Number.isFinite(rates.hbarToEur) && rates.hbarToEur > 0) {
-    return { eurValue: amount * rates.hbarToEur, eurPerAsset: rates.hbarToEur, rateAsset: 'HBAR', historical: false };
-  }
+  // Current HBAR quotes must never replace the value of a past transaction.
+  void rates;
   return null;
 }
 

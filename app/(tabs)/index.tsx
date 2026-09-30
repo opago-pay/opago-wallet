@@ -60,6 +60,8 @@ import { formatBtcBalance } from '@/lib/bitcoin/amount';
 import { pendingOnchainDepositSats } from '@/lib/bitcoin/holdings';
 import { withTimeout } from '@/lib/promise-timeout';
 import { HistoryPager } from '@/lib/history-pagination';
+import { transactionRates } from '@/lib/transaction-rates-native';
+import { rateScope } from '@/lib/transaction-rates';
 import { operationalHealth } from '@/lib/operational-health-native';
 import { yieldToUi } from '@/lib/ui-ready';
 import { walletSession } from '@/lib/wallet-session';
@@ -179,21 +181,38 @@ export default function HomeScreen() {
   const refreshGenerationRef = useRef(0);
   const refreshInProgressRef = useRef<Promise<void> | null>(null);
   const loadLatestLocal = useCallback(async () => {
+    const assertSession = walletSession.captureRuntime();
     // A small local page also skips hidden unresolved payments without
     // starting Spark/Hedera history just to find one visible row.
     const records = await getTransactionPage(10);
     const item = records.find(record => record.status !== 'pending' ||
       !hiddenHistoryKeys.current.includes(record.txId || 'local:' + record.id));
-    return item ? {
+    const entry = item ? {
       key: savedHistoryKey(item), txId: item.txId,
       type: item.type, amountDisplay: item.amount.toLocaleString(appLocale()),
       amountValue: item.amount,
       asset: item.asset, status: item.status, timestamp: item.timestamp,
       reference: item.reference,
       btcEurRate: item.btcEurRate, btcEurRateAt: item.btcEurRateAt,
+      rateTimeUnknown: !!item.rateTimeUnknown,
       route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' : undefined,
     } satisfies DisplayTransaction : null;
-  }, []);
+    if (!entry || !hederaPublicKey) return entry;
+    const [enriched] = await transactionRates.enrich([entry], hederaPublicKey, assertSession);
+    return enriched;
+  }, [hederaPublicKey]);
+
+  const refreshTransactionRates = useCallback(() => {
+    if (!hederaPublicKey || !walletReady || AppState.currentState !== 'active') return;
+    try {
+      const assertCurrent = walletSession.captureRuntime();
+      void transactionRates.process(rateScope('HBAR', hederaPublicKey, appConfig), assertCurrent);
+      void transactionRates.process(rateScope('SAT', hederaPublicKey, appConfig), assertCurrent);
+      if (sparkWallet && secondaryDataReady) void bitcoinScope(sparkWallet, appConfig.sparkNetwork).then(scope => {
+        assertCurrent(); return transactionRates.process('btc:' + scope, assertCurrent);
+      }).catch(() => undefined);
+    } catch { /* A locked wallet does not run valuation jobs. */ }
+  }, [hederaPublicKey, walletReady, sparkWallet, secondaryDataReady]);
 
   const refresh = useCallback(async (force = false, mode: 'initial' | 'more' | 'retry' = 'initial') => {
     // Home reads one small page per asset, independently of the Activity view.
@@ -227,6 +246,7 @@ export default function HomeScreen() {
             amountValue: item.amount,
             status: item.status, timestamp: item.timestamp, reference: item.reference,
             btcEurRate: item.btcEurRate, btcEurRateAt: item.btcEurRateAt,
+            rateTimeUnknown: !!item.rateTimeUnknown,
             route: item.asset === 'SAT' && /^ln:[a-f0-9]{64}$/.test(item.txId ?? '') ? 'lightning' as const : undefined,
           })) };
         } },
@@ -250,6 +270,7 @@ export default function HomeScreen() {
             amountValue: Number(item.amountHbar),
             timestamp: item.occurredAt, explorerUrl: item.hashscanUrl, explorerLabel: 'HashScan' as const,
             priority: item.nonce === 0 ? 1 : 0,
+            rateTimeBasis: 'network' as const,
           })) };
         } },
         { id: 'lightning-journal', label: 'Bitcoin', load: async () => {
@@ -291,6 +312,8 @@ export default function HomeScreen() {
                 amountDisplay: amount.toLocaleString(appLocale()), asset: 'SAT', status: 'confirmed', route: hash ? 'lightning' as const : undefined,
                 amountValue: amount,
                 timestamp: transfer.createdTime ? new Date(transfer.createdTime).toISOString() : new Date().toISOString(),
+                rateTimeBasis: 'network' as const,
+                rateTimeUnknown: !transfer.createdTime,
               }];
             }) };
           } catch (cause) {
@@ -302,10 +325,24 @@ export default function HomeScreen() {
         item => item.status !== 'pending' || !hiddenHistoryKeys.current.includes(item.key), historyOpen ? 20 : 5);
       }
       const pager = historyPagerRef.current;
+      let publication = 0;
       const publish = () => {
         if (generation !== refreshGenerationRef.current) return;
+        const revision = ++publication;
         const snapshot = pager.snapshot();
-        setTransactions(snapshot.items);
+        setTransactions(snapshot.items.map(item => ({ ...item, transactionRatePending: true })));
+        let assertRateSession: (() => void) | null = null;
+        try { assertRateSession = walletSession.captureRuntime(); } catch { /* Optional valuation. */ }
+        if (hederaPublicKey && assertRateSession) {
+          void transactionRates.enrich(snapshot.items, hederaPublicKey, () => {
+            if (generation !== refreshGenerationRef.current) throw new Error('Wallet changed.');
+            assertRateSession!();
+          }).then(items => {
+            if (generation === refreshGenerationRef.current && revision === publication) {
+              setTransactions(items); refreshTransactionRates();
+            }
+          }).catch(() => undefined);
+        }
         setHistoryHasMore(snapshot.hasMore);
         setHistoryErrors(snapshot.errors);
       };
@@ -338,7 +375,7 @@ export default function HomeScreen() {
     });
     refreshInProgressRef.current = operation;
     return operation;
-  }, [historyOpen, secondaryDataReady, refreshHederaAccount, sparkWallet, walletReady, hederaPaymentJournal, lightningPaymentJournal, setTransactions]);
+  }, [historyOpen, secondaryDataReady, refreshHederaAccount, sparkWallet, walletReady, hederaPaymentJournal, lightningPaymentJournal, setTransactions, hederaPublicKey, refreshTransactionRates]);
 
   const refreshSettledPayment = useCallback(async () => {
     const generation = refreshGenerationRef.current;
@@ -420,28 +457,48 @@ export default function HomeScreen() {
       setRecentLocal(item);
     }).catch(() => undefined);
     void refresh();
+    refreshTransactionRates();
+    const unsubscribeRates = transactionRates.subscribe(() => {
+      if (!hederaPublicKey || cancelled) return;
+      const previous = transactionsRef.current;
+      const generation = refreshGenerationRef.current;
+      let assertRateSession: () => void;
+      try { assertRateSession = walletSession.captureRuntime(); } catch { return; }
+      void transactionRates.enrich(previous, hederaPublicKey, () => {
+        if (cancelled || generation !== refreshGenerationRef.current) throw new Error('Wallet changed.');
+        assertRateSession();
+      }).then(items => {
+        if (!cancelled && generation === refreshGenerationRef.current && transactionsRef.current === previous) setTransactions(items);
+      }).catch(() => undefined);
+    });
     const timer = historyOpen ? null : setInterval(() => {
       if (AppState.currentState === 'active') {
         void refresh(true);
         if (secondaryDataReady) void refreshBalances();
+        refreshTransactionRates();
       }
     }, RECENT_ACTIVITY_REFRESH_MS);
+    const rateTimer = historyOpen ? setInterval(refreshTransactionRates, RECENT_ACTIVITY_REFRESH_MS) : null;
     const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshTransactionRates();
       if (state === 'active' && !historyOpen) {
         void refresh(true);
         if (secondaryDataReady) void refreshBalances();
+        refreshTransactionRates();
       }
     });
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
+      if (rateTimer) clearInterval(rateTimer);
       appState.remove();
+      unsubscribeRates();
       refreshGenerationRef.current += 1;
       refreshInProgressRef.current = null;
       historyLoadedRef.current = false;
       historyPagerRef.current = null;
     };
-  }, [refresh, loadLatestLocal, loadOrGenerateWallet, walletReady, walletError, historyOpen, secondaryDataReady, refreshBalances, setRecentLocal]));
+  }, [refresh, loadLatestLocal, loadOrGenerateWallet, walletReady, walletError, historyOpen, secondaryDataReady, refreshBalances, setRecentLocal, hederaPublicKey, refreshTransactionRates, setTransactions]));
 
   useEffect(() => setRecentLocal(null), [setRecentLocal]);
   useEffect(() => {
@@ -554,7 +611,8 @@ export default function HomeScreen() {
 
   if (selectedTransaction) {
     const hash = lightningHashFromPayment(selectedTransaction);
-    return <PaymentDetailsScreen payment={selectedTransaction} rates={displayRates}
+    const updatedPayment = transactions.find(item => item.key === selectedTransaction.key) ?? selectedTransaction;
+    return <PaymentDetailsScreen payment={updatedPayment} rates={displayRates}
       onClose={() => setSelectedTransaction(null)}
       onHide={hash && selectedTransaction.type === 'outgoing' && selectedTransaction.status === 'pending'
         ? () => { void changePaymentVisibility(hash, true).then(changed => {
@@ -791,7 +849,7 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
   useLanguage();
   const eurQuote = paymentEurQuote(transaction, { hbarToEur });
   const eurLabel = eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}`
-    : t(transaction.asset === 'SAT' ? 'Historical EUR value unavailable' : 'EUR estimate unavailable');
+    : t(transaction.transactionRatePending ? 'Historical rate is being retrieved' : 'Historical EUR value unavailable');
   const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
   const title = friendlyStatus === 'Completed'
     ? transaction.asset === 'SAT'

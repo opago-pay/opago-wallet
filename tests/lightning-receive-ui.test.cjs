@@ -94,6 +94,7 @@ function fixture(options = {}) {
     } },
     '@/lib/database': { addTransaction: async () => { calls.push('activity'); if (options.storageFailure) throw new Error('disk error'); } },
     '@/lib/optional-haptics': { notifyPaymentHaptics: async () => {} },
+    '@/lib/transaction-rates-native': { observeTransactionRate: () => calls.push('rate queued') },
     'expo-haptics': { NotificationFeedbackType: { Success: 'success' } },
     'expo-notifications': { getPermissionsAsync: async () => ({ granted: false }) },
   }), exports => exports.default());

@@ -3,6 +3,7 @@ import { addTransaction } from '../database';
 import { resolveLightningReceiveOutcome, type SparkReceiveWalletLike } from '../lightning/receive-status';
 import type { StoredLightningReceiveRequest } from '../lightning/receive-store';
 import { sats } from './amount';
+import { observeTransactionRate } from '../transaction-rates-native';
 
 const KEY = 'opago.bitcoin.receive-tracking.v1';
 export interface TrackedBitcoinRequest {
@@ -89,7 +90,9 @@ export async function reconcileArchivedBitcoinRequests(wallet: SparkReceiveWalle
       }
       // Activity and archive can be replayed: payment hash is the unique key.
       await addTransaction('incoming', confirmedAmount, 'SAT', { txId: `ln:${current.paymentHash}`, reference: current.requestId,
-        status: 'confirmed', captureFiatRate: false });
+        status: 'confirmed', captureFiatRate: false, timestamp: outcome.transactionAt });
+      observeTransactionRate({ scope: 'btc:' + scope, key: 'ln:' + current.paymentHash, asset: 'BTC',
+        transactionAt: outcome.transactionAt ?? null, timeBasis: 'network' }, assertCurrent);
       assertCurrent();
       current.amountSats = confirmedAmount;
       current.state = 'confirmed';

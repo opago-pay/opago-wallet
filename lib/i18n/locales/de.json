@@ -712,5 +712,13 @@
   "All coins": "Alle Coins",
   "Incoming Bitcoin: {amount} BTC": "Eingehende Bitcoin: {amount} BTC",
   "Onchain deposits awaiting credit: {amount} BTC": "Onchain-Einzahlungen vor Gutschrift: {amount} BTC",
-  "Some activity could not be refreshed. Pull down to retry.": "Einige Aktivitäten konnten nicht aktualisiert werden. Ziehe zum Wiederholen nach unten."
+  "Some activity could not be refreshed. Pull down to retry.": "Einige Aktivitäten konnten nicht aktualisiert werden. Ziehe zum Wiederholen nach unten.",
+  "Historical rate is being retrieved": "Der damalige Kurs wird nachgeladen",
+  "Rate source": "Kursquelle",
+  "Rate time": "Kurszeitpunkt",
+  "Rate precision": "Kursgenauigkeit",
+  "One-minute market estimate": "Marktwert auf Minutenbasis",
+  "One-minute market estimate, converted to EUR": "Marktwert auf Minutenbasis, in EUR umgerechnet",
+  "Payment time reference": "Zeitbezug der Zahlung",
+  "Time recorded by this app; updated when network time is available": "Von der App erfasster Zeitpunkt; wird aktualisiert, sobald der Netzwerkzeitpunkt vorliegt"
 }

@@ -6,9 +6,11 @@ import { createDepositWatch } from './deposit-watch';
 import { createBitcoinRequestCursor } from './request-cursor';
 import { createBitcoinDepositCursor } from './deposit-cursor';
 import { deleteSecureItem, getSecureItem, setSecureItem } from '../storage';
+import { withBitcoinRateTracking } from './rate-tracking';
+import { observeBitcoinOperationRate } from '../transaction-rates-native';
 function newBitcoinStore() {
-  return createBitcoinSqliteStore(
-    () => openDatabaseAsync('opago-bitcoin-operations.db'), AsyncStorage);
+  return withBitcoinRateTracking(createBitcoinSqliteStore(
+    () => openDatabaseAsync('opago-bitcoin-operations.db'), AsyncStorage), observeBitcoinOperationRate);
 }
 
 // ES module imports observe the replacement after a completed wallet wipe.

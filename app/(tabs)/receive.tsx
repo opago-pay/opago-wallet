@@ -32,6 +32,7 @@ import { paymentEurValueAtCurrentRate } from '@/lib/payment-details';
 import { formatEurValue } from '@/lib/wallet-display';
 import { appConfig } from '@/lib/config';
 import { addTransaction } from '@/lib/database';
+import { observeTransactionRate } from '@/lib/transaction-rates-native';
 import {
   findNewConfirmedIncomingHederaTransaction,
   loadHederaHistory,
@@ -251,7 +252,11 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     asset: 'SAT',
     txId: string,
     reference = txId,
+    transactionAt?: string,
   ) => {
+    const rateOwner = activeOwnerKey.current;
+    let assertRateSession: (() => void) | null = null;
+    try { assertRateSession = walletSession.captureRuntime(); } catch { /* Optional valuation. */ }
     paymentDetectedAt.current = performance.now();
     recordPerformanceDuration('receive.payment_detected', 0);
     setPaidNetwork('lightning');
@@ -262,7 +267,10 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       txId,
       reference,
       status: 'confirmed',
+      timestamp: transactionAt,
     }).catch(() => undefined); // History can be rebuilt; proof remains authoritative.
+    if (rateOwner && assertRateSession) observeTransactionRate({ scope: 'btc:' + rateOwner, key: txId, asset: 'BTC',
+      transactionAt: transactionAt ?? new Date().toISOString(), timeBasis: transactionAt ? 'network' : 'recorded' }, assertRateSession);
     await lightningReceiveStore.clear(reference).catch(() => undefined);
     try {
       await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
@@ -309,6 +317,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
             'SAT',
             'ln:' + invoicePaymentHash!.toLowerCase(),
             invoiceRequestId!,
+            outcome.transactionAt,
           );
           return;
         }
