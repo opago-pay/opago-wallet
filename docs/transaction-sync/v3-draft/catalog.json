@@ -1,0 +1,59 @@
+{
+  "catalog_version": "0.3.0-draft.1",
+  "networks": {
+    "bitcoin:mainnet": {
+      "rails": ["bitcoin_onchain", "lightning", "spark"],
+      "assets": ["bitcoin:mainnet/native:btc"]
+    },
+    "bitcoin:regtest": {
+      "rails": ["bitcoin_onchain", "lightning", "spark"],
+      "assets": ["bitcoin:regtest/native:btc"]
+    },
+    "hedera:mainnet": {
+      "rails": ["hedera_native"],
+      "assets": ["hedera:mainnet/native:hbar"]
+    },
+    "hedera:testnet": {
+      "rails": ["hedera_native"],
+      "assets": ["hedera:testnet/native:hbar"]
+    }
+  },
+  "assets": {
+    "bitcoin:mainnet/native:btc": {
+      "symbol": "BTC",
+      "scales_by_rail": { "bitcoin_onchain": [8], "lightning": [11], "spark": [8, 11] }
+    },
+    "bitcoin:regtest/native:btc": {
+      "symbol": "BTC",
+      "scales_by_rail": { "bitcoin_onchain": [8], "lightning": [11], "spark": [8, 11] }
+    },
+    "hedera:mainnet/native:hbar": {
+      "symbol": "HBAR",
+      "scales_by_rail": { "hedera_native": [8] }
+    },
+    "hedera:testnet/native:hbar": {
+      "symbol": "HBAR",
+      "scales_by_rail": { "hedera_native": [8] }
+    },
+    "fiat:EUR": {
+      "symbol": "EUR",
+      "scale": 2
+    }
+  },
+  "movement_actions": ["send", "receive", "refund", "fee"],
+  "trade_actions": ["buy", "sell", "swap"],
+  "fiat_rails": ["provider_fiat"],
+  "fiat_native_references": ["provider.fiat_charge", "provider.fiat_payout"],
+  "native_references_by_rail": {
+    "bitcoin_onchain": ["bitcoin.txid", "bitcoin.withdrawal_fee"],
+    "lightning": ["lightning.payment_hash", "lightning.routing_fee"],
+    "spark": ["spark.transfer_id", "lightning.payment_hash", "spark.transfer_fee"],
+    "hedera_native": ["hedera.transaction_id", "hedera.transaction_fee"]
+  },
+  "fee_native_references_by_rail": {
+    "bitcoin_onchain": ["bitcoin.withdrawal_fee"],
+    "lightning": ["lightning.routing_fee"],
+    "spark": ["spark.transfer_fee"],
+    "hedera_native": ["hedera.transaction_fee"]
+  }
+}

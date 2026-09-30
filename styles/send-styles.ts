@@ -241,6 +241,7 @@ export const sendStyles = adaptiveStyles(StyleSheet.create({
   checkmark: { color: '#49d17d', fontSize: 48, fontWeight: '800' },
   successTitle: { color: '#fff', fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.5, textAlign: 'center', marginBottom: 8 },
   successAmount: { color: '#fff', fontSize: 36, lineHeight: 44, fontWeight: '600', fontVariant: ['tabular-nums'], marginBottom: 10 },
+  successFiatAmount: { color: '#a6a6ad', fontSize: 20, lineHeight: 27, textAlign: 'center', fontVariant: ['tabular-nums'] },
   successSummary: {
     flexDirection: 'row',
     alignItems: 'center',

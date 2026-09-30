@@ -91,7 +91,7 @@ export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet
       {!deposits.length && <Text style={bitcoinStyles.muted}>{t('No confirmed Bitcoin deposit detected yet.')}</Text>}
       {deposits.map(item => <View key={item.id} style={bitcoinStyles.box}>
         <Text style={bitcoinStyles.value}>{t(item.state === 'confirmed' ? 'Completed' : item.state === 'action_required' ? 'Claim required' : 'Payment is being checked')}</Text>
-        {item.amountSats > 0 && <BitcoinMoney amount={item.amountSats} />}
+        {item.amountSats > 0 && <BitcoinMoney amount={item.amountSats} historicalBtcEurRate={item.btcEurRate} />}
         <Text selectable style={bitcoinStyles.address}>{item.txid}:{item.vout}</Text>
         {item.state !== 'confirmed' && <Text style={bitcoinStyles.note}>{t('Not included in your available balance yet.')}</Text>}
         {item.state === 'action_required' && <BitcoinButton label={t('Review claim fee')} disabled={!wallet} loading={busy} onPress={() => void run(async () => {

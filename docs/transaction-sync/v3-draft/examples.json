@@ -1,0 +1,229 @@
+{
+  "schema_version": "0.3.0-draft.1",
+  "installation_id": "00000000-0000-4000-8000-000000000001",
+  "items": [
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000101",
+      "activity_id": "00000000-0000-4000-8000-000000000201",
+      "seq": 1,
+      "observed_at": "2026-09-29T12:00:00Z",
+      "source_id": "spark_sdk",
+      "wallet_id": "00000000-0000-4000-8000-000000000301",
+      "network_id": "bitcoin:mainnet",
+      "rail_id": "lightning",
+      "asset_id": "bitcoin:mainnet/native:btc",
+      "quantity": { "atoms": "21000", "scale": 11 },
+      "direction": "incoming",
+      "action_code": "receive",
+      "status": "settled",
+      "native_ref": {
+        "namespace": "lightning.payment_hash",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sub_index": 0
+      }
+    },
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000102",
+      "activity_id": "00000000-0000-4000-8000-000000000202",
+      "seq": 2,
+      "observed_at": "2026-09-29T12:01:00Z",
+      "source_id": "bitcoin_node",
+      "wallet_id": "00000000-0000-4000-8000-000000000301",
+      "network_id": "bitcoin:mainnet",
+      "rail_id": "bitcoin_onchain",
+      "asset_id": "bitcoin:mainnet/native:btc",
+      "quantity": { "atoms": "25000", "scale": 8 },
+      "direction": "outgoing",
+      "action_code": "send",
+      "status": "pending",
+      "native_ref": {
+        "namespace": "bitcoin.txid",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sub_index": 0
+      }
+    },
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000103",
+      "activity_id": "00000000-0000-4000-8000-000000000203",
+      "seq": 3,
+      "observed_at": "2026-09-29T12:02:00Z",
+      "source_id": "hedera_mirror",
+      "wallet_id": "00000000-0000-4000-8000-000000000302",
+      "network_id": "hedera:mainnet",
+      "rail_id": "hedera_native",
+      "asset_id": "hedera:mainnet/native:hbar",
+      "quantity": { "atoms": "100000000", "scale": 8 },
+      "direction": "incoming",
+      "action_code": "receive",
+      "status": "settled",
+      "native_ref": {
+        "namespace": "hedera.transaction_id",
+        "value": "0.0.1234@1727610000.000000001",
+        "sub_index": 0
+      }
+    },
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000104",
+      "activity_id": "00000000-0000-4000-8000-000000000204",
+      "seq": 4,
+      "observed_at": "2026-09-29T12:03:00Z",
+      "source_id": "spark_sdk",
+      "wallet_id": "00000000-0000-4000-8000-000000000301",
+      "network_id": "bitcoin:mainnet",
+      "rail_id": "lightning",
+      "asset_id": "bitcoin:mainnet/native:btc",
+      "quantity": { "atoms": "2100000", "scale": 11 },
+      "direction": "incoming",
+      "action_code": "receive",
+      "status": "settled",
+      "native_ref": {
+        "namespace": "lightning.payment_hash",
+        "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "sub_index": 0
+      }
+    },
+    {
+      "kind": "trade",
+      "client_event_id": "00000000-0000-4000-8000-000000000105",
+      "activity_id": "00000000-0000-4000-8000-000000000204",
+      "seq": 5,
+      "observed_at": "2026-09-29T12:03:01Z",
+      "source_id": "moonpay",
+      "action_code": "buy",
+      "status": "settled",
+      "provider_order_id": "synthetic-buy-1",
+      "provider_event_id": "synthetic-buy-completed-1",
+      "base": {
+        "asset_id": "bitcoin:mainnet/native:btc",
+        "quantity": { "atoms": "2100000", "scale": 11 }
+      },
+      "quote": {
+        "asset_id": "fiat:EUR",
+        "quantity": { "atoms": "250", "scale": 2 }
+      },
+      "amount_basis": "executed",
+      "fees": [{
+        "asset_id": "fiat:EUR",
+        "quantity": { "atoms": "10", "scale": 2 }
+      }],
+      "linked_movement_ids": ["00000000-0000-4000-8000-000000000104"],
+      "settlement_refs": [
+        {
+          "side": "base",
+          "asset_id": "bitcoin:mainnet/native:btc",
+          "network_id": "bitcoin:mainnet",
+          "rail_id": "lightning",
+          "native_ref": {
+            "namespace": "lightning.payment_hash",
+            "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "sub_index": 0
+          }
+        },
+        {
+          "side": "quote",
+          "asset_id": "fiat:EUR",
+          "network_id": null,
+          "rail_id": "provider_fiat",
+          "native_ref": {
+            "namespace": "provider.fiat_charge",
+            "value": "synthetic-card-charge-1",
+            "sub_index": 0
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000106",
+      "activity_id": "00000000-0000-4000-8000-000000000205",
+      "seq": 6,
+      "observed_at": "2026-09-29T12:04:00Z",
+      "source_id": "hedera_mirror",
+      "wallet_id": "00000000-0000-4000-8000-000000000302",
+      "network_id": "hedera:mainnet",
+      "rail_id": "hedera_native",
+      "asset_id": "hedera:mainnet/native:hbar",
+      "quantity": { "atoms": "200000000", "scale": 8 },
+      "direction": "outgoing",
+      "action_code": "send",
+      "status": "settled",
+      "native_ref": {
+        "namespace": "hedera.transaction_id",
+        "value": "0.0.1234@1727610001.000000001",
+        "sub_index": 0
+      }
+    },
+    {
+      "kind": "trade",
+      "client_event_id": "00000000-0000-4000-8000-000000000107",
+      "activity_id": "00000000-0000-4000-8000-000000000205",
+      "seq": 7,
+      "observed_at": "2026-09-29T12:04:01Z",
+      "source_id": "synthetic_provider",
+      "action_code": "sell",
+      "status": "settled",
+      "provider_order_id": "synthetic-sell-1",
+      "provider_event_id": "synthetic-sell-completed-1",
+      "base": {
+        "asset_id": "hedera:mainnet/native:hbar",
+        "quantity": { "atoms": "200000000", "scale": 8 }
+      },
+      "quote": {
+        "asset_id": "fiat:EUR",
+        "quantity": { "atoms": "20", "scale": 2 }
+      },
+      "amount_basis": "executed",
+      "fees": [],
+      "linked_movement_ids": ["00000000-0000-4000-8000-000000000106"],
+      "settlement_refs": [
+        {
+          "side": "base",
+          "asset_id": "hedera:mainnet/native:hbar",
+          "network_id": "hedera:mainnet",
+          "rail_id": "hedera_native",
+          "native_ref": {
+            "namespace": "hedera.transaction_id",
+            "value": "0.0.1234@1727610001.000000001",
+            "sub_index": 0
+          }
+        },
+        {
+          "side": "quote",
+          "asset_id": "fiat:EUR",
+          "network_id": null,
+          "rail_id": "provider_fiat",
+          "native_ref": {
+            "namespace": "provider.fiat_payout",
+            "value": "synthetic-payout-1",
+            "sub_index": 0
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movement",
+      "client_event_id": "00000000-0000-4000-8000-000000000108",
+      "activity_id": "00000000-0000-4000-8000-000000000206",
+      "seq": 8,
+      "observed_at": "2026-09-29T12:05:01Z",
+      "source_id": "hedera_mirror",
+      "wallet_id": "00000000-0000-4000-8000-000000000302",
+      "network_id": "hedera:mainnet",
+      "rail_id": "hedera_native",
+      "asset_id": "hedera:mainnet/native:hbar",
+      "quantity": { "atoms": "100000", "scale": 8 },
+      "direction": "outgoing",
+      "action_code": "fee",
+      "status": "settled",
+      "native_ref": {
+        "namespace": "hedera.transaction_fee",
+        "value": "0.0.1234@1727610001.000000001",
+        "sub_index": 0
+      }
+    }
+  ]
+}

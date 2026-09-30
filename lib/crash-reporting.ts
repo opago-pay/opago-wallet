@@ -1,0 +1,91 @@
+import type { ReactNativeOptions } from '@sentry/react-native';
+import { diagnosticScreen, sanitizeCrashEvent } from './sentry-privacy';
+
+// Public ingestion key, not an API or build-upload credential.
+const dsn = 'https://87bcd96c65e4476e0f783d39cb5f4a86@o4512175942598656.ingest.de.sentry.io/4512175945154640';
+let sdk: typeof import('@sentry/react-native') | undefined;
+let attempted = false;
+
+export function crashReportingOptions(): ReactNativeOptions {
+  return {
+    dsn,
+    debug: false,
+    sendDefaultPii: false,
+    sendClientReports: false,
+    enableNative: true, // Native offline queue; only already-sanitized JS events enter it.
+    // Native crashes bypass JS beforeSend. Keep Apple crash reports for these
+    // until an independently verified native privacy filter is available.
+    enableNativeCrashHandling: false,
+    enableNdk: false,
+    enableNdkScopeSync: false,
+    enableTombstone: false,
+    enableMetricKit: false,
+    enableMetricKitRawPayload: false,
+    enableWatchdogTerminationTracking: false,
+    enableAppHangTracking: false,
+    enableAutoSessionTracking: false,
+    enableAutoPerformanceTracing: false,
+    enableAppStartTracking: false,
+    enableNativeFramesTracking: false,
+    enableStallTracking: false,
+    enableCaptureFailedRequests: false,
+    enableNetworkBreadcrumbs: false,
+    enableNetworkEventBreadcrumbs: false,
+    enableAutoBreadcrumbTracking: false,
+    enableActivityLifecycleBreadcrumbs: false,
+    enableAppLifecycleBreadcrumbs: false,
+    enableSystemEventBreadcrumbs: false,
+    enableUserInteractionTracing: false,
+    enableNativeNagger: false,
+    enableTurboModuleTracking: false,
+    enableLogs: false,
+    enableAutoConsoleLogs: false,
+    attachScreenshot: false,
+    attachViewHierarchy: false,
+    attachThreads: false,
+    attachAllThreads: false,
+    maxBreadcrumbs: 0,
+    maxCacheItems: 10,
+    maxQueueSize: 10,
+    patchGlobalPromise: false,
+    shutdownTimeout: 500,
+    tracePropagationTargets: [],
+    beforeBreadcrumb: () => null,
+    beforeSend: (event, hint) => {
+      hint.attachments = [];
+      return sanitizeCrashEvent(event);
+    },
+    beforeSendTransaction: () => null,
+    integrations: defaults => defaults.filter(integration => new Set([
+      'ReactNativeErrorHandlers', 'Release', 'EventOrigin', 'SdkInfo',
+      'ReactNativeInfo', 'RewriteFrames', 'DebugMeta', 'DeviceContext', 'Dedupe',
+    ]).has(integration.name)),
+  };
+}
+
+/** Optional diagnostics: no awaited initialization, connectivity test or login. */
+export function initializeCrashReporting(development: boolean, platform: string): void {
+  if (attempted || development || platform === 'web' || process.env.EXPO_PUBLIC_SENTRY_ENABLED === 'false') return;
+  attempted = true;
+  const errorUtils = (globalThis as typeof globalThis & {
+    ErrorUtils?: { getGlobalHandler(): (error: Error, fatal?: boolean) => void; setGlobalHandler(handler: (error: Error, fatal?: boolean) => void): void };
+  }).ErrorUtils;
+  let originalHandler: ReturnType<NonNullable<typeof errorUtils>['getGlobalHandler']> | undefined;
+  try {
+    originalHandler = errorUtils?.getGlobalHandler();
+    // A missing/broken native SDK must not prevent the wallet from starting.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const loaded: typeof import('@sentry/react-native') = require('@sentry/react-native');
+    loaded.init(crashReportingOptions());
+    sdk = loaded;
+  } catch {
+    // Undo a partially installed error handler if initialization fails.
+    try { if (originalHandler) errorUtils?.setGlobalHandler(originalHandler); }
+    catch { /* Keep the original startup failure isolated from the wallet. */ }
+  }
+}
+
+export function recordDiagnosticScreen(segments: readonly string[]): void {
+  try { sdk?.setTag('screen', diagnosticScreen(segments)); }
+  catch { /* Diagnostics cannot interrupt navigation. */ }
+}

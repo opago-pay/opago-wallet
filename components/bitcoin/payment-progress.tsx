@@ -8,11 +8,12 @@ import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
 import { useWalletMotion } from '@/hooks/useWalletMotion';
+import { formatEurValue } from '@/lib/wallet-display';
 
 export type BitcoinPaymentPhase = 'authorizing' | 'sending' | 'success';
 
 /** Presentation follows the actual authorization/SDK result, never a simulated timer. */
-export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amountSats: number; footer?: ReactNode; children?: ReactNode; onBack?(): void }) {
+export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amountSats: number; eurValue?: number | null; footer?: ReactNode; children?: ReactNode; onBack?(): void }) {
   useLanguage();
   useColorMode();
   const { width } = useWindowDimensions();
@@ -52,6 +53,8 @@ export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amou
       <View style={styles.summary} accessible accessibilityLiveRegion="polite" accessibilityState={{ busy: !success }}>
         <Text accessibilityRole="header" style={[styles.heading, width < 360 && styles.headingCompact]}>{heading}</Text>
         <Text style={styles.amount}>{props.amountSats.toLocaleString(appLocale())} SAT</Text>
+        {success && <Text style={styles.fiatAmount}>{props.eurValue !== null && props.eurValue !== undefined
+          ? `≈ ${formatEurValue(props.eurValue)}` : t('EUR estimate unavailable')}</Text>}
         <Text style={styles.note}>{t(success ? 'Payment confirmed' : props.phase === 'authorizing' ? 'Approve this payment with your device.' : 'Please wait. Do not send again.')}</Text>
       </View>
       {props.children}
@@ -70,5 +73,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   heading: { color: '#fafaf7', fontSize: 28, lineHeight: 34, fontWeight: '600', textAlign: 'center', letterSpacing: -0.5 },
   headingCompact: { fontSize: 24, lineHeight: 30 },
   amount: { color: '#fafaf7', fontSize: 36, lineHeight: 44, fontWeight: '600', textAlign: 'center', fontVariant: ['tabular-nums'] },
+  fiatAmount: { color: '#a6a6ad', fontSize: 20, lineHeight: 27, textAlign: 'center', fontVariant: ['tabular-nums'] },
   note: { color: '#a6a6ad', fontSize: 15, lineHeight: 22, textAlign: 'center' },
 }));

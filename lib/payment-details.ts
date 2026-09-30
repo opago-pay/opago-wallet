@@ -45,6 +45,20 @@ export type PaymentEurQuote = {
   historical: boolean;
 };
 
+/** Capture a recent fiat estimate when a payment completes. */
+export function paymentEurValueAtCurrentRate(
+  asset: 'SAT' | 'HBAR',
+  amount: number,
+  rates: { btcToEur: number; hbarToEur: number; updatedAt: number },
+  now = Date.now(),
+): number | null {
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rates.updatedAt) ||
+      rates.updatedAt <= 0 || now < rates.updatedAt || now - rates.updatedAt > 300_000) return null;
+  const rate = asset === 'SAT' ? rates.btcToEur : rates.hbarToEur;
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 1e12) return null;
+  return asset === 'SAT' ? amount / 100_000_000 * rate : amount * rate;
+}
+
 /** Only a rate captured for this payment may be presented as its historical value. */
 export function paymentEurQuote(item: PaymentHistoryItem, rates?: { hbarToEur: number }): PaymentEurQuote | null {
   const amount = item.operation?.amountSats && item.operation.amountSats > 0

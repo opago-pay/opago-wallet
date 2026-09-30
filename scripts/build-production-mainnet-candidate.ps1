@@ -220,7 +220,7 @@ try {
     deviceAbi = $deviceAbi
     androidRelease = $androidRelease
     appProcessRunning = $true
-    realFundsAcceptance = 'pending manual approval and LIGHTNING_MAINNET_ACCEPTANCE.md'
+    realFundsAcceptance = 'pending manual approval and docs/LIGHTNING_MAINNET_ACCEPTANCE.md'
   }
   $record | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $outputDirectory 'build.json') -Encoding UTF8
 
@@ -228,7 +228,7 @@ try {
   Write-Host "APK: $targetApk"
   Write-Host "APK SHA-256: $apkHash"
   Write-Host "Package: $packageId"
-  Write-Host 'No real-fund payment was initiated. Continue with LIGHTNING_MAINNET_ACCEPTANCE.md.'
+  Write-Host 'No real-fund payment was initiated. Continue with docs/LIGHTNING_MAINNET_ACCEPTANCE.md.'
 } finally {
   foreach ($name in $managedNames) {
     [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')

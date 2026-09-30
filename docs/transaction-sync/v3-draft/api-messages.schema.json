@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:opago:transaction-sync:0.3.0-draft.1:api-messages",
+  "title": "OPAGO transaction sync v3 plaintext API messages",
+  "definitions": {
+    "Empty": { "type": "object", "additionalProperties": false, "properties": {}, "required": [] },
+    "uuid": { "type": "string", "format": "uuid" },
+    "utc_second": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "positive_seq": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "hex64": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "account_id": { "type": "string", "pattern": "^0\\.0\\.[1-9][0-9]*$", "maxLength": 32 },
+    "hedera_network": { "enum": ["hedera:mainnet", "hedera:testnet"] },
+    "ingest_item_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_event_id", "seq", "result", "movement_id", "code", "closure_token"],
+      "properties": {
+        "client_event_id": { "$ref": "#/definitions/uuid" },
+        "seq": { "$ref": "#/definitions/positive_seq" },
+        "result": { "enum": ["accepted", "duplicate", "rejected_retryable", "rejected_permanent"] },
+        "movement_id": { "oneOf": [{ "$ref": "#/definitions/uuid" }, { "type": "null" }] },
+        "code": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 80 }, { "type": "null" }] },
+        "closure_token": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 8192 }, { "type": "null" }] }
+      }
+    },
+    "IngestResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["installation_id", "results", "last_acknowledged_seq", "missing_seq", "missing_seq_truncated"],
+      "properties": {
+        "installation_id": { "$ref": "#/definitions/uuid" },
+        "results": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/definitions/ingest_item_result" } },
+        "last_acknowledged_seq": { "$ref": "#/definitions/seq" },
+        "missing_seq": { "type": "array", "maxItems": 1000, "uniqueItems": true, "items": { "$ref": "#/definitions/positive_seq" } },
+        "missing_seq_truncated": { "type": "boolean" }
+      }
+    },
+    "Cursor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["installation_id", "last_acknowledged_seq", "missing_seq", "missing_seq_truncated"],
+      "properties": {
+        "installation_id": { "$ref": "#/definitions/uuid" },
+        "last_acknowledged_seq": { "$ref": "#/definitions/seq" },
+        "missing_seq": { "type": "array", "maxItems": 1000, "uniqueItems": true, "items": { "$ref": "#/definitions/positive_seq" } },
+        "missing_seq_truncated": { "type": "boolean" }
+      }
+    },
+    "CloseRejectedRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["installation_id", "items"],
+      "properties": {
+        "installation_id": { "$ref": "#/definitions/uuid" },
+        "items": { "type": "array", "minItems": 1, "maxItems": 100, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["seq", "client_event_id", "closure_token"],
+          "properties": {
+            "seq": { "$ref": "#/definitions/positive_seq" },
+            "client_event_id": { "$ref": "#/definitions/uuid" },
+            "closure_token": { "type": "string", "minLength": 1, "maxLength": 8192 }
+          }
+        } }
+      }
+    },
+    "HederaChallengeRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["installation_id", "network_id", "hedera_account_id", "public_key"],
+      "properties": {
+        "installation_id": { "$ref": "#/definitions/uuid" },
+        "network_id": { "$ref": "#/definitions/hedera_network" },
+        "hedera_account_id": { "$ref": "#/definitions/account_id" },
+        "public_key": { "$ref": "#/definitions/hex64" }
+      }
+    },
+    "HederaChallenge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challenge_id", "signing_message_b64u", "issued_at", "expires_at"],
+      "properties": {
+        "challenge_id": { "$ref": "#/definitions/uuid" },
+        "signing_message_b64u": { "type": "string", "minLength": 1, "maxLength": 2731, "pattern": "^[A-Za-z0-9_-]+$" },
+        "issued_at": { "$ref": "#/definitions/utc_second" },
+        "expires_at": { "$ref": "#/definitions/utc_second" }
+      }
+    },
+    "HederaBindRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challenge_id", "installation_id", "signature_b64u"],
+      "properties": {
+        "challenge_id": { "$ref": "#/definitions/uuid" },
+        "installation_id": { "$ref": "#/definitions/uuid" },
+        "signature_b64u": { "type": "string", "pattern": "^[A-Za-z0-9_-]{86}$" }
+      }
+    },
+    "HederaBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wallet_id", "network_id", "hedera_account_id", "public_key", "binding_generation", "status", "verified_at"],
+      "properties": {
+        "wallet_id": { "$ref": "#/definitions/uuid" },
+        "network_id": { "$ref": "#/definitions/hedera_network" },
+        "hedera_account_id": { "$ref": "#/definitions/account_id" },
+        "public_key": { "$ref": "#/definitions/hex64" },
+        "binding_generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "status": { "enum": ["active", "suspended", "deactivated"] },
+        "verified_at": { "oneOf": [{ "$ref": "#/definitions/utc_second" }, { "type": "null" }] }
+      }
+    },
+    "HederaDeactivateRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["expected_binding_generation", "reason"],
+      "properties": {
+        "expected_binding_generation": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "reason": { "enum": ["user_request", "lost_key"] }
+      }
+    },
+    "MigrationRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["legacy_wallet_id", "legacy_installation_id", "legacy_last_allocated_seq", "v3_installation_id", "catalog_version", "source_anchors"],
+      "properties": {
+        "legacy_wallet_id": { "$ref": "#/definitions/uuid" },
+        "legacy_installation_id": { "$ref": "#/definitions/uuid" },
+        "legacy_last_allocated_seq": { "$ref": "#/definitions/seq" },
+        "v3_installation_id": { "$ref": "#/definitions/uuid" },
+        "catalog_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "source_anchors": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["source_id", "wallet_id", "checkpoint"],
+          "properties": {
+            "source_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z][a-z0-9_]*$" },
+            "wallet_id": { "$ref": "#/definitions/uuid" },
+            "checkpoint": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 256 }, { "type": "null" }] }
+          }
+        } }
+      }
+    },
+    "MigrationStatus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["migration_id", "phase", "legacy_last_allocated_seq", "v2_last_acknowledged_seq", "v3_last_acknowledged_seq", "backfill_through_seq", "blockers"],
+      "properties": {
+        "migration_id": { "$ref": "#/definitions/uuid" },
+        "phase": { "enum": ["preparing", "draining", "backfilling", "coverage_incomplete", "active"] },
+        "legacy_last_allocated_seq": { "$ref": "#/definitions/seq" },
+        "v2_last_acknowledged_seq": { "$ref": "#/definitions/seq" },
+        "v3_last_acknowledged_seq": { "$ref": "#/definitions/seq" },
+        "backfill_through_seq": { "$ref": "#/definitions/seq" },
+        "blockers": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "enum": ["cursor_gap", "source_coverage_incomplete", "alias_conflict", "binding_stale", "evidence_pending"] } }
+      }
+    },
+    "Error": {
+      "type": "object", "additionalProperties": false,
+      "required": ["error"],
+      "properties": { "error": {
+        "type": "object", "additionalProperties": false,
+        "required": ["code", "message", "retryable", "details"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "retryable": { "type": "boolean" },
+          "details": { "type": "object", "maxProperties": 20 }
+        }
+      } }
+    }
+  }
+}

@@ -27,7 +27,7 @@ function openAmount(app) {
 }
 function fixture(options = {}) {
   const calls = [];
-  const rates = options.rates || { btcToEur: 50000, updatedAt: Date.now(), isLoading: false, refresh: async () => {} };
+  const rates = options.rates || { btcToEur: 50000, hbarToEur: 0.2, updatedAt: Date.now(), isLoading: false, refresh: async () => {} };
   const saved = options.saved;
   const cache = options.cache || { address: null };
   const client = {
@@ -49,6 +49,8 @@ function fixture(options = {}) {
     '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({ replace: route => calls.push(['replace', route]) }) }, '@react-navigation/native': { useIsFocused: () => true },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth }, '@/hooks/useExchangeRates': { useExchangeRates: () => rates },
+    '@/lib/payment-details': require('../lib/payment-details.ts'),
+    '@/lib/wallet-display': { formatEurValue: value => `${value.toFixed(2)} EUR` },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', TextInput: 'input' },
     '@/components/send/payment-back-button': { PaymentBackButton: 'back' },
     '@expo/vector-icons': { Ionicons: 'icon' }, 'expo-image': { Image: 'image' },
@@ -237,6 +239,7 @@ test('proof-backed receive success survives activity/storage errors and returns 
   const app = fixture({ saved: request(Date.now() + 60000), status: 'confirmed', storageFailure: true }); t.after(app.unmount);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   app.render(); const screen = await app.settle(); assert.match(text(screen), /Payment received/);
+  assert.match(text(screen), /≈ 0\.01 EUR/);
   t.mock.timers.tick(3001); const after = await app.settle();
   assert.doesNotMatch(text(after), /Payment received/);
   assert.deepEqual(app.calls.filter(call => Array.isArray(call) && call[0] === 'replace'), [['replace', '/(tabs)']]);

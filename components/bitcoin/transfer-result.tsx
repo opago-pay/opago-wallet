@@ -22,7 +22,7 @@ export function BitcoinTransferResult({ operation, onDashboard, onRefresh }: { o
       : <Ionicons name={failed ? 'close-circle-outline' : 'time-outline'} size={66}
         color={themeColor(failed ? 'errorText' : 'warningText')} />}</View>
     <Text style={[bitcoinStyles.title, { textAlign: 'center' }]}>{t(failed ? 'Payment not completed' : confirmed ? 'Bitcoin sent' : checking ? 'Payment is being checked' : 'Bitcoin is on its way')}</Text>
-    <BitcoinMoney amount={operation.amountSats} hero />
+    <BitcoinMoney amount={operation.amountSats} historicalBtcEurRate={operation.btcEurRate} hero />
     <Text style={bitcoinStyles.muted}>{t(failed ? 'Payment failed.' : checking ? 'Please do not send again. We are checking the payment automatically.' : confirmed ? 'Payment confirmed' : 'Arrives after confirmation in the Bitcoin network. This can take some time.')}</Text>
     <View style={bitcoinStyles.box}><Text style={bitcoinStyles.value}>{t('Recipient')}</Text><Text style={bitcoinStyles.address} selectable>{operation.address}</Text>
       <Text style={bitcoinStyles.muted}>{t(failed ? 'Payment failed.' : operation.state === 'broadcast' ? 'Broadcast to the Bitcoin network' : confirmed ? 'Completed' : checking ? 'Payment is being checked' : 'Waiting for network confirmation')}</Text>

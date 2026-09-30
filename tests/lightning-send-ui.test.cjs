@@ -19,7 +19,8 @@ function fixture(options = {}) {
       useFocusEffect: fn => hooks.useEffect(() => params.focused ? fn() : undefined, [fn, params.focused]) },
     'expo-linking': { addEventListener: () => ({ remove() {} }) },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth },
-    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000 }) },
+    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, hbarToEur: 0.2, updatedAt: Date.now() }) },
+    '@/lib/payment-details': require('../lib/payment-details.ts'),
     '@/lib/config': { appConfig: { sparkNetwork: 'REGTEST' } },
     '@/hooks/useWalletBalances': { useWalletBalances: () => ({ balances: {}, balanceStates: { spark: {}, hedera: {} } }) },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: [], refresh() {} }) },
@@ -159,6 +160,7 @@ test('Send immediately shows progress, waits for authorization and proof, and ig
  authorize(()=>{});tree=await app.settle();assert.equal(tree.type,'progress');assert.equal(tree.props.phase,'sending');assert.equal(tree.props.amountSats,20);
  assert.equal(app.calls.filter(c=>c==='submit').length,1);
  complete({amountSats:20,reference:'synthetic-proof'});tree=await app.settle();assert.equal(tree.type,'success');assert.equal(tree.props.reference,'synthetic-proof');
+ assert.equal(tree.props.eurValue,0.01);
 });
 
 test('cancelled device authorization returns to review and never submits or shows success',async t=>{

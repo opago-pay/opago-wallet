@@ -4,7 +4,7 @@ import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { WalletProvider } from '@/hooks/useWalletAuth';
@@ -13,6 +13,7 @@ import { BackupPrompt } from '@/components/security/backup-prompt';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
 import { startEventLoopMonitor } from '@/lib/performance-trace';
+import { recordDiagnosticScreen } from '@/lib/crash-reporting';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,6 +31,8 @@ export const unstable_settings = {
 
 function AppStack() {
   const { mode } = useColorMode();
+  const segments = useSegments();
+  useEffect(() => { recordDiagnosticScreen(segments); }, [segments]);
   useEffect(() => {
     const stop = startEventLoopMonitor(() => AppState.currentState === 'active');
     return stop;

@@ -1,7 +1,7 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const path = require('path');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname, { annotateReactComponents: false, includeWebReplay: false, includeWebFeedback: false });
 const queryStringBridge = path.join(__dirname, 'lib/router-query-string.cjs');
 
 // Expo CLI's dev-server file observers still read `eventsQueue`, while the

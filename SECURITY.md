@@ -49,7 +49,7 @@ The checkout contract cryptographically binds the network, contract, merchant ad
 
 Hedera SDK operations use bounded request/deadline/attempt settings. Once the SDK returns a transaction ID, the app persists a non-secret journal record as `pending` before waiting for the receipt. Only an explicit `SUCCESS` receipt or Mirror Node result promotes it to `confirmed`; known non-success results become `failed`, and unavailable or unknown results remain `pending`. This state survives process death and prevents an unresolved payment from being shown as successful.
 
-Physical Phase 4 acceptance on 12 August 2026 covered offline operation, timeout, force-stop after submission, restart reconciliation, expired and altered checkout data, wrong amounts, and an on-chain replay rejection. The redacted app-process Logcat review found no recovery/private-key labels, complete signed-transaction payloads, or fatal exceptions. Public transaction links and aggregate counts are recorded in [PHASE4_ACCEPTANCE.md](PHASE4_ACCEPTANCE.md); raw device logs are intentionally not retained.
+Physical Phase 4 acceptance on 12 August 2026 covered offline operation, timeout, force-stop after submission, restart reconciliation, expired and altered checkout data, wrong amounts, and an on-chain replay rejection. The redacted app-process Logcat review found no recovery/private-key labels, complete signed-transaction payloads, or fatal exceptions. Public transaction links and aggregate counts are recorded in [PHASE4_ACCEPTANCE.md](docs/PHASE4_ACCEPTANCE.md); raw device logs are intentionally not retained.
 
 ## Wallet recovery and provisioning safeguards
 
@@ -79,7 +79,7 @@ Before receiving, users must check three paper-backup words or explicitly acknow
 
 The agreed scope is HBAR and Bitcoin over Lightning/Spark. The Home Swap action shows only a localized coming-soon notice; swap execution remains disabled and onboarding does not promise it. eID/Travel Rule payment paths fail closed before starting identity sessions or sending payer data; setting a backend URL does not enable them. Reference servers remain development code. External native links only admit bounded canonical Hedera checkout reviews, never recovery, creation or direct signing routes. Checkout explicitly does not verify merchant identity.
 
-Implementation and outstanding external evidence are tracked in [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md). No independent audit or public-release approval has been obtained by these code changes.
+Implementation and outstanding external evidence are tracked in [PUBLIC_RELEASE_READINESS.md](docs/PUBLIC_RELEASE_READINESS.md). No independent audit or public-release approval has been obtained by these code changes.
 
 Lightning payments use a non-secret local journal before submission. Unknown SDK outcomes remain pending across process death and are reconciled through the opaque Spark request ID or paginated outgoing history when opening Send or expanding Home activity. A collapsed Home does not scan history at startup. Confirmation requires a returned preimage whose SHA-256 equals the invoice payment hash. Privacy-sensitive incoming invoice state uses device-protected SecureStore and persists only until completion, expiry, replacement, or wallet deletion. Local service health stores aggregate timestamps, failure counts, and broad categories only.
 

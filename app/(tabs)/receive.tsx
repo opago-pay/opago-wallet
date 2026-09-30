@@ -28,6 +28,8 @@ import { PaymentNetworkIcon } from '@/components/receive/payment-network-icon';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { BackupReminder, BackupStatusNotice } from '@/components/security/backup-prompt';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { paymentEurValueAtCurrentRate } from '@/lib/payment-details';
+import { formatEurValue } from '@/lib/wallet-display';
 import { appConfig } from '@/lib/config';
 import { addTransaction } from '@/lib/database';
 import {
@@ -84,6 +86,8 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   routerRef.current = router;
   const isFocused = useIsFocused();
   const rates = useExchangeRates();
+  const ratesRef = useRef(rates);
+  ratesRef.current = rates;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const {
@@ -130,6 +134,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   const paymentDetectedAt = useRef<number | null>(null);
   const [paidNetwork, setPaidNetwork] = useState<'lightning' | 'hedera' | null>(null);
   const [receivedDescription, setReceivedDescription] = useState('');
+  const [receivedEurValue, setReceivedEurValue] = useState<number | null>(null);
   const [receivedExplorerUrl, setReceivedExplorerUrl] = useState<string | null>(null);
   const hederaKnownTransactions = useRef<Set<string> | null>(null);
   const [hederaReady, setHederaReady] = useState(false);
@@ -251,6 +256,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     recordPerformanceDuration('receive.payment_detected', 0);
     setPaidNetwork('lightning');
     setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
+    setReceivedEurValue(paymentEurValueAtCurrentRate('SAT', amount, ratesRef.current));
     setIsPaid(true);
     await addTransaction('incoming', amount, asset, {
       txId,
@@ -380,6 +386,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           recordPerformanceDuration('receive.payment_detected', 0);
           const description = t('{amount} HBAR confirmed on {network}.', { amount: incoming.amountHbar, network: HEDERA_NETWORK });
           setReceivedDescription(description);
+          setReceivedEurValue(paymentEurValueAtCurrentRate('HBAR', Number(incoming.amountHbar), ratesRef.current));
           setReceivedExplorerUrl(incoming.hashscanUrl);
           setPaidNetwork('hedera');
           setIsPaid(true);
@@ -490,6 +497,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     setIsPaid(false);
     setPaidNetwork(null);
     setReceivedDescription('');
+    setReceivedEurValue(null);
     setReceivedExplorerUrl(null);
     hederaKnownTransactions.current = null;
     setHederaReady(false);
@@ -664,6 +672,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           <Text style={styles.successTitle}>{t("Payment received")}</Text>
           <Text style={[styles.subtitle, styles.centerText]}>
             {receivedDescription || t('The payment is complete and saved in your activity.')}
+          </Text>
+          <Text style={styles.successFiatAmount}>
+            {receivedEurValue !== null ? `≈ ${formatEurValue(receivedEurValue)}` : t('EUR estimate unavailable')}
           </Text>
           <TouchableOpacity
             style={[styles.button, styles.fullWidthButton, { marginTop: 24 }]}
