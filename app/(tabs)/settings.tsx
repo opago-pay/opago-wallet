@@ -44,6 +44,7 @@ import { getPerformanceReport, markNavigationReady, performanceTracingEnabled } 
 import { categorizeAuthFailure, recordAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { bindHederaWalletAccount } from '@/lib/hedera/account-binding-native';
 import { listHederaAccountsForKey, type HederaAccountSnapshot } from '@/lib/hedera/account';
+import { nativeCrashTestEnabled, triggerNativeCrashTest } from '@/lib/crash-reporting';
 
 function SensitiveInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-verification');
@@ -626,6 +627,20 @@ export default function SettingsScreen() {
               .then(() => Alert.alert(t('Copied'), t('Timing report copied to clipboard.')))
               .catch(() => Alert.alert(t('Copy unavailable'), t('Please try again.')))}>
             <Text style={styles.actionText}>{t('Copy timing report')}</Text>
+          </TouchableOpacity>
+        </View>}
+        {nativeCrashTestEnabled(__DEV__, Platform.OS) && <View style={styles.advancedSection}>
+          <Text style={styles.sectionTitle}>{t('Crash diagnostics test')}</Text>
+          <Text style={styles.body}>{t('This test deliberately closes the app. Reopen it to send the diagnostic report. No payment is made.')}</Text>
+          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
+            disabled={busy} accessibilityState={{ disabled: busy }}
+            onPress={() => Alert.alert(t('Close app for crash test?'), t('Reopen the app afterwards and check Sentry for the native test report.'), [
+              { text: t('Cancel'), style: 'cancel' },
+              { text: t('Run crash test'), style: 'destructive', onPress: () => {
+                if (!triggerNativeCrashTest(__DEV__, Platform.OS)) Alert.alert(t('Diagnostics unavailable'), t('Crash reporting is disabled or could not start.'));
+              } },
+            ])}>
+            <Text style={styles.actionText}>{t('Run crash test')}</Text>
           </TouchableOpacity>
         </View>}
       </View>}

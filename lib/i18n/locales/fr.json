@@ -701,5 +701,12 @@
   "Transaction value at payment time": "Valeur de la transaction au moment du paiement",
   "Exchange rate at payment time": "Taux de change au moment du paiement",
   "Historical EUR value unavailable": "Valeur historique en EUR indisponible",
-  "Historical exchange rate unavailable": "Taux de change historique indisponible"
+  "Historical exchange rate unavailable": "Taux de change historique indisponible",
+  "Crash diagnostics test": "Tester le diagnostic des plantages",
+  "This test deliberately closes the app. Reopen it to send the diagnostic report. No payment is made.": "Ce test ferme volontairement l’application. Rouvrez-la pour envoyer le rapport de diagnostic. Aucun paiement n’est effectué.",
+  "Close app for crash test?": "Fermer l’application pour le test de plantage ?",
+  "Reopen the app afterwards and check Sentry for the native test report.": "Rouvrez ensuite l’application et vérifiez dans Sentry la réception du rapport de test natif.",
+  "Run crash test": "Lancer le test de plantage",
+  "Diagnostics unavailable": "Diagnostic indisponible",
+  "Crash reporting is disabled or could not start.": "Le signalement des plantages est désactivé ou n’a pas pu démarrer."
 }
