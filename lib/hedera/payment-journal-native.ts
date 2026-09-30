@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { observeTransactionRate } from '../transaction-rates-native';
+import { normalizeHederaTransactionIdForMirror } from './mirror';
+import { walletSession } from '../wallet-session';
 import { createHederaPaymentJournal, hederaPaymentScope, HEDERA_PAYMENT_JOURNAL_KEY,
   HEDERA_PAYMENT_JOURNAL_V2_PREFIX } from './payment-journal';
 
@@ -7,7 +10,15 @@ export function hederaPaymentJournalFor(network: 'mainnet' | 'testnet', publicKe
   const scope = hederaPaymentScope(network, publicKey);
   let journal = journals.get(scope);
   if (!journal) {
-    journal = createHederaPaymentJournal(AsyncStorage, scope);
+    const original = createHederaPaymentJournal(AsyncStorage, scope);
+    journal = { ...original, async recordSubmitted(submission) {
+      let assertRateSession: (() => void) | null = null;
+      try { assertRateSession = walletSession.captureRuntime(); } catch { /* Optional valuation. */ }
+      await original.recordSubmitted(submission);
+      if (assertRateSession) observeTransactionRate({ scope: 'hbar:' + scope,
+        key: 'hedera:' + normalizeHederaTransactionIdForMirror(submission.transactionId), asset: 'HBAR',
+        transactionAt: new Date().toISOString(), timeBasis: 'recorded' }, assertRateSession);
+    } };
     journals.set(scope, journal);
   }
   return journal;

@@ -12,6 +12,7 @@ import { clearMoonPayReturnNotice } from './moonpay-return-native';
 import { operationalHealth } from './operational-health-native';
 import { createWalletWiper } from './wallet-wipe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { transactionRateStore } from './transaction-rates-native';
 
 const wiper = createWalletWiper({
   get: () => getSecureItem(WALLET_WIPE_PENDING_KEY),
@@ -19,6 +20,7 @@ const wiper = createWalletWiper({
 }, [
   () => homeBalancePreviewStore.clear(),
   () => wipeTransactions(),
+  () => transactionRateStore.clear(),
   () => clearHederaAccountBindings(),
   () => clearAllHederaPaymentJournals(),
   () => clearAllLightningPaymentJournals(),

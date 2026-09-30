@@ -3,6 +3,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { balanceFixture } = require('./wallet-balances-fixture.cjs');
 
+test('Home can load explicitly opened HBAR holdings while Bitcoin is still loading', async t => {
+  let resolveSpark;
+  const app=balanceFixture({params:{allowHederaBeforeSpark:true},sparkRead:()=>new Promise(resolve=>{resolveSpark=resolve;})});
+  t.after(app.unmount);app.render();
+  app.params.enableHedera=true;app.render();const waiting=await app.settle();
+  assert.equal(waiting.balances.hbarTinybars,200000000n);
+  assert.equal(waiting.balances.spark,null);
+  assert.equal(waiting.secondaryDataReady,false);
+  assert.deepEqual(app.reads,['spark','hedera']);
+  resolveSpark({balance:120n});await app.settle();
+});
+
 test('A payment screen can skip the redundant display balance without delaying HBAR', async t => {
   const app = balanceFixture({ params: { enableSpark: false, enableHedera: true } });
   t.after(app.unmount);

@@ -41,6 +41,13 @@ export function formatEurValue(value: number): string {
   }).format(value);
 }
 
+export function formatCoinUnitPrice(value: number, asset: 'bitcoin' | 'hedera'): string {
+  return new Intl.NumberFormat(appLocale(), {
+    style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
+    maximumFractionDigits: asset === 'hedera' ? 6 : 2,
+  }).format(value);
+}
+
 export function paymentHistoryTitle(direction: 'incoming' | 'outgoing', status: string): string {
   if (friendlyPaymentStatus(status) === 'Completed') {
     return direction === 'incoming' ? t('Money received') : t('Payment sent');
@@ -63,7 +70,7 @@ export type BitcoinOperationNotice = {
   destination: 'deposits' | 'activity';
 };
 
-export function bitcoinOperationNotice(operations: ReadonlyArray<{ kind: 'deposit' | 'withdrawal'; state: string }>): BitcoinOperationNotice | null {
+export function bitcoinOperationNotice(operations: readonly { kind: 'deposit' | 'withdrawal'; state: string }[]): BitcoinOperationNotice | null {
   if (operations.some(item => item.kind === 'deposit' && item.state === 'action_required')) {
     return {
       title: 'Bitcoin deposit needs your approval',

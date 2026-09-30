@@ -1,12 +1,13 @@
 import { sparkTransferMatchesInvoice, verifyPaymentPreimage } from '../payments';
 import { withTimeout } from '../promise-timeout';
-import { loadSparkTransfersPaginated, type SparkHistoryWalletLike, type SparkUserRequestLike } from './spark-history';
+import { loadSparkTransfersPaginated, type SparkHistoryWalletLike, type SparkUserRequestLike, type SparkTransferLike } from './spark-history';
 import type { StoredLightningReceiveRequest } from './receive-store';
 
 export type LightningReceiveState = 'waiting' | 'processing' | 'confirmed' | 'failed';
 export interface LightningReceiveOutcome {
   state: LightningReceiveState;
   amountSats: number | null;
+  transactionAt?: string;
 }
 export interface SparkReceiveWalletLike extends SparkHistoryWalletLike {
   getLightningReceiveRequest?(id: string): Promise<SparkUserRequestLike | null>;
@@ -29,7 +30,9 @@ export async function resolveLightningReceiveOutcome(
             unit === 'MILLISATOSHI' ? original / 1000 : NaN;
           const amountSats = saved.amountSats || (Number.isSafeInteger(received) && received > 0 ? received : null);
           if (amountSats !== null && (saved.amountSats === 0 || received === saved.amountSats || !request.transfer)) {
-            return { state: 'confirmed', amountSats };
+            return { state: 'confirmed', amountSats,
+              ...(typeof request.updatedAt === 'string' && Number.isFinite(Date.parse(request.updatedAt))
+                ? { transactionAt: new Date(request.updatedAt).toISOString() } : {}) };
           }
           if (saved.amountSats > 0) return { state: 'processing', amountSats: null };
           // Some SSP responses omit the transfer. History can still supply
@@ -47,8 +50,11 @@ export async function resolveLightningReceiveOutcome(
   }
   const transfers = await withTimeout(loadSparkTransfersPaginated(wallet, 200, 50), 12_000, 'Lightning request status timed out.');
   const matched = transfers.find(transfer => sparkTransferMatchesInvoice(transfer, saved.paymentHash, saved.amountSats));
+  const matchedTime = (matched as SparkTransferLike | undefined)?.createdTime;
   return matched
-    ? { state: 'confirmed', amountSats: saved.amountSats || Number(matched.totalValue) }
+    ? { state: 'confirmed', amountSats: saved.amountSats || Number(matched.totalValue),
+      ...(matchedTime && Number.isFinite(new Date(matchedTime).getTime())
+        ? { transactionAt: new Date(matchedTime).toISOString() } : {}) }
     : { state: 'processing', amountSats: null };
 }
 

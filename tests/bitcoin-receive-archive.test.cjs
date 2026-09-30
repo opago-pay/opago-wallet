@@ -10,6 +10,7 @@ function archiveFixture(memory = new Map()) {
   const dependencies = {
     '@react-native-async-storage/async-storage': { getItem: async key => memory.get(key) ?? null, setItem: async (key,value) => memory.set(key,value), removeItem: async key => memory.delete(key) },
     '../database': { addTransaction: async (direction,amount,asset,details) => activity.set(details.txId, { direction,amount,asset }) },
+    '../transaction-rates-native': { observeTransactionRate: () => {} },
     '../lightning/receive-status': { resolveLightningReceiveOutcome: async (_,record) => {
       checked.push(record.requestId);
       return confirmed.has(record.requestId) ? { state: 'confirmed', amountSats: record.amountSats || 34 }

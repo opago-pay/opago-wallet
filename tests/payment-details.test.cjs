@@ -41,8 +41,9 @@ test('Bitcoin details retain the saved recipient, quote ceiling, references and 
 test('payment EUR quote uses the asset amount and does not invent unavailable rates', () => {
   const payment = { key: 'hedera:1', txId: '1', type: 'incoming', amountDisplay: '12.5', amountValue: 12.5,
     asset: 'HBAR', status: 'success', timestamp: operation.createdAt };
-  assert.deepEqual(paymentEurQuote(payment, { btcToEur: 80000, hbarToEur: 0.2 }), {
-    eurValue: 2.5, eurPerAsset: 0.2, rateAsset: 'HBAR', historical: false,
+  assert.equal(paymentEurQuote(payment, { btcToEur: 80000, hbarToEur: 0.2 }), null);
+  assert.deepEqual(paymentEurQuote({...payment,transactionRate:{asset:'HBAR',eurPerCoin:0.1}}, { hbarToEur: 99 }), {
+    eurValue: 1.25, eurPerAsset: 0.1, rateAsset: 'HBAR', historical: true,
   });
   assert.equal(paymentEurQuote(payment, { btcToEur: 80000, hbarToEur: 0 }), null);
   assert.equal(paymentEurQuote({ ...payment, amountValue: undefined }, { btcToEur: 80000, hbarToEur: 0.2 }), null);

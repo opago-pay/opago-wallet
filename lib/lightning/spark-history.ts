@@ -15,6 +15,7 @@ export interface SparkUserRequestLike {
   idempotencyKey?: unknown;
   encodedInvoice?: unknown;
   paymentPreimage?: unknown;
+  updatedAt?: unknown;
   invoice?: { paymentHash?: unknown };
   transfer?: { totalAmount?: { originalValue?: unknown; originalUnit?: unknown } };
 }

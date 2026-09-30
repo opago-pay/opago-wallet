@@ -708,5 +708,17 @@
   "Reopen the app afterwards and check Sentry for the native test report.": "Rouvrez ensuite l’application et vérifiez dans Sentry la réception du rapport de test natif.",
   "Run crash test": "Lancer le test de plantage",
   "Diagnostics unavailable": "Diagnostic indisponible",
-  "Crash reporting is disabled or could not start.": "Le signalement des plantages est désactivé ou n’a pas pu démarrer."
+  "Crash reporting is disabled or could not start.": "Le signalement des plantages est désactivé ou n’a pas pu démarrer.",
+  "All coins": "Toutes les cryptos",
+  "Incoming Bitcoin: {amount} BTC": "Bitcoin entrant : {amount} BTC",
+  "Onchain deposits awaiting credit: {amount} BTC": "Dépôts onchain en attente de crédit : {amount} BTC",
+  "Some activity could not be refreshed. Pull down to retry.": "Certaines activités n’ont pas pu être actualisées. Tirez vers le bas pour réessayer.",
+  "Historical rate is being retrieved": "Le taux historique est en cours de récupération",
+  "Rate source": "Source du taux",
+  "Rate time": "Date et heure du taux",
+  "Rate precision": "Précision du taux",
+  "One-minute market estimate": "Estimation du marché à la minute",
+  "One-minute market estimate, converted to EUR": "Estimation du marché à la minute, convertie en EUR",
+  "Payment time reference": "Référence temporelle du paiement",
+  "Time recorded by this app; updated when network time is available": "Heure enregistrée par l’application ; mise à jour lorsque l’heure du réseau est disponible"
 }

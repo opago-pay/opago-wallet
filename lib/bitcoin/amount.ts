@@ -22,6 +22,16 @@ export function satsToBtc(value: number): string {
   return `${amount / 100_000_000n}.${String(amount % 100_000_000n).padStart(8, '0')}`;
 }
 
+/** Localize decimal/group separators while preserving all eight Bitcoin decimals. */
+export function formatBtcBalance(value: number, locale: string): string {
+  const [whole, rawFraction] = satsToBtc(value).split('.');
+  const fraction = rawFraction.replace(/0+$/, '');
+  const integer = Number(whole).toLocaleString(locale);
+  if (!fraction) return integer;
+  const decimal = new Intl.NumberFormat(locale).formatToParts(1.1).find(part => part.type === 'decimal')?.value ?? '.';
+  return integer + decimal + fraction;
+}
+
 export interface SparkBalanceResponse {
   balance?: unknown;
   satsBalance?: { available?: unknown; owned?: unknown; incoming?: unknown };

@@ -32,7 +32,10 @@ export class HistoryPager<T extends HistoryEntry> {
   }
 
   private merged() {
-    const byId = new Map<string, T>(this.sources.some(s => s.error) ? this.fallback.map(item => [item.key, item]) : []);
+    // Keep known activity visible while the first pages are still arriving.
+    // Once every source succeeds, its fresh result replaces the fallback.
+    const retainFallback = this.sources.some(s => s.error || s.next === undefined);
+    const byId = new Map<string, T>(retainFallback ? this.fallback.map(item => [item.key, item]) : []);
     for (const source of this.sources) for (const item of source.items) {
       const existing = byId.get(item.key);
       if (existing?.status === 'action_required') continue;

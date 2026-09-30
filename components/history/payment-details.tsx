@@ -7,7 +7,7 @@ import { Pressable } from '@/components/ui/wallet-interaction';
 import { useLanguage } from '@/hooks/useLanguage';
 import { appLocale, t } from '@/lib/i18n';
 import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
-import { formatEurValue } from '@/lib/wallet-display';
+import { formatEurValue, formatCoinUnitPrice } from '@/lib/wallet-display';
 import { openHederaExplorerUrl } from '@/lib/hedera/explorer-native';
 import { bitcoinExplorerUrl, lightningHashFromPayment, paymentDetailReferences, paymentDetailStatus, paymentMethodLabel,
   paymentEurQuote, type PaymentHistoryItem } from '@/lib/payment-details';
@@ -82,10 +82,18 @@ export function PaymentDetailsScreen({ payment, rates, onClose, onHide, onReview
       {dateLabel && <Field label={t('Date and time')} value={dateLabel} />}
       <Field label={t('Payment method')} value={route} />
       {(payment.asset === 'SAT' || payment.asset === 'HBAR') && <>
-        <Field label={t(payment.asset === 'SAT' ? 'Transaction value at payment time' : 'Current transaction value in EUR')}
-          value={eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}` : t(payment.asset === 'SAT' ? 'Historical EUR value unavailable' : 'EUR estimate unavailable')} />
-        <Field label={t(payment.asset === 'SAT' ? 'Exchange rate at payment time' : 'Current exchange rate')}
-          value={eurQuote ? `${formatEurValue(eurQuote.eurPerAsset)} / ${eurQuote.rateAsset}` : t(payment.asset === 'SAT' ? 'Historical exchange rate unavailable' : 'Exchange rate unavailable')} />
+        <Field label={t('Transaction value at payment time')}
+          value={eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}` : t(payment.transactionRatePending ? 'Historical rate is being retrieved' : 'Historical EUR value unavailable')} />
+        <Field label={t('Exchange rate at payment time')}
+          value={eurQuote ? `${formatCoinUnitPrice(eurQuote.eurPerAsset, payment.asset === 'HBAR' ? 'hedera' : 'bitcoin')} / ${eurQuote.rateAsset}` : t('Historical exchange rate unavailable')} />
+        {payment.transactionRate && <>
+          <Field label={t('Rate source')} value={payment.transactionRate.source} />
+          <Field label={t('Rate time')} value={new Date(payment.transactionRate.rateAt).toLocaleString(appLocale())} />
+          <Field label={t('Rate precision')} value={t(payment.transactionRate.method === 'cross-minute-open'
+            ? 'One-minute market estimate, converted to EUR' : 'One-minute market estimate')} />
+          {payment.transactionRate.timeBasis === 'recorded' && <Field label={t('Payment time reference')}
+            value={t('Time recorded by this app; updated when network time is available')} />}
+        </>}
       </>}
       {!!recipient && <Field label={t('Recipient')} value={recipient} selectable />}
       {!!receivingAddress && <Field label={t('Receiving address')} value={receivingAddress} selectable />}
