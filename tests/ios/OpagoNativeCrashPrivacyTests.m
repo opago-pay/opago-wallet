@@ -7,6 +7,33 @@
 @interface OpagoNativeCrashPrivacyTests : XCTestCase
 @end
 @implementation OpagoNativeCrashPrivacyTests
+- (void)testStartupOptionsDoNotRequireBundledJSONAndKeepDefaultScope {
+    // Build 22 crashed after the file loader passed nil options to Cocoa startup.
+    SentryOptions *options = [OpagoNativeCrashDiagnostics optionsForDSN:
+        @"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com/1"];
+    XCTAssertNotNil(options);
+    XCTAssertNotNil(options.initialScope);
+    SentryScope *scope = [[SentryScope alloc] init];
+    XCTAssertEqual(options.initialScope(scope), scope);
+    XCTAssertTrue(options.enableCrashHandler);
+    XCTAssertFalse(options.enableMemoryIntrospection);
+    XCTAssertFalse(options.sendDefaultPii);
+    XCTAssertFalse(options.enableAutoSessionTracking);
+    XCTAssertNotNil(options.beforeSend);
+    SentryEvent *event = [[SentryEvent alloc] initWithLevel:kSentryLevelFatal];
+    event.exceptions = @[[[SentryException alloc] initWithValue:@"private" type:@"SIGABRT"]];
+    XCTAssertEqualObjects(options.beforeSend(event).exceptions.firstObject.value,
+        @"Native error details withheld");
+    event.exceptions = @[[[SentryException alloc] initWithValue:@"private" type:@"Unhandled JS Exception"]];
+    XCTAssertNil(options.beforeSend(event)); // React Native's duplicate suppression remains installed.
+}
+
+- (void)testMissingOrInvalidDSNSkipsDiagnosticsStartup {
+    XCTAssertNil([OpagoNativeCrashDiagnostics optionsForDSN:nil]);
+    XCTAssertNil([OpagoNativeCrashDiagnostics optionsForDSN:@""]);
+    XCTAssertNil([OpagoNativeCrashDiagnostics optionsForDSN:@"not-a-dsn"]);
+}
+
 - (void)testPrivateFieldsAreRemovedAndSymbolicationSurvives {
     NSString *secret = @"synthetic-wallet-secret-never-upload";
     SentryEvent *event = [[SentryEvent alloc] initWithLevel:kSentryLevelFatal];
