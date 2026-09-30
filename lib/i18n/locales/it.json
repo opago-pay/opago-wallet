@@ -698,5 +698,12 @@
   "Transaction value at payment time": "Valore della transazione al momento del pagamento",
   "Exchange rate at payment time": "Tasso di cambio al momento del pagamento",
   "Historical EUR value unavailable": "Valore storico in EUR non disponibile",
-  "Historical exchange rate unavailable": "Tasso di cambio storico non disponibile"
+  "Historical exchange rate unavailable": "Tasso di cambio storico non disponibile",
+  "Crash diagnostics test": "Test della diagnostica degli arresti",
+  "This test deliberately closes the app. Reopen it to send the diagnostic report. No payment is made.": "Questo test chiude intenzionalmente l’app. Riaprila per inviare il rapporto diagnostico. Non viene effettuato alcun pagamento.",
+  "Close app for crash test?": "Chiudere l’app per il test di arresto?",
+  "Reopen the app afterwards and check Sentry for the native test report.": "Riapri poi l’app e verifica in Sentry la ricezione del rapporto di test nativo.",
+  "Run crash test": "Avvia test di arresto",
+  "Diagnostics unavailable": "Diagnostica non disponibile",
+  "Crash reporting is disabled or could not start.": "La segnalazione degli arresti è disattivata o non è stato possibile avviarla."
 }

@@ -6,16 +6,17 @@ const dsn = 'https://87bcd96c65e4476e0f783d39cb5f4a86@o4512175942598656.ingest.d
 let sdk: typeof import('@sentry/react-native') | undefined;
 let attempted = false;
 
-export function crashReportingOptions(): ReactNativeOptions {
+export function crashReportingOptions(platform = 'android'): ReactNativeOptions {
   return {
     dsn,
     debug: false,
     sendDefaultPii: false,
     sendClientReports: false,
-    enableNative: true, // Native offline queue; only already-sanitized JS events enter it.
-    // Native crashes bypass JS beforeSend. Keep Apple crash reports for these
-    // until an independently verified native privacy filter is available.
-    enableNativeCrashHandling: false,
+    enableNative: true,
+    // iOS starts before React Native with its own native privacy filter. Never
+    // reinitialize it from JS: this would replace that filter with SDK defaults.
+    autoInitializeNativeSdk: platform !== 'ios',
+    enableNativeCrashHandling: platform === 'ios',
     enableNdk: false,
     enableNdkScopeSync: false,
     enableTombstone: false,
@@ -76,7 +77,7 @@ export function initializeCrashReporting(development: boolean, platform: string)
     // A missing/broken native SDK must not prevent the wallet from starting.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const loaded: typeof import('@sentry/react-native') = require('@sentry/react-native');
-    loaded.init(crashReportingOptions());
+    loaded.init(crashReportingOptions(platform));
     sdk = loaded;
   } catch {
     // Undo a partially installed error handler if initialization fails.
@@ -88,4 +89,21 @@ export function initializeCrashReporting(development: boolean, platform: string)
 export function recordDiagnosticScreen(segments: readonly string[]): void {
   try { sdk?.setTag('screen', diagnosticScreen(segments)); }
   catch { /* Diagnostics cannot interrupt navigation. */ }
+}
+
+/** Opt-in release-build controls; never called automatically or by a deep link. */
+export function nativeCrashTestEnabled(development: boolean, platform: string): boolean {
+  return !development && platform === 'ios' && process.env.EXPO_PUBLIC_SENTRY_ENABLED !== 'false' &&
+    process.env.EXPO_PUBLIC_SENTRY_TEST_CONTROLS === 'true';
+}
+
+export function triggerNativeCrashTest(development: boolean, platform: string): boolean {
+  if (!nativeCrashTestEnabled(development, platform) || !sdk) return false;
+  try {
+    sdk.setTag('diagnostic_test', 'native');
+    sdk.nativeCrash(); // The next app launch uploads the filtered crash report.
+    return true;
+  } catch {
+    return false;
+  }
 }

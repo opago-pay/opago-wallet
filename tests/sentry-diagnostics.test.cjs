@@ -66,6 +66,24 @@ test('diagnostics never install payment/network, console, session or replay inst
   assert.deepEqual(hint.attachments,[]);
 });
 
+test('iOS reuses the early privacy-filtered SDK; Android retains JavaScript-only diagnostics', () => {
+  assert.equal(crashReportingOptions('ios').autoInitializeNativeSdk,false);
+  assert.equal(crashReportingOptions('ios').enableNativeCrashHandling,true);
+  assert.equal(crashReportingOptions('android').autoInitializeNativeSdk,true);
+  assert.equal(crashReportingOptions('android').enableNativeCrashHandling,false);
+});
+
+test('native startup hook precedes React Native, is idempotent and rejects an unfiltered SDK start', () => {
+  const {patchAppDelegate}=require('../plugins/with-native-crash-diagnostics');
+  const source='public override func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {\n let factory = ExpoReactNativeFactory()\n}';
+  const output=patchAppDelegate(source,'swift');
+  assert.ok(output.indexOf('OpagoNativeCrashDiagnostics.start()') < output.indexOf('let factory'));
+  assert.equal(patchAppDelegate(output,'swift'),output);
+  assert.throws(()=>patchAppDelegate(source.replace('let factory','RNSentrySDK.start()\n let factory'),'swift'));
+  assert.throws(()=>patchAppDelegate('template changed','swift'));
+  assert.throws(()=>patchAppDelegate(source,'objc'));
+});
+
 function runtime(loadSdk, env={}) {
   const exports={}; let handler=()=>{};const original=handler;
   const context={exports,process:{env},globalThis:{ErrorUtils:{getGlobalHandler:()=>handler,setGlobalHandler:h=>{handler=h;}}},
@@ -99,6 +117,25 @@ test('SDK is initialized only once and failed diagnostic updates never interrupt
   r.api.initializeCrashReporting(false,'ios');r.api.initializeCrashReporting(false,'ios');
   assert.equal(calls,1);
   assert.doesNotThrow(()=>r.api.recordDiagnosticScreen(['send']));
+});
+
+test('a native crash test requires opt-in, iOS release, active diagnostics and an initialized SDK', () => {
+  for(const env of [{},{EXPO_PUBLIC_SENTRY_TEST_CONTROLS:'true',EXPO_PUBLIC_SENTRY_ENABLED:'false'}]) {
+    const r=runtime(()=>({init(){},nativeCrash(){throw Error('must not call');}}),env);
+    r.api.initializeCrashReporting(false,'ios');
+    assert.equal(r.api.triggerNativeCrashTest(false,'ios'),false);
+  }
+  let crashes=0;const r=runtime(()=>({init(){},setTag(){},nativeCrash(){crashes++;}}),{EXPO_PUBLIC_SENTRY_TEST_CONTROLS:'true'});
+  assert.equal(r.api.triggerNativeCrashTest(false,'ios'),false);
+  r.api.initializeCrashReporting(false,'ios');
+  assert.equal(r.api.triggerNativeCrashTest(true,'ios'),false);
+  assert.equal(r.api.triggerNativeCrashTest(false,'android'),false);
+  assert.equal(crashes,0);
+  assert.equal(r.api.triggerNativeCrashTest(false,'ios'),true);
+  assert.equal(crashes,1);
+  const unavailable=runtime(()=>({init(){},setTag(){throw Error('unavailable');},nativeCrash(){throw Error('must not call');}}),{EXPO_PUBLIC_SENTRY_TEST_CONTROLS:'true'});
+  unavailable.api.initializeCrashReporting(false,'ios');
+  assert.equal(unavailable.api.triggerNativeCrashTest(false,'ios'),false);
 });
 
 test('builds without credentials skip uploads; EAS upload outages are non-blocking', () => {
