@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PaymentBackButton } from './payment-back-button';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
+import { formatEurValue } from '@/lib/wallet-display';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
@@ -167,6 +168,7 @@ export function HederaReviewView(props: {
 
 export function HederaSuccessView(props: {
   result: HederaTransferResult;
+  eurValue: number | null;
   onOpenHashscan(): void;
   onOpenContract?(): void;
   onDashboard(): void;
@@ -184,6 +186,8 @@ export function HederaSuccessView(props: {
       <PaymentSuccessIcon style={{ marginBottom: 16 }} accessibilityLabel={t("Confirmed")} />
       <Text style={styles.successTitle}>{t("Payment sent")}</Text>
       <Text style={styles.successAmount}>{props.result.amountHbar} HBAR</Text>
+      <Text style={styles.successFiatAmount}>{props.eurValue !== null
+        ? `≈ ${formatEurValue(props.eurValue)}` : t('EUR estimate unavailable')}</Text>
       <Text style={[styles.subtitle, styles.centerText]}>
         {t('Complete on {network}. It is now saved in your activity.', { network: HEDERA_NETWORK_LABEL })}
       </Text>

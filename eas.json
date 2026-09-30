@@ -13,7 +13,10 @@
         "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "regtest",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
-        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com",
+        "SENTRY_ALLOW_FAILURE": "true",
+        "SENTRY_HTTP_TIMEOUT": "10",
+        "SENTRY_HTTP_MAX_RETRIES": "1"
       },
       "android": {
         "buildType": "apk"
@@ -27,7 +30,10 @@
         "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "regtest",
         "EXPO_PUBLIC_HEDERA_BUILD_PROFILE": "testnet",
         "EXPO_PUBLIC_HEDERA_NETWORK": "testnet",
-        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com"
+        "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com",
+        "SENTRY_ALLOW_FAILURE": "true",
+        "SENTRY_HTTP_TIMEOUT": "10",
+        "SENTRY_HTTP_MAX_RETRIES": "1"
       },
       "android": {
         "buildType": "apk"
@@ -47,7 +53,10 @@
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://mainnet.mirrornode.hedera.com",
         "EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR": "1",
         "EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID": "0.0.10850063",
-        "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8"
+        "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
+        "SENTRY_ALLOW_FAILURE": "true",
+        "SENTRY_HTTP_TIMEOUT": "10",
+        "SENTRY_HTTP_MAX_RETRIES": "1"
       },
       "android": {
         "buildType": "apk"
@@ -67,7 +76,10 @@
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://mainnet.mirrornode.hedera.com",
         "EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR": "balance",
         "EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID": "0.0.10850063",
-        "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8"
+        "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
+        "SENTRY_ALLOW_FAILURE": "true",
+        "SENTRY_HTTP_TIMEOUT": "10",
+        "SENTRY_HTTP_MAX_RETRIES": "1"
       }
     }
   },

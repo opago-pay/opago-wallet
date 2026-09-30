@@ -1,6 +1,6 @@
 # Opago Wallet release notes
 
-Latest internal wallet update: 23 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
+Latest internal wallet update: 23 September 2026. The grant-candidate scope below describes the earlier HBAR-only artifact; the current internal production candidate enables the explicitly configured Hedera and Lightning Mainnet profiles. See [PUBLIC_RELEASE_READINESS.md](docs/PUBLIC_RELEASE_READINESS.md) for artifact evidence and outstanding release acceptance.
 
 ## Live Receive QR and network switch — 23 September 2026
 
@@ -78,7 +78,7 @@ Bounded, non-overlapping Bitcoin balance refreshes continue during a longer appr
 
 The owner's anonymous trace located 15.519 seconds in leaf selection/swap and 5.447 seconds in transfer preparation. A bounded exact-fit search now avoids some unnecessary swaps; required swaps select the fewest inputs. The pinned SDK retains its mutex, reservation, submission and recovery state machine. Android reuses deterministic key derivations only during a send, clearing owned cache copies on completion, failure and wallet cleanup. Random keys and signing nonces remain fresh.
 
-390 app tests, TypeScript and changed-file lint passed, including synthetic installed-SDK reservation/swap/failure tests and cache lifecycle checks. The next internal build retains owner-approved anonymous timing for comparison. No real payment was performed by the agent; actual speed improvement and the five-second target remain unverified. Details: [Lightning send performance](LIGHTNING_SEND_PERFORMANCE.md).
+390 app tests, TypeScript and changed-file lint passed, including synthetic installed-SDK reservation/swap/failure tests and cache lifecycle checks. The next internal build retains owner-approved anonymous timing for comparison. No real payment was performed by the agent; actual speed improvement and the five-second target remain unverified. Details: [Lightning send performance](docs/LIGHTNING_SEND_PERFORMANCE.md).
 
 ## Owner-approved anonymous send timing — 22 September 2026
 
@@ -204,7 +204,7 @@ Hide empty network badges instead of leaving an unlabelled dark pill beside Bitc
 - Use only validated Spark `available` funds for display and spending. Pending incoming funds are separate. Invalidate only old Bitcoin cache values whose definition could include incoming transfers; do not modify wallet keys or the existing Lightning/HBAR journals.
 - Implement actual Spark 0.7.12 withdrawal and static-deposit claim adapters, strict Bitcoin address/URI parsing, integer amounts, approved fee ceilings, session checks and persistent unknown-outcome reconciliation. Quoting can sign an internal Spark swap, so onchain preparation requires explicit device authorization; scan/paste alone never invokes it.
 - Retain earlier/expired Lightning requests and watch shared Bitcoin addresses after restart. Avoid startup address/quote generation, and defer status work until the primary Bitcoin balance has loaded. A claim is not automatically credited as spendable.
-- 270 app tests, TypeScript, lint and Android build passed. Native main views captured with synthetic data in all four languages, including keyboard and large-text review. No real payment was sent. Combined receive URI, external sender/claim tests, provider failure recovery, full onchain-history reconstruction and iOS remain open. See [Bitcoin implementation and acceptance](BITCOIN_PAYMENT_ACCEPTANCE.md) for exact limits, migration, SDK behavior and the concrete partner test matrix.
+- 270 app tests, TypeScript, lint and Android build passed. Native main views captured with synthetic data in all four languages, including keyboard and large-text review. No real payment was sent. Combined receive URI, external sender/claim tests, provider failure recovery, full onchain-history reconstruction and iOS remain open. See [Bitcoin implementation and acceptance](docs/BITCOIN_PAYMENT_ACCEPTANCE.md) for exact limits, migration, SDK behavior and the concrete partner test matrix.
 - The final candidate updated Android ending 8690 at 13:00:05; installed hash and 65 bundled source modules verified, wallet data preserved, cold locked launch without observed runtime errors. Exact evidence is recorded in release readiness.
 
 ## Lightning completion work P01–P05 — 21 September 2026
@@ -338,7 +338,7 @@ The standalone Android candidate enables real funds only for Hedera Mainnet. Lig
 | Deployment manifest | [`deployments/hedera-testnet.json`](deployments/hedera-testnet.json) | [`deployments/hedera-mainnet.json`](deployments/hedera-mainnet.json) |
 | Physical-device checkout | [Testnet transaction](https://hashscan.io/testnet/transaction/0.0.9960666%401786350735.994979380) | [Submitted-video Mainnet transaction](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764) |
 
-The exact Mainnet candidate, transaction, and remaining limitations are recorded in [`HEDERA_MAINNET_CANARY_ACCEPTANCE.md`](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). The Thrive evidence index is [`THRIVE_MILESTONE2_MAINNET.md`](THRIVE_MILESTONE2_MAINNET.md).
+The exact Mainnet candidate, transaction, and remaining limitations are recorded in [`HEDERA_MAINNET_CANARY_ACCEPTANCE.md`](docs/HEDERA_MAINNET_CANARY_ACCEPTANCE.md). The Thrive evidence index is [`THRIVE_MILESTONE2_MAINNET.md`](docs/THRIVE_MILESTONE2_MAINNET.md).
 
 ## Verification baseline
 
@@ -368,4 +368,4 @@ npm run phase5:verify
 
 ## Known limits
 
-The wallet, native integration, dependencies, and Solidity contract have not received an independent security audit. Both npm audit scopes report zero advisories as of 17 September 2026. The merchant demo does not authenticate an Opago merchant identity. iOS, store signing/distribution, public hosting, external-user recovery, production monitoring, and broad Mainnet failure-path acceptance remain outside this internal candidate. See [`SECURITY.md`](SECURITY.md) and [`PUBLIC_RELEASE_READINESS.md`](PUBLIC_RELEASE_READINESS.md) for current evidence and release blockers.
+The wallet, native integration, dependencies, and Solidity contract have not received an independent security audit. Both npm audit scopes report zero advisories as of 17 September 2026. The merchant demo does not authenticate an Opago merchant identity. iOS, store signing/distribution, public hosting, external-user recovery, production monitoring, and broad Mainnet failure-path acceptance remain outside this internal candidate. See [`SECURITY.md`](SECURITY.md) and [`PUBLIC_RELEASE_READINESS.md`](docs/PUBLIC_RELEASE_READINESS.md) for current evidence and release blockers.

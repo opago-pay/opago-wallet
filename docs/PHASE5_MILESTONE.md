@@ -18,7 +18,7 @@ This document is the reproducible evidence index for the Opago Wallet Hedera tes
 | Solidity compiler | `0.8.28+commit.7893614a.Emscripten.clang` |
 | Runtime bytecode SHA-256 | `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8` |
 | Dependency lock | committed `package-lock.json`; install with `npm ci` |
-| Deployment manifest | [`deployments/hedera-testnet.json`](deployments/hedera-testnet.json) |
+| Deployment manifest | [`deployments/hedera-testnet.json`](../deployments/hedera-testnet.json) |
 
 The submitted commit is the commit checked out for the build. Record it before capture with `git rev-parse HEAD`, require a clean `git status --short`, and use the same commit for the APK, tests, and video.
 
@@ -35,9 +35,8 @@ The submitted commit is the commit checked out for the build. Record it before c
 | Phase 4 checkout | [Successful contract call](https://hashscan.io/testnet/transaction/0.0.10030291%401786528624.880688643) |
 | Replay rejection | [Reverted duplicate call](https://hashscan.io/testnet/transaction/0.0.10030291%401786528712.770556312) |
 | Physical-device matrix | [`PHASE4_ACCEPTANCE.md`](PHASE4_ACCEPTANCE.md) |
-| Security boundaries and known limits | [`SECURITY.md`](SECURITY.md) |
-| Milestone release notes | [`RELEASE_NOTES.md`](RELEASE_NOTES.md) |
-| Video sequence | [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) |
+| Security boundaries and known limits | [`SECURITY.md`](../SECURITY.md) |
+| Milestone release notes | [`RELEASE_NOTES.md`](../RELEASE_NOTES.md) |
 
 The versioned deployment manifest is the machine-readable source of truth for network, IDs, timestamps, compiler, bytecode hashes, transaction URL, and source-verification status. It contains no operator credential.
 
@@ -104,11 +103,11 @@ The completed physical-device results and public transaction links for these fai
 - [ ] `npm ci` succeeds in a clean clone without changing `package-lock.json`.
 - [ ] `npm run phase5:verify` passes in that clean clone.
 - [ ] A fresh Android native project builds, installs, launches, and reaches the Hedera dashboard on the intended physical device.
-- [ ] The video follows [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md), lasts one to five minutes, and exposes no secret or personal data.
+- [ ] The video lasts one to five minutes, demonstrates the testnet acceptance sequence above, and exposes no secret or personal data.
 - [ ] The video shows the visible testnet label, balance, merchant QR, review screen, device confirmation, success transaction ID, and public HashScan record.
 - [ ] Contract, deployment transaction, source-verification record, deployment manifest, lockfile, security status, and Phase 4 acceptance evidence are included with the exact submitted commit.
 - [ ] No mainnet claim is made. Hedera remains technically restricted to testnet.
 
 ## Known limits
 
-The wallet and checkout contract have not received an independent audit. The dependency tree contains unresolved transitive advisories documented in [`SECURITY.md`](SECURITY.md). iOS is outside this milestone. Local merchant, eID, OCP, and Travel Rule services are reference demos rather than production backends. Phase 5 demonstrates a reproducible Hedera testnet milestone and does not authorize real-fund use.
+The wallet and checkout contract have not received an independent audit. The dependency tree contains unresolved transitive advisories documented in [`SECURITY.md`](../SECURITY.md). iOS is outside this milestone. Local merchant, eID, OCP, and Travel Rule services are reference demos rather than production backends. Phase 5 demonstrates a reproducible Hedera testnet milestone and does not authorize real-fund use.

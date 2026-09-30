@@ -25,6 +25,7 @@ export function LightningReviewView(props: {
 
 export function LightningSuccessView(props: {
   amountSats: number;
+  eurValue: number | null;
   reference: string;
   onDashboard(): void;
   onReset(): void;
@@ -33,7 +34,7 @@ export function LightningSuccessView(props: {
   const [showDetails, setShowDetails] = useState(false);
   return (
     <PaymentSuccessMotionView style={{ flex: 1 }}>
-    {exit => <BitcoinPaymentProgress phase="success" amountSats={props.amountSats}
+    {exit => <BitcoinPaymentProgress phase="success" amountSats={props.amountSats} eurValue={props.eurValue}
       onBack={() => exit(props.onDashboard)}
       footer={<BitcoinButton label={t('Done')} onPress={() => exit(props.onDashboard)} />}>
       <TouchableOpacity

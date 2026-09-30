@@ -1,0 +1,1151 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OPAGO multi-asset transaction sync v3 internal DRAFT",
+    "version": "0.3.0-draft.1",
+    "description": "Normative behavior: PROTOCOL-V3.md and MIGRATION.md. Not yet deployed or jointly approved."
+  },
+  "servers": [
+    {
+      "url": "https://opago-internal.invalid"
+    }
+  ],
+  "paths": {
+    "/api/v3/wallet/observations": {
+      "post": {
+        "operationId": "ingestV3Observations",
+        "summary": "ingestV3Observations",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 524288,
+        "parameters": [
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/IngestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./observations.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallet/observations/cursor": {
+      "get": {
+        "operationId": "getV3Cursor",
+        "summary": "getV3Cursor",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Cursor"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallet/observations/batches/{idempotency_key}": {
+      "get": {
+        "operationId": "getV3Batch",
+        "summary": "getV3Batch",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "idempotency_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "installation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/IngestResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallet/observations/close-rejected": {
+      "post": {
+        "operationId": "closeV3Rejected",
+        "summary": "closeV3Rejected",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Cursor"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/CloseRejectedRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/hedera/binding-challenges": {
+      "post": {
+        "operationId": "createHederaBindingChallenge",
+        "summary": "createHederaBindingChallenge",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh",
+        "x-opago-end-user-policy": "account_fresh",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/HederaChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/HederaChallengeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/hedera/bindings": {
+      "post": {
+        "operationId": "bindHederaAccount",
+        "summary": "bindHederaAccount",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/HederaBinding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/HederaBindRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/hedera/bindings/{wallet_id}": {
+      "get": {
+        "operationId": "getHederaBinding",
+        "summary": "getHederaBinding",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/HederaBinding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/hedera/bindings/{wallet_id}/deactivate": {
+      "post": {
+        "operationId": "deactivateHederaBinding",
+        "summary": "deactivateHederaBinding",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh",
+        "x-opago-end-user-policy": "account_fresh",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/HederaBinding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/HederaDeactivateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallet/observation-migrations/{migration_id}": {
+      "put": {
+        "operationId": "putObservationMigration",
+        "summary": "putObservationMigration",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "migration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/MigrationStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/MigrationRequest"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getObservationMigration",
+        "summary": "getObservationMigration",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "migration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/MigrationStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallet/observation-migrations/{migration_id}/activate": {
+      "post": {
+        "operationId": "activateObservationMigration",
+        "summary": "activateObservationMigration",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-end-user-policy": "account",
+        "x-opago-transport": "json",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "migration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer [^\\s]+$",
+              "maxLength": 8192
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result; accepted observation is not settlement proof.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/MigrationStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business status/code preserved; after valid HPKE envelope the error is encrypted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./api-messages.schema.json#/definitions/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./api-messages.schema.json#/definitions/Empty"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ServiceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authorized API-facade service token; independently verify forwarded user bearer."
+      }
+    }
+  }
+}

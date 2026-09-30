@@ -47,6 +47,8 @@ yarn-error.*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.sentry-build-plugin
+.sentryclirc
 
 # typescript
 *.tsbuildinfo

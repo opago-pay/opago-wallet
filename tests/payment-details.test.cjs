@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 require('./register-typescript.cjs');
 const { bitcoinOperationHistoryItem, lightningHashFromPayment, paymentDetailStatus,
-  paymentDetailReferences, bitcoinExplorerUrl, paymentMethodLabel, paymentEurQuote } = require('../lib/payment-details.ts');
+  paymentDetailReferences, bitcoinExplorerUrl, paymentMethodLabel, paymentEurQuote,
+  paymentEurValueAtCurrentRate } = require('../lib/payment-details.ts');
 const { assertBitcoinOperation } = require('../lib/bitcoin/store.ts');
 
 const txid = 'ab'.repeat(32);
@@ -50,6 +51,14 @@ test('payment EUR quote uses the asset amount and does not invent unavailable ra
   assert.deepEqual(paymentEurQuote({ ...oldBitcoin, btcEurRate: 70000 }, { btcToEur: 80000, hbarToEur: 0.2 }), {
     eurValue: 70, eurPerAsset: 70000, rateAsset: 'BTC', historical: true,
   });
+});
+
+test('success EUR value uses a recent rate for the confirmed asset', () => {
+  const rates = { btcToEur: 50_000, hbarToEur: 0.2, updatedAt: 1_000_000 };
+  assert.equal(paymentEurValueAtCurrentRate('SAT', 20, rates, 1_000_100), 0.01);
+  assert.equal(paymentEurValueAtCurrentRate('HBAR', 12.5, rates, 1_000_100), 2.5);
+  assert.equal(paymentEurValueAtCurrentRate('SAT', 20, rates, 1_300_001), null);
+  assert.equal(paymentEurValueAtCurrentRate('HBAR', 12.5, { ...rates, hbarToEur: 0 }, 1_000_100), null);
 });
 
 test('restored Bitcoin operations do not invent recipient, amount, fee or explorer target', () => {

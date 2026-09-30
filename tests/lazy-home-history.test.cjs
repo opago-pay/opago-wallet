@@ -46,6 +46,7 @@ function fixture(data = {}) {
       RefreshControl: 'refresh', ActivityIndicator: 'loading', BackHandler: { addEventListener: () => ({ remove() {} }) },
     },
     '@/components/ui/advanced-options': { AdvancedOptions: 'advanced' },
+    '@/components/ui/asset-icon': { AssetIcon: 'asset-icon' },
     '@/components/history/payment-details': { PaymentDetailsScreen: 'payment-details' },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', Pressable: 'pressable' },
     '@/lib/i18n': { t: (value, values = {}) => value.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match), appLocale: () => 'en' },
@@ -86,6 +87,7 @@ function fixture(data = {}) {
       paymentHistoryStatus: () => 'Completed',
       paymentHistoryTitle: () => 'Payment',
     },
+    '@/lib/wallet-assets': { walletAssetKeyFromSymbol: value => value },
     '@/lib/database': { getTransactionPage: query('local') },
     '@/lib/hedera/account': { loadHederaHistoryPage: async (...args) => ({
       items: await query('hedera history')(...args), next: null,
@@ -160,6 +162,29 @@ test('Home puts the euro amount above SAT and shows the last saved payment befor
   assert.ok(texts.includes('Latest activity'));
   assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);
   assert.equal(advanced(screen).props.label, 'More coins');
+});
+
+test('activity rows show the same EUR quote or unavailable message as payment details', async () => {
+  const bitcoin = fixture({ primaryReady: false, local: [
+    { ...record(1, '2026-09-23T10:00:00Z'), btcEurRate: 50_000 },
+  ] });
+  bitcoin.render(); bitcoin.refocus(); await settle();
+  let row = latestRow(bitcoin.render());
+  let rendered = row.type(row.props);
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '≈ 0.01'));
+  assert.match(rendered.props.accessibilityLabel, /≈ 0\.01/);
+
+  const hedera = fixture({ primaryReady: false, local: [record(2, '2026-09-23T10:00:00Z', 'HBAR')] });
+  hedera.render(); hedera.refocus(); await settle();
+  row = latestRow(hedera.render());
+  rendered = row.type(row.props);
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '≈ 2'));
+
+  const oldBitcoin = fixture({ primaryReady: false, local: [record(3, '2026-09-23T10:00:00Z')] });
+  oldBitcoin.render(); oldBitcoin.refocus(); await settle();
+  row = latestRow(oldBitcoin.render());
+  rendered = row.type(row.props);
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === 'Historical EUR value unavailable'));
 });
 
 test('latest activity and an unresolved-payment notice open the same details view', async () => {

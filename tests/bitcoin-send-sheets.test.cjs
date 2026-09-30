@@ -19,10 +19,22 @@ const base = {
  '@/components/ui/wallet-interaction': {TextInput:'input',TouchableOpacity:'button'},
  '@/hooks/useLanguage': {useLanguage(){}}, '@/hooks/useExchangeRates': {useExchangeRates:()=>({btcToEur:75000,updatedAt:Date.now()})},
  '@/lib/i18n': {t:key=>key,appLocale:()=> 'en'}, '@/lib/config':{appConfig:{isMainnet:true}},
+ '@/lib/wallet-display': {formatEurValue:value=>`${value.toFixed(2)} EUR`},
  '@/components/ui/asset-icon':{AssetIcon:'asset'}, '@expo/vector-icons':{Ionicons:'icon'},
  './send-sheet': {BitcoinSendScreen:'screen'},
  '@/lib/payment-input': {editPaymentAmount,paymentDecimalSeparator},
+ '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
 };
+test('confirmed Bitcoin amounts retain their saved EUR rate when the live rate is unavailable',async t=>{
+ const props={amount:100_000,historicalBtcEurRate:80_000,hero:true};
+ const app=hookFixture('components/bitcoin/payment-ui.tsx',()=>({...base,
+  '@/hooks/useExchangeRates':{useExchangeRates:()=>({btcToEur:0,updatedAt:0})},
+ }),e=>e.BitcoinMoney(props));t.after(app.unmount);
+ let tree=expand(await app.settle());assert.match(text(tree),/€80\.00/);
+ assert.doesNotMatch(text(tree),/EUR estimate unavailable/);
+ props.historicalBtcEurRate=0;tree=expand(app.render());
+ assert.match(text(tree),/EUR estimate unavailable/);
+});
 test('review sheet shows exact SAT costs, hides raw requests and only sends on explicit confirmation',async t=>{
  const calls=[];const props={amountSats:10,feeSats:2,route:'lightning',recipient:'synthetic-long-invoice',label:'wallet.example\nUnverified description',loading:false,onConfirm:()=>calls.push('send'),onCancel:()=>calls.push('back')};
  const app=hookFixture('components/bitcoin/payment-ui.tsx',()=>base,e=>e.BitcoinReview(props));t.after(app.unmount);
@@ -133,7 +145,8 @@ test('payment animation follows real phases, stops on success and respects reduc
  let tree=await app.settle();assert.match(text(tree),/Confirm on your device/);assert.deepEqual(calls,['start']);
  props.phase='sending';tree=app.render();assert.match(text(tree),/Sending Bitcoin/);assert.doesNotMatch(text(tree),/Payment confirmed/);
  motionAllowed=false;app.render();assert.deepEqual(calls,['start','stop']);
- motionAllowed=true;app.render();props.phase='success';tree=app.render();assert.equal(tree.props.loading,false);assert.match(text(tree),/Payment confirmed/);
+ motionAllowed=true;app.render();props.phase='success';props.eurValue=0.01;tree=app.render();assert.equal(tree.props.loading,false);assert.match(text(tree),/Payment confirmed/);
+ assert.match(text(tree),/≈ 0.01 EUR/);
  assert.deepEqual(calls,['start','stop','start','stop']);
 });
 test('native sheet has no header action and cannot dismiss an in-flight payment',async t=>{

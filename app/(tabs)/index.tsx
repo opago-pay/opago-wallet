@@ -60,7 +60,7 @@ import { HistoryPager } from '@/lib/history-pagination';
 import { operationalHealth } from '@/lib/operational-health-native';
 import { yieldToUi } from '@/lib/ui-ready';
 import { walletSession } from '@/lib/wallet-session';
-import { bitcoinOperationHistoryItem, lightningHashFromPayment, type PaymentHistoryItem } from '@/lib/payment-details';
+import { bitcoinOperationHistoryItem, lightningHashFromPayment, paymentEurQuote, type PaymentHistoryItem } from '@/lib/payment-details';
 import {
   getWalletAssetPresentation,
   walletAssetKeyFromSymbol,
@@ -533,6 +533,7 @@ export default function HomeScreen() {
   if (historyOpen) return <HistoryPage
     insets={insets}
     transactions={visibleTransactions}
+    hbarToEur={displayRates.hbarToEur}
     loading={!walletReady || loading || !historyLoadedRef.current}
     waitingForSpark={!secondaryDataReady}
     hasMore={historyHasMore}
@@ -626,7 +627,7 @@ export default function HomeScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t('Latest activity')}</Text>
         </View>
-        {latestTransaction ? <TransactionRow transaction={latestTransaction} openTransaction={openTransaction} />
+        {latestTransaction ? <TransactionRow transaction={latestTransaction} hbarToEur={displayRates.hbarToEur} openTransaction={openTransaction} />
           : <View style={styles.emptyLatest}>
             <Text style={styles.emptyLatestText}>{historyErrors.length || loadError
               ? t('Payments are temporarily unavailable') : t('No payments yet')}</Text>
@@ -730,11 +731,15 @@ function StartupLoadingScreen() {
   </View>;
 }
 
-function TransactionRow({ transaction, openTransaction }: {
+function TransactionRow({ transaction, hbarToEur, openTransaction }: {
   transaction: DisplayTransaction;
+  hbarToEur: number;
   openTransaction(transaction: DisplayTransaction): void;
 }) {
   useLanguage();
+  const eurQuote = paymentEurQuote(transaction, { hbarToEur });
+  const eurLabel = eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}`
+    : t(transaction.asset === 'SAT' ? 'Historical EUR value unavailable' : 'EUR estimate unavailable');
   const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
   const title = friendlyStatus === 'Completed'
     ? transaction.asset === 'SAT'
@@ -751,7 +756,7 @@ function TransactionRow({ transaction, openTransaction }: {
     style={styles.transaction}
     onPress={() => openTransaction(transaction)}
     accessibilityRole="button"
-    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${t(friendlyStatus)}`}
+    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${eurLabel}, ${t(friendlyStatus)}`}
   >
     <AssetIcon asset={walletAssetKeyFromSymbol(transaction.asset)} size={40} />
     <View style={styles.transactionBody}>
@@ -769,15 +774,17 @@ function TransactionRow({ transaction, openTransaction }: {
       <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
         {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
       </Text>
+      <Text style={styles.transactionEurValue}>{eurLabel}</Text>
       {transaction.explorerUrl && <Ionicons name="chevron-forward" size={16} color={adaptColor('#5f5f6b', 'color')} />}
     </View>
   </TouchableOpacity>;
 }
 
 function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError, openTransaction,
-  hasMore, loadingMore, historyErrors, onLoadMore, onRetry, onClose, onRefresh, refreshing }: {
+  hbarToEur, hasMore, loadingMore, historyErrors, onLoadMore, onRetry, onClose, onRefresh, refreshing }: {
   insets: { top: number; bottom: number };
   transactions: DisplayTransaction[]; loading: boolean; waitingForSpark: boolean; loadError: string | null;
+  hbarToEur: number;
    openTransaction(transaction: DisplayTransaction): void;
   hasMore: boolean; loadingMore: boolean; historyErrors: string[]; onLoadMore(): void; onRetry(): void;
   onClose(): void; onRefresh(): void; refreshing: boolean;
@@ -789,7 +796,7 @@ function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={adaptColor('#ffb000', 'color')} />}
     data={transactions}
     keyExtractor={(transaction) => transaction.key}
-    renderItem={({ item }) => <TransactionRow transaction={item} openTransaction={openTransaction} />}
+    renderItem={({ item }) => <TransactionRow transaction={item} hbarToEur={hbarToEur} openTransaction={openTransaction} />}
     initialNumToRender={12}
     maxToRenderPerBatch={12}
     windowSize={7}
@@ -1031,6 +1038,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   transactionMeta: { color: '#a3a3ad', fontSize: 12, lineHeight: 17 },
   transactionTrailing: { alignItems: 'flex-end', gap: 7, maxWidth: '40%' },
   transactionAmount: { color: '#fff', fontWeight: '600', fontSize: 14, lineHeight: 20, fontVariant: ['tabular-nums'], marginLeft: 6 },
+  transactionEurValue: { color: '#a3a3ad', fontSize: 12, lineHeight: 17, textAlign: 'right' },
   incoming: { color: '#49d17d' },
   statusPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
   statusPillSuccess: { backgroundColor: 'rgba(73,209,125,0.12)' },

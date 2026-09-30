@@ -11,10 +11,13 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { satsToBtc } from '@/lib/bitcoin/amount';
 import { appConfig } from '@/lib/config';
 
-export function BitcoinMoney({ amount, hero = false }: { amount: number; hero?: boolean }) {
+export function BitcoinMoney({ amount, hero = false, historicalBtcEurRate }: { amount: number; hero?: boolean; historicalBtcEurRate?: number | null }) {
   const rates = useExchangeRates();
   const fresh = rates.updatedAt > 0 && Date.now() - rates.updatedAt <= 5 * 60_000;
-  const eur = rates.btcToEur > 0 && fresh ? new Intl.NumberFormat(appLocale(), { style: 'currency', currency: 'EUR' }).format(amount / 1e8 * rates.btcToEur) : null;
+  const savedRate = typeof historicalBtcEurRate === 'number' && Number.isFinite(historicalBtcEurRate) && historicalBtcEurRate > 0 && historicalBtcEurRate <= 1e12
+    ? historicalBtcEurRate : null;
+  const rate = savedRate ?? (rates.btcToEur > 0 && fresh ? rates.btcToEur : null);
+  const eur = rate ? new Intl.NumberFormat(appLocale(), { style: 'currency', currency: 'EUR' }).format(amount / 1e8 * rate) : null;
   return <View>
     <Text style={hero ? bitcoinStyles.amount : bitcoinStyles.value}>{eur ?? `${amount.toLocaleString(appLocale())} SAT`}</Text>
     <Text style={[bitcoinStyles.muted, hero && { textAlign: 'center' }]}>{satsToBtc(amount)} BTC · {amount.toLocaleString(appLocale())} SAT</Text>

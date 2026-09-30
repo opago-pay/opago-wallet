@@ -10,6 +10,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { paymentScanInbox } from '@/lib/payment-scan';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { paymentEurValueAtCurrentRate } from '@/lib/payment-details';
 import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { useBitcoinOperations } from '@/hooks/useBitcoinOperations';
 import { fetchOcpExecutionPayload, resolveOcpUrl } from '@/lib/ocp-safe';
@@ -99,6 +100,8 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   const [localScanKey, setLocalScanKey] = useState<string | null>(null);
   const activeScanKey = localScanKey ?? scanResultKey;
   const rates = useExchangeRates();
+  const ratesRef = useRef(rates);
+  ratesRef.current = rates;
   const [source, setSource] = useState<PaymentSource>('spark');
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const {
@@ -132,6 +135,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   const [loading, setLoading] = useState(false);
   const [paymentPhase, setPaymentPhase] = useState<'authorizing' | 'sending' | null>(null);
   const [lightningResult, setLightningResult] = useState<SparkPaymentResult | null>(null);
+  const [lightningResultEur, setLightningResultEur] = useState<number | null>(null);
   const [pendingLightning, setPendingLightning] = useState<PendingLightningPayment | null>(null);
   const [reviewPreparation, setReviewPreparation] = useState<{ amountSats?: number; label?: string } | null>(
     typeof scanResultKey === 'string' ? {} : null,
@@ -142,6 +146,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   const bitcoinTracking = useBitcoinOperations(sparkWallet, !!bitcoinResult);
   const [pendingHedera, setPendingHedera] = useState<PendingHederaPayment | null>(null);
   const [hederaResult, setHederaResult] = useState<HederaTransferResult | null>(null);
+  const [hederaResultEur, setHederaResultEur] = useState<number | null>(null);
   const [ocpState, setOcpState] = useState<OcpState | null>(null);
   const [selectedOcpOption, setSelectedOcpOption] = useState<OcpOption | null>(null);
   const paymentInFlight = useRef(false);
@@ -391,6 +396,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         checkoutRequest: pendingHedera.checkoutRequest,
       });
       setPendingHedera(null);
+      setHederaResultEur(paymentEurValueAtCurrentRate('HBAR', Number(result.amountHbar), ratesRef.current));
       setHederaResult(result);
       await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
@@ -442,6 +448,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
       );
       if (!isCurrent()) return;
       setPendingLightning(null);
+      setLightningResultEur(paymentEurValueAtCurrentRate('SAT', result.amountSats, ratesRef.current));
       setLightningResult(result);
       try {
         await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
@@ -504,12 +511,14 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     setAmountInput('');
     setAmountRequirement(null);
     setLightningResult(null);
+    setLightningResultEur(null);
     setPendingLightning(null);
     setBitcoinDestination(null);
     setPendingBitcoin(null);
     setBitcoinResult(null);
     setPendingHedera(null);
     setHederaResult(null);
+    setHederaResultEur(null);
     setOcpState(null);
     setSelectedOcpOption(null);
     setSourceSelected(false);
@@ -580,6 +589,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     return (
       <HederaSuccessView
         result={hederaResult}
+        eurValue={hederaResultEur}
         onOpenHashscan={() => {
           void openHederaExplorerUrl(hederaResult.hashscanUrl).catch(cause =>
             Alert.alert(t('Could not open HashScan'), t(messageOf(cause))),
@@ -627,6 +637,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     return (
       <LightningSuccessView
         amountSats={lightningResult.amountSats}
+        eurValue={lightningResultEur}
         reference={lightningResult.reference}
         onDashboard={closeToHome}
         onReset={reset}

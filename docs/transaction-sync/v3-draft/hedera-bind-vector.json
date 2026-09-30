@@ -1,0 +1,7 @@
+{
+  "note": "PUBLIC TEST VECTOR ONLY. RFC 8032 TEST 1 seed; never use for funds.",
+  "test_private_seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  "message": "opago-hedera-account-bind-v1\naudience: https://api.opago.com\naction: hedera_account_bind\nparty_id: 00000000-0000-4000-8000-000000000301\naccount_generation: 4\ninstallation_id: 00000000-0000-4000-8000-000000000401\nnetwork_id: hedera:testnet\nhedera_account_id: 0.0.1234\npublic_key: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a\nchallenge_id: 00000000-0000-4000-8000-000000000501\nnonce: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nissued_at: 2026-09-29T12:00:00Z\nexpires_at: 2026-09-29T12:05:00Z",
+  "signature_b64u": "vElv18ROskWDgpE359meVwBXgKCNEVlidhg2ufCOz8LliOKTy-R1ZA1AtrdHjHg9SQmF9M49hMKXqEpddntNBg"
+}
