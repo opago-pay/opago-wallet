@@ -173,6 +173,6 @@ test('bounds optional dashboard services and always releases pull-to-refresh', (
   assert.match(source, /refreshInProgressRef/);
   assert.match(
     source,
-    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refreshBalances\(\);[\s\S]*?if \(historyOpen\) await refresh\(true\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
+    /async function onRefresh\(\) \{[\s\S]*?try \{[\s\S]*?await refreshBalances\(\);[\s\S]*?await Promise\.all\(\[refresh\(true\), rates\.refresh\(\)\]\);[\s\S]*?\} finally \{\s*setRefreshing\(false\);/,
   );
 });
