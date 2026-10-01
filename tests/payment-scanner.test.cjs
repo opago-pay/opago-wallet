@@ -10,7 +10,7 @@ function fixture(options = {}) {
   let appState; let back;
   const app = hookFixture('components/send/payment-scanner.tsx', () => ({
     'react-native': { View: 'view', Text: 'text', ScrollView: 'scroll', ActivityIndicator: 'spinner', StyleSheet: { create: v => v },
-      Platform: { OS: 'android' }, useWindowDimensions: () => ({ width: 360, height: 720, fontScale: 1 }),
+      Platform: { OS: options.os || 'android' }, useWindowDimensions: () => ({ width: 360, height: 720, fontScale: 1 }),
       Keyboard: { dismiss() {} }, AccessibilityInfo: { announceForAccessibility: v => calls.push(['announce',v]) },
       BackHandler: { addEventListener: (_,fn) => { back=fn; return {remove(){}}; } },
       AppState: { currentState: 'active', addEventListener: (_,fn) => {appState=fn;return {remove(){}};} }, Linking: { openSettings: async()=>{} } },
@@ -52,6 +52,25 @@ test('permission denial retains manual entry and paste without prompting again',
  button(tree,'Paste from clipboard').props.onPress();tree=await app.settle();assert.ok(nodes(tree).some(n=>n.props.children==='Your clipboard is empty.'));
  assert.equal(app.calls.includes('permission-request'),false);button(tree,'Enter address').props.onPress();tree=app.render();
  assert.ok(nodes(tree).find(n=>n.type==='sheet'&&n.props.title==='Enter address').props.visible);
+});
+test('iOS clipboard permission resumes the first paste after the temporary inactive state',async t=>{
+ let resolveClipboard;
+ const app=fixture({os:'ios',clipboard:()=>new Promise(resolve=>{resolveClipboard=resolve;})});t.after(app.unmount);
+ let tree=await app.settle();button(tree,'Paste from clipboard').props.onPress();
+ app.background('inactive');tree=app.render();
+ resolveClipboard('lightning-request');tree=await app.settle();
+ assert.equal(validations(app).length,0,'do not validate while the iOS permission dialog is open');
+ app.background('active');tree=await app.settle();
+ assert.deepEqual(detected(app),[['detected','lightning-request']]);
+ assert.equal(app.calls.filter(call=>call==='clipboard').length,1,'one tap and one clipboard read');
+});
+test('iOS clipboard permission cannot resume a paste after the app enters the background',async t=>{
+ let resolveClipboard;
+ const app=fixture({os:'ios',clipboard:()=>new Promise(resolve=>{resolveClipboard=resolve;})});t.after(app.unmount);
+ const tree=await app.settle();button(tree,'Paste from clipboard').props.onPress();
+ app.background('inactive');app.render();app.background('background');app.render();
+ resolveClipboard('lightning-request');app.background('active');await app.settle();
+ assert.equal(validations(app).length,0);assert.equal(detected(app).length,0);
 });
 test('invalid QR never shows recognized state or haptics and can be scanned again',async t=>{
  const app=fixture({validate:async()=>{throw Error('invalid-code');}});t.after(app.unmount);let tree=await app.settle();
