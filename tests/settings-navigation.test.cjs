@@ -112,6 +112,7 @@ test('help page no longer exposes the temporary diagnostic report action', t => 
   const ui = settingsFixture(t, 'help');
   const screen = ui.render();
   assert.ok(find(screen, node => node.type === 'Legal'));
+  assert.ok(find(screen, node => node.type === 'Legacy'));
   assert.equal(find(screen, node => node.type === 'Diagnostics'), null);
 });
 

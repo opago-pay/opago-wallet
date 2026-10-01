@@ -91,9 +91,7 @@ export function SettingsMenu(props: {
     </MenuGroup>
     <MenuGroup title={t('Support and information')}>
       <MenuRow title={t('Help and legal')} detail={t('Contact, privacy and terms')}
-        icon="help-circle-outline" divider disabled={props.disabled} onPress={() => props.onSelect('help')} />
-      <MenuRow title={t('Advanced options')} detail={t('Networks and diagnostics')}
-        icon="options-outline" disabled={props.disabled} onPress={() => props.onSelect('advanced')} />
+        icon="help-circle-outline" disabled={props.disabled} onPress={() => props.onSelect('help')} />
     </MenuGroup>
     <View style={[styles.card, styles.management]}>
       <MenuRow title={t('Manage this wallet')} detail={t('Local wallet data')}

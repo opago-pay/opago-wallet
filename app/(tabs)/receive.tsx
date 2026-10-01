@@ -778,11 +778,11 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   // Leave 22 px of white card around the QR, in addition to its encoded quiet zone.
   const qrSize = Math.max(160, Math.min(300, width - 90));
   const receiveRoutes: { id: ReceiveNetwork; label: string; description: string }[] = [
-    { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet.' },
-    { id: 'onchain', label: 'Bitcoin network', description: 'Receive to a Bitcoin address, for example from an exchange.' },
+    { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet' },
+    { id: 'onchain', label: 'Bitcoin network', description: 'Receive from a Bitcoin wallet' },
   ];
   if (showAllCoins || network === 'hedera') receiveRoutes.push({
-    id: 'hedera', label: 'HBAR', description: 'Receive to your Hedera account.',
+    id: 'hedera', label: 'HBAR', description: 'Receive from a Hedera account',
   });
 
   return <ScrollView
