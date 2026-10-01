@@ -67,6 +67,7 @@
       "node": "22.23.1",
       "autoIncrement": true,
       "env": {
+        "EXPO_PUBLIC_SENTRY_ENABLED": "false",
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
         "EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET": "true",
         "EXPO_PUBLIC_LIGHTNING_BUILD_PROFILE": "mainnet",
