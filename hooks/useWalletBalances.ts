@@ -14,6 +14,7 @@ const SPARK_STARTUP_PRIORITY_MS = 20_000;
 
 export function useWalletBalances(params: {
   walletReady: boolean;
+  walletIdentity?: string | null;
   sparkWallet: SparkBalanceReader | null;
   initializationError?: string | null;
   enableSpark?: boolean;
@@ -22,12 +23,13 @@ export function useWalletBalances(params: {
   allowHederaBeforeSpark?: boolean;
   refreshHederaAccount(): Promise<HederaAccountSnapshot | null>;
 }) {
-  const { walletReady, sparkWallet, initializationError, refreshHederaAccount, enableSpark = true, enableHedera = true, prioritizeSpark = false, allowHederaBeforeSpark = false } = params;
+  const { walletReady, walletIdentity = null, sparkWallet, initializationError, refreshHederaAccount, enableSpark = true, enableHedera = true, prioritizeSpark = false, allowHederaBeforeSpark = false } = params;
   const isFocused = useIsFocused();
   const [sparkSnapshot, setSparkSnapshot] = useState(() => ({ wallet: sparkWallet, state: unknownBalance<number>() }));
   const [incomingSnapshot, setIncomingSnapshot] = useState<{ wallet: SparkBalanceReader | null; value: number | null }>({ wallet: sparkWallet, value: null });
   const spark = sparkSnapshot.wallet === sparkWallet ? sparkSnapshot.state : unknownBalance<number>();
-  const [hedera, setHedera] = useState(unknownBalance<bigint>);
+  const [hederaSnapshot, setHederaSnapshot] = useState(() => ({ identity: walletIdentity, state: unknownBalance<bigint>() }));
+  const hedera = hederaSnapshot.identity === walletIdentity ? hederaSnapshot.state : unknownBalance<bigint>();
   const sparkGeneration = useRef(0);
   const hasFocusedSpark = useRef(false);
   const lastFocusedSparkWallet = useRef<SparkBalanceReader | null>(null);
@@ -92,7 +94,10 @@ export function useWalletBalances(params: {
     if (!force && hederaLoaded.current) return Promise.resolve();
     const request = ++hederaGeneration.current;
     const active = () => focused.current && request === hederaGeneration.current;
-    setHedera(current => refreshingBalance(current));
+    setHederaSnapshot(current => ({
+      identity: walletIdentity,
+      state: refreshingBalance(current.identity === walletIdentity ? current.state : unknownBalance<bigint>()),
+    }));
     const operation = (async () => {
       await yieldToUi();
       if (!active() || (!force && !hederaEnabled.current)) return;
@@ -102,13 +107,16 @@ export function useWalletBalances(params: {
           withTimeout(refreshHederaAccount(), 8_000, 'HBAR balance refresh timed out.'));
         if (active()) {
           hederaLoaded.current = true;
-          setHedera(loadedBalance(account?.balanceTinybars ?? 0n));
+          setHederaSnapshot({ identity: walletIdentity, state: loadedBalance(account?.balanceTinybars ?? 0n) });
           recordWalletStartupStage('hbar_balance');
         }
       } catch (cause) {
         if (active()) {
           hederaLoaded.current = false;
-          setHedera(current => failedBalance(current, cause));
+          setHederaSnapshot(current => ({
+            identity: walletIdentity,
+            state: failedBalance(current.identity === walletIdentity ? current.state : unknownBalance<bigint>(), cause),
+          }));
         }
       }
     })().finally(() => {
@@ -116,7 +124,7 @@ export function useWalletBalances(params: {
     });
     hederaPending.current = operation;
     return operation;
-  }, [walletReady, refreshHederaAccount]);
+  }, [walletReady, refreshHederaAccount, walletIdentity]);
 
   // Asset disclosure changes must never restart Bitcoin's balance request.
   useFocusEffect(useCallback(() => {

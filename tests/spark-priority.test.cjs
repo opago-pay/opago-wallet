@@ -105,6 +105,27 @@ test('Returning to Home refreshes HBAR again and discards a late result from the
   assert.equal(result.balances.hbarTinybars, 400000000n);
 });
 
+test('a wallet switch never displays the previous wallet HBAR balance', async t => {
+  let resolveSecond;
+  let lookups = 0;
+  const app = balanceFixture({ params: {
+    walletIdentity: 'wallet-a', enableHedera: true,
+    refreshHederaAccount: async () => {
+      if (++lookups === 1) return { balanceTinybars: 200000000n };
+      return new Promise(resolve => { resolveSecond = resolve; });
+    },
+  } });
+  t.after(app.unmount);
+  app.render();
+  assert.equal((await app.settle()).balances.hbarTinybars, 200000000n);
+
+  app.params.walletIdentity = 'wallet-b';
+  assert.equal(app.render().balances.hbarTinybars, null);
+  await app.settle();
+  resolveSecond({ balanceTinybars: 400000000n });
+  assert.equal((await app.settle()).balances.hbarTinybars, 400000000n);
+});
+
 test('A failed HBAR read can be retried by reopening the section', async t => {
   let hederaReads = 0;
   const app = balanceFixture({ params: { enableHedera: true, refreshHederaAccount: async () => {

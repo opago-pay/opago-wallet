@@ -55,7 +55,7 @@ import {
 } from '@/lib/lightning/spark-history';
 import { formatTinybars } from '@/lib/hedera/payments';
 import { appConfig } from '@/lib/config';
-import { calculateBitcoinEur, calculateHederaEur } from '@/lib/portfolio-valuation';
+import { calculateBitcoinEur, calculateHederaEur, sumAssetValuesEur } from '@/lib/portfolio-valuation';
 import { formatBtcBalance } from '@/lib/bitcoin/amount';
 import { pendingOnchainDepositSats } from '@/lib/bitcoin/holdings';
 import { withTimeout } from '@/lib/promise-timeout';
@@ -141,7 +141,7 @@ export default function HomeScreen() {
   const [startupComplete, setStartupComplete] = useState(false);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const { balances, balanceStates, bitcoinIncoming, secondaryDataReady, sparkPriorityTimedOut, refreshBalances } = useWalletBalances({
-    walletReady, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: advancedExpanded,
+    walletReady, walletIdentity: hederaPublicKey, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: true,
     prioritizeSpark: true, allowHederaBeforeSpark: true,
   });
   const preview = useHomeBalancePreview({
@@ -153,7 +153,8 @@ export default function HomeScreen() {
     spark: balances.spark ?? preview?.spark?.value ?? null,
     hbarTinybars: balances.hbarTinybars ?? (preview?.hedera ? BigInt(preview.hedera.value) : null),
   };
-  const previewRates = !(rates.btcToEur > 0) && !!preview?.rates;
+  const previewRates = (!!preview?.rates?.btcToEur && !(rates.btcToEur > 0)) ||
+    (!!preview?.rates?.hbarToEur && !(rates.hbarToEur > 0));
   const displayRates = {
     btcToEur: rates.btcToEur > 0 ? rates.btcToEur : preview?.rates?.btcToEur ?? 0,
     hbarToEur: rates.hbarToEur > 0 ? rates.hbarToEur : preview?.rates?.hbarToEur ?? 0,
@@ -558,9 +559,58 @@ export default function HomeScreen() {
     item => item.status !== 'pending' || !hiddenPaymentKeys.includes(item.key),
   ), [transactions, hiddenPaymentKeys]);
 
-  const totalEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
+  const bitcoinEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
   const hederaEur = calculateHederaEur(displayBalances.hbarTinybars, displayRates.hbarToEur);
   const balanceError = balanceStates.spark.error;
+  const assetBalanceError = balanceError || balanceStates.hedera.error;
+  const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
+    ? t(!(rates.hbarToEur > 0) || !(rates.hbarUpdatedAt > 0) || Date.now() - rates.hbarUpdatedAt > 300_000
+      ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatCoinUnitPrice(displayRates.hbarToEur, 'hedera') })
+    : t(rates.isLoading ? 'Loading HBAR price…' : 'HBAR price unavailable');
+  const bitcoinPriceText = Number.isFinite(displayRates.btcToEur) && displayRates.btcToEur > 0
+    ? t(!(rates.btcToEur > 0) || !(rates.btcUpdatedAt > 0) || Date.now() - rates.btcUpdatedAt > 300_000
+      ? '1 BTC = {price} · last known' : '1 BTC = {price}', { price: formatEurValue(displayRates.btcToEur) })
+    : t(rates.isLoading ? 'Loading BTC price…' : 'BTC price unavailable');
+  const bitcoinNotice = bitcoinOperationNotice(bitcoinOperations);
+  const pendingDeposits = pendingOnchainDepositSats(bitcoinOperations);
+  const bitcoinNotes = [
+    ...(bitcoinIncoming !== null && bitcoinIncoming !== undefined && bitcoinIncoming > 0
+      ? [t('Incoming Bitcoin: {amount} BTC', { amount: formatBtcBalance(bitcoinIncoming, appLocale()) })] : []),
+    ...(pendingDeposits !== null && pendingDeposits > 0
+      ? [t('Onchain deposits awaiting credit: {amount} BTC', { amount: formatBtcBalance(pendingDeposits, appLocale()) })] : []),
+  ];
+
+  // Each visible coin card contributes exactly once to the headline. Adding a
+  // new coin card to this list also adds its EUR value to the portfolio total.
+  const assetCards: { eurValue: number | null; props: React.ComponentProps<typeof BalanceCard> }[] = [
+    {
+      eurValue: bitcoinEur,
+      props: {
+        asset: 'bitcoin', subtitle: bitcoinPriceText, notes: bitcoinNotes,
+        value: displayBalances.spark === null ? '— BTC' : formatBtcBalance(displayBalances.spark, appLocale()) + ' BTC',
+        fiatValue: bitcoinEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(bitcoinEur),
+        loading: balanceStates.spark.status === 'loading' && displayBalances.spark === null,
+        statusText: balanceStates.spark.status === 'error'
+          ? displayBalances.spark === null ? t('Balance unavailable') : t('Last known balance')
+          : balanceStates.spark.status === 'loading' && displayBalances.spark === null
+            ? t('Loading balance…') : undefined,
+      },
+    },
+    {
+      eurValue: hederaEur,
+      props: {
+        asset: 'hedera', subtitle: hederaPriceText,
+        value: displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR',
+        fiatValue: hederaEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(hederaEur),
+        loading: balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null,
+        statusText: balanceStates.hedera.status === 'error'
+          ? displayBalances.hbarTinybars === null ? t('Balance unavailable') : t('Last known balance')
+          : balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null
+            ? t('Loading balance…') : undefined,
+      },
+    },
+  ];
+  const totalEur = sumAssetValuesEur(assetCards.map(card => card.eurValue));
   const initialBalanceReady = walletReady && displayBalances.spark !== null
     && (displayRates.btcToEur > 0 || !rates.isLoading);
   useEffect(() => {
@@ -582,27 +632,12 @@ export default function HomeScreen() {
   useEffect(() => {
     if (balanceStates.spark.status === 'ready' && balances.spark !== null) recordWalletStartupStage('home_live_balance_rendered');
   }, [balanceStates.spark.status, balances.spark]);
-  const balanceCaveat = balanceError
-    ? (displayBalances.spark === null ? t('Bitcoin balance unavailable') : t('Last known balance · refresh unavailable'))
+  const balanceCaveat = assetBalanceError
+    ? (totalEur === null ? t('Balance unavailable') : t('Last known balance · refresh unavailable'))
     : sparkPriorityTimedOut && displayBalances.spark === null ? t('Bitcoin balance unavailable')
-      : previewRates && !rates.isLoading ? t('Last known exchange rates')
-        : totalEur === null && !rates.isLoading ? t('EUR estimate unavailable') : null;
-  const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
-    ? t(!(rates.hbarToEur > 0) || !(rates.hbarUpdatedAt > 0) || Date.now() - rates.hbarUpdatedAt > 300_000
-      ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatCoinUnitPrice(displayRates.hbarToEur, 'hedera') })
-    : t(rates.isLoading ? 'Loading HBAR price…' : 'HBAR price unavailable');
-  const bitcoinPriceText = Number.isFinite(displayRates.btcToEur) && displayRates.btcToEur > 0
-    ? t(!(rates.btcToEur > 0) || !(rates.btcUpdatedAt > 0) || Date.now() - rates.btcUpdatedAt > 300_000
-      ? '1 BTC = {price} · last known' : '1 BTC = {price}', { price: formatEurValue(displayRates.btcToEur) })
-    : t(rates.isLoading ? 'Loading BTC price…' : 'BTC price unavailable');
-  const bitcoinNotice = bitcoinOperationNotice(bitcoinOperations);
-  const pendingDeposits = pendingOnchainDepositSats(bitcoinOperations);
-  const bitcoinNotes = [
-    ...(bitcoinIncoming !== null && bitcoinIncoming !== undefined && bitcoinIncoming > 0
-      ? [t('Incoming Bitcoin: {amount} BTC', { amount: formatBtcBalance(bitcoinIncoming, appLocale()) })] : []),
-    ...(pendingDeposits !== null && pendingDeposits > 0
-      ? [t('Onchain deposits awaiting credit: {amount} BTC', { amount: formatBtcBalance(pendingDeposits, appLocale()) })] : []),
-  ];
+      : totalEur === null && (rates.isLoading || assetCards.some(card => card.props.loading)) ? t('Loading balances…')
+        : totalEur === null ? t('EUR estimate unavailable')
+          : previewRates && !rates.isLoading ? t('Last known exchange rates') : null;
 
   const localVisible = recentLocal && (recentLocal.status !== 'pending' || !hiddenPaymentKeys.includes(recentLocal.key))
     ? recentLocal : null;
@@ -685,19 +720,19 @@ export default function HomeScreen() {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.5}
-            accessibilityLabel={totalEur === null ? t('Bitcoin balance unavailable')
-              : t('Estimated Bitcoin balance: {amount}', { amount: formatEurValue(totalEur) })}
+            accessibilityLabel={totalEur === null ? t('Balance unavailable')
+              : t('Total estimated balance: {amount}', { amount: formatEurValue(totalEur) })}
           >
             {totalEur === null ? '—' : <><Text style={styles.approximation}>≈ </Text>{formatEurValue(totalEur)}</>}
           </Text>
         </View>
-        <View style={styles.satBalanceRow} accessibilityLiveRegion="polite">
-          <Text style={styles.satBalance} accessibilityLabel={t('Bitcoin balance: {amount}', { amount: displayBalances.spark === null ? '—' : t('{amount} Sats', { amount: displayBalances.spark.toLocaleString(appLocale()) }) })}>
-            {displayBalances.spark === null ? '— Sats' : t('{amount} Sats', { amount: displayBalances.spark.toLocaleString(appLocale()) })}
-          </Text>
-        </View>
         <View style={styles.balanceStatusRow} accessibilityLiveRegion="polite">
-          <Text style={styles.totalLabel}>{t('Bitcoin balance')}</Text>
+          <Text style={styles.totalLabel}>{t('Your money')}</Text>
+        </View>
+        <View style={styles.satBalanceRow} accessibilityLiveRegion="polite">
+          <Text style={styles.satBalance}>
+            {t('Bitcoin balance: {amount}', { amount: displayBalances.spark === null ? '—' : t('{amount} Sats', { amount: displayBalances.spark.toLocaleString(appLocale()) }) })}
+          </Text>
         </View>
         {!!balanceCaveat && <Text style={styles.balanceCaveat}>{balanceCaveat}</Text>}
       </View>
@@ -775,35 +810,9 @@ export default function HomeScreen() {
 
       <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} label={t('All coins')}>
         {!secondaryDataReady && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance…')}</Text>}
-        <BalanceCard
-          asset="bitcoin"
-          subtitle={bitcoinPriceText}
-          notes={bitcoinNotes}
-          value={displayBalances.spark === null ? '— BTC' : formatBtcBalance(displayBalances.spark, appLocale()) + ' BTC'}
-          fiatValue={totalEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(totalEur)}
-          loading={balanceStates.spark.status === 'loading' && displayBalances.spark === null}
-          statusText={balanceStates.spark.status === 'error'
-            ? displayBalances.spark === null ? t('Balance unavailable') : t('Last known balance')
-            : balanceStates.spark.status === 'loading' && displayBalances.spark === null
-              ? t('Loading balance…')
-              : undefined}
-        />
-        <BalanceCard
-          asset="hedera"
-          subtitle={hederaPriceText}
-          value={displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR'}
-          fiatValue={hederaEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(hederaEur)}
-          loading={balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null}
-          statusText={
-            balanceStates.hedera.status === 'error'
-              ? displayBalances.hbarTinybars === null ? t('Balance unavailable') : t('Last known balance')
-              : balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null
-                ? t('Loading balance…')
-                : undefined
-          }
-        />
+        {assetCards.map(card => <BalanceCard key={card.props.asset} {...card.props} />)}
       </AdvancedOptions>
-      {!!balanceError && (
+      {!!assetBalanceError && (
         <View style={styles.errorNotice}>
           <Ionicons name="cloud-offline-outline" size={18} color={adaptColor('#f2b45d', 'color')} />
           <Text style={styles.error}>{t("Some balances could not be refreshed. Pull down to try again.")}</Text>

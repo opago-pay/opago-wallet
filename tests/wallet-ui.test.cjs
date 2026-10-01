@@ -59,7 +59,7 @@ test('uses accessible asset icons throughout portfolio, send, and receive views'
   assert.match(icon, /props\.asset === 'hedera'/);
   assert.match(icon, /hedera-logo\.png/);
   assert.doesNotMatch(icon, /\\u210f/);
-  assert.match(portfolio, /asset="hedera"/);
+  assert.match(portfolio, /asset: 'hedera'/);
   assert.doesNotMatch(portfolio, /asset="lightning"/);
   assert.match(portfolio, /walletAssetKeyFromSymbol\(transaction\.asset\)/);
   assert.doesNotMatch(portfolio, /HBAR payments are live/);
