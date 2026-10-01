@@ -726,14 +726,6 @@ export default function HomeScreen() {
             {totalEur === null ? '—' : <><Text style={styles.approximation}>≈ </Text>{formatEurValue(totalEur)}</>}
           </Text>
         </View>
-        <View style={styles.balanceStatusRow} accessibilityLiveRegion="polite">
-          <Text style={styles.totalLabel}>{t('Your money')}</Text>
-        </View>
-        <View style={styles.satBalanceRow} accessibilityLiveRegion="polite">
-          <Text style={styles.satBalance}>
-            {t('Bitcoin balance: {amount}', { amount: displayBalances.spark === null ? '—' : t('{amount} Sats', { amount: displayBalances.spark.toLocaleString(appLocale()) }) })}
-          </Text>
-        </View>
         {!!balanceCaveat && <Text style={styles.balanceCaveat}>{balanceCaveat}</Text>}
       </View>
 
@@ -1075,11 +1067,7 @@ const styles = adaptiveStyles(StyleSheet.create({
     paddingVertical: 32,
     marginTop: 30,
   },
-  satBalanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
-  satBalance: { color: '#d5d5da', fontSize: 19, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  balanceStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
   totalAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%' },
-  totalLabel: { color: '#85858f', fontSize: 13, fontWeight: '500', textAlign: 'center', flexShrink: 1 },
   balanceCaveat: { color: '#a59a84', fontSize: 11, textAlign: 'center', marginTop: 5 },
   approximation: { color: '#a3a3ad', fontSize: 27, fontWeight: '400' },
   total: { color: '#fff', fontSize: 52, fontWeight: '600', textAlign: 'center', flexShrink: 1, fontVariant: ['tabular-nums'] },
