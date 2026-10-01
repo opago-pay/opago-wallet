@@ -395,7 +395,6 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">{settingsSectionTitle(activeSection)}</Text>
-          {activeSection === 'overview' && <Text style={styles.subtitle}>{t('Your wallet, your preferences.')}</Text>}
         </View>
         <CloseWalletScreen disabled={busy} />
       </View>
@@ -655,7 +654,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   header: { marginBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 20 },
   headerCopy: { flex: 1 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '600', color: '#fff', letterSpacing: -0.8 },
-  subtitle: { color: '#a3a3ad', fontSize: 15, lineHeight: 22, marginTop: 6 },
   backButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10, paddingRight: 12 },
   backText: { fontSize: 14, color: '#aaaab3', fontWeight: '500' },
   walletCard: { padding: 20, borderRadius: 20, backgroundColor: '#151518', borderWidth: 1, borderColor: '#2d2d31' },

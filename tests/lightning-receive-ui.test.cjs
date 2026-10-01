@@ -143,8 +143,8 @@ test('Receive opens on the QR, with optional amount and payment routes behind sm
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel === 'Via Lightning').props.onPress();
   screen = app.render();
   assert.match(text(screen), /Receive from a Lightning wallet/);
-  assert.match(text(screen), /Receive to a Bitcoin address/);
-  assert.doesNotMatch(text(screen), /Receive to your Hedera account/);
+  assert.match(text(screen), /Receive from a Bitcoin wallet/);
+  assert.doesNotMatch(text(screen), /Receive from a Hedera account/);
   assert.ok(nodes(screen).some(node => node.props?.accessibilityLabel === 'Show all coins'));
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel === 'Via Lightning').props.onPress();
 
@@ -311,12 +311,12 @@ test('Show all coins reveals HBAR in the network picker and opens its account QR
   app.render(); let screen = await app.settle();
   nodes(screen).find(node => node.props.accessibilityLabel === 'Via Lightning').props.onPress();
   screen = app.render();
-  assert.doesNotMatch(text(screen), /Receive to your Hedera account/);
+  assert.doesNotMatch(text(screen), /Receive from a Hedera account/);
   nodes(screen).find(node => node.props.accessibilityLabel === 'Show all coins').props.onPress();
   screen = app.render();
   assert.match(text(screen), /Receive from a Lightning wallet/);
-  assert.match(text(screen), /Receive to a Bitcoin address/);
-  assert.match(text(screen), /Receive to your Hedera account/);
+  assert.match(text(screen), /Receive from a Bitcoin wallet/);
+  assert.match(text(screen), /Receive from a Hedera account/);
   nodes(screen).find(node => node.type === 'button' && text(node).startsWith('HBAR')).props.onPress();
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, '0.0.123456');

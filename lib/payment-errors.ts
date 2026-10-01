@@ -10,7 +10,7 @@ export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): strin
   if (message === 'The Bitcoin fee quote expired. Review this payment again.' || message === 'The Bitcoin fee changed. Review the deposit again.') return t(message);
   if (/bitcoin.*still being checked/.test(normalized)) return t('Please do not send again. We are checking the payment automatically.');
   if (/unscoped (?:lightning|hedera) payment|legacy (?:lightning|hedera) payment journal/.test(normalized)) {
-    return t('An older payment needs review. Do not send again. Open Settings > Advanced options to see its reference and contact support.');
+    return t('An older payment needs review. Do not send again. Contact Opago support with your payment receipt.');
   }
   if (/invalid bitcoin address or network/.test(normalized)) return t('Check the Bitcoin address and network. Its checksum must be valid and its network must match this wallet.');
   if (/ambiguous bitcoin|conflicting amounts/.test(normalized)) return t('This Bitcoin request contains conflicting instructions. Ask the recipient for a new request.');

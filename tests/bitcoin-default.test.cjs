@@ -122,10 +122,10 @@ test('Receive reveals HBAR through Show all coins and returns to Lightning', asy
   assert.doesNotMatch(text(screen), /HBAR/);
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel?.startsWith('Via ')).props.onPress();
   screen = ui.render();
-  assert.doesNotMatch(text(screen), /Receive to your Hedera account/);
+  assert.doesNotMatch(text(screen), /Receive from a Hedera account/);
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel === 'Show all coins').props.onPress();
   screen = ui.render();
-  assert.match(text(screen), /Receive to your Hedera account/);
+  assert.match(text(screen), /Receive from a Hedera account/);
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityRole === 'radio' && text(node).startsWith('HBAR')).props.onPress();
   await flush();
   screen = ui.render();
