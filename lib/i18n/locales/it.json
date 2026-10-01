@@ -10,7 +10,7 @@
   "Your wallet, your preferences.": "Il tuo portafoglio, le tue preferenze.",
   "Write down your recovery words and check your backup in Settings > Security and backup.": "Annota le parole di recupero e verifica il backup in Impostazioni > Sicurezza e backup.",
   "Remove the current wallet through Settings before restoring a different wallet.": "Rimuovi il portafoglio attuale da Impostazioni prima di ripristinarne uno diverso.",
-  "An older payment needs review. Do not send again. Open Settings > Help and legal to see its reference and contact support.": "Un pagamento precedente richiede una verifica. Non inviarlo di nuovo. Apri Impostazioni > Aiuto e informazioni legali per vedere il riferimento e contattare l’assistenza.",
+  "An older payment needs review. Do not send again. Contact Opago support with your payment receipt.": "Un pagamento precedente richiede una verifica. Non inviarlo di nuovo. Contatta l’assistenza Opago con la ricevuta del pagamento.",
   "The payment connection could not be secured. Check your connection and try again later. Nothing was sent.": "Non è stato possibile stabilire una connessione sicura per il pagamento. Controlla la connessione e riprova più tardi. Non è stato inviato nulla.",
   "Connecting to Bitcoin…": "Connessione a Bitcoin…",
   "Bitcoin connection unavailable": "Connessione Bitcoin non disponibile",

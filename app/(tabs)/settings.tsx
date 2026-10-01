@@ -547,10 +547,7 @@ export default function SettingsScreen() {
 
       {activeSection === 'appearance' && <ColorModePicker embedded />}
       {activeSection === 'language' && <LanguagePicker embedded />}
-      {activeSection === 'help' && <View style={styles.helpContent}>
-        <LegacyPaymentReview />
-        <LegalLinks embedded disabled={busy} />
-      </View>}
+      {activeSection === 'help' && <LegalLinks embedded disabled={busy} />}
       {activeSection === 'wallet' && <View style={styles.walletCard}>
         <Text style={styles.body}>{t("Remove the keys and saved payment data from this device. Keep your complete recovery phrase to access the wallet again.")}</Text>
         <Text style={styles.caption}>{t("Backup verification and a separate confirmation protect against accidental removal.")}</Text>
@@ -571,6 +568,7 @@ export default function SettingsScreen() {
       </View>}
 
       {showAdvanced && <View style={styles.advancedContent}>
+        <LegacyPaymentReview />
         <View style={styles.advancedIntro}>
           <Text style={styles.advancedIntroTitle}>{t('How your Bitcoin balance works')}</Text>
           <Text style={styles.advancedIntroBody}>{t('Opago uses Spark for your available Bitcoin balance. Your recovery words control your wallet keys. Lightning payments and Bitcoin network withdrawals use this balance. Spark operators and the service provider are needed for these payment routes; availability and fees depend on them and the Bitcoin network. This balance is not a set of ordinary onchain outputs controlled only by a single address. Keep your recovery words: restoring access also depends on compatible Spark software and its recovery procedures. Onchain deposits require a separate claim before spending.')}</Text>
@@ -656,7 +654,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   header: { marginBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 20 },
   headerCopy: { flex: 1 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '600', color: '#fff', letterSpacing: -0.8 },
-  helpContent: { gap: 18 },
   backButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10, paddingRight: 12 },
   backText: { fontSize: 14, color: '#aaaab3', fontWeight: '500' },
   walletCard: { padding: 20, borderRadius: 20, backgroundColor: '#151518', borderWidth: 1, borderColor: '#2d2d31' },
