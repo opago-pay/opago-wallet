@@ -4,7 +4,7 @@
 
 ## 1. Who provides the wallet
 
-The OPAGO Wallet is provided by OPAGO GmbH, Moosstraße 4, 83404 Ainring, Germany. You can contact us at **info@opago.com**. The wallet is a service for users to manage and use Bitcoin via Spark/Lightning and, where available in the app, HBAR on the Hedera network. The existing OPAGO Pay terms primarily describe merchant and point of sale services. The terms of use that apply specifically to the wallet will be clarified before its public release.
+The OPAGO Wallet is provided by OPAGO GmbH, Moosstraße 4, 83404 Ainring, Germany. Wallet support is available at **support@opago.com**. The wallet is a service for users to manage and use Bitcoin via Spark/Lightning and, where available in the app, HBAR on the Hedera network. The existing OPAGO Pay terms concern the merchant solution. Separate terms of use for the consumer wallet still need to be finalised before its public release.
 
 ## 2. What the app provides
 
@@ -26,7 +26,7 @@ After a connection is lost, a submitted payment may initially have an unclear st
 
 ## 5. Fees and euro values
 
-Lightning/Spark, Bitcoin on-chain and Hedera payments may incur fees charged by the network, its operators or the relevant service. Before a payment, the app shows the amount and, where available, a fee estimate or maximum. The actual fee may depend on the payment method and network conditions; quotes may expire and require another review. Making a Bitcoin on-chain deposit available in your Spark balance may also incur a fee.
+OPAGO does not charge its own fee for payments made in the wallet app. Lightning/Spark, Bitcoin on-chain and Hedera payments may still incur fees charged by the network, its operators or other services. Before a payment, the app shows the amount and, where available, a fee estimate or maximum. The actual fee may depend on the payment method and network conditions; quotes may expire and require another review. Making a Bitcoin on-chain deposit available in your Spark balance may also incur a fee.
 
 Balances and historical values shown in euros are approximate, non-binding estimates based on external exchange rate data. They are not a promise that coins can be sold or exchanged for that amount. Exchange rates and the market value of Bitcoin and HBAR can fluctuate significantly.
 
@@ -40,13 +40,13 @@ Public Bitcoin on-chain and Hedera transactions may remain visible to others per
 
 Protect your device, your wallet PIN or device lock, and your recovery words. Check payment requests, including those from a QR code or the clipboard. Deleting a wallet locally removes its associated app data from the device; without a saved copy of your recovery words, you cannot restore it afterward.
 
-You can reach support at [opago.com/contact](https://www.opago.com/contact/) or **info@opago.com**. OPAGO can answer general questions about the app and investigate technical activity, but it cannot recreate lost private keys or reverse a completed network payment on its own.
+You can reach wallet support at **support@opago.com**. OPAGO can answer general questions about the app and investigate technical activity, but it cannot recreate lost private keys or reverse a completed network payment on its own.
 
 ## Internal approval items – remove before publication
 
-1. **Legal form and scope:** Decide whether this is a separate risk notice or part of the wallet terms of use. The [existing OPAGO Pay terms](https://www.opago.com/terms/) refer to apps and payers, but later limit the service to business customers and say that OPAGO does not provide its own Lightning wallet. This conflict requires legal resolution.
-2. **Fees:** Check the actual fees charged by OPAGO and third parties for each active payment method. Do not copy any fee amount or claim of no fees from the Wallet of Satoshi example. Check statements about maximum fees against the final build.
-3. **Third parties:** Verify the Spark/Lightspark operators used, the terms that actually apply, exit and recovery procedures, and dependencies. The public [Spark terms](https://www.spark.money/terms) and [Spark privacy policy](https://www.spark.money/privacy-policy) are sources, but do not establish every OPAGO agreement or SDK configuration.
+1. **Legal form and scope:** Decide whether this is a separate risk notice or part of the wallet terms of use. OPAGO states that the [existing OPAGO Pay terms](https://www.opago.com/terms/) apply to its merchant solution only. Because the published text also refers broadly to apps and payers, make that separation explicit and approve separate consumer wallet terms.
+2. **Fees:** OPAGO states that it charges no fee of its own for payments in the wallet app. Verify this against every active payment route and the final build; check third-party charges and statements about fee maxima. Do not import any fee amount from the Wallet of Satoshi example.
+3. **Third parties:** Verify the Spark/Lightspark operators actually used, the applicable public terms, exit and recovery procedures, and dependencies. OPAGO reports no direct contracts with the external network and information providers. The public [Spark terms](https://www.spark.money/terms) and [Spark privacy policy](https://www.spark.money/privacy-policy) do not establish every SDK configuration or the app's exact data flows.
 4. **Legal review:** Review consumer information, any withdrawal rights, regulatory classification, target countries, minimum age and mandatory liability rules for the specific EU wallet offering. Do not adopt another provider's liability exclusions or Australian clauses.
 5. **Release check:** Remove Sentry and MoonPay from the signed release as decided; check the available Bitcoin/HBAR functions, account activation, fees, backup and payment status behaviour in the final build. Then approve and publish the German and English versions.
 
