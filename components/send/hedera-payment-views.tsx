@@ -5,6 +5,7 @@ import { PaymentBackButton } from './payment-back-button';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { formatEurValue } from '@/lib/wallet-display';
+import { appConfig } from '@/lib/config';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { TouchableOpacity } from '@/components/ui/wallet-interaction';
@@ -35,9 +36,7 @@ export function HederaReviewView(props: {
   useColorMode();
   const insets = useSafeAreaInsets();
   const [showDetails, setShowDetails] = useState(false);
-  const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars(
-    props.payment.checkoutRequest ? 'checkout' : 'direct',
-  );
+  const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars('checkout');
   return (
     <View style={styles.scrollContainer}>
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 16 }}>
@@ -85,6 +84,9 @@ export function HederaReviewView(props: {
       {props.payment.checkoutRequest && (
         <Text style={[styles.subtitle, styles.centerText]}>{t("This request does not verify the merchant’s identity. Confirm the recipient with the merchant.")}</Text>
       )}
+      {!props.payment.checkoutRequest && (
+        <Text style={[styles.subtitle, styles.centerText]}>{t('This HBAR transfer uses the Opago smart contract. Network fees may be higher than for a direct transfer.')}</Text>
+      )}
       <View style={styles.safetyNote}>
         <Ionicons name="lock-closed-outline" size={17} color={adaptColor('#f2b45d', 'color')} />
         <Text style={styles.safetyText}>
@@ -116,15 +118,15 @@ export function HederaReviewView(props: {
           <View style={styles.quoteRow}>
             <Text style={styles.quoteLabel}>{t("Payment type")}</Text>
             <Text style={styles.quoteValue}>
-              {props.payment.checkoutRequest ? t('Opago checkout') : t('Direct transfer')}
+              {t('Opago checkout')}
             </Text>
+          </View>
+          <View style={styles.quoteRow}>
+            <Text style={styles.quoteLabel}>{t("Contract")}</Text>
+            <Text style={styles.quoteValue} selectable>{props.payment.checkoutRequest?.contractId || appConfig.hederaCheckoutContractId}</Text>
           </View>
           {props.payment.checkoutRequest && (
             <>
-            <View style={styles.quoteRow}>
-              <Text style={styles.quoteLabel}>{t("Contract")}</Text>
-              <Text style={styles.quoteValue} selectable>{props.payment.checkoutRequest.contractId}</Text>
-            </View>
             <View style={styles.quoteRow}>
               <Text style={styles.quoteLabel}>{t("Payment ID")}</Text>
               <Text style={styles.quoteValue} selectable numberOfLines={2}>

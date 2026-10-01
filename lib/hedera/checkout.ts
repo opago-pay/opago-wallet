@@ -327,6 +327,45 @@ export function buildHederaCheckoutRequest(request: HederaCheckoutRequest): stri
   return 'opagowallet://' + CHECKOUT_HOST + '?' + params.toString();
 }
 
+// A normal HBAR recipient does not provide a merchant QR. Bind the chosen
+// account and amount to a fresh single-use checkout immediately before sending.
+export async function createHederaTransferCheckoutRequest(input: {
+  recipientAccountId: string;
+  amountTinybars: bigint;
+  nonce: Uint8Array;
+  nowSeconds?: number;
+}): Promise<HederaCheckoutRequest> {
+  assertHederaNetwork();
+  const recipientAccountId = parseHederaAccountId(input.recipientAccountId);
+  const amountTinybars = assertHederaTransferAmount(input.amountTinybars);
+  if (input.nonce.length !== 32 || input.nonce.every(byte => byte === 0)) {
+    throw new Error('HBAR payment nonce is invalid.');
+  }
+  const recipient = await getMirrorAccountById(recipientAccountId);
+  const merchantEvmAddress = recipient?.evm_address?.toLowerCase() || '';
+  if (recipient?.deleted || recipient?.account !== recipientAccountId ||
+      !EVM_ADDRESS_PATTERN.test(merchantEvmAddress) ||
+      merchantEvmAddress === '0x' + '0'.repeat(40)) {
+    throw new Error('HBAR recipient is unavailable or has no contract-compatible address.');
+  }
+  const nowSeconds = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(nowSeconds) || nowSeconds <= 0) {
+    throw new Error('HBAR payment time is invalid.');
+  }
+  const contractId = configuredContractId();
+  const requestNonce = '0x' + bytesToHex(input.nonce);
+  const expiresAt = nowSeconds + 10 * 60;
+  return {
+    kind: 'checkout', network: HEDERA_NETWORK, contractId,
+    merchantAccountId: recipientAccountId, merchantEvmAddress,
+    amountTinybars, amountHbar: formatTinybars(amountTinybars),
+    requestNonce, expiresAt,
+    paymentId: computeHederaCheckoutPaymentId({
+      contractId, merchantEvmAddress, amountTinybars, requestNonce, expiresAt,
+    }),
+  };
+}
+
 function bytes32(value: string, label: string): Uint8Array {
   if (!BYTES32_PATTERN.test(value.toLowerCase())) throw new Error(label + ' is invalid.');
   return hexToBytes(value, label);

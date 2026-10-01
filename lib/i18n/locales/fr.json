@@ -315,6 +315,7 @@
   "Maximum fee": "Frais maximaux",
   "Up to": "Jusqu’à",
   "This request does not verify the merchant’s identity. Confirm the recipient with the merchant.": "Cette demande ne vérifie pas l’identité du commerçant. Confirmez le destinataire auprès du commerçant.",
+  "This HBAR transfer uses the Opago smart contract. Network fees may be higher than for a direct transfer.": "Ce transfert HBAR utilise le contrat intelligent Opago. Les frais réseau peuvent être plus élevés que pour un transfert direct.",
   "Check the amount and recipient. Crypto payments cannot be reversed.": "Vérifiez le montant et le destinataire. Les paiements en crypto sont irréversibles.",
   "Hide payment details": "Masquer les détails du paiement",
   "Show payment details": "Afficher les détails du paiement",

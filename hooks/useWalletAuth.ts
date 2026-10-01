@@ -36,12 +36,12 @@ import {
   HEDERA_NETWORK,
 } from '../lib/hedera/config';
 import {
+  createHederaTransferCheckoutRequest,
   sendHederaCheckoutPayment,
   type HederaCheckoutRequest,
 } from '../lib/hedera/checkout';
 import {
   assertHederaPaymentBalance,
-  sendHederaTransfer,
   type HederaTransferResult,
 } from '../lib/hedera/payments';
 import { hederaPaymentJournalFor } from '../lib/hedera/payment-journal-native';
@@ -541,45 +541,43 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
           'No Hedera ' + HEDERA_NETWORK + ' account exists for this wallet key. Open Receive to activate it with an HBAR deposit.',
         );
       }
-      if (!input.checkoutRequest) await hederaPaymentJournal.assertNoUnresolvedDirectPayment(account.accountId);
+      await hederaPaymentJournal.assertNoUnresolvedDirectPayment(account.accountId);
+      if (account.accountId === input.recipientAccountId) {
+        throw new Error('Source and recipient Hedera accounts must be different.');
+      }
+      const recipientTransfer = !input.checkoutRequest;
+      const checkoutRequest = input.checkoutRequest || await createHederaTransferCheckoutRequest({
+        recipientAccountId: input.recipientAccountId,
+        amountTinybars: input.amountTinybars,
+        nonce: Crypto.getRandomBytes(32),
+      });
       const assertAuthorized = await authorizePayment();
       assertAuthorized();
       assertHederaPaymentBalance(
         input.amountTinybars,
         account.balanceTinybars,
-        input.checkoutRequest ? 'checkout' : 'direct',
+        'checkout',
       );
       if (
-        input.checkoutRequest &&
-        (
-          input.checkoutRequest.merchantAccountId !== input.recipientAccountId ||
-          input.checkoutRequest.amountTinybars !== input.amountTinybars
-        )
+        checkoutRequest.merchantAccountId !== input.recipientAccountId ||
+        checkoutRequest.amountTinybars !== input.amountTinybars
       ) {
         throw new Error('Checkout details changed before signing.');
       }
-      const result = input.checkoutRequest
-        ? await sendHederaCheckoutPayment({
-            sourceAccountId: account.accountId,
-            request: input.checkoutRequest,
-            privateKey,
-            assertAuthorized,
-            lifecycle: {
-              onSubmitted: submission => hederaPaymentJournal.recordSubmitted(submission),
-              onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
-            },
-          })
-        : await sendHederaTransfer({
-            sourceAccountId: account.accountId,
-            recipientAccountId: input.recipientAccountId,
-            amountTinybars: input.amountTinybars,
-            privateKey,
-            assertAuthorized,
-            lifecycle: {
-              onSubmitted: submission => hederaPaymentJournal.recordSubmitted(submission),
-              onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
-            },
-          });
+      const result = await sendHederaCheckoutPayment({
+        sourceAccountId: account.accountId,
+        request: checkoutRequest,
+        privateKey,
+        assertAuthorized,
+        lifecycle: {
+          // Keep recipient transfers in the journal's direct-payment guard so
+          // an unresolved result cannot be retried with a fresh payment ID.
+          onSubmitted: submission => hederaPaymentJournal.recordSubmitted({
+            ...submission, mode: recipientTransfer ? 'direct' : 'checkout',
+          }),
+          onResolved: resolution => hederaPaymentJournal.recordResolved(resolution),
+        },
+      });
       try {
         const refreshed = await loadHederaAccount(account.accountId, privateKey.publicKey);
         // A confirmed payment stays confirmed even if its session has ended.

@@ -19,6 +19,7 @@ const {
   buildHederaCheckoutRequest,
   buildHederaCheckoutTransaction,
   computeHederaCheckoutPaymentId,
+  createHederaTransferCheckoutRequest,
   parseHederaCheckoutRequest,
   verifyHederaCheckoutRequest,
 } = require('../lib/hedera/checkout.ts');
@@ -220,6 +221,45 @@ test('verifies merchant alias and the pinned contract runtime through Mirror Nod
     now,
   );
   await verifyHederaCheckoutRequest(request);
+});
+
+test('binds an ordinary HBAR recipient to a fresh payable checkout', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async input => {
+    assert.match(String(input), /\/api\/v1\/accounts\/0\.0\.8888$/);
+    return mirrorResponse({
+      account: '0.0.8888', deleted: false,
+      evm_address: '0x1111111111111111111111111111111111111111',
+    });
+  };
+  const now = Math.floor(Date.now() / 1000);
+  const request = await createHederaTransferCheckoutRequest({
+    recipientAccountId: '0.0.8888', amountTinybars: 1_000_000n,
+    nonce: new Uint8Array(32).fill(42), nowSeconds: now,
+  });
+  assert.equal(request.merchantAccountId, '0.0.8888');
+  assert.equal(request.contractId, '0.0.7777');
+  assert.equal(request.expiresAt, now + 600);
+  assert.equal(request.amountTinybars, 1_000_000n);
+  assert.deepEqual(parseHederaCheckoutRequest(buildHederaCheckoutRequest(request), now), request);
+  const transaction = buildHederaCheckoutTransaction(request);
+  assert.equal(transaction.contractId.toString(), '0.0.7777');
+  assert.equal(transaction.payableAmount.toTinybars().toString(), '1000000');
+});
+
+test('does not prepare a contract transfer without a valid recipient alias or nonce', async t => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async () => mirrorResponse({ account: '0.0.8888', deleted: false, evm_address: null });
+  await assert.rejects(createHederaTransferCheckoutRequest({
+    recipientAccountId: '0.0.8888', amountTinybars: 1n,
+    nonce: new Uint8Array(32).fill(42),
+  }), /contract-compatible address/i);
+  await assert.rejects(createHederaTransferCheckoutRequest({
+    recipientAccountId: '0.0.8888', amountTinybars: 1n,
+    nonce: new Uint8Array(32),
+  }), /nonce is invalid/i);
 });
 
 test('rejects a Mirror Node merchant alias mismatch', async t => {

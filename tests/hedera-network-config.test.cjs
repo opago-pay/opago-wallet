@@ -56,8 +56,8 @@ test('uses the official Hedera testnet profile by default', () => {
     buildProfile: 'testnet',
     mirrorNodeUrl: 'https://testnet.mirrornode.hedera.com',
     maxTransferHbar: '1',
-    checkoutContractId: '',
-    checkoutRuntimeSha256: '',
+    checkoutContractId: '0.0.9972670',
+    checkoutRuntimeSha256: '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
   });
   assert.equal(getHederaChainId('testnet'), 296n);
   assert.equal(getHederaHashscanBaseUrl('testnet'), 'https://hashscan.io/testnet');
