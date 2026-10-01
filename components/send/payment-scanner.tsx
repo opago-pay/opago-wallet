@@ -44,6 +44,8 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
   const requesting = useRef(false);
   const generation = useRef(0);
   const inputBusy = useRef(false);
+  const pastePending = useRef(false);
+  const pasteForegroundWaiter = useRef<((active: boolean) => void) | null>(null);
   const mode = useRef<'scan' | 'manual' | 'error' | 'leaving'>('scan');
   const focusRef = useRef(focused);
   focusRef.current = focused;
@@ -70,6 +72,9 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
   const invalidate = useCallback(() => {
     generation.current += 1;
     inputBusy.current = false;
+    pastePending.current = false;
+    pasteForegroundWaiter.current?.(false);
+    pasteForegroundWaiter.current = null;
     setChecking(false);
     setTorch(false);
   }, []);
@@ -87,15 +92,23 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     mounted.current = true;
     const subscription = AppState.addEventListener('change', state => {
       visible.current = focusRef.current && state === 'active';
-      if (state !== 'active') invalidate();
+      if (state === 'active') {
+        pasteForegroundWaiter.current?.(true);
+        pasteForegroundWaiter.current = null;
+      // The iOS clipboard consent sheet briefly marks the app inactive.
+      } else if (!(Platform.OS === 'ios' && state === 'inactive' && pastePending.current)) invalidate();
       setActive(state === 'active');
     });
     void hasBackCameraTorch().then(value => { if (mounted.current) setTorchSupported(value); });
-    return () => { mounted.current = false; generation.current += 1; subscription.remove(); };
+    return () => {
+      mounted.current = false; generation.current += 1; pastePending.current = false;
+      pasteForegroundWaiter.current?.(false); pasteForegroundWaiter.current = null;
+      subscription.remove();
+    };
   }, [invalidate]);
   useEffect(() => {
     if (focused && active) void checkPermission();
-    else invalidate();
+    else if (!focused || !(Platform.OS === 'ios' && pastePending.current)) invalidate();
   }, [focused, active, checkPermission, invalidate]);
   useEffect(() => {
     if (!focused) return;
@@ -148,16 +161,22 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     mode.current = 'scan'; setError('');
     inputBusy.current = true; setChecking(true); setTorch(false);
     const ticket = ++generation.current;
+    pastePending.current = Platform.OS === 'ios';
+    const waitForForeground = () => visible.current ? Promise.resolve(true) :
+      pastePending.current ? new Promise<boolean>(resolve => { pasteForegroundWaiter.current = resolve; }) : Promise.resolve(false);
     try {
       const assertSession = walletSession.capture();
       const value = await measurePerformance('scanner.clipboard', () => Clipboard.getStringAsync());
-      if (!mounted.current || !visible.current || generation.current !== ticket) return;
+      if (!await waitForForeground() || !mounted.current || !visible.current || generation.current !== ticket) return;
       assertSession();
+      pastePending.current = false;
       if (!value.trim()) { showError('Your clipboard is empty.'); return; }
       await recognize(value, ticket, assertSession);
     } catch {
+      if (pastePending.current && !visible.current) await waitForForeground();
       if (mounted.current && visible.current && generation.current === ticket) showError('Could not paste. Please try again or enter the recipient manually.');
     } finally {
+      if (generation.current === ticket) pastePending.current = false;
       if (mounted.current && generation.current === ticket) { inputBusy.current = false; setChecking(false); }
     }
   }
