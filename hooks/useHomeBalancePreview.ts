@@ -20,7 +20,9 @@ export function useHomeBalancePreview(input: {
     let active = true;
     setPreview(null);
     if (!scope || !walletSession.isUnlocked()) return;
-    const assertCurrent = walletSession.capture();
+    let assertCurrent: () => void;
+    try { assertCurrent = walletSession.capture(); }
+    catch { return; }
     void homeBalancePreviewStore.read(scope).then(saved => {
       if (!active) return;
       assertCurrent();
@@ -37,7 +39,10 @@ export function useHomeBalancePreview(input: {
     if (hedera !== null) next.hedera = { value: hedera.toString(), at: hederaAt };
     // Rates now persist globally per coin. Retain old preview quotes only as
     // a migration fallback; balance updates must never overwrite them.
-    void homeBalancePreviewStore.update(next, walletSession.capture()).catch(() => undefined);
+    let assertCurrent: () => void;
+    try { assertCurrent = walletSession.capture(); }
+    catch { return; }
+    void homeBalancePreviewStore.update(next, assertCurrent).catch(() => undefined);
   }, [scope, spark, hedera, sparkAt, hederaAt]);
 
   return preview?.scope === scope ? preview : null;

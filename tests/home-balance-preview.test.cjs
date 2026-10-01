@@ -3,11 +3,47 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 require('./register-typescript.cjs');
 const { HomeBalancePreviewStore, parseHomeBalancePreview } = require('../lib/home-balance-preview.ts');
+const { WalletSession } = require('../lib/wallet-session.ts');
+const { hookFixture } = require('./react-hooks-fixture.cjs');
 const { loadDisplaySparkBalance, markSparkWalletSynchronized } = require('../lib/display-spark-balance.ts');
 const { calculatePortfolioEur } = require('../lib/portfolio-valuation.ts');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const scope = 'public-fixture:mainnet:MAINNET';
 const record = () => ({ version: 1, scope, spark: { definition: 'available', value: 4200, at: Date.now() }, hedera: { value: '200000000', at: Date.now() }, rates: { btcToEur: 50000, hbarToEur: 0.2, at: Date.now() } });
+
+test('Home preview does not throw or access storage while the app is inactive', async t => {
+  const session = new WalletSession();
+  session.unlock();
+  let publicKey = 'public-fixture';
+  let spark = 4200;
+  let reads = 0;
+  let writes = 0;
+  const fixture = hookFixture('hooks/useHomeBalancePreview.ts', () => ({
+    '@/lib/config': { appConfig: { hederaNetwork: 'mainnet', sparkNetwork: 'MAINNET' } },
+    '@/lib/home-balance-preview-native': { homeBalancePreviewStore: {
+      read: async () => { reads++; return null; },
+      update: async () => { writes++; },
+    } },
+    '@/lib/wallet-session': { walletSession: session },
+    '@/lib/startup-timing': { recordWalletStartupStage() {} },
+  }), exports => exports.useHomeBalancePreview({
+    publicKey, spark, hedera: 200000000n,
+    sparkAt: Date.now(), hederaAt: Date.now(),
+  }));
+  t.after(fixture.unmount);
+  assert.equal(fixture.render(), null);
+  await fixture.settle();
+  assert.ok(reads > 0);
+  assert.ok(writes > 0);
+
+  session.handleAppState('inactive');
+  publicKey = 'another-public-fixture';
+  spark = 4300;
+  const before = { reads, writes };
+  assert.equal(fixture.render(), null);
+  await fixture.settle();
+  assert.deepEqual({ reads, writes }, before);
+});
 
 test('a new Home instance can display the last known full portfolio without a network connection', async () => {
   let stored = null;
