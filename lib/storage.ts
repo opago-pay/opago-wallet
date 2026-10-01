@@ -2,12 +2,14 @@ import { t } from './i18n';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { categorizeAuthFailure, recordAuthDiagnostic } from './auth-diagnostics';
+import { securityPreferences } from './security-preferences';
 
 export const MNEMONIC_STORE_KEY = 'opago_wallet_mnemonic';
 export const WALLET_IDENTITY_KEY = 'opago_wallet_public_identity_v1';
 export const WALLET_WIPE_PENDING_KEY = 'opago_wallet_wipe_pending_v1';
 const WALLET_EXISTS_KEY = 'opago_wallet_exists';
 const KEYCHAIN_SERVICE = 'opago.wallet.mnemonic.v2';
+const QUICK_KEYCHAIN_SERVICE = 'opago.wallet.mnemonic.quick.v1';
 
 function assertNativeStorage(): void {
   if (Platform.OS === 'web') {
@@ -22,6 +24,43 @@ function mnemonicOptions(): SecureStore.SecureStoreOptions {
     requireAuthentication: SecureStore.canUseBiometricAuthentication(),
     authenticationPrompt: t('Unlock your Opago recovery phrase'),
   };
+}
+
+function quickMnemonicOptions(): SecureStore.SecureStoreOptions {
+  return {
+    keychainService: QUICK_KEYCHAIN_SERVICE,
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    requireAuthentication: false,
+  };
+}
+
+async function readMnemonic(): Promise<string | null> {
+  const preferred = securityPreferences.getSnapshot().lockOnOpen ? mnemonicOptions() : quickMnemonicOptions();
+  const value = await SecureStore.getItemAsync(MNEMONIC_STORE_KEY, preferred);
+  if (value) return value;
+  // A failed or interrupted migration may leave the other secure item intact.
+  const alternate = securityPreferences.getSnapshot().lockOnOpen ? quickMnemonicOptions() : mnemonicOptions();
+  return SecureStore.getItemAsync(MNEMONIC_STORE_KEY, alternate);
+}
+
+export async function changeOpeningAuthentication(enabled: boolean): Promise<void> {
+  assertNativeStorage();
+  if (securityPreferences.getSnapshot().lockOnOpen === enabled) return;
+  const source = enabled ? quickMnemonicOptions() : mnemonicOptions();
+  const target = enabled ? mnemonicOptions() : quickMnemonicOptions();
+  const mnemonic = await SecureStore.getItemAsync(MNEMONIC_STORE_KEY, source);
+  if (!mnemonic) throw new Error('Wallet keys are unavailable. Unlock your wallet and try again.');
+  await SecureStore.setItemAsync(MNEMONIC_STORE_KEY, mnemonic, target);
+  const verified = await SecureStore.getItemAsync(MNEMONIC_STORE_KEY, target);
+  if (verified !== mnemonic) throw new Error('The wallet key could not be moved safely.');
+  if (enabled) await SecureStore.deleteItemAsync(MNEMONIC_STORE_KEY, source);
+  try { await securityPreferences.set({ lockOnOpen: enabled }); }
+  catch (cause) {
+    if (enabled) await SecureStore.setItemAsync(MNEMONIC_STORE_KEY, mnemonic, source);
+    await SecureStore.deleteItemAsync(MNEMONIC_STORE_KEY, target);
+    throw cause;
+  }
+  if (!enabled) await SecureStore.deleteItemAsync(MNEMONIC_STORE_KEY, source);
 }
 
 export async function hasStoredMnemonic(): Promise<boolean> {
@@ -43,6 +82,10 @@ export async function hasStoredMnemonic(): Promise<boolean> {
     // Older installations may have a protected mnemonic but no existence flag.
     // Do not mistake that wallet for a fresh installation.
     if (await SecureStore.getItemAsync(MNEMONIC_STORE_KEY, mnemonicOptions()) !== null) {
+      recordAuthDiagnostic('startup.storage_check.wallet_found');
+      return true;
+    }
+    if (await SecureStore.getItemAsync(MNEMONIC_STORE_KEY, quickMnemonicOptions()) !== null) {
       recordAuthDiagnostic('startup.storage_check.wallet_found');
       return true;
     }
@@ -68,6 +111,7 @@ export async function getBiometricallyProtectedMnemonic(): Promise<string | null
 export async function replaceInaccessibleMnemonic(mnemonic: string): Promise<void> {
   assertNativeStorage();
   await SecureStore.deleteItemAsync(MNEMONIC_STORE_KEY, mnemonicOptions());
+  await SecureStore.deleteItemAsync(MNEMONIC_STORE_KEY, quickMnemonicOptions());
   await SecureStore.setItemAsync(WALLET_EXISTS_KEY, 'true');
   await setSecureItem(MNEMONIC_STORE_KEY, mnemonic);
 }
@@ -80,7 +124,8 @@ export async function setSecureItem(key: string, value: string): Promise<void> {
     });
     return;
   }
-  await SecureStore.setItemAsync(key, value, mnemonicOptions());
+  await SecureStore.setItemAsync(key, value,
+    securityPreferences.getSnapshot().lockOnOpen ? mnemonicOptions() : quickMnemonicOptions());
   await SecureStore.setItemAsync(WALLET_EXISTS_KEY, 'true');
 }
 
@@ -89,7 +134,7 @@ export async function getSecureItem(key: string): Promise<string | null> {
   if (key !== MNEMONIC_STORE_KEY) return SecureStore.getItemAsync(key);
   recordAuthDiagnostic('mnemonic_read.begin');
   try {
-    const protectedValue = await SecureStore.getItemAsync(key, mnemonicOptions());
+    const protectedValue = await readMnemonic();
     if (protectedValue) {
       recordAuthDiagnostic('mnemonic_read.protected');
       return protectedValue;
@@ -103,7 +148,7 @@ export async function getSecureItem(key: string): Promise<string | null> {
 
     await setSecureItem(key, legacyValue);
     await SecureStore.deleteItemAsync(key);
-    const migrated = await SecureStore.getItemAsync(key, mnemonicOptions());
+    const migrated = await readMnemonic();
     recordAuthDiagnostic(migrated ? 'mnemonic_read.legacy' : 'mnemonic_read.missing');
     return migrated;
   } catch (cause) {
@@ -117,6 +162,7 @@ export async function deleteSecureItem(key: string): Promise<void> {
   if (key === MNEMONIC_STORE_KEY) {
     await Promise.all([
       SecureStore.deleteItemAsync(key, mnemonicOptions()),
+      SecureStore.deleteItemAsync(key, quickMnemonicOptions()),
       SecureStore.deleteItemAsync(key),
       SecureStore.deleteItemAsync(WALLET_EXISTS_KEY),
     ]);

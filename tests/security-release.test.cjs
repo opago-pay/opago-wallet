@@ -235,6 +235,12 @@ test('iOS biometric-only policy rejects passcode-only authentication before a wa
   assert.equal(biometric.prompts(), 1);
 });
 
+test('iOS payment approval can use the device passcode when explicitly enabled', async () => {
+  const pinOnly = deviceAuthFixture({ os: 'ios', level: 1, allowDeviceCredential: true });
+  (await pinOnly.authorizeWalletAction('Confirm this payment', { allowDeviceCredential: true }))();
+  assert.equal(pinOnly.prompts(), 1);
+});
+
 test('successful iOS Face ID waits for the app to resume even when dismissal takes over two seconds', async () => {
   let finished = false;
   const fixture = deviceAuthFixture({ os: 'ios', duringPrompt: change => {

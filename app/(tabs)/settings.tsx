@@ -28,6 +28,7 @@ import { ProtectedRecoveryPhrase } from '@/components/security/recovery-phrase';
 import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { ColorModePicker } from '@/components/settings/color-mode-picker';
+import { SecurityOptions } from '@/components/settings/security-options';
 import { getSettingsSection, SettingsMenu, settingsSectionTitle, type SettingsSection } from '@/components/settings/settings-menu';
 import { SettingsTransition } from '@/components/settings/settings-transition';
 import { LegalLinks } from '@/components/legal/legal-links';
@@ -462,8 +463,8 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle} accessibilityRole="header">{t("App protection")}</Text>
-        <Text style={styles.body}>{t("Opago locks when you leave the app or after 2 minutes without activity. Unlock with your device passcode or biometrics.")}</Text>
-        <Text style={styles.caption}>{t("Every payment needs your review and confirmation with supported biometrics or your Android device passcode.")}</Text>
+        <Text style={styles.body}>{t('Choose when Opago asks for device authentication.')}</Text>
+        <SecurityOptions />
         <TouchableOpacity accessibilityRole="button" style={styles.lockButton} onPress={lockWallet}>
           <Ionicons name="lock-closed-outline" size={19} color={adaptColor('#d5d5dc', 'color')} />
           <Text style={styles.actionText}>{t("Lock wallet now")}</Text>

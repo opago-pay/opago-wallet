@@ -1,4 +1,4 @@
-import { colorModePreference, type ColorMode } from './color-mode';
+import { colorModePreference, type ResolvedColorMode } from './color-mode';
 
 // Explicit roles preserve the original dark design while assigning known
 // screen colors a deliberate light counterpart. No arbitrary RGB conversion.
@@ -27,7 +27,7 @@ export const themePalette = {
 
 export type ThemeColorRole = keyof typeof themePalette.dark;
 
-export function themeColor(role: ThemeColorRole, mode: ColorMode = colorModePreference.getSnapshot().mode): string {
+export function themeColor(role: ThemeColorRole, mode: ResolvedColorMode = colorModePreference.getSnapshot().mode): string {
   return themePalette[mode][role];
 }
 
