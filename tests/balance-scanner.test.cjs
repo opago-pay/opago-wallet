@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 require('./register-typescript.cjs');
 const { unknownBalance, loadedBalance, refreshingBalance, failedBalance, readSparkBalance } = require('../lib/balance-state.ts');
-const { calculatePortfolioEur } = require('../lib/portfolio-valuation.ts');
+const { calculatePortfolioEur, sumAssetValuesEur } = require('../lib/portfolio-valuation.ts');
 const { scannerPermission } = require('../lib/scanner-permission.ts');
 const { WalletSession } = require('../lib/wallet-session.ts');
 const { PaymentScanInbox } = require('../lib/payment-scan.ts');
@@ -19,6 +19,10 @@ test('unknown or failed first balance is never interpreted as a zero or partial 
   assert.equal(calculatePortfolioEur({ sparkSats: null, hbarTinybars: 100_000_000n }, rates), null);
   assert.equal(calculatePortfolioEur({ sparkSats: 20, hbarTinybars: null }, rates), null);
   assert.equal(calculatePortfolioEur({ sparkSats: 0, hbarTinybars: 0n }, rates), 0);
+  assert.equal(sumAssetValuesEur([50_000, 8, 2]), 50_010);
+  assert.equal(sumAssetValuesEur([50_000, null, 2]), null);
+  assert.equal(sumAssetValuesEur([]), null);
+  assert.equal(calculatePortfolioEur({ sparkSats: 100_000_000, hbarTinybars: 0n }, { btcToEur: 50_000, hbarToEur: 0 }), 50_000);
 });
 
 test('refresh and offline failure retain the last known amount with an explicit state', () => {

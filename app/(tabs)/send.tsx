@@ -119,6 +119,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   } = useWalletAuth();
   const { balances, balanceStates, balanceError } = useWalletBalances({
     walletReady,
+    walletIdentity: hederaPublicKey,
     sparkWallet,
     refreshHederaAccount,
     initializationError: walletError,

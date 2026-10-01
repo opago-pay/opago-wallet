@@ -70,12 +70,12 @@ function fixture(data = {}) {
       loadOrGenerateWallet: async () => { reads.push('wallet init'); },
       refreshHederaAccount: async () => { reads.push('account'); return { accountId: '0.0.123' }; }, error: null,
     }) },
-    '@/hooks/useWalletBalances': { useWalletBalances: () => ({
-      balances: { spark: data.spark === undefined ? 107 : data.spark, hbarTinybars: data.hbarTinybars ?? 0n },
+    '@/hooks/useWalletBalances': { useWalletBalances: params => { data.balanceParams = params; return ({
+      balances: { spark: data.spark === undefined ? 107 : data.spark, hbarTinybars: data.hbarTinybars === undefined ? 0n : data.hbarTinybars },
       balanceStates: { spark: { status: data.sparkStatus ?? 'ready', updatedAt: 1, error: data.sparkError }, hedera: { status: data.hederaStatus ?? 'ready', updatedAt: 1 } },
       bitcoinIncoming: data.bitcoinIncoming ?? null,
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
-    }) },
+    }); } },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
@@ -186,10 +186,34 @@ test('Home keeps its primary balance and reads HBAR activity without waiting for
     React.Children.toArray(node.props?.children).forEach(collect);
   };
   collect(screen);
-  assert.ok(texts.includes('107 Sats'));
+  assert.ok(texts.includes('Bitcoin balance: 107 Sats'));
   assert.ok(texts.includes('Latest activity'));
   assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);
   assert.equal(advanced(screen).props.label, 'All coins');
+});
+
+test('Home headline adds every displayed coin and waits for missing holdings', () => {
+  const data = { spark: 150_000_000, hbarTinybars: 2_000_000_000n };
+  const app = fixture(data);
+  let screen = app.render();
+  assert.equal(data.balanceParams.enableHedera, true);
+  const headline = find(screen, node => node.type === 'text' && node.props.accessibilityLabel?.startsWith('Total estimated balance:'));
+  assert.equal(headline.props.accessibilityLabel, 'Total estimated balance: 75002');
+  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'bitcoin').props.fiatValue, '≈ 75000');
+
+  data.hbarTinybars = null;
+  screen = app.render();
+  assert.equal(find(screen, node => node.type === 'text' && node.props.accessibilityLabel === 'Balance unavailable').props.children, '—');
+
+  data.hbarTinybars = 2_000_000_000n;
+  data.hbarRate = 0;
+  screen = app.render();
+  assert.equal(find(screen, node => node.type === 'text' && node.props.accessibilityLabel === 'Balance unavailable').props.children, '—');
+  assert.ok(find(screen, node => node.type === 'text' && node.props.children === 'EUR estimate unavailable'));
+
+  data.hbarTinybars = 0n;
+  screen = app.render();
+  assert.equal(find(screen, node => node.type === 'text' && node.props.accessibilityLabel === 'Total estimated balance: 75000').props.accessibilityLabel, 'Total estimated balance: 75000');
 });
 
 test('activity rows show the same EUR quote or unavailable message as payment details', async () => {
