@@ -88,6 +88,7 @@ function walletFixture(t, options = {}) {
     '../lib/retry': { retryWithBackoff: fn => fn() },
     '../lib/ui-ready': { yieldToUi: async () => {} },
     '../lib/startup-timing': { beginWalletStartupTiming() {}, recordWalletStartupStage() {} },
+    ...options.dependencies,
   }), exported => {
     const provider = exported.WalletProvider({ children: null });
     return provider.type(provider.props).props.value;
@@ -97,6 +98,59 @@ function walletFixture(t, options = {}) {
   return { ...fixture, storage, writes, prompts, session, seeds, sdkStarts: () => sdkStarts,
     changeState };
 }
+
+test('an ordinary HBAR send uses the checkout contract and retains the pending-transfer guard', async t => {
+  const calls = [];
+  const request = {
+    merchantAccountId: '0.0.2222', amountTinybars: 1_000_000n,
+    paymentId: '0x' + 'ab'.repeat(32),
+  };
+  const account = { accountId: '0.0.1111', balanceTinybars: 1_000_000_000n };
+  const fixture = walletFixture(t, {
+    storage: new Map([[MNEMONIC, PHRASE]]),
+    dependencies: {
+      '../lib/hedera/config': { HEDERA_NETWORK: 'testnet' },
+      '../lib/hedera/account-binding-native': { resolveHederaWalletAccount: async () => account },
+      '../lib/hedera/account': { loadHederaAccount: async () => account },
+      '../lib/hedera/payment-journal-native': { hederaPaymentJournalFor: () => ({
+        assertNoUnresolvedDirectPayment: async () => { calls.push('pending-guard'); },
+        recordSubmitted: async item => { calls.push(['submitted', item.mode, item.paymentId]); },
+        recordResolved: async () => { calls.push('resolved'); },
+      }) },
+      '../lib/hedera/checkout': {
+        createHederaTransferCheckoutRequest: async input => {
+          calls.push(['request', input.recipientAccountId, input.amountTinybars, input.nonce.length]);
+          return request;
+        },
+        sendHederaCheckoutPayment: async input => {
+          calls.push('contract-call'); input.assertAuthorized();
+          await input.lifecycle.onSubmitted({
+            transactionId: '0.0.1111@1700000000.000000001', mode: 'checkout',
+            recipientAccountId: '0.0.2222', amountTinybars: 1_000_000n,
+            paymentId: request.paymentId,
+          });
+          await input.lifecycle.onResolved({ transactionId: '0.0.1111@1700000000.000000001', state: 'confirmed', result: 'SUCCESS' });
+          return { mode: 'checkout', status: 'SUCCESS', amountHbar: '0.01' };
+        },
+      },
+      '../lib/hedera/payments': { assertHederaPaymentBalance: (_amount, _balance, mode) => calls.push(['fee-mode', mode]) },
+      '../lib/payment-authorization': { authorizePayment: async () => () => { calls.push('authorized'); } },
+    },
+  });
+  await fixture.settle();
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  await fixture.render().loadOrGenerateWallet();
+  await fixture.settle();
+  assert.equal(fixture.render().walletReady, true, fixture.render().error || 'wallet not ready');
+  const result = await fixture.render().sendHederaPayment({ recipientAccountId: '0.0.2222', amountTinybars: 1_000_000n });
+  assert.equal(result.status, 'SUCCESS');
+  assert.deepEqual(calls.filter(item => item === 'contract-call'), ['contract-call']);
+  assert.ok(calls.includes('pending-guard'));
+  assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'request' && item[3] === 32));
+  assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'fee-mode' && item[1] === 'checkout'));
+  assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'submitted' && item[1] === 'direct' && item[2] === request.paymentId));
+});
 
 test('iOS keychain Face ID can briefly background the app while the existing wallet opens', async t => {
   let reads = 0;

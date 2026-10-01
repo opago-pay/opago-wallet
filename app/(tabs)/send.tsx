@@ -261,7 +261,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         assertHederaPaymentBalance(
           amountTinybars,
           sourceAccount.balanceTinybars,
-          checkoutRequest ? 'checkout' : 'direct',
+          'checkout',
         );
         if (checkoutRequest) await verifyHederaCheckoutRequest(checkoutRequest);
         if (!isCurrent()) return;

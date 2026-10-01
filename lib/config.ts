@@ -150,19 +150,22 @@ export function resolveHederaBuildPolicy(
     );
   }
 
-  const checkoutContractId = input.checkoutContractId || '';
-  const checkoutRuntimeSha256 = input.checkoutRuntimeSha256 || '';
-  if (network === 'mainnet' && !/^0\.0\.[1-9]\d*$/.test(checkoutContractId)) {
+  // The public, source-verified Testnet deployment is available to local
+  // development builds even when no EAS profile supplies these values.
+  const checkoutContractId = input.checkoutContractId ||
+    (network === 'testnet' ? '0.0.9972670' : '');
+  const checkoutRuntimeSha256 = input.checkoutRuntimeSha256 ||
+    (network === 'testnet' ? '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8' : '');
+  if (!/^0\.0\.[1-9]\d*$/.test(checkoutContractId)) {
     throw new Error(
-      'A verified EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID is required for Hedera mainnet builds.',
+      'A verified EXPO_PUBLIC_HEDERA_CHECKOUT_CONTRACT_ID is required for Hedera ' + network + ' builds.',
     );
   }
   if (
-    network === 'mainnet' &&
     !/^(?:0x)?[0-9a-fA-F]{64}$/.test(checkoutRuntimeSha256)
   ) {
     throw new Error(
-      'A pinned EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 is required for Hedera mainnet builds.',
+      'A pinned EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256 is required for Hedera ' + network + ' builds.',
     );
   }
 

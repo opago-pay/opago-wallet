@@ -458,6 +458,7 @@ test('includes a native checkout child transfer received through a contract call
   assert.equal(history.length, 1);
   assert.equal(history[0].direction, 'received');
   assert.equal(history[0].amountTinybars, 100_000n);
+  assert.equal(history[0].counterpartyAccountId, '0.0.7314364');
 });
 
 test('prefers the checkout parent fee when parent and child both contain the payer', async t => {
