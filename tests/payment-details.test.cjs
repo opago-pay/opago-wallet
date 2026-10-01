@@ -62,6 +62,13 @@ test('success EUR value uses a recent rate for the confirmed asset', () => {
   assert.equal(paymentEurValueAtCurrentRate('HBAR', 12.5, { ...rates, hbarToEur: 0 }, 1_000_100), null);
 });
 
+test('fresh HBAR must not make a stale Bitcoin quote usable for a payment and vice versa',()=>{
+  const rates={btcToEur:50000,hbarToEur:0.2,updatedAt:1_000_000,btcUpdatedAt:1_000_000,hbarUpdatedAt:1_301_000};
+  assert.equal(paymentEurValueAtCurrentRate('SAT',20,rates,1_301_100),null);
+  assert.equal(paymentEurValueAtCurrentRate('HBAR',2,rates,1_301_100),0.4);
+  assert.equal(paymentEurValueAtCurrentRate('HBAR',2,{...rates,btcUpdatedAt:1_301_000,hbarUpdatedAt:1_000_000},1_301_100),null);
+});
+
 test('restored Bitcoin operations do not invent recipient, amount, fee or explorer target', () => {
   const payment = bitcoinOperationHistoryItem({ ...operation, address: '', amountSats: 0,
     feeSats: null, recoveredFromProvider: true, txid: undefined }, 'en-US');

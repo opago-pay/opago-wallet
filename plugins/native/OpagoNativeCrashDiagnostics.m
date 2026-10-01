@@ -1,5 +1,5 @@
 #import "OpagoNativeCrashDiagnostics.h"
-#import <RNSentry/RNSentrySDK.h>
+#import <RNSentry/RNSentryStart.h>
 #import <Sentry/Sentry.h>
 #include <math.h>
 @import Sentry;
@@ -115,51 +115,71 @@ static SentryStacktrace *OpagoStack(SentryStacktrace *stack) {
     }
 }
 
++ (SentryOptions *)optionsForDSN:(NSString *)dsn {
+    if (![dsn isKindOfClass:NSString.class] || !dsn.length) return nil;
+    // The RNSentrySDK file loader can produce nil options when sentry.options.json
+    // is absent: its empty-dictionary fallback requires a DSN before configuration.
+    // Cocoa then dereferences options.initialScope and crashes with SIGSEGV.
+    // Construct valid defaults directly, independently of any bundled JSON file.
+    SentryOptions *options = [[SentryOptions alloc] init];
+    if (!options) return nil;
+    options.dsn = dsn;
+    if (!options.dsn.length || !options.initialScope) return nil;
+    [RNSentryStart updateWithReactDefaults:options];
+    options.environment = @"production";
+    options.debug = NO;
+    options.enableCrashHandler = YES;
+    options.enableMemoryIntrospection = NO;
+    options.sendDefaultPii = NO;
+    options.sendClientReports = NO;
+    options.maxCacheItems = 10;
+    options.maxBreadcrumbs = 0;
+    options.maxAttachmentSize = 0;
+    options.shutdownTimeInterval = 0.5;
+    options.enableSwizzling = NO;
+    options.enableAutoBreadcrumbTracking = NO;
+    options.enableNetworkBreadcrumbs = NO;
+    options.enableAutoSessionTracking = NO;
+    options.enableAutoPerformanceTracing = NO;
+    options.enableNetworkTracking = NO;
+    options.enableCaptureFailedRequests = NO;
+    options.enableFileIOTracing = NO;
+    options.enableCoreDataTracing = NO;
+    options.enablePersistingTracesWhenCrashing = NO;
+    options.enableAppHangTracking = NO;
+    options.enableWatchdogTerminationTracking = NO;
+    options.enableMetricKit = NO;
+    options.enableMetricKitRawPayload = NO;
+    options.enableLogs = NO;
+    options.enableMetrics = NO;
+    options.enableSpotlight = NO;
+    options.attachScreenshot = NO;
+    options.attachViewHierarchy = NO;
+    options.attachAllThreads = NO;
+    options.tracesSampleRate = @0;
+    options.tracePropagationTargets = @[];
+    options.sessionReplay.sessionSampleRate = 0;
+    options.sessionReplay.onErrorSampleRate = 0;
+    [RNSentryStart updateWithReactFinals:options];
+    // RN 0.81 render errors call ExceptionsManager directly, bypassing the
+    // ErrorUtils handler used by JS Sentry. The default native duplicate filter
+    // drops these aborts even when no JS event was captured. Keep the native
+    // crash as a privacy-filtered fallback; final hybrid tracking flags stay set.
+    options.beforeSend = ^SentryEvent *(SentryEvent *event) { return [self sanitizeEvent:event]; };
+    options.beforeBreadcrumb = ^SentryBreadcrumb *(SentryBreadcrumb *breadcrumb) { return nil; };
+    return options;
+}
+
 + (void)start {
 #if !DEBUG
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         if (![[NSBundle.mainBundle objectForInfoDictionaryKey:@"OpagoCrashDiagnosticsEnabled"] boolValue]) return;
         @try {
-            [RNSentrySDK startWithConfigureOptions:^(SentryOptions *options) {
-                options.dsn = [NSBundle.mainBundle objectForInfoDictionaryKey:@"OpagoCrashDiagnosticsDSN"];
-                options.environment = @"production";
-                options.debug = NO;
-                options.enableCrashHandler = YES;
-                options.enableMemoryIntrospection = NO;
-                options.sendDefaultPii = NO;
-                options.sendClientReports = NO;
-                options.maxCacheItems = 10;
-                options.maxBreadcrumbs = 0;
-                options.maxAttachmentSize = 0;
-                options.shutdownTimeInterval = 0.5;
-                options.enableSwizzling = NO;
-                options.enableAutoBreadcrumbTracking = NO;
-                options.enableNetworkBreadcrumbs = NO;
-                options.enableAutoSessionTracking = NO;
-                options.enableAutoPerformanceTracing = NO;
-                options.enableNetworkTracking = NO;
-                options.enableCaptureFailedRequests = NO;
-                options.enableFileIOTracing = NO;
-                options.enableCoreDataTracing = NO;
-                options.enablePersistingTracesWhenCrashing = NO;
-                options.enableAppHangTracking = NO;
-                options.enableWatchdogTerminationTracking = NO;
-                options.enableMetricKit = NO;
-                options.enableMetricKitRawPayload = NO;
-                options.enableLogs = NO;
-                options.enableMetrics = NO;
-                options.enableSpotlight = NO;
-                options.attachScreenshot = NO;
-                options.attachViewHierarchy = NO;
-                options.attachAllThreads = NO;
-                options.tracesSampleRate = @0;
-                options.tracePropagationTargets = @[];
-                options.sessionReplay.sessionSampleRate = 0;
-                options.sessionReplay.onErrorSampleRate = 0;
-                options.beforeSend = ^SentryEvent *(SentryEvent *event) { return [self sanitizeEvent:event]; };
-                options.beforeBreadcrumb = ^SentryBreadcrumb *(SentryBreadcrumb *breadcrumb) { return nil; };
-            }];
+            SentryOptions *options = [self optionsForDSN:
+                [NSBundle.mainBundle objectForInfoDictionaryKey:@"OpagoCrashDiagnosticsDSN"]];
+            if (!options) return; // Invalid diagnostics configuration never reaches SDK startup.
+            [RNSentryStart startWithOptions:options];
         } @catch (NSException *exception) {
             // Diagnostics must never abort wallet startup, even if SDK init fails.
             @try { [SentrySDK close]; } @catch (NSException *ignored) {}

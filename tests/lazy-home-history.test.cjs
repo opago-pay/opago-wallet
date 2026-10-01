@@ -86,7 +86,9 @@ function fixture(data = {}) {
       data.paymentSettled = onResolved;
       return { pendingCount: data.pendingCount || 0, hiddenPaymentKeys: data.hiddenPaymentKeys || [] };
     } },
-    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: data.btcRate ?? 50000, hbarToEur: data.hbarRate ?? 0.1, updatedAt: data.ratesAt ?? Date.now(), refresh: query('rates') }) },
+    '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: data.btcRate ?? 50000, hbarToEur: data.hbarRate ?? 0.1,
+      btcUpdatedAt: data.btcRatesAt ?? data.ratesAt ?? Date.now(), hbarUpdatedAt: data.hbarRatesAt ?? data.ratesAt ?? Date.now(),
+      updatedAt: data.ratesAt ?? Date.now(), refresh: query('rates') }) },
     '@/lib/config': { appConfig: { isMainnet: true, hederaNetwork: 'mainnet', sparkNetwork: 'MAINNET' } },
     '@/lib/payment-details': require('../lib/payment-details.ts'),
     '@/lib/wallet-session': { walletSession: { capture: () => () => {}, captureRuntime: () => () => {} } },
@@ -119,6 +121,7 @@ function fixture(data = {}) {
       subscribe: listener => { rateListeners.add(listener); return () => rateListeners.delete(listener); },
       process: async () => {},
       enrich: async (items, _identity, assertCurrent) => {
+        if(data.beforeEnrich) await data.beforeEnrich();
         assertCurrent();return items.map(item=>({...item,transactionRate:savedQuotes[item.key]||null,transactionRatePending:!savedQuotes[item.key]}));
       },
     } },
@@ -209,7 +212,9 @@ test('activity rows show the same EUR quote or unavailable message as payment de
   oldBitcoin.render(); oldBitcoin.refocus(); await settle();
   row = latestRow(oldBitcoin.render());
   rendered = row.type(row.props);
-  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === 'Historical rate is being retrieved'));
+  const pendingValue=find(rendered,node=>node.type==='text'&&node.props.accessibilityLabel==='Historical rate is being retrieved');
+  assert.equal(pendingValue.props.children,'—');
+  assert.equal(pendingValue.props.numberOfLines,1);
 });
 
 test('latest activity and an unresolved-payment notice open the same details view', async () => {
@@ -421,6 +426,23 @@ test('a local HBAR payment and its mirror receipt deduplicate across SDK and mir
   app.blur();
 });
 
+test('Home and incoming Bitcoin amounts render without Intl.formatToParts on iOS Hermes',()=>{
+  const descriptor=Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype,'formatToParts');
+  Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',{...descriptor,value:undefined});
+  try {
+    for(const incoming of [false,true]) {
+      const app=fixture({spark:107,bitcoinIncoming:incoming?100:null,bitcoinOperations:incoming?[
+        {id:'pending-deposit',kind:'deposit',state:'pending',amountSats:200},
+      ]:[]});
+      const screen=app.render();
+      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+      assert.ok(btc);
+      assert.equal(btc.props.value,'0.00000107 BTC');
+      assert.deepEqual(btc.props.notes,incoming?['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']:[]);
+    }
+  } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
+});
+
 test('All coins shows available BTC and HBAR holdings, EUR values, unit prices and separate incoming amounts', async () => {
   const app=fixture({spark:150_000_000,hbarTinybars:2_000_000_000n,bitcoinIncoming:100,
     bitcoinOperations:[{id:'pending-deposit',kind:'deposit',state:'action_required',amountSats:200}],
@@ -431,6 +453,7 @@ test('All coins shows available BTC and HBAR holdings, EUR values, unit prices a
   const hbar=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera');
   assert.equal(btc.props.value,'1.5 BTC');assert.equal(btc.props.fiatValue,'≈ 75000');
   assert.equal(btc.props.subtitle,'1 BTC = 50000');
+  assert.equal(btc.props.description,undefined);
   assert.deepEqual(btc.props.notes,['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']);
   assert.equal(hbar.props.value,'20 HBAR');assert.equal(hbar.props.fiatValue,'≈ 2');
   assert.equal(hbar.props.subtitle,'1 HBAR = 0.1');
@@ -439,12 +462,56 @@ test('All coins shows available BTC and HBAR holdings, EUR values, unit prices a
   assert.equal(unknown.props.value,'— BTC');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
 });
 
-test('coin cards keep the unit price visible while their balance is updating',()=>{
-  const app=fixture({sparkStatus:'loading'});const screen=app.render();
-  const card=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
-  const rendered=card.type(card.props);
-  assert.ok(find(rendered,node=>node.type==='text'&&node.props.children==='1 BTC = 50000'));
-  assert.ok(find(rendered,node=>node.type==='text'&&node.props.children==='Last known balance · updating…'));
+test('known coin holdings keep their values and layout during background balance refresh',()=>{
+  const app=fixture({sparkStatus:'loading',hederaStatus:'loading'});const screen=app.render();
+  for(const asset of ['bitcoin','hedera']) {
+    const card=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset===asset);
+    assert.equal(card.props.loading,false);
+    assert.equal(card.props.statusText,undefined);
+    const rendered=card.type(card.props);
+    assert.ok(find(rendered,node=>node.type==='text'&&node.props.children===card.props.subtitle));
+    assert.ok(find(rendered,node=>node.type==='text'&&node.props.children===card.props.value));
+    assert.equal(find(rendered,node=>node.type==='loading'),null);
+  }
+});
+
+test('BTC and HBAR activities have one matching detail arrow beside the amount column',async()=>{
+  for(const asset of ['SAT','HBAR']) {
+    const app=fixture({local:[record(1,'2026-09-23T10:00:00Z',asset)]});
+    app.render();app.refocus();await settle();
+    const row=latestRow(app.render());
+    const rendered=row.type({...row.props,transaction:{...row.props.transaction,
+      ...(asset==='HBAR'?{explorerUrl:'https://hashscan.io/mainnet/transaction/synthetic'}:{}),
+    }});
+    const children=React.Children.toArray(rendered.props.children);
+    assert.equal(children.filter(node=>node.type==='icon'&&node.props.name==='chevron-forward').length,1);
+    assert.equal(find(children[2],node=>node.type==='icon'&&node.props.name==='chevron-forward'),null);
+    rendered.props.onPress();
+    assert.equal(app.render().type,'payment-details');
+    app.blur();
+  }
+});
+
+test('background activity refresh retains an existing EUR quote while enrichment is still loading',async()=>{
+  const pending=[];
+  const data={local:[record(1,'2026-09-23T10:00:00Z')],
+    transactionQuotes:{'fixture-1':{asset:'BTC',eurPerCoin:50000}}};
+  const app=fixture(data);app.render();app.refocus();await settle();app.render();
+  data.beforeEnrich=()=>new Promise(resolve=>pending.push(resolve));
+  app.poll();await settle();
+  const row=latestRow(app.render());
+  assert.equal(row.props.transaction.transactionRate.eurPerCoin,50000);
+  assert.equal(row.props.transaction.transactionRatePending,false);
+  assert.ok(pending.length>0);
+  pending.forEach(resolve=>resolve());await settle();app.blur();
+});
+
+test('coin unit prices use their own timestamps when only the other asset was refreshed',()=>{
+  const now=Date.now();
+  const app=fixture({btcRatesAt:now-301_000,hbarRatesAt:now});
+  const screen=app.render();
+  assert.match(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin').props.subtitle,/last known/);
+  assert.doesNotMatch(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera').props.subtitle,/last known/);
 });
 
 test('a known HBAR receipt stays visible while a slower fresh page is still loading',async()=>{
