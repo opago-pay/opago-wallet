@@ -186,6 +186,7 @@ test('Home keeps its primary balance and reads HBAR activity without waiting for
     React.Children.toArray(node.props?.children).forEach(collect);
   };
   collect(screen);
+  assert.ok(texts.includes('Balance'));
   assert.equal(texts.some(text => text.includes('Bitcoin balance:') || text.includes('Your money')), false);
   assert.ok(texts.includes('Latest activity'));
   assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);

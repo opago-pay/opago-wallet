@@ -726,6 +726,7 @@ export default function HomeScreen() {
             {totalEur === null ? '—' : <><Text style={styles.approximation}>≈ </Text>{formatEurValue(totalEur)}</>}
           </Text>
         </View>
+        <Text style={styles.portfolioBalanceLabel}>{t('Balance')}</Text>
         {!!balanceCaveat && <Text style={styles.balanceCaveat}>{balanceCaveat}</Text>}
       </View>
 
@@ -1068,6 +1069,7 @@ const styles = adaptiveStyles(StyleSheet.create({
     marginTop: 30,
   },
   totalAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%' },
+  portfolioBalanceLabel: { color: '#d5d5da', fontSize: 19, fontWeight: '600', marginTop: 8 },
   balanceCaveat: { color: '#a59a84', fontSize: 11, textAlign: 'center', marginTop: 5 },
   approximation: { color: '#a3a3ad', fontSize: 27, fontWeight: '400' },
   total: { color: '#fff', fontSize: 52, fontWeight: '600', textAlign: 'center', flexShrink: 1, fontVariant: ['tabular-nums'] },
