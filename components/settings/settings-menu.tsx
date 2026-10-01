@@ -73,7 +73,7 @@ export function SettingsMenu(props: {
   onSelect(section: SettingsSection): void;
   onLock(): void;
 }) {
-  const { mode } = useColorMode();
+  const { selection } = useColorMode();
   const { language } = useLanguage();
   return <View>
     <MenuGroup title={t('Wallet')}>
@@ -84,7 +84,7 @@ export function SettingsMenu(props: {
           disabled={props.disabled} onPress={() => props.onSelect('security')} />}
     </MenuGroup>
     <MenuGroup title={t('Preferences')}>
-      <MenuRow title={t('Appearance')} detail={t(mode === 'light' ? 'Day' : 'Night')}
+      <MenuRow title={t('Appearance')} detail={t(selection === 'system' ? 'System' : selection === 'light' ? 'Day' : 'Dark')}
         icon="color-palette-outline" divider disabled={props.disabled} onPress={() => props.onSelect('appearance')} />
       <MenuRow title={t('Language')} detail={LANGUAGE_NAMES[language]}
         icon="language-outline" disabled={props.disabled} onPress={() => props.onSelect('language')} />

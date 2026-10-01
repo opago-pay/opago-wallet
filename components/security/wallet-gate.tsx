@@ -8,12 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { LegalLinks } from '@/components/legal/legal-links';
+import { useSecurityPreferences } from '@/hooks/useSecurityPreferences';
 
 export function WalletGate({ children }: { children: ReactNode }) {
   useLanguage();
   const router = useRouter();
   const segments = useSegments();
   const { securityReady, hasStoredWallet, isLocked, unlockWallet, loadOrGenerateWallet, recoveryRequired, walletReady, error: walletError } = useWalletAuth();
+  const { lockOnOpen } = useSecurityPreferences();
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState('');
   const [active, setActive] = useState(AppState.currentState === 'active');
@@ -53,18 +55,18 @@ export function WalletGate({ children }: { children: ReactNode }) {
   }, [isLocked]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios' || !securityReady || hasStoredWallet !== true || !isLocked || !active) return;
+    if ((Platform.OS !== 'ios' && lockOnOpen) || !securityReady || hasStoredWallet !== true || !isLocked || !active) return;
     const visit = foregroundVisit.current;
     if (attemptedVisit.current === visit) return;
-    // Let iOS finish returning to the foreground before presenting Face ID.
+    // Let the app finish returning to the foreground before reopening the wallet.
     const timer = setTimeout(() => {
       if (AppState.currentState === 'active' && attemptedVisit.current !== visit) void unlock();
     }, 200);
     return () => clearTimeout(timer);
-  }, [securityReady, hasStoredWallet, isLocked, active, unlock]);
+  }, [securityReady, hasStoredWallet, isLocked, active, lockOnOpen, unlock]);
 
   if (!securityReady) return <View style={styles.lock}><ActivityIndicator color={adaptColor('#ffb000', 'color')} /></View>;
-  if (Platform.OS === 'ios' && isLocked && hasStoredWallet === true && active &&
+  if ((Platform.OS === 'ios' || !lockOnOpen) && isLocked && hasStoredWallet === true && active &&
       (unlocking || attemptedVisit.current !== foregroundVisit.current)) {
     return <View style={styles.lock}><ActivityIndicator color={adaptColor('#ffb000', 'color')} /></View>;
   }
@@ -72,11 +74,11 @@ export function WalletGate({ children }: { children: ReactNode }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.lockContent}>
       <Ionicons name="lock-closed-outline" color={adaptColor('#ffb000', 'color')} size={42} />
       <Text style={styles.title}>{t("Your wallet is locked.")}</Text>
-      <Text style={styles.description}>{t(Platform.OS === 'ios'
-        ? 'Use Face ID or Touch ID to continue. Set up biometrics in your device settings if needed.'
+      <Text style={styles.description}>{!lockOnOpen ? t('Open your wallet to continue.') : t(Platform.OS === 'ios'
+        ? 'Use Face ID, Touch ID or your device passcode to continue.'
         : 'Use your device passcode or biometrics to continue.')}</Text>
       <TouchableOpacity style={styles.button} onPress={() => void unlock()} disabled={unlocking} accessibilityRole="button">
-        {unlocking ? <ActivityIndicator color={adaptColor('#111', 'color')} /> : <Text style={styles.buttonText}>{t("Unlock Opago")}</Text>}
+        {unlocking ? <ActivityIndicator color={adaptColor('#111', 'color')} /> : <Text style={styles.buttonText}>{t(lockOnOpen ? 'Unlock Opago' : 'Open Opago')}</Text>}
       </TouchableOpacity>
       {!!(error || walletError) && <Text style={styles.error} accessibilityRole="alert">{t(error || walletError || '')}</Text>}
       <LegalLinks variant="help" disabled={unlocking} />

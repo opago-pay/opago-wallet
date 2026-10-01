@@ -67,6 +67,7 @@ function settingsFixture(t, initialSection = 'overview') {
     '@/components/settings/settings-menu': { ...menuExports, SettingsMenu: 'Menu' },
     '@/components/settings/settings-transition': { SettingsTransition: 'Transition' },
     '@/components/settings/color-mode-picker': { ColorModePicker: 'Appearance' },
+    '@/components/settings/security-options': { SecurityOptions: 'SecurityOptions' },
     '@/components/settings/language-picker': { LanguagePicker: 'Language' },
     '@/components/legal/legal-links': { LegalLinks: 'Legal' },
     '@/components/security/recovery-phrase': { ProtectedRecoveryPhrase: 'Recovery' },

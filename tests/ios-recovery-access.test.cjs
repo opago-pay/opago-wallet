@@ -80,6 +80,7 @@ test('protected-only storage lookup cannot silently return a legacy unprotected 
     },
     'react-native': { Platform: { OS: 'ios' } },
     './auth-diagnostics': { recordAuthDiagnostic() {}, categorizeAuthFailure: () => 'unknown' },
+    './security-preferences': { securityPreferences: { getSnapshot: () => ({ lockOnOpen: true }) } },
   });
   assert.equal(await storage.getBiometricallyProtectedMnemonic(), null);
   assert.equal(requests.length, 1);

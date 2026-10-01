@@ -41,6 +41,25 @@ test('a failed preference write leaves the current mode intact', async () => {
   assert.equal(preference.getSnapshot().mode, 'dark');
 });
 
+test('system mode follows device changes while explicit day and dark modes stay fixed', async () => {
+  const values = new Map();
+  const preference = new ColorModePreference();
+  await preference.initialize({
+    getItem: async key => values.get(key) ?? null,
+    setItem: async (key, value) => { values.set(key, value); },
+  }, 'light');
+  assert.deepEqual(preference.getSnapshot(), { mode: 'light', selection: 'system', ready: true });
+  preference.setSystemMode('dark');
+  assert.equal(preference.getSnapshot().mode, 'dark');
+  await preference.setMode('light');
+  preference.setSystemMode('light');
+  preference.setSystemMode('dark');
+  assert.equal(preference.getSnapshot().mode, 'light');
+  await preference.setMode('system');
+  assert.equal(values.get(COLOR_MODE_STORAGE_KEY), 'system');
+  assert.equal(preference.getSnapshot().mode, 'dark');
+});
+
 test('Home loaded in light mode can switch back to true dark colors', async () => {
   const storage = { getItem: async () => 'light', setItem: async () => {} };
   await colorModePreference.initialize(storage);

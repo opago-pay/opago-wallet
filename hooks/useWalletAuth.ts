@@ -49,6 +49,7 @@ import { retryWithBackoff } from '../lib/retry';
 import { walletSession } from '../lib/wallet-session';
 import { authenticateDevice, authorizeWalletAction, readProtectedKeyForUnlock, withProtectedWalletAccess } from '../lib/device-authentication';
 import { authorizePayment } from '../lib/payment-authorization';
+import { securityPreferences } from '../lib/security-preferences';
 import { BACKUP_STATUS_KEY, readBackupStatus } from '../lib/wallet-backup';
 import { SessionResource } from '../lib/session-resource';
 import { yieldToUi } from '../lib/ui-ready';
@@ -383,13 +384,14 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       // A protected iOS keychain read is itself the Face ID challenge. Reuse
       // its result to open the wallet instead of prompting and reading twice.
       // Legacy unprotected entries still require explicit device authorization.
-      const protectedMnemonic = Platform.OS === 'ios'
+      const lockOnOpen = securityPreferences.getSnapshot().lockOnOpen;
+      const protectedMnemonic = lockOnOpen && Platform.OS === 'ios'
         ? await measurePerformance('wallet.device_unlock', () =>
           readProtectedKeyForUnlock(getBiometricallyProtectedMnemonic))
         : null;
-      if (!protectedMnemonic) {
+      if (lockOnOpen && !protectedMnemonic) {
         await measurePerformance('wallet.device_unlock', () =>
-          authenticateDevice('Unlock Opago', { allowDeviceCredential: Platform.OS === 'android' }));
+          authenticateDevice('Unlock Opago', { allowDeviceCredential: true }));
       }
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
       if (await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true') {

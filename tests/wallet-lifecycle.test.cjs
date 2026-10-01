@@ -33,6 +33,7 @@ function walletFixture(t, options = {}) {
     bip39,
     'expo-crypto': { getRandomBytes: size => new Uint8Array(size).fill(42) },
     '../lib/wallet-session': { walletSession: session },
+    '../lib/security-preferences': { securityPreferences: { getSnapshot: () => ({ lockOnOpen: options.lockOnOpen !== false }) } },
     '../lib/auth-diagnostics': { recordAuthDiagnostic() {}, categorizeAuthFailure: () => 'unknown' },
     '../lib/storage': {
       MNEMONIC_STORE_KEY: MNEMONIC,
@@ -98,6 +99,19 @@ function walletFixture(t, options = {}) {
   return { ...fixture, storage, writes, prompts, session, seeds, sdkStarts: () => sdkStarts,
     changeState };
 }
+
+test('a wallet with opening authentication disabled unlocks without a device prompt', async t => {
+  for (const os of ['android', 'ios']) {
+    const fixture = walletFixture(t, { storage: new Map([[MNEMONIC, PHRASE]]), lockOnOpen: false, os });
+    await fixture.settle();
+    await fixture.render().unlockWallet();
+    assert.deepEqual(fixture.prompts, []);
+    await fixture.settle();
+    await fixture.render().loadOrGenerateWallet();
+    await fixture.settle();
+    assert.equal(fixture.render().walletReady, true);
+  }
+});
 
 test('an ordinary HBAR send uses the checkout contract and retains the pending-transfer guard', async t => {
   const calls = [];

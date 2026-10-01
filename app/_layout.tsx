@@ -12,6 +12,7 @@ import { WalletGate } from '@/components/security/wallet-gate';
 import { BackupPrompt } from '@/components/security/backup-prompt';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
+import { SecurityPreferencesProvider } from '@/hooks/useSecurityPreferences';
 import { startEventLoopMonitor } from '@/lib/performance-trace';
 import { recordDiagnosticScreen } from '@/lib/crash-reporting';
 
@@ -60,5 +61,5 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <LanguageProvider><ColorModeProvider><AppStack /></ColorModeProvider></LanguageProvider>;
+  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><AppStack /></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
 }

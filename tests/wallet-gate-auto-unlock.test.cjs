@@ -5,7 +5,7 @@ const { hookFixture } = require('./react-hooks-fixture.cjs');
 
 const waitForPrompt = () => new Promise(resolve => setTimeout(resolve, 260));
 
-function gateFixture(t, os = 'ios') {
+function gateFixture(t, os = 'ios', lockOnOpen = true) {
   const listeners = new Set();
   const appState = { currentState: 'active', addEventListener: (_name, listener) => {
     listeners.add(listener);
@@ -24,6 +24,7 @@ function gateFixture(t, os = 'ios') {
     '@/lib/i18n': { t: value => value },
     '@/hooks/useLanguage': { useLanguage() {} },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth },
+    '@/hooks/useSecurityPreferences': { useSecurityPreferences: () => ({ lockOnOpen }) },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', WalletActivityBoundary: 'boundary' },
     '@/components/legal/legal-links': { LegalLinks: 'legal' },
     '@expo/vector-icons': { Ionicons: 'icon' },
@@ -60,6 +61,14 @@ test('Android does not start an unlock prompt automatically', async t => {
   app.render();
   await waitForPrompt();
   assert.equal(app.unlocks(), 0);
+});
+
+test('Android reopens automatically when opening authentication is disabled', async t => {
+  const app = gateFixture(t, 'android', false);
+  app.render();
+  await waitForPrompt();
+  await app.settle();
+  assert.equal(app.unlocks(), 1);
 });
 
 test('locking an already open wallet while still foreground does not summon Face ID', async t => {

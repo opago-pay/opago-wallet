@@ -10,10 +10,10 @@ import type { ColorMode } from '@/lib/color-mode';
 
 export function ColorModePicker({ embedded = false }: { embedded?: boolean }) {
   useLanguage();
-  const { mode, setMode } = useColorMode();
+  const { selection, setMode } = useColorMode();
   const [saving, setSaving] = useState<ColorMode | null>(null);
   async function select(next: ColorMode) {
-    if (saving || next === mode) return;
+    if (saving || next === selection) return;
     setSaving(next);
     try { await setMode(next); }
     catch { Alert.alert(t('Appearance not saved'), t('Please try again.')); }
@@ -21,19 +21,19 @@ export function ColorModePicker({ embedded = false }: { embedded?: boolean }) {
   }
   return <View style={[styles.section, embedded && styles.embedded]}>
     {!embedded && <Text style={styles.title} accessibilityRole="header">{t('Appearance')}</Text>}
-    <Text style={styles.subtitle}>{t('Choose a light or dark background.')}</Text>
+    <Text style={styles.subtitle}>{t('Use your device setting or choose a background.')}</Text>
     <View style={styles.choices} accessibilityRole="radiogroup" accessibilityLabel={t('Appearance')}>
-      {(['light', 'dark'] as const).map(item => <TouchableOpacity
-        key={item} style={[styles.choice, item === mode && styles.selected]}
-        accessibilityRole="radio" accessibilityLabel={t(item === 'light' ? 'Day' : 'Night')}
-        aria-checked={item === mode}
-        accessibilityState={{ checked: item === mode, disabled: saving !== null, busy: saving === item }}
+      {(['system', 'light', 'dark'] as const).map(item => <TouchableOpacity
+        key={item} style={[styles.choice, item === selection && styles.selected]}
+        accessibilityRole="radio" accessibilityLabel={t(item === 'system' ? 'System' : item === 'light' ? 'Day' : 'Dark')}
+        aria-checked={item === selection}
+        accessibilityState={{ checked: item === selection, disabled: saving !== null, busy: saving === item }}
         disabled={saving !== null} onPress={() => void select(item)}
       >
-          <Ionicons name={item === 'light' ? 'sunny-outline' : 'moon-outline'} size={21} color={item === mode ? themeColor('accentText') : adaptColor('#96969d', 'color')} />
-        <Text style={[styles.choiceText, item === mode && styles.selectedText]}>{t(item === 'light' ? 'Day' : 'Night')}</Text>
+          <Ionicons name={item === 'system' ? 'phone-portrait-outline' : item === 'light' ? 'sunny-outline' : 'moon-outline'} size={21} color={item === selection ? themeColor('accentText') : adaptColor('#96969d', 'color')} />
+        <Text style={[styles.choiceText, item === selection && styles.selectedText]}>{t(item === 'system' ? 'System' : item === 'light' ? 'Day' : 'Dark')}</Text>
         {saving === item ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> :
-          <Ionicons name={item === mode ? 'checkmark-circle' : 'ellipse-outline'} size={21} color={item === mode ? themeColor('accentText') : adaptColor('#96969d', 'color')} />}
+          <Ionicons name={item === selection ? 'checkmark-circle' : 'ellipse-outline'} size={21} color={item === selection ? themeColor('accentText') : adaptColor('#96969d', 'color')} />}
       </TouchableOpacity>)}
     </View>
   </View>;

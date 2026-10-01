@@ -1,5 +1,6 @@
 export const COLOR_MODE_STORAGE_KEY = 'opago_color_mode';
-export type ColorMode = 'dark' | 'light';
+export type ColorMode = 'system' | 'dark' | 'light';
+export type ResolvedColorMode = 'dark' | 'light';
 
 export interface ColorModeStorage {
   getItem(key: string): Promise<string | null>;
@@ -7,7 +8,8 @@ export interface ColorModeStorage {
 }
 
 export class ColorModePreference {
-  private snapshot: { mode: ColorMode; ready: boolean } = { mode: 'dark', ready: false };
+  private systemMode: ResolvedColorMode = 'dark';
+  private snapshot: { mode: ResolvedColorMode; selection: ColorMode; ready: boolean } = { mode: 'dark', selection: 'system', ready: false };
   private listeners = new Set<() => void>();
   private initialization: Promise<void> | null = null;
   private storage: ColorModeStorage | null = null;
@@ -18,19 +20,26 @@ export class ColorModePreference {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };
   };
-  private publish(mode: ColorMode) {
-    this.snapshot = { mode, ready: true };
+  private publish(selection: ColorMode) {
+    this.snapshot = { mode: selection === 'system' ? this.systemMode : selection, selection, ready: true };
     this.listeners.forEach(listener => listener());
   }
 
-  initialize(storage: ColorModeStorage): Promise<void> {
+  setSystemMode = (mode: ResolvedColorMode) => {
+    if (this.systemMode === mode) return;
+    this.systemMode = mode;
+    if (this.snapshot.ready && this.snapshot.selection === 'system') this.publish('system');
+  };
+
+  initialize(storage: ColorModeStorage, systemMode: ResolvedColorMode = 'dark'): Promise<void> {
     if (this.initialization) return this.initialization;
     this.storage = storage;
+    this.systemMode = systemMode;
     this.initialization = (async () => {
-      let mode: ColorMode = 'dark';
+      let mode: ColorMode = 'system';
       try {
         const saved = await storage.getItem(COLOR_MODE_STORAGE_KEY);
-        if (saved === 'light' || saved === 'dark') mode = saved;
+        if (saved === 'system' || saved === 'light' || saved === 'dark') mode = saved;
       } catch { /* Appearance preferences never block wallet access. */ }
       this.publish(mode);
     })();
@@ -38,7 +47,7 @@ export class ColorModePreference {
   }
 
   setMode = (mode: ColorMode): Promise<void> => {
-    if (mode !== 'dark' && mode !== 'light') return Promise.reject(new Error('Unsupported color mode.'));
+    if (mode !== 'system' && mode !== 'dark' && mode !== 'light') return Promise.reject(new Error('Unsupported color mode.'));
     const save = this.saving.catch(() => undefined).then(async () => {
       await this.initialization;
       if (!this.storage) throw new Error('Appearance preferences are not ready.');

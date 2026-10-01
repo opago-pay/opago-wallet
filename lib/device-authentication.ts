@@ -110,11 +110,11 @@ export async function readProtectedKeyForUnlock<T>(operation: () => Promise<T>):
 
 // The exception exists only while this exact native prompt is outstanding.
 // No key access/submission is authorized in the background or before success.
-export async function authorizeWalletAction(promptMessage: string): Promise<() => void> {
+export async function authorizeWalletAction(promptMessage: string, options: { allowDeviceCredential?: boolean } = {}): Promise<() => void> {
   const assertCurrent = walletSession.capture();
   let attempt: ReturnType<typeof walletSession.beginDeviceAuthentication> | undefined;
   try {
-    await runDeviceAuthentication(promptMessage, { allowDeviceCredential: Platform.OS === 'android' }, allowsCredentialActivity => {
+    await runDeviceAuthentication(promptMessage, { allowDeviceCredential: Platform.OS === 'android' || !!options.allowDeviceCredential }, allowsCredentialActivity => {
       assertCurrent();
       attempt = walletSession.beginDeviceAuthentication(allowsCredentialActivity);
     });
