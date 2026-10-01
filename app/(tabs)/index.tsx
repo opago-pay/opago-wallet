@@ -147,7 +147,6 @@ export default function HomeScreen() {
   const preview = useHomeBalancePreview({
     publicKey: hederaPublicKey, spark: balances.spark, hedera: balances.hbarTinybars,
     sparkAt: balanceStates.spark.updatedAt, hederaAt: balanceStates.hedera.updatedAt,
-    btcToEur: rates.btcToEur, hbarToEur: rates.hbarToEur, ratesAt: rates.updatedAt,
   });
   const [visibilityRevision, setVisibilityRevision] = useState(0);
   const displayBalances = {
@@ -330,7 +329,14 @@ export default function HomeScreen() {
         if (generation !== refreshGenerationRef.current) return;
         const revision = ++publication;
         const snapshot = pager.snapshot();
-        setTransactions(snapshot.items.map(item => ({ ...item, transactionRatePending: true })));
+        const previousItems = new Map(transactionsRef.current.map(item => [item.key, item]));
+        setTransactions(snapshot.items.map(item => {
+          const previous = previousItems.get(item.key);
+          const sameAmountAndTime = previous?.asset === item.asset && previous.amountValue === item.amountValue &&
+            previous.timestamp === item.timestamp;
+          const quote = sameAmountAndTime ? previous.transactionRate ?? item.transactionRate : undefined;
+          return { ...item, transactionRate: quote, transactionRatePending: !quote };
+        }));
         let assertRateSession: (() => void) | null = null;
         try { assertRateSession = walletSession.captureRuntime(); } catch { /* Optional valuation. */ }
         if (hederaPublicKey && assertRateSession) {
@@ -582,11 +588,11 @@ export default function HomeScreen() {
       : previewRates && !rates.isLoading ? t('Last known exchange rates')
         : totalEur === null && !rates.isLoading ? t('EUR estimate unavailable') : null;
   const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
-    ? t(!(rates.hbarToEur > 0) || !(rates.updatedAt > 0) || Date.now() - rates.updatedAt > 300_000
+    ? t(!(rates.hbarToEur > 0) || !(rates.hbarUpdatedAt > 0) || Date.now() - rates.hbarUpdatedAt > 300_000
       ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatCoinUnitPrice(displayRates.hbarToEur, 'hedera') })
     : t(rates.isLoading ? 'Loading HBAR price…' : 'HBAR price unavailable');
   const bitcoinPriceText = Number.isFinite(displayRates.btcToEur) && displayRates.btcToEur > 0
-    ? t(!(rates.btcToEur > 0) || !(rates.updatedAt > 0) || Date.now() - rates.updatedAt > 300_000
+    ? t(!(rates.btcToEur > 0) || !(rates.btcUpdatedAt > 0) || Date.now() - rates.btcUpdatedAt > 300_000
       ? '1 BTC = {price} · last known' : '1 BTC = {price}', { price: formatEurValue(displayRates.btcToEur) })
     : t(rates.isLoading ? 'Loading BTC price…' : 'BTC price unavailable');
   const bitcoinNotice = bitcoinOperationNotice(bitcoinOperations);
@@ -772,15 +778,14 @@ export default function HomeScreen() {
         <BalanceCard
           asset="bitcoin"
           subtitle={bitcoinPriceText}
-          description={t('One balance. Two payment routes.')}
           notes={bitcoinNotes}
           value={displayBalances.spark === null ? '— BTC' : formatBtcBalance(displayBalances.spark, appLocale()) + ' BTC'}
           fiatValue={totalEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(totalEur)}
-          loading={balanceStates.spark.status === 'loading'}
+          loading={balanceStates.spark.status === 'loading' && displayBalances.spark === null}
           statusText={balanceStates.spark.status === 'error'
             ? displayBalances.spark === null ? t('Balance unavailable') : t('Last known balance')
-            : balanceStates.spark.status === 'loading'
-              ? displayBalances.spark === null ? t('Loading balance…') : t('Last known balance · updating…')
+            : balanceStates.spark.status === 'loading' && displayBalances.spark === null
+              ? t('Loading balance…')
               : undefined}
         />
         <BalanceCard
@@ -788,12 +793,12 @@ export default function HomeScreen() {
           subtitle={hederaPriceText}
           value={displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR'}
           fiatValue={hederaEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(hederaEur)}
-          loading={balanceStates.hedera.status === 'loading'}
+          loading={balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null}
           statusText={
             balanceStates.hedera.status === 'error'
               ? displayBalances.hbarTinybars === null ? t('Balance unavailable') : t('Last known balance')
-              : balanceStates.hedera.status === 'loading'
-                ? (displayBalances.hbarTinybars === null ? t('Loading balance…') : t('Last known balance · updating…'))
+              : balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null
+                ? t('Loading balance…')
                 : undefined
           }
         />
@@ -848,7 +853,8 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
 }) {
   useLanguage();
   const eurQuote = paymentEurQuote(transaction, { hbarToEur });
-  const eurLabel = eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}`
+  const eurLabel = eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}` : '—';
+  const eurAccessibilityLabel = eurQuote ? eurLabel
     : t(transaction.transactionRatePending ? 'Historical rate is being retrieved' : 'Historical EUR value unavailable');
   const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
   const title = friendlyStatus === 'Completed'
@@ -866,7 +872,7 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
     style={styles.transaction}
     onPress={() => openTransaction(transaction)}
     accessibilityRole="button"
-    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${eurLabel}, ${t(friendlyStatus)}`}
+    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${eurAccessibilityLabel}, ${t(friendlyStatus)}`}
   >
     <AssetIcon asset={walletAssetKeyFromSymbol(transaction.asset)} size={40} />
     <View style={styles.transactionBody}>
@@ -884,9 +890,9 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
       <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
         {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
       </Text>
-      <Text style={styles.transactionEurValue}>{eurLabel}</Text>
-      {transaction.explorerUrl && <Ionicons name="chevron-forward" size={16} color={adaptColor('#5f5f6b', 'color')} />}
+      <Text style={styles.transactionEurValue} numberOfLines={1} accessibilityLabel={eurAccessibilityLabel}>{eurLabel}</Text>
     </View>
+    <Ionicons name="chevron-forward" size={16} color={adaptColor('#5f5f6b', 'color')} />
   </TouchableOpacity>;
 }
 

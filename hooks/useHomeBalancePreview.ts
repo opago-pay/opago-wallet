@@ -9,13 +9,10 @@ export function useHomeBalancePreview(input: {
   publicKey: string | null;
   spark: number | null;
   hedera: bigint | null;
-  btcToEur: number;
-  hbarToEur: number;
   sparkAt: number;
   hederaAt: number;
-  ratesAt: number;
 }) {
-  const { publicKey, spark, hedera, btcToEur, hbarToEur, sparkAt, hederaAt, ratesAt } = input;
+  const { publicKey, spark, hedera, sparkAt, hederaAt } = input;
   const scope = publicKey ? `${publicKey}:${appConfig.hederaNetwork}:${appConfig.sparkNetwork}` : null;
   const [preview, setPreview] = useState<HomeBalancePreview | null>(null);
 
@@ -34,13 +31,14 @@ export function useHomeBalancePreview(input: {
   }, [scope]);
 
   useEffect(() => {
-    if (!scope || !walletSession.isUnlocked() || (spark === null && hedera === null && !(btcToEur > 0))) return;
+    if (!scope || !walletSession.isUnlocked() || (spark === null && hedera === null)) return;
     const next: HomeBalancePreview = { version: 1, scope };
     if (spark !== null) next.spark = { value: spark, at: sparkAt, definition: 'available' };
     if (hedera !== null) next.hedera = { value: hedera.toString(), at: hederaAt };
-    if (btcToEur > 0) next.rates = { btcToEur, hbarToEur: hbarToEur > 0 ? hbarToEur : 0, at: ratesAt };
+    // Rates now persist globally per coin. Retain old preview quotes only as
+    // a migration fallback; balance updates must never overwrite them.
     void homeBalancePreviewStore.update(next, walletSession.capture()).catch(() => undefined);
-  }, [scope, spark, hedera, btcToEur, hbarToEur, sparkAt, hederaAt, ratesAt]);
+  }, [scope, spark, hedera, sparkAt, hederaAt]);
 
   return preview?.scope === scope ? preview : null;
 }

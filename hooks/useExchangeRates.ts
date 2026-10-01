@@ -3,23 +3,28 @@ import { AppState } from 'react-native';
 import { fetchJson } from '@/lib/http';
 import { measurePerformance } from '@/lib/performance-trace';
 import { rememberBitcoinRate } from '@/lib/exchange-rate-snapshot';
+import { exchangeRateCacheStorage } from '@/lib/exchange-rates-cache-native';
+import {
+  exchangeRateCacheView, mergeExchangeRateCache, parseExchangeRateCache,
+  EXCHANGE_RATE_FRESH_MS, type ExchangeRateCache, type ExchangeRates,
+} from '@/lib/exchange-rates-cache';
+import { withTimeout } from '@/lib/promise-timeout';
+
+export type { ExchangeRates } from '@/lib/exchange-rates-cache';
 
 // Reopening Send/Receive within a few minutes must not compete with Spark
 // requests just to refresh a display-only fiat estimate.
-const CACHE_EXPIRY = 5 * 60_000;
 const PARTIAL_CACHE_EXPIRY = 30_000;
-export interface ExchangeRates {
-  btcToEur: number;
-  hbarToEur: number;
-}
 
 const FALLBACK_RATES: ExchangeRates = {
   btcToEur: 0,
   hbarToEur: 0,
 };
-let cachedRates = FALLBACK_RATES;
-let lastFetch = 0;
-let ratesRequest: Promise<ExchangeRates> | null = null;
+let cachedQuotes: ExchangeRateCache = { version: 1 };
+let lastAttempt = 0;
+let restoreRequest: Promise<void> | null = null;
+type ExchangeRateView = ReturnType<typeof exchangeRateCacheView>;
+let ratesRequest: Promise<ExchangeRateView> | null = null;
 const subscribers = new Set<() => void>();
 
 interface CoinGeckoResponse {
@@ -44,9 +49,28 @@ function hasAnyRate(rates: ExchangeRates): boolean {
 }
 
 function hasFreshCache(): boolean {
-  const expiry = hasBitcoinRate(cachedRates) && hasHederaRate(cachedRates)
-    ? CACHE_EXPIRY : PARTIAL_CACHE_EXPIRY;
-  return hasAnyRate(cachedRates) && Date.now() - lastFetch < expiry;
+  const now = Date.now();
+  const cached = exchangeRateCacheView(cachedQuotes, now);
+  return (hasBitcoinRate(cached) && hasHederaRate(cached) &&
+    now - cached.btcUpdatedAt < EXCHANGE_RATE_FRESH_MS && now - cached.hbarUpdatedAt < EXCHANGE_RATE_FRESH_MS) ||
+    (lastAttempt > 0 && now >= lastAttempt && now - lastAttempt < PARTIAL_CACHE_EXPIRY);
+}
+
+function publishRates(): void {
+  const cached = exchangeRateCacheView(cachedQuotes);
+  if (hasBitcoinRate(cached)) rememberBitcoinRate(cached.btcToEur, cached.btcUpdatedAt);
+  subscribers.forEach(notify => notify());
+}
+
+function restoreRates(): Promise<void> {
+  if (!restoreRequest) restoreRequest = (async () => {
+    try {
+      const raw = await withTimeout(exchangeRateCacheStorage.read(), 2_000, 'Exchange-rate cache');
+      cachedQuotes = mergeExchangeRateCache(cachedQuotes, parseExchangeRateCache(raw));
+      publishRates();
+    } catch { /* Storage failure never prevents live quotes or wallet use. */ }
+  })();
+  return restoreRequest;
 }
 
 function validRate(value: unknown): number {
@@ -63,7 +87,7 @@ function krakenRate(ticker: KrakenTickerResponse, pairNames: string[]): number {
   return 0;
 }
 
-async function requestRates(): Promise<ExchangeRates> {
+async function requestRates(): Promise<ExchangeRateView> {
   if (ratesRequest) return ratesRequest;
   ratesRequest = (async () => {
     const nextRates = await measurePerformance('rates.fetch', async () => {
@@ -102,28 +126,34 @@ async function requestRates(): Promise<ExchangeRates> {
     if (!hasAnyRate(nextRates)) {
       throw new Error('Exchange-rate service returned invalid rates.');
     }
-    cachedRates = nextRates;
-    lastFetch = Date.now();
-    if (hasBitcoinRate(nextRates)) rememberBitcoinRate(nextRates.btcToEur, lastFetch);
-    subscribers.forEach((notify) => notify());
-    return cachedRates;
+    const at = Date.now();
+    cachedQuotes = mergeExchangeRateCache(cachedQuotes, {
+      version: 1,
+      btc: hasBitcoinRate(nextRates) ? { eur: nextRates.btcToEur, at } : undefined,
+      hbar: hasHederaRate(nextRates) ? { eur: nextRates.hbarToEur, at } : undefined,
+    }, at);
+    publishRates();
+    // Display immediately; a failed disk write must not turn a good quote into
+    // a wallet error. The storage adapter serializes writes in observation order.
+    void exchangeRateCacheStorage.write(JSON.stringify(cachedQuotes)).catch(() => undefined);
+    return exchangeRateCacheView(cachedQuotes);
   })();
   try {
     return await ratesRequest;
   } finally {
+    lastAttempt = Date.now();
     ratesRequest = null;
   }
 }
 
 export function useExchangeRates() {
-  const [rates, setRates] = useState(cachedRates);
-  const [updatedAt, setUpdatedAt] = useState(lastFetch);
+  const [rates, setRates] = useState(() => exchangeRateCacheView(cachedQuotes));
   const [isLoading, setIsLoading] = useState(() => !hasFreshCache());
 
   const loadRates = useCallback(async (force = false) => {
+      await restoreRates();
       if (!force && hasFreshCache()) {
-        setRates(cachedRates);
-        setUpdatedAt(lastFetch);
+        setRates(exchangeRateCacheView(cachedQuotes));
         setIsLoading(false);
         return;
       }
@@ -131,20 +161,19 @@ export function useExchangeRates() {
       try {
         const nextRates = await requestRates();
         setRates(nextRates);
-        setUpdatedAt(lastFetch);
       } catch {
-        setRates(cachedRates);
+        setRates(exchangeRateCacheView(cachedQuotes));
       } finally {
         setIsLoading(false);
       }
   }, []);
+  const refresh = useCallback(() => loadRates(true), [loadRates]);
 
   useEffect(() => {
     let active = true;
     const notify = () => {
       if (!active) return;
-      setRates(cachedRates);
-      setUpdatedAt(lastFetch);
+      setRates(exchangeRateCacheView(cachedQuotes));
     };
     subscribers.add(notify);
     void loadRates();
@@ -164,5 +193,5 @@ export function useExchangeRates() {
     };
   }, [loadRates]);
 
-  return useMemo(() => ({ ...rates, isLoading, updatedAt, refresh: () => loadRates(true) }), [rates, isLoading, updatedAt, loadRates]);
+  return useMemo(() => ({ ...rates, isLoading, refresh }), [rates, isLoading, refresh]);
 }

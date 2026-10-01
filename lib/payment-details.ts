@@ -54,11 +54,12 @@ export type PaymentEurQuote = {
 export function paymentEurValueAtCurrentRate(
   asset: 'SAT' | 'HBAR',
   amount: number,
-  rates: { btcToEur: number; hbarToEur: number; updatedAt: number },
+  rates: { btcToEur: number; hbarToEur: number; updatedAt: number; btcUpdatedAt?: number; hbarUpdatedAt?: number },
   now = Date.now(),
 ): number | null {
-  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rates.updatedAt) ||
-      rates.updatedAt <= 0 || now < rates.updatedAt || now - rates.updatedAt > 300_000) return null;
+  const at = (asset === 'SAT' ? rates.btcUpdatedAt : rates.hbarUpdatedAt) ?? rates.updatedAt;
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(at) ||
+      at <= 0 || now < at || now - at > 300_000) return null;
   const rate = asset === 'SAT' ? rates.btcToEur : rates.hbarToEur;
   if (!Number.isFinite(rate) || rate <= 0 || rate > 1e12) return null;
   return asset === 'SAT' ? amount / 100_000_000 * rate : amount * rate;
