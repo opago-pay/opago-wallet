@@ -15,6 +15,20 @@ test('BTC holdings retain single-sat precision and localize without float roundi
   for(const value of [NaN,-1,1.1,MAX_BITCOIN_SATS+1])assert.throws(()=>formatBtcBalance(value,'en-US'));
 });
 
+test('BTC holdings render on iOS Hermes without Intl.NumberFormat.formatToParts',()=>{
+  const descriptor=Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype,'formatToParts');
+  Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',{...descriptor,value:undefined});
+  try {
+    for(const [locale,decimal] of [['en-GB','.'],['de-DE',','],['fr-FR',','],['es-ES',','],['it-IT',',']]) {
+      assert.equal(formatBtcBalance(107,locale),'0'+decimal+'00000107');
+      assert.equal(formatBtcBalance(150_000_000,locale),'1'+decimal+'5');
+      assert.equal(formatBtcBalance(0,locale),'0');
+      assert.equal(formatBtcBalance(100_000_000,locale),'1');
+    }
+    assert.equal(formatBtcBalance(MAX_BITCOIN_SATS-1,'en-US'),'20,999,999.99999999');
+  } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
+});
+
 test('pending deposits exclude credited/failed entries and withdrawals, and count each output once',()=>{
   const deposit=(id,amountSats,state='action_required')=>({id,kind:'deposit',amountSats,state});
   assert.equal(pendingOnchainDepositSats([

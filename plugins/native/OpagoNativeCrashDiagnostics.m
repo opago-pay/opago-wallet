@@ -160,9 +160,13 @@ static SentryStacktrace *OpagoStack(SentryStacktrace *stack) {
     options.tracePropagationTargets = @[];
     options.sessionReplay.sessionSampleRate = 0;
     options.sessionReplay.onErrorSampleRate = 0;
+    [RNSentryStart updateWithReactFinals:options];
+    // RN 0.81 render errors call ExceptionsManager directly, bypassing the
+    // ErrorUtils handler used by JS Sentry. The default native duplicate filter
+    // drops these aborts even when no JS event was captured. Keep the native
+    // crash as a privacy-filtered fallback; final hybrid tracking flags stay set.
     options.beforeSend = ^SentryEvent *(SentryEvent *event) { return [self sanitizeEvent:event]; };
     options.beforeBreadcrumb = ^SentryBreadcrumb *(SentryBreadcrumb *breadcrumb) { return nil; };
-    [RNSentryStart updateWithReactFinals:options];
     return options;
 }
 

@@ -28,7 +28,9 @@ export function formatBtcBalance(value: number, locale: string): string {
   const fraction = rawFraction.replace(/0+$/, '');
   const integer = Number(whole).toLocaleString(locale);
   if (!fraction) return integer;
-  const decimal = new Intl.NumberFormat(locale).formatToParts(1.1).find(part => part.type === 'decimal')?.value ?? '.';
+  // iOS Hermes has NumberFormat.format but not formatToParts. Only format
+  // this small probe; the actual balance stays in integer sats for precision.
+  const decimal = new Intl.NumberFormat(locale, { useGrouping: false }).format(1.1).replace(/[0-9]/g, '') || '.';
   return integer + decimal + fraction;
 }
 

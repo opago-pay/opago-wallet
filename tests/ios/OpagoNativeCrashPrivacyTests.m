@@ -24,8 +24,25 @@
     event.exceptions = @[[[SentryException alloc] initWithValue:@"private" type:@"SIGABRT"]];
     XCTAssertEqualObjects(options.beforeSend(event).exceptions.firstObject.value,
         @"Native error details withheld");
-    event.exceptions = @[[[SentryException alloc] initWithValue:@"private" type:@"Unhandled JS Exception"]];
-    XCTAssertNil(options.beforeSend(event)); // React Native's duplicate suppression remains installed.
+}
+
+- (void)testReactRenderAbortSurvivesNativeFilteringWithoutPrivateExceptionText {
+    SentryOptions *options = [OpagoNativeCrashDiagnostics optionsForDSN:
+        @"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com/1"];
+    // Either SDK suppression condition can match RN's fatal render exception.
+    for (NSString *type in @[@"RCTFatalException: Unhandled JS Exception", @"NSException"]) {
+        SentryEvent *event = [[SentryEvent alloc] initWithLevel:kSentryLevelFatal];
+        NSString *private = @"ExceptionsManager.reportException synthetic-wallet-secret";
+        event.exceptions = @[[[SentryException alloc] initWithValue:private type:type]];
+        SentryEvent *clean = options.beforeSend(event);
+        XCTAssertNotNil(clean);
+        XCTAssertEqualObjects(clean.exceptions.firstObject.type, @"NativeCrash");
+        XCTAssertEqualObjects(clean.exceptions.firstObject.value, @"Native error details withheld");
+        NSData *json = [NSJSONSerialization dataWithJSONObject:[clean serialize] options:0 error:nil];
+        NSString *serialized = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
+        XCTAssertFalse([serialized containsString:private]);
+        XCTAssertFalse([serialized containsString:@"Unhandled JS Exception"]);
+    }
 }
 
 - (void)testMissingOrInvalidDSNSkipsDiagnosticsStartup {

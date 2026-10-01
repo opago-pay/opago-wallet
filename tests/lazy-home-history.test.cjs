@@ -421,6 +421,23 @@ test('a local HBAR payment and its mirror receipt deduplicate across SDK and mir
   app.blur();
 });
 
+test('Home and incoming Bitcoin amounts render without Intl.formatToParts on iOS Hermes',()=>{
+  const descriptor=Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype,'formatToParts');
+  Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',{...descriptor,value:undefined});
+  try {
+    for(const incoming of [false,true]) {
+      const app=fixture({spark:107,bitcoinIncoming:incoming?100:null,bitcoinOperations:incoming?[
+        {id:'pending-deposit',kind:'deposit',state:'pending',amountSats:200},
+      ]:[]});
+      const screen=app.render();
+      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+      assert.ok(btc);
+      assert.equal(btc.props.value,'0.00000107 BTC');
+      assert.deepEqual(btc.props.notes,incoming?['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']:[]);
+    }
+  } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
+});
+
 test('All coins shows available BTC and HBAR holdings, EUR values, unit prices and separate incoming amounts', async () => {
   const app=fixture({spark:150_000_000,hbarTinybars:2_000_000_000n,bitcoinIncoming:100,
     bitcoinOperations:[{id:'pending-deposit',kind:'deposit',state:'action_required',amountSats:200}],
