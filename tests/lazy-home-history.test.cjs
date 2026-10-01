@@ -97,7 +97,7 @@ function fixture(data = {}) {
       formatEurValue: value => String(value),
       formatCoinUnitPrice: value => String(value),
       bitcoinOperationNotice: () => null,
-      paymentHistoryStatus: () => 'Completed',
+      paymentHistoryStatus: () => data.historyStatus ?? 'Completed',
       paymentHistoryTitle: () => 'Payment',
     },
     '@/lib/wallet-assets': require('../lib/wallet-assets.ts'),
@@ -224,14 +224,16 @@ test('activity rows show the same EUR quote or unavailable message as payment de
   bitcoin.render(); bitcoin.refocus(); await settle();
   let row = latestRow(bitcoin.render());
   let rendered = row.type(row.props);
-  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '≈ 0.01'));
-  assert.match(rendered.props.accessibilityLabel, /≈ 0\.01/);
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '0.01'));
+  assert.match(rendered.props.accessibilityLabel, /0\.01/);
+  assert.doesNotMatch(rendered.props.accessibilityLabel, /Completed/);
+  assert.equal(find(rendered, node => node.type === 'text' && node.props.children === 'Completed'), null);
 
   const hedera = fixture({ primaryReady: false, transactionQuotes: { 'hedera:fixture-2': { asset:'HBAR',eurPerCoin:0.1 }, 'fixture-2': { asset:'HBAR',eurPerCoin:0.1 } }, local: [record(2, '2026-09-23T10:00:00Z', 'HBAR')] });
   hedera.render(); hedera.refocus(); await settle();
   row = latestRow(hedera.render());
   rendered = row.type(row.props);
-  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '≈ 2'));
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === '2'));
 
   const oldBitcoin = fixture({ primaryReady: false, local: [record(3, '2026-09-23T10:00:00Z')] });
   oldBitcoin.render(); oldBitcoin.refocus(); await settle();
@@ -240,6 +242,13 @@ test('activity rows show the same EUR quote or unavailable message as payment de
   const pendingValue=find(rendered,node=>node.type==='text'&&node.props.accessibilityLabel==='Historical rate is being retrieved');
   assert.equal(pendingValue.props.children,'—');
   assert.equal(pendingValue.props.numberOfLines,1);
+
+  const needsAttention = fixture({ historyStatus: 'Needs attention', local: [record(4, '2026-09-23T10:00:00Z')] });
+  needsAttention.render(); needsAttention.refocus(); await settle();
+  row = latestRow(needsAttention.render());
+  rendered = row.type(row.props);
+  assert.ok(find(rendered, node => node.type === 'text' && node.props.children === 'Needs attention'));
+  assert.match(rendered.props.accessibilityLabel, /Needs attention/);
 });
 
 test('latest activity and an unresolved-payment notice open the same details view', async () => {

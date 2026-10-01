@@ -855,7 +855,7 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
 }) {
   useLanguage();
   const eurQuote = paymentEurQuote(transaction, { hbarToEur });
-  const eurLabel = eurQuote ? `≈ ${formatEurValue(eurQuote.eurValue)}` : '—';
+  const eurLabel = eurQuote ? formatEurValue(eurQuote.eurValue) : '—';
   const eurAccessibilityLabel = eurQuote ? eurLabel
     : t(transaction.transactionRatePending ? 'Historical rate is being retrieved' : 'Historical EUR value unavailable');
   const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
@@ -874,18 +874,17 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
     style={styles.transaction}
     onPress={() => openTransaction(transaction)}
     accessibilityRole="button"
-    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${eurAccessibilityLabel}, ${t(friendlyStatus)}`}
+    accessibilityLabel={`${title} ${transaction.amountDisplay} ${transaction.asset}, ${eurAccessibilityLabel}${friendlyStatus === 'Completed' ? '' : `, ${t(friendlyStatus)}`}`}
   >
     <AssetIcon asset={walletAssetKeyFromSymbol(transaction.asset)} size={40} />
     <View style={styles.transactionBody}>
       <Text style={styles.transactionTitle}>{title}</Text>
       <View style={styles.transactionMetaRow}>
         <Text style={styles.transactionMeta}>{dateLabel}</Text>
-        <View style={[styles.statusPill, friendlyStatus === 'Completed'
-          ? styles.statusPillSuccess : friendlyStatus === 'Needs attention'
-            ? styles.statusPillError : styles.statusPillPending]}>
+        {friendlyStatus !== 'Completed' && <View style={[styles.statusPill,
+          friendlyStatus === 'Needs attention' ? styles.statusPillError : styles.statusPillPending]}>
           <Text style={styles.statusPillText}>{t(friendlyStatus)}</Text>
-        </View>
+        </View>}
       </View>
     </View>
     <View style={styles.transactionTrailing}>
@@ -1163,7 +1162,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   transactionEurValue: { color: '#a3a3ad', fontSize: 12, lineHeight: 17, textAlign: 'right' },
   incoming: { color: '#49d17d' },
   statusPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
-  statusPillSuccess: { backgroundColor: 'rgba(73,209,125,0.12)' },
   statusPillPending: { backgroundColor: 'rgba(255,176,0,0.12)' },
   statusPillError: { backgroundColor: 'rgba(255,102,102,0.14)' },
   statusPillText: { color: '#b8b8c2', fontSize: 11, lineHeight: 15, fontWeight: '600' },
