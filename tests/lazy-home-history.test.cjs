@@ -276,6 +276,27 @@ test('latest activity and an unresolved-payment notice open the same details vie
   assert.equal(screen.props.payment.requestId, 'request-1');
 });
 
+test('a Lightning payment keeps the recipient amount when Spark reports an amount including fees', async () => {
+  const hash = 'ab'.repeat(32);
+  const key = 'ln:' + hash;
+  const createdAt = '2026-09-30T10:00:00Z';
+  const app = fixture({
+    local: [{ ...record(1, createdAt), txId: key, type: 'outgoing', amount: 1 }],
+    'lightning journal': [{ paymentHash: hash, amountSats: 1, state: 'confirmed', createdAt }],
+    'lightning history': [{ id: 'transfer-1', status: 'COMPLETED', totalValue: 3,
+      transferDirection: 'OUTGOING', createdTime: createdAt, userRequest: { invoice: { paymentHash: hash } } }],
+  });
+  app.render(); app.refocus(); await settle();
+  assert.equal(latestRow(app.render()).props.transaction.amountDisplay, '1');
+  openHistory(app); app.refocus(); await settle();
+  const payment = app.render().props.transactions.find(item => item.key === key);
+  assert.equal(payment.amountDisplay, '1');
+  assert.equal(payment.amountValue, 1);
+  app.render().props.openTransaction(payment);
+  assert.equal(app.render().props.payment.amountDisplay, '1');
+  app.blur();
+});
+
 test('Receive, Send, and Buy keep their positions regardless of balance', () => {
   for (const spark of [107, 0]) {
     const app = fixture({ spark });
@@ -556,6 +577,29 @@ test('a known HBAR receipt stays visible while a slower fresh page is still load
   app.poll();await settle();
   assert.equal(latestRow(app.render()).props.transaction.asset,'HBAR');
   release([receipt]);await settle();app.blur();
+});
+
+test('a background refresh publishes its new activity page only after all sources finish', async () => {
+  const old = record(1, '2026-09-30T10:00:00Z');
+  const newest = record(2, '2026-09-30T11:00:00Z');
+  const pendingRates = [];
+  const data = { local: [old], transactionQuotes: { 'fixture-2': { asset: 'BTC', eurPerCoin: 50_000 } } };
+  const app = fixture(data);
+  app.render(); app.refocus(); await settle();
+  assert.equal(latestRow(app.render()).props.transaction.key, 'fixture-1');
+  let release;
+  data.local = [newest, old];
+  data['hedera history'] = () => new Promise(resolve => { release = resolve; });
+  data.beforeEnrich = () => new Promise(resolve => pendingRates.push(resolve));
+  app.poll(); await settle();
+  assert.equal(latestRow(app.render()).props.transaction.key, 'fixture-1');
+  release([]); await settle();
+  assert.equal(latestRow(app.render()).props.transaction.key, 'fixture-1');
+  pendingRates.forEach(resolve => resolve()); await settle();
+  const latest = latestRow(app.render()).props.transaction;
+  assert.equal(latest.key, 'fixture-2');
+  assert.equal(latest.transactionRate.eurPerCoin, 50_000);
+  app.blur();
 });
 
 test('changing wallet identity does not expose the previous wallet latest activity',async()=>{

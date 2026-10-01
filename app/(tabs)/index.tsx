@@ -233,6 +233,14 @@ export default function HomeScreen() {
       recordWalletStartupStage('history_refresh_started');
       if (!historyPagerRef.current) {
         let account: ReturnType<typeof refreshHederaAccount> | undefined;
+        let lightningRecords: ReturnType<ReturnType<typeof lightningPaymentJournalFor>['list']> | null = null;
+        const readLightningRecords = () => {
+          if (!lightningRecords) lightningRecords = lightningPaymentJournal?.list().catch(cause => {
+            lightningRecords = null;
+            throw cause;
+          }) ?? Promise.resolve([]);
+          return lightningRecords;
+        };
         historyPagerRef.current = new HistoryPager<DisplayTransaction>([
         { id: 'local', label: 'Saved payments', load: async (cursor, limit) => {
           const records = await measurePerformance('history.local', () =>
@@ -275,7 +283,7 @@ export default function HomeScreen() {
         } },
         { id: 'lightning-journal', label: 'Bitcoin', load: async () => {
           if (!lightningPaymentJournal) return { items: [], next: null };
-          const records = await lightningPaymentJournal.list();
+          const records = await readLightningRecords();
           return { next: null, items: records.map(item => ({
             key: 'ln:' + item.paymentHash, txId: 'ln:' + item.paymentHash,
             type: 'outgoing' as const, amountDisplay: item.amountSats.toLocaleString(appLocale()),
@@ -296,19 +304,25 @@ export default function HomeScreen() {
           try {
             const page = await measurePerformance('history.spark', () =>
               loadSparkTransferPage(sparkWallet, limit, Number(cursor ?? 0)));
+            const journalAmounts = new Map((await readLightningRecords().catch(() => []))
+              .map(item => [item.paymentHash, item.amountSats]));
             void operationalHealth.recordSuccess('lightning').catch(() => undefined);
             const timestamps = page.transfers.map(item => new Date(item.createdTime ?? 0).getTime()).filter(Number.isFinite);
             return { next: page.next, through: timestamps.length ? Math.min(...timestamps) : undefined,
               items: page.transfers.flatMap(transfer => {
               if (['CoopExitRequest', 'ClaimStaticDeposit', 'LeavesSwapRequest'].includes(String(transfer.userRequest?.typename))) return [];
               if (!String(transfer.status || '').toUpperCase().includes('COMPLETED')) return [];
-              const amount = Math.abs(Number(transfer.totalValue) || 0);
-              if (amount <= 0) return [];
               const hash = sparkUserRequestPaymentHash(transfer.userRequest);
+              const incoming = String(transfer.transferDirection).toUpperCase() === 'INCOMING';
+              // Spark's outgoing transfer total can include the routing fee. The
+              // saved payment request contains the amount sent to the recipient.
+              const amount = !incoming && hash ? journalAmounts.get(hash) ?? Math.abs(Number(transfer.totalValue) || 0)
+                : Math.abs(Number(transfer.totalValue) || 0);
+              if (amount <= 0) return [];
               const key = hash ? 'ln:' + hash : 'spark:' + String(transfer.id || 'unknown');
               return [{
                 key, txId: key,
-                type: String(transfer.transferDirection).toUpperCase() === 'INCOMING' ? 'incoming' as const : 'outgoing' as const,
+                type: incoming ? 'incoming' as const : 'outgoing' as const,
                 amountDisplay: amount.toLocaleString(appLocale()), asset: 'SAT', status: 'confirmed', route: hash ? 'lightning' as const : undefined,
                 amountValue: amount,
                 timestamp: transfer.createdTime ? new Date(transfer.createdTime).toISOString() : new Date().toISOString(),
@@ -325,37 +339,41 @@ export default function HomeScreen() {
         item => item.status !== 'pending' || !hiddenHistoryKeys.current.includes(item.key), historyOpen ? 20 : 5);
       }
       const pager = historyPagerRef.current;
-      let publication = 0;
-      const publish = () => {
+      const publish = async () => {
         if (generation !== refreshGenerationRef.current) return;
-        const revision = ++publication;
         const snapshot = pager.snapshot();
         const previousItems = new Map(transactionsRef.current.map(item => [item.key, item]));
-        setTransactions(snapshot.items.map(item => {
+        const stableItems = snapshot.items.map(item => {
           const previous = previousItems.get(item.key);
           const sameAmountAndTime = previous?.asset === item.asset && previous.amountValue === item.amountValue &&
             previous.timestamp === item.timestamp;
           const quote = sameAmountAndTime ? previous.transactionRate ?? item.transactionRate : undefined;
           return { ...item, transactionRate: quote, transactionRatePending: !quote };
-        }));
+        });
+        let items: DisplayTransaction[] = stableItems;
         let assertRateSession: (() => void) | null = null;
         try { assertRateSession = walletSession.captureRuntime(); } catch { /* Optional valuation. */ }
         if (hederaPublicKey && assertRateSession) {
-          void transactionRates.enrich(snapshot.items, hederaPublicKey, () => {
-            if (generation !== refreshGenerationRef.current) throw new Error('Wallet changed.');
-            assertRateSession!();
-          }).then(items => {
-            if (generation === refreshGenerationRef.current && revision === publication) {
-              setTransactions(items); refreshTransactionRates();
-            }
-          }).catch(() => undefined);
+          try {
+            const enriched = await withTimeout(transactionRates.enrich(stableItems, hederaPublicKey, () => {
+              if (generation !== refreshGenerationRef.current) throw new Error('Wallet changed.');
+              assertRateSession!();
+            }), 2_000, 'Historical rates timed out.');
+            items = enriched.map((item, index) => item.transactionRate || !stableItems[index].transactionRate ? item
+              : { ...item, transactionRate: stableItems[index].transactionRate, transactionRatePending: false });
+          } catch { /* Keep the previously displayed rates if valuation fails. */ }
         }
+        if (generation !== refreshGenerationRef.current) return;
+        setTransactions(items);
         setHistoryHasMore(snapshot.hasMore);
         setHistoryErrors(snapshot.errors);
+        refreshTransactionRates();
       };
-      await measurePerformance('history.page', () => pager.load(mode, publish));
+      // Publish one complete page. Partial source results made rows jump between
+      // local, journal and provider amounts while the other sources were loading.
+      await measurePerformance('history.page', () => pager.load(mode));
       if (generation !== refreshGenerationRef.current) return;
-      publish();
+      await publish();
       historyLoadedRef.current = true;
       // Status recovery is independent of loading a display page. It must not
       // leave a spinner/error on a history page that has already loaded.
@@ -370,7 +388,7 @@ export default function HomeScreen() {
           if (generation !== refreshGenerationRef.current) return;
           hederaHistoryPending.current = records.some(item => item.state === 'pending');
           pager.replace('hedera-journal', mapHederaJournal(records));
-          publish();
+          void publish();
         })().catch(() => undefined).finally(() => { if (hederaRecovery.current === recovery) hederaRecovery.current = null; });
         hederaRecovery.current = recovery;
       }
