@@ -8,9 +8,10 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { t } from '@/lib/i18n';
 import { normalizeHederaPublicKey } from '@/lib/hedera/keys';
 
-export function HederaActivation({ publicKey, network }: { publicKey: string; network: string }) {
+export function HederaActivation({ publicKey, network, pilotError }: { publicKey: string; network: string; pilotError?: string | null }) {
   useLanguage();
   const [showDetails, setShowDetails] = useState(false);
+  const pilotActive = process.env.EXPO_PUBLIC_OPAGO_PILOT_FUNDING_ENABLED === 'true';
 
   async function copyPublicKey() {
     await Clipboard.setStringAsync(normalizeHederaPublicKey(publicKey));
@@ -19,14 +20,18 @@ export function HederaActivation({ publicKey, network }: { publicKey: string; ne
 
   return <View style={styles.card}>
     <Ionicons name="wallet-outline" size={30} color={adaptColor('#ffb000', 'color')} />
-    <Text style={styles.title} accessibilityRole="header">{t('Activate HBAR first')}</Text>
-    <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR from HashPack.')}</Text>
-    <Text style={styles.body}>{t('HashPack requires a numeric account ID for this wallet. It does not accept this wallet’s activation alias.')}</Text>
+    <Text style={styles.title} accessibilityRole="header">{t(pilotActive ? 'Setting up HBAR' : 'Activate HBAR first')}</Text>
+    {pilotActive
+      ? <Text style={styles.body}>{t('Opago is activating your HBAR account automatically.')}</Text>
+      : <>
+        <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR from HashPack.')}</Text>
+        <Text style={styles.body}>{t('HashPack requires a numeric account ID for this wallet. It does not accept this wallet’s activation alias.')}</Text>
+      </>}
     <View style={styles.waiting}>
       <ActivityIndicator size="small" color={adaptColor('#ffb000', 'color')} />
       <Text style={styles.waitingText}>{t('Waiting for activation on {network}', { network })}</Text>
     </View>
-    <Text style={styles.caption}>{t('After activation, your account ID and payment QR will appear here automatically.')}</Text>
+    <Text style={styles.caption}>{pilotError ? t(pilotError) : t('After activation, your account ID and payment QR will appear here automatically.')}</Text>
     <TouchableOpacity style={styles.detailsButton} accessibilityRole="button" accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails(value => !value)}>
       <Text style={styles.detailsLabel}>{t('Account activation details')}</Text>
       <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#a5a5af', 'color')} />
