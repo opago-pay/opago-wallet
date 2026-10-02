@@ -430,11 +430,11 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     setHasStoredWallet(true);
     assertUnlocked();
     await initializeMnemonic(mnemonic);
-    if (process.env.EXPO_PUBLIC_OPAGO_PILOT_FUNDING_ENABLED === 'true') {
+    if (process.env.EXPO_PUBLIC_OPAGO_PILOT_ACTIVATION_ENABLED === 'true') {
       const publicKey = hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase();
       if (publicKey) {
         try {
-          const { activateNewPilotWallet } = await import('../lib/hedera/pilot-funding-native');
+          const { activateNewPilotWallet } = await import('../lib/hedera/pilot-account-creation-native');
           await activateNewPilotWallet(publicKey);
           if (walletSession.isUnlocked() &&
               hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase() === publicKey) {
@@ -444,7 +444,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
         } catch {
           if (walletSession.isUnlocked() &&
               hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase() === publicKey) {
-            setPilotActivationError('Automatic HBAR activation could not be confirmed. Contact Opago with your activation public key; do not create a second wallet.');
+            setPilotActivationError('Automatic Hedera account creation could not be confirmed. Contact Opago with your activation public key; do not create a second wallet.');
           }
         }
       }

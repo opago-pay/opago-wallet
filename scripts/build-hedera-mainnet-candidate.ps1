@@ -141,21 +141,18 @@ if (-not [string]::IsNullOrWhiteSpace($pilotPrivateKey)) {
   if ($pilotHex.Length -lt 64 -or $pilotHex.Length -gt 512 -or $pilotHex.Length % 2 -ne 0 -or $pilotHex -notmatch '^[0-9a-fA-F]+$') {
     throw 'OPAGO_PILOT_HEDERA_PRIVATE_KEY must be a raw or DER hex private key.'
   }
-  $pilotAmount = if ($env:OPAGO_PILOT_HEDERA_AMOUNT_HBAR) { $env:OPAGO_PILOT_HEDERA_AMOUNT_HBAR } else { '1' }
-  $pilotMaxFee = if ($env:OPAGO_PILOT_HEDERA_MAX_FEE_HBAR) { $env:OPAGO_PILOT_HEDERA_MAX_FEE_HBAR } else { '0.1' }
-  foreach ($amount in @($pilotAmount, $pilotMaxFee)) {
-    if ($amount -notmatch '^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$' -or [decimal]::Parse($amount, [System.Globalization.CultureInfo]::InvariantCulture) -le 0) {
-      throw 'Pilot HBAR amounts must be positive with at most eight decimals.'
-    }
+  if ($env:OPAGO_PILOT_HEDERA_AMOUNT_HBAR) {
+    throw 'Pilot accounts start with 0 HBAR; remove OPAGO_PILOT_HEDERA_AMOUNT_HBAR.'
   }
-  if ([decimal]::Parse($pilotAmount, [System.Globalization.CultureInfo]::InvariantCulture) -gt 1 -or
-      [decimal]::Parse($pilotMaxFee, [System.Globalization.CultureInfo]::InvariantCulture) -gt 0.1) {
-    throw 'Pilot amount exceeds the 1 HBAR grant or 0.1 HBAR fee ceiling.'
+  $pilotMaxFee = if ($env:OPAGO_PILOT_HEDERA_MAX_FEE_HBAR) { $env:OPAGO_PILOT_HEDERA_MAX_FEE_HBAR } else { '2' }
+  if ($pilotMaxFee -notmatch '^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$' -or
+      [decimal]::Parse($pilotMaxFee, [System.Globalization.CultureInfo]::InvariantCulture) -le 0 -or
+      [decimal]::Parse($pilotMaxFee, [System.Globalization.CultureInfo]::InvariantCulture) -gt 5) {
+    throw 'Pilot fee limit must be positive, at most 5 HBAR, with up to eight decimals.'
   }
-  $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_FUNDING_ENABLED = 'true'
+  $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_ACTIVATION_ENABLED = 'true'
   $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_PAYER_ACCOUNT_ID = $pilotPayerAccountId
   $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_PRIVATE_KEY = $pilotPrivateKey
-  $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_AMOUNT_HBAR = $pilotAmount
   $buildSettings.EXPO_PUBLIC_OPAGO_PILOT_MAX_FEE_HBAR = $pilotMaxFee
 }
 $savedEnvironment = @{}
@@ -239,7 +236,7 @@ try {
     signing = 'local debug certificate; internal Mainnet candidate, not store release'
     standalone = $true
     hederaNetwork = 'mainnet'
-    pilotFundingEnabled = -not [string]::IsNullOrWhiteSpace($pilotPrivateKey)
+    pilotActivationEnabled = -not [string]::IsNullOrWhiteSpace($pilotPrivateKey)
     hederaMaximumTransferHbar = '1'
     hederaDirectTransferFeeCeilingHbar = '0.1'
     hederaCheckoutFeeCeilingHbar = '0.75'
@@ -261,7 +258,7 @@ try {
   Write-Host "APK SHA-256: $apkHash"
   Write-Host "Package: $packageId"
   Write-Host 'Hedera uses Mainnet and Lightning remains on regtest.'
-  Write-Host ('Pilot funding: ' + $(if ($pilotPrivateKey) { 'enabled' } else { 'disabled' }))
+  Write-Host ('Pilot account creation: ' + $(if ($pilotPrivateKey) { 'enabled' } else { 'disabled' }))
 } finally {
   foreach ($name in $managedNames) {
     [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')

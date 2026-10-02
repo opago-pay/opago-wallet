@@ -11,7 +11,7 @@ import { normalizeHederaPublicKey } from '@/lib/hedera/keys';
 export function HederaActivation({ publicKey, network, pilotError }: { publicKey: string; network: string; pilotError?: string | null }) {
   useLanguage();
   const [showDetails, setShowDetails] = useState(false);
-  const pilotActive = process.env.EXPO_PUBLIC_OPAGO_PILOT_FUNDING_ENABLED === 'true';
+  const pilotActive = process.env.EXPO_PUBLIC_OPAGO_PILOT_ACTIVATION_ENABLED === 'true';
 
   async function copyPublicKey() {
     await Clipboard.setStringAsync(normalizeHederaPublicKey(publicKey));
@@ -20,9 +20,9 @@ export function HederaActivation({ publicKey, network, pilotError }: { publicKey
 
   return <View style={styles.card}>
     <Ionicons name="wallet-outline" size={30} color={adaptColor('#ffb000', 'color')} />
-    <Text style={styles.title} accessibilityRole="header">{t(pilotActive ? 'Setting up HBAR' : 'Activate HBAR first')}</Text>
+    <Text style={styles.title} accessibilityRole="header">{t(pilotActive ? 'Setting up Hedera account' : 'Activate HBAR first')}</Text>
     {pilotActive
-      ? <Text style={styles.body}>{t('Opago is activating your HBAR account automatically.')}</Text>
+      ? <Text style={styles.body}>{t('Opago is creating your Hedera account with 0 HBAR.')}</Text>
       : <>
         <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR from HashPack.')}</Text>
         <Text style={styles.body}>{t('HashPack requires a numeric account ID for this wallet. It does not accept this wallet’s activation alias.')}</Text>

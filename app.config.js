@@ -1,9 +1,9 @@
 // Preserve app.json as the app configuration.
-// An enabled internal pilot build bundles its separate funding key.
+// An enabled internal pilot build bundles its separate account-creation key.
 if (process.env.EAS_BUILD_PROFILE === 'production' &&
-    (process.env.EXPO_PUBLIC_OPAGO_PILOT_FUNDING_ENABLED === 'true' ||
+    (process.env.EXPO_PUBLIC_OPAGO_PILOT_ACTIVATION_ENABLED === 'true' ||
      process.env.EXPO_PUBLIC_OPAGO_PILOT_PRIVATE_KEY)) {
-  throw new Error('Pilot funding credentials cannot be included in a production build.');
+  throw new Error('Pilot account-creation credentials cannot be included in a production build.');
 }
 module.exports = ({ config }) => ({
   ...config,

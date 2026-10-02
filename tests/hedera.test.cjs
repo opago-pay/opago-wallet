@@ -188,10 +188,10 @@ function listSourceFiles(directory) {
   });
 }
 
-test('only the isolated pilot module may bundle a funding key', () => {
+test('only the isolated pilot account-creation module may bundle a payer key', () => {
   const bundledRoots = ['app', 'components', 'hooks', 'lib'];
   const forbidden = /EXPO_PUBLIC_[A-Z0-9_]*(?:OPERATOR|FAUCET|PRIVATE[A-Z0-9_]*KEY)/i;
-  const pilotModule = path.join(__dirname, '..', 'lib', 'hedera', 'pilot-funding-native.ts');
+  const pilotModule = path.join(__dirname, '..', 'lib', 'hedera', 'pilot-account-creation-native.ts');
   const violations = bundledRoots
     .flatMap(root => listSourceFiles(path.join(__dirname, '..', root)))
     .filter(file => file !== pilotModule && forbidden.test(fs.readFileSync(file, 'utf8')));
