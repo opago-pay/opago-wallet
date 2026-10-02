@@ -100,6 +100,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     loadOrGenerateWallet,
     hederaAccount,
     hederaPublicKey,
+    pilotActivationError,
     refreshHederaAccount,
     backupStatus,
     beginBackup,
@@ -919,7 +920,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     {network === 'onchain' && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
       {t('Bitcoin deposits require network confirmation and a claim fee before the balance is available.')}
     </Text>}
-    {network === 'hedera' && (hederaMissing && hederaPublicKey ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} /> :
+    {network === 'hedera' && (hederaMissing && hederaPublicKey ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} pilotError={pilotActivationError} /> :
       <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
         {hederaLookupError ? t('Account verification unavailable:') + ' ' + t(hederaLookupError) :
           t('HashPack scans the account ID. Enter the amount in the sending wallet.')}

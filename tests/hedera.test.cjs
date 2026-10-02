@@ -188,13 +188,15 @@ function listSourceFiles(directory) {
   });
 }
 
-test('never exposes operator, faucet, or private keys through bundled EXPO_PUBLIC variables', () => {
+test('only the isolated pilot account-creation module may bundle a payer key', () => {
   const bundledRoots = ['app', 'components', 'hooks', 'lib'];
   const forbidden = /EXPO_PUBLIC_[A-Z0-9_]*(?:OPERATOR|FAUCET|PRIVATE[A-Z0-9_]*KEY)/i;
+  const pilotModule = path.join(__dirname, '..', 'lib', 'hedera', 'pilot-account-creation-native.ts');
   const violations = bundledRoots
     .flatMap(root => listSourceFiles(path.join(__dirname, '..', root)))
-    .filter(file => forbidden.test(fs.readFileSync(file, 'utf8')));
+    .filter(file => file !== pilotModule && forbidden.test(fs.readFileSync(file, 'utf8')));
   assert.deepEqual(violations, []);
+  assert.match(fs.readFileSync(pilotModule, 'utf8'), /EXPO_PUBLIC_OPAGO_PILOT_PRIVATE_KEY/);
 });
 
 

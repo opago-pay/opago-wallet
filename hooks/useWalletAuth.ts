@@ -80,6 +80,7 @@ interface WalletContextValue {
   retrySparkConnection(): Promise<void>;
   hederaPublicKey: string | null;
   hederaAccount: HederaAccountSnapshot | null;
+  pilotActivationError: string | null;
   error: string | null;
   recoveryRequired: boolean;
   loadOrGenerateWallet(): Promise<void>;
@@ -115,6 +116,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const [sparkError, setSparkError] = useState<string | null>(null);
   const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
   const [hederaAccount, setHederaAccount] = useState<HederaAccountSnapshot | null>(null);
+  const [pilotActivationError, setPilotActivationError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
 
@@ -133,6 +135,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     setInitStatus('');
     setHederaPublicKey(null);
     setHederaAccount(null);
+    setPilotActivationError(null);
     setError(null);
   }, []);
 
@@ -427,6 +430,25 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     setHasStoredWallet(true);
     assertUnlocked();
     await initializeMnemonic(mnemonic);
+    if (process.env.EXPO_PUBLIC_OPAGO_PILOT_ACTIVATION_ENABLED === 'true') {
+      const publicKey = hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase();
+      if (publicKey) {
+        try {
+          const { activateNewPilotWallet } = await import('../lib/hedera/pilot-account-creation-native');
+          await activateNewPilotWallet(publicKey);
+          if (walletSession.isUnlocked() &&
+              hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase() === publicKey) {
+            try { setHederaAccount(await resolveHederaWalletAccount(publicKey)); }
+            catch { /* The receive screen retries Mirror Node discovery. */ }
+          }
+        } catch {
+          if (walletSession.isUnlocked() &&
+              hederaPrivateKeyRef.current?.publicKey.toStringRaw().toLowerCase() === publicKey) {
+            setPilotActivationError('Automatic Hedera account creation could not be confirmed. Contact Opago with your activation public key; do not create a second wallet.');
+          }
+        }
+      }
+    }
   }), [hasStoredWallet, initializeMnemonic, runExclusive]);
 
   const restoreWallet = useCallback(
@@ -625,6 +647,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       retrySparkConnection,
       hederaPublicKey,
       hederaAccount,
+      pilotActivationError,
       error,
       recoveryRequired,
       loadOrGenerateWallet,
@@ -640,6 +663,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       recoveryRequired,
       hederaAccount,
       hederaPublicKey,
+      pilotActivationError,
       initStatus,
       isInitializing,
       loadOrGenerateWallet,
