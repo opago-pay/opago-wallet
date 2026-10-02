@@ -10,6 +10,7 @@ Commands and source paths in these documents are relative to the repository root
 - [Mainnet scope](MAINNET_SCOPE.md) and [threat model](MAINNET_THREAT_MODEL.md)
 - [Hedera activation service requirements](hedera-activation-service-requirements.md) — planned Opago-funded activation, limited to 20 activations per day; supersedes the funding approach in the historical account lifecycle record.
 - [Wallet data flows](wallet-data-flows.md)
+- [Wallet privacy policy (German)](wallet-datenschutzerklaerung.md) and [English](wallet-privacy-policy-en.md)
 - [Lightning send performance](LIGHTNING_SEND_PERFORMANCE.md)
 - [Spark pending-send integration](SPARK_PENDING_SEND_INTEGRATION.md) and [support investigation](SPARK_SUPPORT_REQUEST.md)
 - [Local eID reference testing](TESTING_EIDAS.md)

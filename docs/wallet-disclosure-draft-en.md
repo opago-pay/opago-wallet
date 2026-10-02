@@ -1,6 +1,6 @@
 # OPAGO Wallet – How It Works and Key Risks (Draft)
 
-**Working draft as of 1 October 2026. Not published or legally approved.** This document explains the mobile consumer wallet and the main consequences of using it. It does not replace the [Wallet Privacy Policy](wallet-privacy-policy-draft-en.md) or appropriate wallet terms of use. It describes the intended release without Sentry and MoonPay; the actual signed build must be checked before publication.
+**Working draft as of 1 October 2026. Not published or legally approved.** This document explains the mobile consumer wallet and the main consequences of using it. It does not replace the [Wallet Privacy Policy](wallet-privacy-policy-en.md) or appropriate wallet terms of use. It describes the intended release with optional Sentry diagnostics and without MoonPay; the actual signed build must be checked before publication.
 
 ## 1. Who provides the wallet
 
@@ -34,7 +34,7 @@ Balances and historical values shown in euros are approximate, non-binding estim
 
 Spark operators and their service providers are needed for Bitcoin/Lightning functions. HBAR functions use the Hedera network and mirror nodes. For certain payment destinations, the app connects to an endpoint chosen by the user, for example for a Lightning Address or LNURL request. These services may be unavailable, change their fees or restrict features. OPAGO cannot guarantee the availability of third-party networks or a specific confirmation time.
 
-Public Bitcoin on-chain and Hedera transactions may remain visible to others permanently. Deleting a wallet locally does not remove network transactions that have already taken place. The [Wallet Privacy Policy](wallet-privacy-policy-draft-en.md) explains the information processed locally and by external services.
+Public Bitcoin on-chain and Hedera transactions may remain visible to others permanently. Deleting a wallet locally does not remove network transactions that have already taken place. The [Wallet Privacy Policy](wallet-privacy-policy-en.md) explains the information processed locally and by external services.
 
 ## 7. Security and support
 
