@@ -1,5 +1,7 @@
 # OPAGO Wallet – vorbereitetes Apple-Einreichungspaket
 
+**Release-Update 2. Oktober 2026:** Der neue Quellstand setzt `ios.supportsTablet=false`. Erst ein neu gebauter und in App Store Connect ausgewählter iOS-Build macht iPad-Screenshots für diese Version entbehrlich. Eine Apple-Watch-App ist nicht enthalten. Der direkte Android-APK-Pfad nutzt das Profil `production-apk` mit Produktionsnetzwerken; MoonPay-Code und SDK wurden entfernt, Sentry bleibt aktiv. Die nachfolgende Bestandsaufnahme vom 24. September beschreibt den damaligen Stand und muss am finalen Build neu geprüft werden. Siehe [Direct APK release](DIRECT_APK_RELEASE.md).
+
 **Arbeitsstand 24.09.2026 · Entscheidung für den identifizierten Stand: NO-GO.** Es wurde nichts bei Apple hochgeladen oder im Store geändert. Dieses Paket bündelt [Netzwerk-Nachweis](native-network-release-evidence.md), [Legacy-Nachweis](legacy-recovery-release-evidence.md), [Geräteabnahme](native-release-acceptance.md), [Datenflussmatrix](wallet-data-flows.md) und [Rechtstextentwurf](legal-wallet-draft.md). Es trennt belegte Apple-Vorgaben von zusätzlichen Produkt- und Sicherheitsempfehlungen.
 
 ## Kandidat und Kontostand

@@ -4,11 +4,11 @@ const { spawnSync } = require('node:child_process');
 const { join } = require('node:path');
 
 // This hook runs on the EAS worker after dependencies and native prebuild.
-// A direct `eas build --profile production` must pass the same repo gate as CI.
+// Both the store build and the direct-download APK must pass the same repo gate as CI.
 if (!process.env.EAS_BUILD_PROFILE) {
   throw new Error('EAS_BUILD_PROFILE is required for the EAS build quality hook.');
 }
-if (!['production', 'mainnet-candidate'].includes(process.env.EAS_BUILD_PROFILE)) {
+if (!['production', 'production-apk', 'mainnet-candidate'].includes(process.env.EAS_BUILD_PROFILE)) {
   process.stdout.write(`Skipping release gate for ${process.env.EAS_BUILD_PROFILE}.\n`);
   process.exit(0);
 }

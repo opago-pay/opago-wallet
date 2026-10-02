@@ -132,7 +132,6 @@ function fixture(data = {}) {
     '@/lib/operational-health-native': { operationalHealth: {
       recordSuccess: async () => {}, recordFailure: async () => {},
     } },
-    '@/lib/moonpay-return-native': { consumeMoonPayReturnNotice: async () => false },
   };
   const source = fs.readFileSync(path.join(__dirname, '../app/(tabs)/index.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: {

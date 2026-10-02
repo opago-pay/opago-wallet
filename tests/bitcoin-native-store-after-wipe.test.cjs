@@ -85,7 +85,6 @@ function fixture(t) {
     './lightning/payment-journal-native': { clearAllLightningPaymentJournals: noop },
     './lightning/receive-store-native': { lightningReceiveStore: { clear: noop } },
     './bitcoin/receive-archive': { clearBitcoinReceiveArchive: noop },
-    './moonpay-return-native': { clearMoonPayReturnNotice: noop },
     './operational-health-native': { operationalHealth: { clear: noop } },
     './wallet-backup': { BACKUP_STATUS_KEY: 'synthetic-backup' },
   };
