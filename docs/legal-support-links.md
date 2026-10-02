@@ -1,6 +1,6 @@
 # Kontakt und Rechtstexte der Wallet
 
-Stand: 24. September 2026. Betreiber laut Vorgabe: **OPAGO GmbH**.
+Stand: 3. Oktober 2026. Betreiber laut Vorgabe: **OPAGO GmbH**.
 Die URLs sind zentral in `lib/legal-links.ts` hinterlegt.
 
 | Zweck | URL |
@@ -8,7 +8,7 @@ Die URLs sind zentral in `lib/legal-links.ts` hinterlegt.
 | Öffentlicher Kontakt | https://www.opago.com/contact/ |
 | Supportportal | https://dashboard.opago.com/ |
 | Impressum | https://www.opago.com/imprint/ |
-| Datenschutz | https://www.opago.com/privacy/ |
+| Datenschutz | https://opago.com/wallet/privacy |
 | AGB | https://www.opago.com/terms/ |
 
 ## Umsetzung in der App
@@ -24,7 +24,7 @@ Die URLs sind zentral in `lib/legal-links.ts` hinterlegt.
 
 ## Vor Einreichung noch offen
 
-Der Betreiber hat bestätigt, die bestehenden Seiten unter denselben URLs um Wallet-Inhalte zu ergänzen. Bei Prüfung am 24. September 2026 beschrieb die Datenschutzerklärung vorwiegend die Website. Die AGB beschrieben OPAGO Pay für Händler; Abschnitt 3.7 erklärte noch, OPAGO biete keine eigene Bitcoin-LN-Wallet an.
+Der Wallet-Datenschutzlink führt jetzt zu `https://opago.com/wallet/privacy`. Bei Prüfung am 3. Oktober 2026 leitete diese Adresse noch auf die OPAGO-Startseite weiter; vor der Einreichung muss dort die Wallet-Datenschutzerklärung erscheinen. Die veröffentlichten AGB beschreiben OPAGO Pay für Händler; Abschnitt 3.7 erklärt noch, OPAGO biete keine eigene Bitcoin-LN-Wallet an.
 
 1. Wallet-spezifische Datenschutzinformationen veröffentlichen und mit dem tatsächlichen Datenfluss abgleichen, einschließlich genutzter Spark-, Hedera-, Lightning- und gegebenenfalls MoonPay-Dienste, öffentlicher Blockchain-Daten, Speicherfristen, Löschmöglichkeiten und Kontaktweg.
 2. Die Anwendbarkeit der AGB auf die Wallet klarstellen und widersprüchliche Angaben zu Wallet-Angebot und Zielgruppe korrigieren.
