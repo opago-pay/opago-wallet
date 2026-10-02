@@ -190,6 +190,8 @@ npm run android:production-candidate
 
 That command builds and launches the artifact but never initiates a payment. Continue with the manual real-funds gate in [LIGHTNING_MAINNET_ACCEPTANCE.md](docs/LIGHTNING_MAINNET_ACCEPTANCE.md).
 
+For a standalone Android APK intended for direct download, use the EAS `production-apk` profile. It inherits the production Mainnet settings and release checks, builds `assembleRelease` with EAS-managed signing credentials, and needs neither Metro nor ADB on the user's device. The existing `production` profile remains the store AAB build; `preview` remains on test networks. See the [direct APK release guide](docs/DIRECT_APK_RELEASE.md) for signing, artifact verification, device acceptance, and hosting steps. Do not serve a locally built candidate signed with the Android debug certificate.
+
 Before any public release, complete [Lightning Mainnet Android acceptance](docs/LIGHTNING_MAINNET_ACCEPTANCE.md), follow the [Lightning operations and incident runbook](docs/LIGHTNING_OPERATIONS_RUNBOOK.md), reassess the dependency tree, and obtain independent security, privacy, and regulatory reviews. Network support in source code is not authorization to use real funds; the go/no-go gates remain binding.
 
 ## Reference services

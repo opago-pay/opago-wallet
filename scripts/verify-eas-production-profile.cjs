@@ -6,8 +6,23 @@ const { spawnSync } = require('node:child_process');
 
 const eas = JSON.parse(readFileSync(join(__dirname, '..', 'eas.json'), 'utf8'));
 const profile = eas.build?.production;
-if (!profile || !profile.env || profile.developmentClient || profile.distribution === 'internal') {
+if (!profile || !profile.env || profile.developmentClient ||
+    profile.distribution === 'internal' || profile.credentialsSource !== 'remote') {
   throw new Error('EAS production profile is missing or is not a store profile.');
+}
+const apkProfile = eas.build?.['production-apk'];
+if (apkProfile?.extends !== 'production' ||
+    apkProfile.distribution !== 'internal' ||
+    apkProfile.developmentClient !== false ||
+    apkProfile.android?.buildType !== 'apk' ||
+    apkProfile.android?.gradleCommand ||
+    apkProfile.android?.withoutCredentials ||
+    apkProfile.credentialsSource ||
+    apkProfile.env ||
+    apkProfile.environment ||
+    apkProfile.node ||
+    apkProfile.autoIncrement !== undefined) {
+  throw new Error('EAS production-apk must inherit production settings and build a standalone release APK.');
 }
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 const app = JSON.parse(readFileSync(join(__dirname, '..', 'app.json'), 'utf8'));

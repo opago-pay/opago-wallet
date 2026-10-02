@@ -152,5 +152,8 @@ test('builds without credentials skip uploads; EAS upload outages are non-blocki
     assert.doesNotMatch(JSON.stringify(configured),/synthetic-build-only-token/);
   } finally {if(token===undefined)delete process.env.SENTRY_AUTH_TOKEN;else process.env.SENTRY_AUTH_TOKEN=token;}
   const eas=JSON.parse(fs.readFileSync(path.join(__dirname,'../eas.json'),'utf8'));
-  for(const profile of Object.values(eas.build))assert.equal(profile.env.SENTRY_ALLOW_FAILURE,'true');
+  for(const profile of Object.values(eas.build)) {
+    const inherited=eas.build[profile.extends];
+    assert.equal((profile.env ?? inherited?.env)?.SENTRY_ALLOW_FAILURE,'true');
+  }
 });

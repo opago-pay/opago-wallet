@@ -8,7 +8,6 @@ import { clearAllLightningPaymentJournals } from './lightning/payment-journal-na
 import { lightningReceiveStore } from './lightning/receive-store-native';
 import { clearBitcoinReceiveArchive } from './bitcoin/receive-archive';
 import { bitcoinStore, activateBitcoinStoreAfterWipe, bitcoinDepositWatch, bitcoinRequestCursor, bitcoinDepositCursor, bitcoinStaticAddressCache } from './bitcoin/store-native';
-import { clearMoonPayReturnNotice } from './moonpay-return-native';
 import { operationalHealth } from './operational-health-native';
 import { createWalletWiper } from './wallet-wipe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +31,7 @@ const wiper = createWalletWiper({
   () => bitcoinStaticAddressCache.clear(),
   () => AsyncStorage.removeItem('opago.bitcoin.static-address.v1'),
   () => clearBitcoinReceiveArchive(),
-  () => clearMoonPayReturnNotice(),
+  () => AsyncStorage.removeItem('opago:moonpay:pending-return'),
   () => operationalHealth.clear(),
   // Remove the protected key last. If any earlier operation fails, startup
   // resumes the pending wipe instead of opening a partially erased wallet.

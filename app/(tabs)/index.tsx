@@ -36,7 +36,6 @@ import { BitcoinConnectionStatus } from '@/components/bitcoin/connection-status'
 import { PaymentDetailsScreen } from '@/components/history/payment-details';
 import { bitcoinScope } from '@/lib/bitcoin/onchain';
 import { bitcoinStore } from '@/lib/bitcoin/store-native';
-import { consumeMoonPayReturnNotice } from '@/lib/moonpay-return-native';
 import { recordWalletStartupStage } from '@/lib/startup-timing';
 import { markNavigationReady, markNavigationStart, measurePerformance } from '@/lib/performance-trace';
 import { BackupReminder } from '@/components/security/backup-prompt';
@@ -125,16 +124,6 @@ export default function HomeScreen() {
   const lightningScope = useMemo(() => hederaPublicKey ?
     { network: appConfig.sparkNetwork, publicKey: hederaPublicKey } : null, [hederaPublicKey]);
   const rates = useExchangeRates();
-  const [moonPayReturn, setMoonPayReturn] = useState(false);
-  useEffect(() => setMoonPayReturn(false), [hederaPublicKey]);
-  useFocusEffect(useCallback(() => {
-    if (!hederaPublicKey) return;
-    let cancelled = false;
-    void consumeMoonPayReturnNotice(hederaPublicKey).then(found => {
-      if (found && !cancelled) setMoonPayReturn(true);
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [hederaPublicKey]));
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -758,14 +747,6 @@ export default function HomeScreen() {
         <QuickAction icon="scan-outline" label={t('Send')} onPress={() => { markNavigationStart('send'); router.push('/send-flow' as Href); }} />
         <QuickAction icon="card-outline" label={t('Buy')} onPress={() => { markNavigationStart('buy'); router.push('../buy'); }} />
       </View>
-
-      {moonPayReturn && <View accessibilityRole="alert" style={{ backgroundColor: adaptColor('#242018', 'backgroundColor'), borderRadius: 16, padding: 16, marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text style={{ color: adaptColor('#f4d38a', 'color'), flex: 1, lineHeight: 20 }}>{t('Closing MoonPay does not confirm a purchase. Check its order status there. If Bitcoin arrives, Opago will show the deposit and any claim needed.')}</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')} onPress={() => setMoonPayReturn(false)}
-          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="close" size={20} color={adaptColor('#f4d38a', 'color')} />
-        </TouchableOpacity>
-      </View>}
 
       <BackupReminder />
       {(latestTransaction || historyLoadedRef.current) && <>

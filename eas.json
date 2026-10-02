@@ -64,6 +64,7 @@
     },
     "production": {
       "environment": "production",
+      "credentialsSource": "remote",
       "node": "22.23.1",
       "autoIncrement": true,
       "env": {
@@ -80,6 +81,14 @@
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
         "SENTRY_HTTP_MAX_RETRIES": "1"
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "developmentClient": false,
+      "android": {
+        "buildType": "apk"
       }
     }
   },

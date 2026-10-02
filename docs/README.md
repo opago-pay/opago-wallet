@@ -16,6 +16,7 @@ Commands and source paths in these documents are relative to the repository root
 
 ## Operations and release checks
 
+- [Direct Android APK release](DIRECT_APK_RELEASE.md)
 - [Optional Sentry crash diagnostics](sentry-diagnostics.md)
 - [Hedera Mainnet deployment runbook](HEDERA_MAINNET_DEPLOYMENT_RUNBOOK.md)
 - [Lightning operations runbook](LIGHTNING_OPERATIONS_RUNBOOK.md)
