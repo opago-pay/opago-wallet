@@ -1,5 +1,51 @@
 # Opago Wallet
 
+## App Store listing
+
+**Send, receive and pay with Bitcoin. Your everyday wallet.**
+
+<p align="center">
+  <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="OPAGO Wallet: Bitcoin for everyday life" width="168" />
+  <img src="docs/app-store-assets/OPAGO_02_Scan_a_QR_Code_6_5.png" alt="Scan a Bitcoin payment QR code" width="168" />
+  <img src="docs/app-store-assets/OPAGO_03_Check_Your_Payment_6_5.png" alt="Review the payment amount and fees" width="168" />
+  <img src="docs/app-store-assets/OPAGO_04_Paid_Next_6_5.png" alt="Confirmed Bitcoin payment" width="168" />
+  <img src="docs/app-store-assets/OPAGO_05_Fund_Your_Bitcoin_Wallet_6_5.png" alt="Top up through the Bitcoin network" width="168" />
+  <img src="docs/app-store-assets/OPAGO_06_Top_Up_Lightning_6_5.png" alt="Top up over Lightning" width="168" />
+  <img src="docs/app-store-assets/OPAGO_07_Self_Custodial_Your_Money_6_5.png" alt="Self-custodial OPAGO Wallet" width="168" />
+</p>
+
+### Description
+
+Make Bitcoin part of your everyday life. With OPAGO Wallet, you can send, receive and pay with Bitcoin right from your phone. Simple and easy to use, even if you're new to Bitcoin.
+
+**SCAN. CHECK. PAY.**
+
+From a coffee on the go to shopping at a store that accepts Bitcoin: scan the QR code, check the payment details and confirm.
+
+**SEND AND RECEIVE BITCOIN**
+
+Send Bitcoin to friends and family or receive it from others. To get paid, simply share your QR code or payment request.
+
+**FAST PAYMENTS WITH LIGHTNING**
+
+OPAGO supports Lightning for fast Bitcoin payments, making it easy to send and receive even small amounts. You can also transfer Bitcoin over the Bitcoin network.
+
+**EVERYTHING AT A GLANCE**
+
+See your Bitcoin balance and its value in euros. Keep track of past payments and their status, and review the amount and fees before you send.
+
+**YOUR BITCOIN. YOUR CONTROL.**
+
+With OPAGO, you control your Bitcoin. Your recovery words let you restore your wallet on a new device. Keep them somewhere safe.
+
+Alongside Bitcoin, OPAGO also supports HBAR, available under additional coins.
+
+Whether it's your first Bitcoin payment or already part of your daily routine, OPAGO Wallet keeps it simple.
+
+Download OPAGO Wallet and start using Bitcoin in everyday life.
+
+## About this repository
+
 Opago Wallet is a Bitcoin-first mobile wallet built with Expo and React Native. Bitcoin Lightning is the default on Home, Send and Request. HBAR remains available through collapsed **Advanced options**, using the same existing protected recovery phrase and keys.
 
 The default mobile build is intended for development and test networks. The verified Hedera Mainnet contract does not by itself make the Android app an audited production wallet, a licensed financial service, or evidence of regulatory compliance. See [SECURITY.md](SECURITY.md) before using the code with identities or funds.
