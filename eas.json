@@ -94,6 +94,11 @@
   },
   "submit": {
     "production": {
+      "android": {
+        "applicationId": "com.opago.wallet",
+        "track": "internal",
+        "releaseStatus": "completed"
+      },
       "ios": {
         "ascAppId": "6816107766"
       }
