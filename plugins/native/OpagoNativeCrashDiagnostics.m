@@ -1,8 +1,12 @@
 #import "OpagoNativeCrashDiagnostics.h"
 #import <RNSentry/RNSentryStart.h>
 #import <Sentry/Sentry.h>
+#import <React/RCTBridgeModule.h>
 #include <math.h>
 @import Sentry;
+
+static NSString *const OpagoCrashConsentKey = @"OpagoCrashDiagnosticsConsentV1";
+static BOOL OpagoCrashStarted = NO;
 
 // Never copy free-form fields. Native events bypass JavaScript beforeSend.
 static NSString *OpagoMatch(id value, NSString *pattern) {
@@ -172,19 +176,49 @@ static SentryStacktrace *OpagoStack(SentryStacktrace *stack) {
 
 + (void)start {
 #if !DEBUG
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
+    @synchronized(self) {
         if (![[NSBundle.mainBundle objectForInfoDictionaryKey:@"OpagoCrashDiagnosticsEnabled"] boolValue]) return;
+        if (![[NSUserDefaults standardUserDefaults] boolForKey:OpagoCrashConsentKey]) return;
+        if (OpagoCrashStarted) return;
         @try {
             SentryOptions *options = [self optionsForDSN:
                 [NSBundle.mainBundle objectForInfoDictionaryKey:@"OpagoCrashDiagnosticsDSN"]];
             if (!options) return; // Invalid diagnostics configuration never reaches SDK startup.
             [RNSentryStart startWithOptions:options];
+            OpagoCrashStarted = YES;
         } @catch (NSException *exception) {
             // Diagnostics must never abort wallet startup, even if SDK init fails.
             @try { [SentrySDK close]; } @catch (NSException *ignored) {}
         }
-    });
+    }
 #endif
+}
+
++ (void)stop {
+    @synchronized(self) {
+        if (!OpagoCrashStarted) return;
+        @try { [SentrySDK close]; } @catch (NSException *ignored) {}
+        OpagoCrashStarted = NO;
+    }
+}
+@end
+
+@interface OpagoNativeCrashConsent : NSObject <RCTBridgeModule>
+@end
+
+@implementation OpagoNativeCrashConsent
+RCT_EXPORT_MODULE(OpagoNativeCrashConsent)
+
++ (dispatch_queue_t)methodQueue { return dispatch_get_main_queue(); }
+
+RCT_REMAP_METHOD(read, readWithResolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+    resolve(@([[NSUserDefaults standardUserDefaults] boolForKey:OpagoCrashConsentKey]));
+}
+
+RCT_REMAP_METHOD(setEnabled, setEnabled:(BOOL)enabled resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:OpagoCrashConsentKey];
+    if (enabled) [OpagoNativeCrashDiagnostics start];
+    else [OpagoNativeCrashDiagnostics stop];
+    resolve(nil);
 }
 @end

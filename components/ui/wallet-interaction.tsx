@@ -12,7 +12,7 @@ import {
 import { walletSession } from '@/lib/wallet-session';
 import { beginPerformanceSpan, recordPerformanceDuration } from '@/lib/performance-trace';
 import { useColorMode } from '@/hooks/useColorMode';
-import { adaptColor, themeColor } from '@/lib/theme-styles';
+import { themeColor } from '@/lib/theme-styles';
 
 // Observe gestures before a child consumes them, without claiming its responder.
 // Native modals need their own boundary because they have a separate view root.
@@ -37,8 +37,8 @@ export const TextInput = forwardRef<NativeTextInput, TextInputProps>(function Wa
   return <NativeTextInput {...props} ref={ref}
     keyboardAppearance={props.keyboardAppearance ?? mode}
     selectionColor={props.selectionColor ?? themeColor('accentText')}
-    placeholderTextColor={typeof props.placeholderTextColor === 'string'
-      ? adaptColor(props.placeholderTextColor, 'color') : props.placeholderTextColor ?? themeColor('muted')}
+    // Inputs share a tested foreground role even when legacy callers pass dark literals.
+    placeholderTextColor={themeColor('muted')}
     onChangeText={value => { walletSession.touch(); props.onChangeText?.(value); }}
     onKeyPress={event => { walletSession.touch(); props.onKeyPress?.(event); }}
     onSubmitEditing={event => { walletSession.touch(); props.onSubmitEditing?.(event); }}
@@ -48,7 +48,8 @@ export const TextInput = forwardRef<NativeTextInput, TextInputProps>(function Wa
 // Also count accessibility/keyboard activation, which may have no touch event.
 export const TouchableOpacity = forwardRef<React.ComponentRef<typeof NativeTouchableOpacity>, TouchableOpacityProps>(function WalletTouchableOpacity(props, ref) {
   const pressedAt = useRef<number | null>(null);
-  return <NativeTouchableOpacity {...props} ref={ref} activeOpacity={props.activeOpacity ?? 0.72}
+  return <NativeTouchableOpacity {...props} ref={ref} accessibilityRole={props.accessibilityRole ?? 'button'}
+    accessibilityState={{ ...props.accessibilityState, disabled: !!props.disabled || !!props.accessibilityState?.disabled }} activeOpacity={props.activeOpacity ?? 0.72}
     onPressIn={event => { pressedAt.current = performance.now(); walletSession.touch(); props.onPressIn?.(event); }}
     onPress={event => {
       if (pressedAt.current !== null) recordPerformanceDuration('ui.tap_to_handler', performance.now() - pressedAt.current);
@@ -67,6 +68,8 @@ export const TouchableOpacity = forwardRef<React.ComponentRef<typeof NativeTouch
 export const Pressable = forwardRef<View, PressableProps>(function WalletPressable(props, ref) {
   const pressedAt = useRef<number | null>(null);
   return <NativePressable {...props} ref={ref}
+    accessibilityRole={props.accessibilityRole ?? 'button'}
+    accessibilityState={{ ...props.accessibilityState, disabled: !!props.disabled || !!props.accessibilityState?.disabled }}
     style={state => [typeof props.style === 'function' ? props.style(state) : props.style,
       state.pressed && !props.disabled ? { opacity: 0.72 } : undefined]}
     onPressIn={event => { pressedAt.current = performance.now(); walletSession.touch(); props.onPressIn?.(event); }}

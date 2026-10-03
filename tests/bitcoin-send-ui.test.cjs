@@ -5,7 +5,9 @@ const { hookFixture } = require('./react-hooks-fixture.cjs');
 function fixture(options = {}) {
   const calls = [];
   let locked = false;
+  let removal;
   const app = hookFixture('app/(tabs)/send.tsx', hooks => ({
+    '@react-navigation/native': { usePreventRemove: (blocked, onAttempt) => { removal = { blocked, onAttempt }; } },
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({remove(){}}) }, BackHandler: { addEventListener: () => ({remove(){}}) } },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({ scanResultKey: 'synthetic-scan' }), useFocusEffect: fn => hooks.useEffect(fn, [fn]) },
@@ -32,7 +34,7 @@ function fixture(options = {}) {
     '@/components/bitcoin/payment-progress':{BitcoinPaymentProgress:'progress'},
     '@/components/bitcoin/transfer-result':{BitcoinTransferResult:'onchain-result'},
   }), exports => exports.default());
-  return { ...app, calls, lock() { locked=true; } };
+  return { ...app, calls, removal: () => removal, lock() { locked=true; } };
 }
 test('onchain scan and input edits never quote/sign; explicit preparation authenticates the exact amount', async t => {
   const app=fixture();t.after(app.unmount);
@@ -47,9 +49,9 @@ test('onchain send shows progress, submits once, then preserves unconfirmed netw
  const app=fixture({submit:()=>sent});t.after(app.unmount);
  let tree=await app.settle();tree.props.onAmountChange('1000');tree=app.render();await tree.props.onReview();
  tree=await app.settle();tree.props.onConfirm();tree.props.onConfirm();tree=await app.settle();
- assert.equal(tree.type,'progress');assert.equal(tree.props.phase,'sending');assert.equal(app.calls.filter(c=>c==='submit').length,1);
+ assert.equal(tree.type,'progress');assert.equal(tree.props.phase,'sending');assert.equal(app.removal().blocked,true);app.removal().onAttempt();assert.equal(app.render().type,'progress');assert.equal(app.calls.filter(c=>c==='submit').length,1);
  finish({id:'synthetic',amountSats:1000,state:'broadcast'});tree=await app.settle();
- assert.equal(tree.type,'onchain-result');assert.equal(tree.props.operation.state,'broadcast');
+ assert.equal(tree.type,'onchain-result');assert.equal(tree.props.operation.state,'broadcast');assert.equal(app.removal().blocked,false);
 });
 test('a locked onchain preparation never reaches the signing SDK adapter', async t => {
   const app=fixture();t.after(app.unmount);let tree=await app.settle();

@@ -6,14 +6,16 @@ import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { useColorMode } from '@/hooks/useColorMode';
 import { useLanguage } from '@/hooks/useLanguage';
 import { t } from '@/lib/i18n';
+import { diagnosticsConsent } from '@/lib/diagnostics-consent';
+import { useSyncExternalStore } from 'react';
 import { LANGUAGE_NAMES } from '@/lib/i18n/language';
 import { adaptiveStyles, themeColor } from '@/lib/theme-styles';
 
-export type SettingsSection = 'overview' | 'security' | 'appearance' | 'language' | 'help' | 'advanced' | 'wallet';
+export type SettingsSection = 'overview' | 'security' | 'appearance' | 'language' | 'help' | 'diagnostics' | 'advanced' | 'wallet';
 
 export function getSettingsSection(value: string | string[] | undefined): SettingsSection {
   switch (value) {
-    case 'security': case 'appearance': case 'language': case 'help': case 'advanced': case 'wallet':
+    case 'security': case 'appearance': case 'language': case 'help': case 'diagnostics': case 'advanced': case 'wallet':
       return value;
     default: return 'overview';
   }
@@ -25,6 +27,7 @@ export function settingsSectionTitle(section: SettingsSection): string {
     case 'appearance': return t('Appearance');
     case 'language': return t('Language');
     case 'help': return t('Help and legal');
+    case 'diagnostics': return t('Error reports');
     case 'advanced': return t('Advanced options');
     case 'wallet': return t('Manage this wallet');
     default: return t('Settings');
@@ -75,6 +78,7 @@ export function SettingsMenu(props: {
 }) {
   const { selection } = useColorMode();
   const { language } = useLanguage();
+  const diagnostics = useSyncExternalStore(diagnosticsConsent.subscribe, diagnosticsConsent.getSnapshot, diagnosticsConsent.getSnapshot);
   return <View>
     <MenuGroup title={t('Wallet')}>
       {props.backupLoading ? <View style={styles.loading}><BackupStatusNotice /></View> :
@@ -91,7 +95,9 @@ export function SettingsMenu(props: {
     </MenuGroup>
     <MenuGroup title={t('Support and information')}>
       <MenuRow title={t('Help and legal')} detail={t('Contact, privacy and terms')}
-        icon="help-circle-outline" disabled={props.disabled} onPress={() => props.onSelect('help')} />
+        icon="help-circle-outline" divider disabled={props.disabled} onPress={() => props.onSelect('help')} />
+      <MenuRow title={t('Error reports')} detail={diagnostics.granted ? t('Optional · on') : t('Optional · off')}
+        icon="bug-outline" disabled={props.disabled} onPress={() => props.onSelect('diagnostics')} />
     </MenuGroup>
     <View style={[styles.card, styles.management]}>
       <MenuRow title={t('Manage this wallet')} detail={t('Local wallet data')}

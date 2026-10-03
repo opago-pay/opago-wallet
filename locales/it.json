@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Consenti a Opago di usare la fotocamera per scansionare i codici QR di pagamento.",
+    "NSFaceIDUsageDescription": "Usa Face ID per sbloccare il portafoglio, confermare i pagamenti e accedere alla frase di recupero."
+  }
+}

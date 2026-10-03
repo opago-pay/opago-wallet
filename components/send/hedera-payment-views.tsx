@@ -1,3 +1,5 @@
+import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
+import { useAccessibleHeading } from '@/hooks/useAccessibleHeading';
 import { adaptColor, themeColor } from '@/lib/theme-styles';
 import { useColorMode } from '@/hooks/useColorMode';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +38,7 @@ export function HederaReviewView(props: {
   useColorMode();
   const insets = useSafeAreaInsets();
   const [showDetails, setShowDetails] = useState(false);
+  useAccessibleStatus(props.loading ? t('Sending payment') : null);
   const feeCeilingTinybars = getHederaPaymentFeeCeilingTinybars('checkout');
   return (
     <View style={styles.scrollContainer}>
@@ -148,6 +151,7 @@ export function HederaReviewView(props: {
         style={[styles.button, styles.fullWidthButton, props.loading && styles.buttonDisabled]}
         onPress={props.onConfirm}
         disabled={props.loading}
+        accessibilityState={{ busy: props.loading, disabled: props.loading }}
         accessibilityLabel={t('Send {amount} HBAR', { amount: props.payment.amountHbar })}
       >
         {props.loading ? (
@@ -179,14 +183,16 @@ export function HederaSuccessView(props: {
   useLanguage();
   useColorMode();
   const [showDetails, setShowDetails] = useState(false);
+  const insets = useSafeAreaInsets();
+  const heading = useAccessibleHeading(props.result.transactionId);
   return (
     <PaymentSuccessMotionScrollView
       style={styles.scrollContainer}
-      contentContainerStyle={[styles.formContent, styles.centered]}
+      contentContainerStyle={[styles.formContent, styles.centered, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
     >
       {exit => <>
       <PaymentSuccessIcon style={{ marginBottom: 16 }} accessibilityLabel={t("Confirmed")} />
-      <Text style={styles.successTitle}>{t("Payment sent")}</Text>
+      <Text ref={heading} accessibilityRole="header" style={styles.successTitle}>{t("Payment sent")}</Text>
       <Text style={styles.successAmount}>{props.result.amountHbar} HBAR</Text>
       <Text style={styles.successFiatAmount}>{props.eurValue !== null
         ? `≈ ${formatEurValue(props.eurValue)}` : t('EUR estimate unavailable')}</Text>

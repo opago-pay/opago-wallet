@@ -1,4 +1,5 @@
-import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
+import { KeyboardDoneAccessory } from '@/components/ui/keyboard-done-accessory';
+import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect, useRef, useState } from 'react';
@@ -109,7 +110,7 @@ export function PaymentForm(props: {
     sparkStatus={props.sparkStatus} sparkError={props.sparkError} onRetrySpark={props.onRetrySpark}
     onAmount={props.onAmountChange} onCurrency={props.onCurrencyChange} onBack={props.onScan} onContinue={props.onReview} />;
 
-  if (!isHedera) return <ScrollView style={bitcoinStyles.screen} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
+  if (!isHedera) return <ScrollView style={bitcoinStyles.screen} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
     contentContainerStyle={[bitcoinStyles.page, { paddingTop: insets.top + 12 }]}>
     <PaymentBackButton onPress={props.onScan} disabled={props.loading} label={t('Back to scanner')} />
     <Text style={[bitcoinStyles.title, recipientStyles.title]}>{t('Enter address')}</Text>
@@ -134,7 +135,7 @@ export function PaymentForm(props: {
       <Text style={bitcoinStyles.value}>{t('Recipient receives')}</Text>
       {props.fixedAmountSats != null ? <Text style={bitcoinStyles.amount}>{props.fixedAmountSats.toLocaleString(appLocale())} SAT</Text> : <>
         <TextInput ref={amountRef} style={[bitcoinStyles.input, { fontSize: 30, textAlign: 'center' }]} value={props.amountInput}
-          onChangeText={props.onAmountChange} placeholder="0" placeholderTextColor="#888893" keyboardType="decimal-pad"
+          onChangeText={props.onAmountChange} placeholder="0" placeholderTextColor="#888893" keyboardType="decimal-pad" inputAccessoryViewID="send-amount-done"
           editable={!props.loading} accessibilityLabel={t('Amount')} />
         <View style={styles.row}>{CURRENCIES.map(item => <TouchableOpacity key={item} style={[styles.selector, props.currency === item && styles.selectorActive]}
           onPress={() => { props.onAmountChange(''); props.onCurrencyChange(item); }} disabled={props.loading} accessibilityRole="radio" accessibilityState={{ checked: props.currency === item }}>
@@ -152,13 +153,14 @@ export function PaymentForm(props: {
     <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
       <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
     </AdvancedOptions>
+    <KeyboardDoneAccessory nativeID="send-amount-done" />
   </ScrollView>;
 
   return (
-    <ScrollView
+    <ScrollView automaticallyAdjustKeyboardInsets
       style={styles.scrollContainer}
       contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12 }]}
-      keyboardShouldPersistTaps="handled"
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
     >
       {props.sourceSelected && <PaymentBackButton onPress={props.onScan} disabled={props.loading} label={t('Back to scanner')} />}
       <View style={styles.header}>
@@ -266,7 +268,7 @@ export function PaymentForm(props: {
                     ? t('Scan a payment code or enter an account')
                   : t('Scan or paste a Lightning request')
                 }
-                placeholderTextColor="#666"
+                placeholderTextColor={themeColor('muted')}
                 value={props.destination}
                 onChangeText={props.onDestinationChange}
                 editable={!props.loading}
@@ -295,12 +297,12 @@ export function PaymentForm(props: {
               placeholder={
                 isHedera ? 'HBAR' : props.currency === 'SAT' ? t('Satoshis') : t('Euro')
               }
-              placeholderTextColor="#666"
+              placeholderTextColor={themeColor('muted')}
               value={props.amountInput}
               onChangeText={props.onAmountChange}
               editable={!props.loading}
               accessibilityLabel={t('Amount')}
-              keyboardType="decimal-pad"
+              keyboardType="decimal-pad" inputAccessoryViewID="send-amount-done"
             />
             {!isHedera && (
               <View style={styles.row}>
@@ -338,6 +340,7 @@ export function PaymentForm(props: {
       {props.sourceSelected && !isHedera && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
         <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
       </AdvancedOptions>}
+      <KeyboardDoneAccessory nativeID="send-amount-done" />
     </ScrollView>
   );
 }

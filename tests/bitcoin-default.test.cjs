@@ -25,6 +25,8 @@ function fixture(file, overrides = {}) {
       return state[i];
     }, useCallback: fn => fn, useMemo: fn => fn(), useEffect: () => {} },
     'react/jsx-runtime': require('react/jsx-runtime'),
+    '@/hooks/useAccessibleHeading': { useAccessibleHeading: () => ({ current: null }) },
+    '@/hooks/useAccessibleStatus': { useAccessibleStatus() {} },
     'react-native': { StyleSheet: { create: value => value }, ScrollView: 'scroll', Text: 'text', View: 'view', ActivityIndicator: 'loading', Keyboard: { dismiss: () => {} }, useWindowDimensions: () => ({ width: 390 }), AppState: { currentState: 'active' } },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', TextInput: 'input' },
     './wallet-interaction': { TouchableOpacity: 'button' },

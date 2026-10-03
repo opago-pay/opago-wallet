@@ -4,6 +4,7 @@ import { beginPerformanceSpan, markNavigationReady, measurePerformance } from '@
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { usePreventRemove } from '@react-navigation/native';
 import { Alert, BackHandler } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -528,6 +529,11 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   }, []);
 
   useFocusEffect(useCallback(() => reset, [reset]));
+  // Guard iOS native gestures and route removal as well as Android back presses.
+  usePreventRemove(loading || !!reviewPreparation || !!pendingBitcoin || !!pendingLightning || !!pendingHedera, () => {
+    if (paymentInFlight.current || loading) return;
+    cancelPayment();
+  });
   function cancelPayment() {
     if (paymentInFlight.current) return;
     reset();

@@ -80,10 +80,25 @@ export function initializeCrashReporting(development: boolean, platform: string)
     loaded.init(crashReportingOptions(platform));
     sdk = loaded;
   } catch {
+    attempted = false;
     // Undo a partially installed error handler if initialization fails.
     try { if (originalHandler) errorUtils?.setGlobalHandler(originalHandler); }
     catch { /* Keep the original startup failure isolated from the wallet. */ }
   }
+}
+
+export async function stopCrashReporting(): Promise<void> {
+  const current = sdk;
+  sdk = undefined;
+  attempted = false;
+  try {
+    // Disable new envelopes immediately; close may still finish events queued
+    // before withdrawal.
+    const options = current?.getClient()?.getOptions();
+    if (options) options.enabled = false;
+    await current?.close();
+  }
+  catch { /* Withdrawal must not interrupt the wallet. */ }
 }
 
 export function recordDiagnosticScreen(segments: readonly string[]): void {

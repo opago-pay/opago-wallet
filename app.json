@@ -12,7 +12,14 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.opago.wallet",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": [
+          "en",
+          "de",
+          "fr",
+          "es",
+          "it"
+        ]
       }
     },
     "android": {
@@ -59,7 +66,7 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Allow Opago to unlock your protected recovery phrase.",
+          "faceIDPermission": "Use Face ID to unlock your wallet, confirm payments and access your recovery phrase.",
           "configureAndroidBackup": false
         }
       ],
@@ -67,15 +74,16 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Opago to confirm payments securely."
+          "faceIDPermission": "Use Face ID to unlock your wallet, confirm payments and access your recovery phrase."
         }
       ],
       "expo-sqlite",
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Opago to access your camera to scan payment QR codes.",
-          "recordAudioAndroid": false
+          "cameraPermission": "Allow Opago to use your camera to scan payment QR codes.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       "expo-web-browser",
@@ -97,6 +105,13 @@
         "projectId": "e2fc1c68-5aab-46c9-82e7-1918c7c90f66"
       }
     },
-    "owner": "fabcot01"
+    "owner": "fabcot01",
+    "locales": {
+      "en": "./locales/en.json",
+      "de": "./locales/de.json",
+      "fr": "./locales/fr.json",
+      "es": "./locales/es.json",
+      "it": "./locales/it.json"
+    }
   }
 }
