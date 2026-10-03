@@ -5,7 +5,7 @@ export const OPAGO_OPERATOR = 'OPAGO GmbH';
 export const OPAGO_LINKS = {
   contact: 'https://www.opago.com/contact/',
   support: 'https://dashboard.opago.com/',
-  privacy: 'https://opago.com/wallet/privacy',
+  privacy: 'https://www.opago.com/wallet/privacy/',
   imprint: 'https://www.opago.com/imprint/',
   terms: 'https://www.opago.com/terms/',
 } as const;
