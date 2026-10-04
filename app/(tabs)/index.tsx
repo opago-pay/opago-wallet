@@ -618,6 +618,8 @@ export default function HomeScreen() {
     },
   ];
   const totalEur = sumAssetValuesEur(assetCards.map(card => card.eurValue));
+  const totalEurLabel = totalEur === null ? '—'
+    : formatEurValue(totalEur).replace('€', '').trim() + '\u00a0€';
   const initialBalanceReady = walletReady && displayBalances.spark !== null
     && (displayRates.btcToEur > 0 || !rates.isLoading);
   useEffect(() => {
@@ -725,9 +727,9 @@ export default function HomeScreen() {
           <Text
             style={styles.total}
             accessibilityLabel={totalEur === null ? t('Balance unavailable')
-              : t('Total estimated balance: {amount}', { amount: formatEurValue(totalEur) })}
+              : t('Total estimated balance: {amount}', { amount: totalEurLabel })}
           >
-            {totalEur === null ? '—' : <><Text style={styles.approximation}>≈ </Text>{formatEurValue(totalEur)}</>}
+            {totalEurLabel}
           </Text>
         </View>
         <Text style={styles.portfolioBalanceLabel}>{t('Balance')}</Text>
@@ -1065,7 +1067,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   totalAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%' },
   portfolioBalanceLabel: { color: '#d5d5da', fontSize: 19, fontWeight: '600', marginTop: 8 },
   balanceCaveat: { color: '#a59a84', fontSize: 11, textAlign: 'center', marginTop: 5 },
-  approximation: { color: '#a3a3ad', fontSize: 27, fontWeight: '400' },
   total: { color: '#fff', fontSize: 52, fontWeight: '600', textAlign: 'center', flexShrink: 1, fontVariant: ['tabular-nums'] },
   quickActions: {
     flexDirection: 'row',
