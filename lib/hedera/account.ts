@@ -64,7 +64,8 @@ function snapshotFromMirror(
   account: MirrorAccountRecord,
   expectedPublicKey?: string,
 ): HederaAccountSnapshot {
-  if (account.deleted) throw new Error('Hedera account is deleted.');
+  if (account.deleted || account.expired_and_pending_removal) throw new Error('Hedera account is deleted or expired.');
+  if (account.key?._type && account.key._type !== 'ED25519') throw new Error('Hedera account has no supported Ed25519 public key.');
   if (typeof account.account !== 'string') {
     throw new Error('Hedera Mirror Node returned an invalid account ID.');
   }
@@ -131,6 +132,9 @@ export async function loadHederaAccount(
 ): Promise<HederaAccountSnapshot | null> {
   const account = await getMirrorAccountById(accountId);
   if (!account) return null;
+  if (account.account !== parseHederaAccountId(accountId)) {
+    throw new Error('Hedera Mirror Node returned a different account ID.');
+  }
   const normalizedKey = expectedPublicKey
     ? normalizeHederaPublicKey(expectedPublicKey)
     : undefined;

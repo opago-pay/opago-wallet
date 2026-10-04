@@ -137,6 +137,7 @@ class OpagoSafeHttpModule : Module() {
                 promise.resolve(mapOf(
                   "status" to response.code,
                   "contentType" to (response.header("Content-Type") ?: ""),
+                  "retryAfter" to (response.header("Retry-After") ?: ""),
                   "body" to output.toString(Charsets.UTF_8.name()),
                 ))
               }

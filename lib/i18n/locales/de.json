@@ -758,5 +758,8 @@
   "Keep error reports off": "Fehlerberichte deaktivieren",
   "Selection not saved": "Auswahl nicht gespeichert",
   "Please try again. Your previous choice may still apply after restarting the app.": "Bitte versuche es erneut. Nach einem Neustart der App kann noch deine bisherige Auswahl gelten.",
-  "Sending payment": "Zahlung wird gesendet"
+  "Sending payment": "Zahlung wird gesendet",
+  "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Diese Wallet benötigt einmalig ein Hedera-Konto, bevor sie HBAR empfangen kann.",
+  "No Hedera activation was found for this wallet. Start account activation to continue.": "Für diese Wallet wurde keine Hedera-Aktivierung gefunden. Starte die Kontoaktivierung.",
+  "Could not connect to Hedera account setup. Check your connection and try again.": "Die Hedera-Kontoaktivierung ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut."
 }

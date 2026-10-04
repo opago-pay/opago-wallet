@@ -1,7 +1,7 @@
 import { appConfig } from './config';
 import { walletSession } from './wallet-session';
 
-type NativeResponse = { status: number; contentType: string; body: string };
+type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string };
 type NativeTransport = {
   request(options: { url: string; method: string; headers: Record<string, string>; body: string;
     maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
@@ -60,9 +60,13 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
       typeof result.body !== 'string' || typeof result.contentType !== 'string') {
       throw new Error('Secure network transport returned an invalid response.');
     }
+    const responseHeaders: Record<string, string> = { 'content-type': result.contentType };
+    if (typeof result.retryAfter === 'string' && result.retryAfter) {
+      responseHeaders['retry-after'] = result.retryAfter;
+    }
     const response = new Response(result.body, {
       status: result.status,
-      headers: { 'content-type': result.contentType },
+      headers: responseHeaders,
     });
     boundedNativeResponses.set(response, maxBytes);
     return response;

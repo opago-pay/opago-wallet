@@ -4,9 +4,10 @@ struct SafeHTTPResponse {
   let status: Int
   let contentType: String
   let body: String
+  let retryAfter: String
 
   var bridgeValue: [String: Any] {
-    ["status": status, "contentType": contentType, "body": body]
+    ["status": status, "contentType": contentType, "body": body, "retryAfter": retryAfter]
   }
 }
 
@@ -19,6 +20,7 @@ final class BoundedHTTPResponse {
   private var headerEnd: Int?
   private var status: Int?
   private var contentType = ""
+  private var retryAfter = ""
   private var contentLength: Int?
   private var chunked = false
   private let headerLimit = 16_384
@@ -95,6 +97,9 @@ final class BoundedHTTPResponse {
         lengths.append(parsed)
       case "transfer-encoding": transfers.append(value.lowercased())
       case "content-encoding": encodings.append(value.lowercased())
+      case "retry-after":
+        guard retryAfter.isEmpty else { throw SafeHTTPFailure.rejected }
+        retryAfter = value
       case "content-type":
         guard !seenContentType else { throw SafeHTTPFailure.rejected }
         seenContentType = true
@@ -149,6 +154,6 @@ final class BoundedHTTPResponse {
   private func result(_ bytes: Data) throws -> SafeHTTPResponse {
     guard bytes.count <= maxBytes, let status,
           let text = String(data: bytes, encoding: .utf8) else { throw SafeHTTPFailure.rejected }
-    return SafeHTTPResponse(status: status, contentType: contentType, body: text)
+    return SafeHTTPResponse(status: status, contentType: contentType, body: text, retryAfter: retryAfter)
   }
 }

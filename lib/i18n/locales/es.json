@@ -758,5 +758,8 @@
   "Setting up Hedera account…": "Creando la cuenta Hedera…",
   "Check activation status": "Consultar el estado de activación",
   "Activate Hedera account": "Activar la cuenta Hedera",
-  "Sending payment": "Enviando el pago"
+  "Sending payment": "Enviando el pago",
+  "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Esta cartera necesita crear una cuenta Hedera una sola vez antes de poder recibir HBAR.",
+  "No Hedera activation was found for this wallet. Start account activation to continue.": "No se ha encontrado ninguna activación de Hedera para esta cartera. Inicia la activación de la cuenta para continuar.",
+  "Could not connect to Hedera account setup. Check your connection and try again.": "No se ha podido conectar con el servicio de creación de cuentas Hedera. Comprueba tu conexión y vuelve a intentarlo."
 }

@@ -88,3 +88,10 @@ test('bounded stream preserves UTF-8 split across chunks and rejects a false sho
   }), { headers: { 'content-length': '1' } });
   assert.equal(await readBoundedText(response, 'Test endpoint', 1, new AbortController(), 2), 'é');
 });
+
+test('native Retry-After reaches the activation backoff even for proxy errors', async () => {
+  const request = nativeTransport({request: async () => ({status:429,contentType:'text/html',body:'busy',retryAfter:'120'}),cancel:async()=>{}});
+  const response = await request('https://hedera-activation.opago.com/v1/challenges', {method:'POST',body:'{}'});
+  assert.equal(response.status,429);
+  assert.equal(response.headers.get('retry-after'),'120');
+});

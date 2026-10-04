@@ -9,6 +9,7 @@ import { readBoundedText, strictFetch } from '../strict-http-transport';
 export interface MirrorAccountRecord {
   account?: string | null;
   deleted?: boolean | null;
+  expired_and_pending_removal?: boolean | null;
   evm_address?: string | null;
   balance?: { balance?: string | null; timestamp?: string | null } | null;
   key?: { _type?: string | null; key?: string | null } | null;
