@@ -1,36 +1,38 @@
-# OPAGO Wallet
+<p align="center">
+  <img src="assets/images/icon.png" alt="OPAGO Wallet app icon" width="80" />
+</p>
 
-**Send, receive and pay with Bitcoin. Your everyday wallet.**
+<h1 align="center">OPAGO Wallet</h1>
+
+<p align="center">
+  <strong>Send, receive and pay with Bitcoin.<br />Your everyday wallet.</strong>
+</p>
 
 Make Bitcoin part of your everyday life. With OPAGO Wallet, you can send, receive and pay with Bitcoin right from your phone. Simple and easy to use, even if you're new to Bitcoin.
 
-## Scan. Check. Pay.
-
+**Scan. Check. Pay.**<br />
 From a coffee on the go to shopping at a store that accepts Bitcoin: scan the QR code, check the payment details and confirm.
 
-## Send and receive Bitcoin
-
+**Send and receive Bitcoin**<br />
 Send Bitcoin to friends and family or receive it from others. To get paid, simply share your QR code or payment request.
 
-## Fast payments with Lightning
-
+**Fast payments with Lightning**<br />
 OPAGO supports Lightning for fast Bitcoin payments, making it easy to send and receive even small amounts. You can also transfer Bitcoin over the Bitcoin network.
 
-## Everything at a glance
-
+**Everything at a glance**<br />
 See your Bitcoin balance and its value in euros. Keep track of past payments and their status, and review the amount and fees before you send.
 
-## Your Bitcoin. Your control.
-
+**Your Bitcoin. Your control.**<br />
 With OPAGO, you control your Bitcoin. Your recovery words let you restore your wallet on a new device. Keep them somewhere safe.
 
+**Bitcoin and HBAR**<br />
 Alongside Bitcoin, OPAGO also supports HBAR, available under additional coins.
 
 Whether it's your first Bitcoin payment or already part of your daily routine, OPAGO Wallet keeps it simple.
 
 Download OPAGO Wallet and start using Bitcoin in everyday life.
 
-## See it in action
+<h3 align="center">See it in action</h3>
 
 <p align="center">
   <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="Bitcoin for everyday life — OPAGO Wallet home screen" width="600" />
