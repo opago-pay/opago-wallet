@@ -761,5 +761,17 @@
   "Sending payment": "Zahlung wird gesendet",
   "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Diese Wallet benötigt einmalig ein Hedera-Konto, bevor sie HBAR empfangen kann.",
   "No Hedera activation was found for this wallet. Start account activation to continue.": "Für diese Wallet wurde keine Hedera-Aktivierung gefunden. Starte die Kontoaktivierung.",
-  "Could not connect to Hedera account setup. Check your connection and try again.": "Die Hedera-Kontoaktivierung ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut."
+  "Could not connect to Hedera account setup. Check your connection and try again.": "Die Hedera-Kontoaktivierung ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+  "Your HBAR address": "Deine HBAR-Adresse",
+  "Create your address once to receive HBAR.": "Lege einmal deine Adresse an, um HBAR zu empfangen.",
+  "Create address": "Adresse anlegen",
+  "Creating your address…": "Deine Adresse wird angelegt…",
+  "This can take a few minutes. Your address will appear here automatically.": "Das kann einige Minuten dauern. Deine Adresse erscheint hier automatisch.",
+  "Your address is still being created. Check its status again in a moment.": "Deine Adresse wird noch angelegt. Prüfe den Status gleich noch einmal.",
+  "We could not create your address. Please contact Opago support.": "Deine Adresse konnte nicht angelegt werden. Bitte kontaktiere den Opago-Support.",
+  "We could not check your address. Please try again.": "Deine Adresse konnte nicht geprüft werden. Bitte versuche es erneut.",
+  "Address setup is temporarily unavailable. Please try again later.": "Das Anlegen der Adresse ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
+  "Technical details": "Technische Details",
+  "Checking your address…": "Deine Adresse wird geprüft…",
+  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen."
 }

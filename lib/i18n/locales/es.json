@@ -761,5 +761,17 @@
   "Sending payment": "Enviando el pago",
   "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Esta cartera necesita crear una cuenta Hedera una sola vez antes de poder recibir HBAR.",
   "No Hedera activation was found for this wallet. Start account activation to continue.": "No se ha encontrado ninguna activación de Hedera para esta cartera. Inicia la activación de la cuenta para continuar.",
-  "Could not connect to Hedera account setup. Check your connection and try again.": "No se ha podido conectar con el servicio de creación de cuentas Hedera. Comprueba tu conexión y vuelve a intentarlo."
+  "Could not connect to Hedera account setup. Check your connection and try again.": "No se ha podido conectar con el servicio de creación de cuentas Hedera. Comprueba tu conexión y vuelve a intentarlo.",
+  "Your HBAR address": "Tu dirección de HBAR",
+  "Create your address once to receive HBAR.": "Crea tu dirección una sola vez para recibir HBAR.",
+  "Create address": "Crear dirección",
+  "Creating your address…": "Creando tu dirección…",
+  "This can take a few minutes. Your address will appear here automatically.": "Esto puede tardar varios minutos. Tu dirección aparecerá aquí automáticamente.",
+  "Your address is still being created. Check its status again in a moment.": "Tu dirección aún se está creando. Vuelve a comprobar su estado dentro de un momento.",
+  "We could not create your address. Please contact Opago support.": "No se ha podido crear tu dirección. Contacta con el soporte de Opago.",
+  "We could not check your address. Please try again.": "No se ha podido comprobar tu dirección. Vuelve a intentarlo.",
+  "Address setup is temporarily unavailable. Please try again later.": "La creación de direcciones no está disponible temporalmente. Vuelve a intentarlo más tarde.",
+  "Technical details": "Detalles técnicos",
+  "Checking your address…": "Comprobando tu dirección…",
+  "Your address is ready. Show this code to receive HBAR.": "Tu dirección está lista. Muestra este código para recibir HBAR."
 }

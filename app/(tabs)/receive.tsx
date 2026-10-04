@@ -426,7 +426,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [hederaPublicKey, isPaid, network, ownerKey, pollingEnabled, refreshHederaAccount, walletReady]);
+  }, [hederaAccount?.accountId, hederaPublicKey, isPaid, network, ownerKey, pollingEnabled, refreshHederaAccount, retryVersion, walletReady]);
 
   const parseInvoiceAmount = useCallback((): number => {
     const freshRate = rates.updatedAt > 0 && Date.now() - rates.updatedAt <= 300_000 ? rates.btcToEur : 0;
@@ -880,7 +880,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       }}>{network === 'lightning' ? requestError : draftAmountError}</Text>}
     </View>}
 
-    <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
+    {(network !== 'hedera' || hederaReadyForQr) && <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
       {qrValue ? <View style={mode === 'light'
         ? { backgroundColor: '#fff', borderRadius: 20, padding: 12, overflow: 'hidden' }
         : { backgroundColor: '#fff', borderRadius: 24, padding: 20, overflow: 'hidden' }}>
@@ -892,14 +892,14 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           logo={network === 'onchain' ? 'bitcoin' : network}
         />
       </View> : <View style={{ width: qrSize + 44, height: qrSize + 44, borderRadius: 24, backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), alignItems: 'center', justifyContent: 'center', padding: 22 }}>
-        {loading || onchainLoading || (!hederaReady && network === 'hedera') || (!restoreComplete && network === 'lightning')
+        {loading || onchainLoading || (!restoreComplete && network === 'lightning')
           ? <ActivityIndicator color={themeColor('accentText')} size="large" />
           : <Ionicons name="qr-code-outline" size={40} color={themeColor('muted')} />}
         <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', marginTop: 12 }}>
           {(network === 'lightning' ? requestError : network === 'onchain' ? draftAmountError || onchainError : hederaLookupError) || t('Preparing payment code…')}
         </Text>
       </View>}
-    </View>
+    </View>}
 
     {network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
       onPress={() => {
@@ -925,11 +925,19 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     {network === 'onchain' && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
       {t('Bitcoin deposits require network confirmation and a claim fee before the balance is available.')}
     </Text>}
-    {network === 'hedera' && (hederaMissing && hederaPublicKey ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} /> :
+    {network === 'hedera' && !hederaReadyForQr && (hederaMissing && hederaPublicKey
+      ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} />
+      : <View style={{ paddingVertical: 32, alignItems: 'center', gap: 16 }} accessibilityLiveRegion="polite">
+        <Text style={{ color: adaptColor('#b5b5bf', 'color'), textAlign: 'center', fontSize: 16, lineHeight: 24 }}>
+          {hederaLookupError ? t('We could not check your address. Please try again.') :
+            !walletReady || !hederaPublicKey ? t('Unlock your wallet to continue.') : t('Checking your address…')}
+        </Text>
+        {hederaLookupError && <BitcoinButton label={t('Try again')} secondary onPress={() => setRetryVersion(value => value + 1)} />}
+      </View>)}
+    {hederaReadyForQr &&
       <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
-        {hederaLookupError ? t('Account verification unavailable:') + ' ' + t(hederaLookupError) :
-          t('HashPack scans the account ID. Enter the amount in the sending wallet.')}
-      </Text>)}
+        {t('Your address is ready. Show this code to receive HBAR.')}
+      </Text>}
 
     {qrValue && <View style={{ flexDirection: fontScale > 1.3 || width < 360 ? 'column' : 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
       <TouchableOpacity onPress={() => void copy(displayValue || qrValue)} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>

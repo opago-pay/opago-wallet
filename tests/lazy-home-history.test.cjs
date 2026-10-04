@@ -198,7 +198,7 @@ test('Home headline adds every displayed coin and waits for missing holdings', (
   let screen = app.render();
   assert.equal(data.balanceParams.enableHedera, true);
   const headline = find(screen, node => node.type === 'text' && node.props.accessibilityLabel?.startsWith('Total estimated balance:'));
-  assert.equal(headline.props.accessibilityLabel, 'Total estimated balance: 75002\u00a0€');
+  assert.equal(headline.props.accessibilityLabel, 'Total estimated balance: 75002€');
   assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'bitcoin').props.fiatValue, '≈ 75000');
 
   data.hbarTinybars = null;
@@ -213,7 +213,7 @@ test('Home headline adds every displayed coin and waits for missing holdings', (
 
   data.hbarTinybars = 0n;
   screen = app.render();
-  assert.equal(find(screen, node => node.type === 'text' && node.props.accessibilityLabel === 'Total estimated balance: 75000\u00a0€').props.accessibilityLabel, 'Total estimated balance: 75000\u00a0€');
+  assert.equal(find(screen, node => node.type === 'text' && node.props.accessibilityLabel === 'Total estimated balance: 75000€').props.accessibilityLabel, 'Total estimated balance: 75000€');
 });
 
 test('activity rows show the same EUR quote or unavailable message as payment details', async () => {
