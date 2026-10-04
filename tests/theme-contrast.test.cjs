@@ -75,3 +75,9 @@ test('welcome wordmark has an explicit visible light variant', () => {
   assert.match(lightMark, /fill="#18181d"/);
   assert.doesNotMatch(lightMark, /fill="#ffffff"/);
 });
+
+test('shared placeholder role meets contrast on actual dark input surfaces', () => {
+  for (const background of ['#17171c', '#151519', '#1b2017', '#1b1b20']) {
+    assert.ok(contrast(themePalette.dark.muted, background) >= 4.5, background);
+  }
+});

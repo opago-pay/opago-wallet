@@ -1,3 +1,5 @@
+import { useAccessibleHeading } from '@/hooks/useAccessibleHeading';
+import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
 import React, { useEffect, useState } from 'react';
 import { BackHandler, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +30,8 @@ export function PaymentDetailsScreen({ payment, rates, onClose, onHide, onReview
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
     return () => subscription.remove();
   }, [onClose]);
+  const heading = useAccessibleHeading(payment.key);
+  useAccessibleStatus(copied ? t(copied === 'Copy unavailable' || copied === 'Could not open explorer' ? copied : 'Copied') : null);
   const status = paymentDetailStatus(payment);
   const date = new Date(payment.timestamp);
   const dateLabel = Number.isFinite(date.getTime()) ? date.toLocaleString(appLocale(), {
@@ -56,18 +60,18 @@ export function PaymentDetailsScreen({ payment, rates, onClose, onHide, onReview
     } catch { setCopied(t('Could not open explorer')); }
   }
 
-  return <ScrollView style={styles.screen} contentContainerStyle={[styles.content, {
+  return <ScrollView onAccessibilityEscape={onClose} style={styles.screen} contentContainerStyle={[styles.content, {
     paddingTop: insets.top + 12, paddingBottom: insets.bottom + 30,
   }]}>
     <View style={styles.header}>
-      <Text style={styles.title}>{t('Payment details')}</Text>
+      <Text ref={heading} accessibilityRole="header" style={styles.title}>{t('Payment details')}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={t('Close')} onPress={onClose} style={styles.close}>
         <Ionicons name="close" size={27} color={adaptColor('#fff', 'color')} />
       </Pressable>
     </View>
 
     <View style={styles.summary}>
-      <Text style={styles.amount} adjustsFontSizeToFit numberOfLines={1}>{amount}</Text>
+      <Text style={styles.amount}>{amount}</Text>
       <View style={[styles.status, status === 'Completed' ? styles.statusDone :
         status === 'Failed' || status === 'Claim required' ? styles.statusAttention : styles.statusPending]}>
         <Text style={styles.statusText}>{t(status)}</Text>

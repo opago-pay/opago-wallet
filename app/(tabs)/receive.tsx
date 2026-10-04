@@ -65,7 +65,11 @@ import { validateBitcoinAddress } from '@/lib/bitcoin/destination';
 import { satsToBtc } from '@/lib/bitcoin/amount';
 import { bitcoinDepositWatch, bitcoinStaticAddressCache } from '@/lib/bitcoin/store-native';
 import { beginPerformanceSpan, markNavigationReady, measurePerformance, recordPerformanceDuration } from '@/lib/performance-trace';
-import { PaymentSuccessIcon, PaymentSuccessMotionView, type SuccessExit } from '@/components/ui/payment-success-motion';
+import { PaymentSuccessIcon, PaymentSuccessMotionScrollView } from '@/components/ui/payment-success-motion';
+
+import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
+import { useAccessibleHeading } from '@/hooks/useAccessibleHeading';
+import { KeyboardDoneAccessory } from '@/components/ui/keyboard-done-accessory';
 
 type ReceiveNetwork = 'lightning' | 'onchain' | 'hedera';
 // Polling and amount edits rerender Receive frequently; QR encoding is only
@@ -90,7 +94,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   const ratesRef = useRef(rates);
   ratesRef.current = rates;
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const {
     sparkWallet,
     sparkStatus,
@@ -131,7 +135,6 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   const copyFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
-  const successExit = useRef<SuccessExit>(action => action());
   const paymentDetectedAt = useRef<number | null>(null);
   const [paidNetwork, setPaidNetwork] = useState<'lightning' | 'hedera' | null>(null);
   const [receivedDescription, setReceivedDescription] = useState('');
@@ -541,8 +544,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       recordPerformanceDuration('receive.confirm_to_screen', performance.now() - paymentDetectedAt.current);
       paymentDetectedAt.current = null;
     }
-    const timer = setTimeout(() => successExit.current(returnHomeAfterReceive), 3_000);
-    return () => clearTimeout(timer);
+
   }, [isPaid, returnHomeAfterReceive]);
 
   useEffect(() => {
@@ -656,6 +658,10 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     return () => { cancelled = true; };
   }, [sparkWallet, walletReady, ownerKey, onchainAddress?.ownerKey, onchainError, pollingEnabled, shouldPrefetchOnchain]);
 
+  const successHeading = useAccessibleHeading('receive-success', isPaid);
+  useAccessibleStatus(isPaid ? null : requestError, isFocused);
+  useAccessibleStatus(copyFeedback ? t(copyFeedback.copied ? 'Copied' : 'Please try again.') : null, isFocused);
+
   if (backupStatus === 'loading') return <View style={[styles.container, styles.centered]}>
     <CloseWalletScreen dismiss={modal} style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
     <BackupStatusNotice />
@@ -664,7 +670,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   if (backupStatus !== 'verified' && backupStatus !== 'deferred') return (
     <View style={[styles.container, styles.centered]}>
       <CloseWalletScreen dismiss={modal} style={{ position: 'absolute', top: insets.top + 12, right: 23 }} />
-      <Text style={styles.successTitle}>{t("Back up before adding money")}</Text>
+      <Text accessibilityRole="header" style={styles.successTitle}>{t("Back up before adding money")}</Text>
       <Text style={styles.subtitle}>{t("Write down your recovery words and check your backup in Settings > Security and backup.")}</Text>
       <TouchableOpacity style={[styles.button, styles.fullWidthButton]} accessibilityRole="button" onPress={() => { beginBackup(); router.push({ pathname: '/(tabs)/settings', params: { section: 'security' } }); }}>
         <Text style={styles.buttonText}>{t("Back up my wallet")}</Text>
@@ -673,12 +679,12 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   );
 
   if (isPaid) return (
-    <PaymentSuccessMotionView style={[styles.container, styles.centered]}>
+    <PaymentSuccessMotionScrollView style={styles.scrollContainer}
+      contentContainerStyle={[styles.formContent, styles.centered, { flexGrow: 1, paddingTop: insets.top + 24, paddingBottom: Math.max(insets.bottom, 16) + 24 }]}>
       {exit => {
-        successExit.current = exit;
         return <>
           <PaymentSuccessIcon style={{ marginBottom: 16 }} accessibilityLabel={t("Confirmed")} />
-          <Text style={styles.successTitle}>{t("Payment received")}</Text>
+          <Text ref={successHeading} accessibilityRole="header" style={styles.successTitle}>{t("Payment received")}</Text>
           <Text style={[styles.subtitle, styles.centerText]}>
             {receivedDescription || t('The payment is complete and saved in your activity.')}
           </Text>
@@ -709,7 +715,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           </TouchableOpacity>
         </>;
       }}
-    </PaymentSuccessMotionView>
+    </PaymentSuccessMotionScrollView>
   );
 
   if (showDepositDetails) return <BitcoinDepositScreen wallet={sparkWallet} onBack={() => setShowDepositDetails(false)} />;
@@ -789,7 +795,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     ref={receiveScrollRef}
     style={styles.scrollContainer}
     contentContainerStyle={[styles.formContent, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 28, paddingHorizontal: 23 }]}
-    keyboardShouldPersistTaps="handled"
+    keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
   >
     <View style={styles.header}>
       <Text style={bitcoinStyles.title}>{t(network === 'hedera' ? 'Receive HBAR' : 'Receive Bitcoin')}</Text>
@@ -861,9 +867,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           value={amountInput}
           onChangeText={changeAmount}
           editable={restoreComplete}
-          keyboardType="decimal-pad"
+          keyboardType="decimal-pad" inputAccessoryViewID="receive-amount-done"
           placeholder="0"
-          placeholderTextColor={adaptColor('#696971', 'color')}
+          placeholderTextColor={themeColor('muted')}
           accessibilityLabel={t('Amount (optional)')}
           style={{ color: adaptColor('#fff', 'color'), fontSize: 26, fontWeight: '700', flex: 1, paddingVertical: 6 }}
         />
@@ -925,7 +931,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           t('HashPack scans the account ID. Enter the amount in the sending wallet.')}
       </Text>)}
 
-    {qrValue && <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
+    {qrValue && <View style={{ flexDirection: fontScale > 1.3 || width < 360 ? 'column' : 'row', gap: 10, justifyContent: 'center', marginBottom: 10 }}>
       <TouchableOpacity onPress={() => void copy(displayValue || qrValue)} accessibilityRole="button" style={{ minHeight: 48, minWidth: 120, borderRadius: 24, borderWidth: 1, borderColor: adaptColor('#44444a', 'borderColor'), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 }}>
         <Ionicons name={copyFeedback?.copied && copyFeedback.value === (displayValue || qrValue) ? 'checkmark' : 'copy-outline'} size={18} color={themeColor('accentText')} />
         <Text accessibilityLiveRegion="polite" style={{ color: adaptColor('#fff', 'color'), fontWeight: '700' }}>
@@ -952,5 +958,6 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     }} />}
     {network === 'onchain' && <BitcoinButton label={t('Incoming Bitcoin')} secondary onPress={() => setShowDepositDetails(true)} />}
 
+    <KeyboardDoneAccessory nativeID="receive-amount-done" />
   </ScrollView>;
 }

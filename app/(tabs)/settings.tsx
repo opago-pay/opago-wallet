@@ -29,6 +29,8 @@ import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { ColorModePicker } from '@/components/settings/color-mode-picker';
 import { SecurityOptions } from '@/components/settings/security-options';
+import { KeyboardDoneAccessory } from '@/components/ui/keyboard-done-accessory';
+import { DiagnosticsConsentPanel } from '@/components/settings/diagnostics-consent';
 import { getSettingsSection, SettingsMenu, settingsSectionTitle, type SettingsSection } from '@/components/settings/settings-menu';
 import { SettingsTransition } from '@/components/settings/settings-transition';
 import { LegalLinks } from '@/components/legal/legal-links';
@@ -386,7 +388,7 @@ export default function SettingsScreen() {
   }, [activeSection, busy, navigateToSection]));
 
   return (
-    <ScrollView ref={scrollRef} style={styles.container} keyboardShouldPersistTaps="handled"
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" ref={scrollRef} style={styles.container} keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 }]}>
       {activeSection !== 'overview' && <TouchableOpacity style={styles.backButton} onPress={() => navigateToSection('overview')}
         accessibilityRole="button" accessibilityLabel={t('Back to settings')} accessibilityState={{ disabled: busy }} disabled={busy}>
@@ -542,13 +544,15 @@ export default function SettingsScreen() {
                 <Text style={styles.cancelButtonText}>{t("Cancel")}</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
+
+    </ScrollView>
         </KeyboardAvoidingView></WalletActivityBoundary>
       </Modal>
 
       {activeSection === 'appearance' && <ColorModePicker embedded />}
       {activeSection === 'language' && <LanguagePicker embedded />}
       {activeSection === 'help' && <LegalLinks embedded disabled={busy} />}
+      {activeSection === 'diagnostics' && <DiagnosticsConsentPanel />}
       {activeSection === 'wallet' && <View style={styles.walletCard}>
         <Text style={styles.body}>{t("Remove the keys and saved payment data from this device. Keep your complete recovery phrase to access the wallet again.")}</Text>
         <Text style={styles.caption}>{t("Backup verification and a separate confirmation protect against accidental removal.")}</Text>
@@ -612,7 +616,7 @@ export default function SettingsScreen() {
           ))}
           <TextInput style={styles.verificationInput} value={accountIdInput} onChangeText={setAccountIdInput}
             placeholder="0.0.123456" placeholderTextColor={adaptColor('#777', 'color')} autoCapitalize="none" autoCorrect={false}
-            accessibilityLabel={t('Hedera account ID')} />
+            accessibilityLabel={t('Hedera account ID')} inputAccessoryViewID="settings-account-done" returnKeyType="done" onSubmitEditing={Keyboard.dismiss} />
           <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} accessibilityRole="button"
             accessibilityState={{ disabled: !hederaPublicKey || bindingAccount || busy, busy: bindingAccount }}
             disabled={!hederaPublicKey || bindingAccount || busy} onPress={() => void importHederaAccount()}>
@@ -645,6 +649,7 @@ export default function SettingsScreen() {
         </View>}
       </View>}
       </SettingsTransition>
+      <KeyboardDoneAccessory nativeID="settings-account-done" />
     </ScrollView>
   );
 }

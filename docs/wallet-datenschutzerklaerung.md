@@ -1,6 +1,6 @@
 # Datenschutzerklärung für die OPAGO Wallet
 
-**Stand: 3. Oktober 2026.** Diese Erklärung beschreibt die Datenverarbeitung in der mobilen OPAGO Wallet. Ergänzend gilt für OPAGO-Webseiten die [Datenschutzerklärung für die Website](https://www.opago.com/de/privacy/).
+**Stand: 4. Oktober 2026.** Diese Erklärung beschreibt die Datenverarbeitung in der mobilen OPAGO Wallet. Ergänzend gilt für OPAGO-Webseiten die [Datenschutzerklärung für die Website](https://www.opago.com/de/privacy/).
 
 ## 1. Verantwortlicher und Kontakt
 
@@ -13,7 +13,7 @@ Wenn Sie eine Wallet erstellen oder wiederherstellen, verarbeitet die App Wieder
 
 Die App lädt Wiederherstellungswörter nicht automatisch zu OPAGO hoch. Geben Sie diese Wörter niemals an den Support oder andere Personen weiter. Ihre Geräteeinstellungen und Sicherungsfunktionen des Betriebssystems können beeinflussen, welche lokalen Daten in Backups gelangen.
 
-Nach Auskunft von OPAGO stellen die Wallet-Funktionen keine Verbindung zu OPAGO-Servern her. Davon zu unterscheiden sind Verbindungen zu externen Netzwerkdiensten, öffentliche Blockchain-Daten sowie OPAGO-Webseiten, die Sie selbst öffnen, und Informationen, die Sie an den Support senden.
+Die Verbindungen der Wallet hängen von den in Ihrer App-Version verfügbaren Funktionen ab. Neben externen Netzwerkdiensten können dazu OPAGO-Dienste gehören: Falls Ihre Version eine Hedera-Kontoaktivierung über OPAGO anbietet und Sie diese starten oder deren Status abfragen, werden der öffentliche Aktivierungsschlüssel, das Netzwerk sowie eine Challenge-Kennung und eine Signatur zum Nachweis der Schlüsselkontrolle an den Aktivierungsdienst übermittelt. Wiederherstellungswörter und private Schlüssel gehören nicht zu dieser Anfrage. Technisch fallen dabei Verbindungsdaten wie die IP-Adresse an. Öffentliche Blockchain-Daten, von Ihnen geöffnete OPAGO-Webseiten und Supportanfragen sind davon getrennte Verarbeitungen.
 
 ## 3. Zahlungen und Netzwerkabfragen
 

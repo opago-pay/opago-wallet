@@ -34,6 +34,8 @@ function hookFixture(file, makeDependencies, invoke) {
   const dependencies = {
     react: hooks,
     'react/jsx-runtime': require('react/jsx-runtime'),
+    '@/hooks/useAccessibleStatus': { useAccessibleStatus() {} },
+    '@/hooks/useAccessibleHeading': { useAccessibleHeading: () => hooks.useRef(null) },
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),

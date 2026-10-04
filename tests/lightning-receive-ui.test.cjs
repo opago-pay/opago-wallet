@@ -58,7 +58,7 @@ function fixture(options = {}) {
     '@/components/receive/wallet-qr-code': { WalletQrCode: 'qr' },
     '@/components/receive/payment-network-icon': { PaymentNetworkIcon: 'network-icon' },
     '@/components/ui/payment-success-motion': {
-      PaymentSuccessIcon: 'success-icon', PaymentSuccessMotionView: 'success-motion',
+      PaymentSuccessIcon: 'success-icon', PaymentSuccessMotionScrollView: 'success-motion',
     },
     '@/styles/send-styles': { sendStyles: {} }, '@/lib/wallet-assets': require('../lib/wallet-assets.ts'),
     '@/lib/config': { appConfig: { isMainnet: false, hederaNetwork: 'testnet', sparkNetwork: 'REGTEST' } },
@@ -236,13 +236,16 @@ test('an expired restored request is replaced by an open Lightning QR without ta
   assert.equal(app.calls.includes('clear'), false);
 });
 
-test('proof-backed receive success survives activity/storage errors and returns Home after three seconds', async t => {
+test('proof-backed receive success survives activity/storage errors remains available until the user chooses Done', async t => {
   const app = fixture({ saved: request(Date.now() + 60000), status: 'confirmed', storageFailure: true }); t.after(app.unmount);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   app.render(); const screen = await app.settle(); assert.match(text(screen), /Payment received/);
   assert.match(text(screen), /≈ 0\.01 EUR/);
-  t.mock.timers.tick(3001); const after = await app.settle();
-  assert.doesNotMatch(text(after), /Payment received/);
+  t.mock.timers.tick(30001); const after = await app.settle();
+  assert.match(text(after), /Payment received/);
+  assert.deepEqual(app.calls.filter(call => Array.isArray(call) && call[0] === 'replace'), []);
+  nodes(after).find(node => node.type === 'button' && text(node) === 'Done').props.onPress();
+  await app.settle();
   assert.deepEqual(app.calls.filter(call => Array.isArray(call) && call[0] === 'replace'), [['replace', '/(tabs)']]);
 });
 

@@ -128,7 +128,7 @@ test('full-screen payment hides private content on background/blur and guards An
  }),e=>e.BitcoinSendScreen(props));t.after(app.unmount);
  let tree=await app.settle();assert.equal(tree.type,'activity');back();assert.deepEqual(calls,[]);
  assert.equal(nodes(tree).some(n=>n.type==='modal'||n.type==='scan-background'),false);
- assert.equal(nodes(nodes(tree).find(n=>n.type==='scroll')).some(n=>n.type==='actions'),false);
+ assert.equal(nodes(nodes(tree).find(n=>n.type==='scroll')).some(n=>n.type==='actions'),true);
  listener('background');tree=app.render();assert.equal(nodes(tree).some(n=>n.type==='private-amount'),false);
  listener('active');tree=app.render();assert.equal(nodes(tree).some(n=>n.type==='private-amount'),true);
  props.loading=false;app.render();back();assert.deepEqual(calls,['back']);

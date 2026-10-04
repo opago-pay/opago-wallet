@@ -31,7 +31,7 @@ export function BitcoinAmountSheet(props: {
       {!appConfig.isMainnet && <Text style={bitcoinStyles.warning}>REGTEST · {t('TEST MODE')}</Text>}
       {props.fixedAmount != null ? <Text style={amountStyles.amount}>{props.fixedAmount.toLocaleString(appLocale())} SAT</Text> : <>
         <View style={amountStyles.field}>
-          <Text style={amountStyles.input} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}
+          <Text style={amountStyles.input}
             accessibilityLabel={`${t('Amount')}: ${props.amount || '0'} ${props.currency}`} accessibilityLiveRegion="polite">
             {props.amount || '0'}
           </Text>

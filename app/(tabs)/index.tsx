@@ -724,9 +724,6 @@ export default function HomeScreen() {
         <View style={styles.totalAmountRow}>
           <Text
             style={styles.total}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.5}
             accessibilityLabel={totalEur === null ? t('Balance unavailable')
               : t('Total estimated balance: {amount}', { amount: formatEurValue(totalEur) })}
           >
@@ -745,7 +742,6 @@ export default function HomeScreen() {
           onPress={() => { markNavigationStart('receive'); router.push('/receive-flow' as Href); }}
         />
         <QuickAction icon="scan-outline" label={t('Send')} onPress={() => { markNavigationStart('send'); router.push('/send-flow' as Href); }} />
-        <QuickAction icon="card-outline" label={t('Buy')} onPress={() => { markNavigationStart('buy'); router.push('../buy'); }} />
       </View>
 
       <BackupReminder />

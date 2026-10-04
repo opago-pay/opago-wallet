@@ -15,6 +15,7 @@ import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
 import { SecurityPreferencesProvider } from '@/hooks/useSecurityPreferences';
 import { startEventLoopMonitor } from '@/lib/performance-trace';
 import { recordDiagnosticScreen } from '@/lib/crash-reporting';
+import { diagnosticsConsent } from '@/lib/diagnostics-consent';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -34,6 +35,7 @@ function AppStack() {
   const { mode } = useColorMode();
   const segments = useSegments();
   useEffect(() => { recordDiagnosticScreen(segments); }, [segments]);
+  useEffect(() => { void diagnosticsConsent.initialize(); }, []);
   useEffect(() => {
     const stop = startEventLoopMonitor(() => AppState.currentState === 'active');
     return stop;
@@ -49,7 +51,6 @@ function AppStack() {
           <Stack.Screen name="send-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="buy" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
         </Stack>
         <BackupPrompt />

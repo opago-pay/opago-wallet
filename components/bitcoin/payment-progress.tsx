@@ -1,3 +1,4 @@
+import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
 import { adaptiveStyles } from '@/lib/theme-styles';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -29,6 +30,7 @@ export function BitcoinPaymentProgress(props: { phase: BitcoinPaymentPhase; amou
   }, [motionAllowed, rotation, success]);
   const moving = motionAllowed && !success;
   const heading = t(success ? 'Bitcoin sent' : props.phase === 'authorizing' ? 'Confirm on your device' : 'Sending Bitcoin…');
+  useAccessibleStatus(heading);
   return <BitcoinSendScreen loading={!success} onBack={props.onBack} footer={props.footer}>
     <View style={styles.content}>
       <View style={[styles.hero, success && styles.successHero]} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

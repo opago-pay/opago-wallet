@@ -13,6 +13,7 @@ function fixture(options = {}) {
     hederaAccount: { accountId: '0.0.456', balanceTinybars: 1000000000n } };
   let localInput;let scanCounter=0;
   const app = hookFixture('app/(tabs)/send.tsx', hooks => ({
+    '@react-navigation/native': { usePreventRemove() {} },
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({ remove() {} }) }, BackHandler: { addEventListener: () => ({ remove() {} }) } },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => params,

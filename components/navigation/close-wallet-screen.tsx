@@ -14,7 +14,7 @@ export function CloseWalletScreen({ disabled = false, dismiss = false, style }: 
       if (dismiss && router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
     disabled={disabled}
     accessibilityRole="button"
-    accessibilityLabel={t('Home')}
+    accessibilityLabel={t(dismiss ? 'Close' : 'Home')}
     accessibilityState={{ disabled }}
     style={[styles.button, style, disabled && { opacity: 0.4 }]}
   >
