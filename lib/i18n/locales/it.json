@@ -761,5 +761,17 @@
   "Sending payment": "Invio del pagamento",
   "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Questo portafoglio richiede la creazione di un account Hedera una sola volta prima di poter ricevere HBAR.",
   "No Hedera activation was found for this wallet. Start account activation to continue.": "Non è stata trovata alcuna attivazione Hedera per questo portafoglio. Avvia l’attivazione dell’account per continuare.",
-  "Could not connect to Hedera account setup. Check your connection and try again.": "Impossibile connettersi al servizio di creazione degli account Hedera. Controlla la connessione e riprova."
+  "Could not connect to Hedera account setup. Check your connection and try again.": "Impossibile connettersi al servizio di creazione degli account Hedera. Controlla la connessione e riprova.",
+  "Your HBAR address": "Il tuo indirizzo HBAR",
+  "Create your address once to receive HBAR.": "Crea il tuo indirizzo una sola volta per ricevere HBAR.",
+  "Create address": "Crea indirizzo",
+  "Creating your address…": "Creazione del tuo indirizzo…",
+  "This can take a few minutes. Your address will appear here automatically.": "Potrebbero volerci alcuni minuti. Il tuo indirizzo apparirà qui automaticamente.",
+  "Your address is still being created. Check its status again in a moment.": "La creazione del tuo indirizzo è ancora in corso. Controlla di nuovo lo stato tra un momento.",
+  "We could not create your address. Please contact Opago support.": "Non è stato possibile creare il tuo indirizzo. Contatta l’assistenza Opago.",
+  "We could not check your address. Please try again.": "Non è stato possibile verificare il tuo indirizzo. Riprova.",
+  "Address setup is temporarily unavailable. Please try again later.": "La creazione di indirizzi è temporaneamente non disponibile. Riprova più tardi.",
+  "Technical details": "Dettagli tecnici",
+  "Checking your address…": "Verifica del tuo indirizzo…",
+  "Your address is ready. Show this code to receive HBAR.": "Il tuo indirizzo è pronto. Mostra questo codice per ricevere HBAR."
 }

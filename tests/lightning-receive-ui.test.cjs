@@ -25,6 +25,15 @@ function openAmount(app) {
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityLabel === 'Add amount').props.onPress();
   return app.render();
 }
+function selectHedera(app) {
+  let screen = app.render();
+  nodes(screen).find(node => node.props.accessibilityLabel?.startsWith('Via ')).props.onPress();
+  screen = app.render();
+  nodes(screen).find(node => node.props.accessibilityLabel === 'Show all coins').props.onPress();
+  screen = app.render();
+  nodes(screen).find(node => node.type === 'button' && text(node).startsWith('HBAR')).props.onPress();
+  return app.render();
+}
 function fixture(options = {}) {
   const calls = [];
   const rates = options.rates || { btcToEur: 50000, hbarToEur: 0.2, updatedAt: Date.now(), isLoading: false, refresh: async () => {} };
@@ -40,7 +49,11 @@ function fixture(options = {}) {
   };
   const hederaAccount = { accountId: '0.0.123456' };
   const auth = { walletReady: true, backupStatus: 'verified', sparkWallet: client, hederaPublicKey: 'fixture-owner',
-    hederaAccount, refreshHederaAccount: async () => hederaAccount };
+    hederaAccount: options.hederaMissing ? null : hederaAccount,
+    refreshHederaAccount: async () => {
+      if (options.hederaLookupError) throw new Error('network unavailable');
+      return auth.hederaAccount;
+    } };
   const app = hookFixture('app/(tabs)/receive.tsx', () => ({
     'react-native': { View: 'view', Text: 'text', ScrollView: 'scroll', ActivityIndicator: 'loading', Keyboard: { dismiss: () => {} }, useWindowDimensions: () => ({ width: 390 }), Alert: { alert: () => calls.push('alert') }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     '@/lib/i18n': { t: (key, vars = {}) => key.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`), appLocale: () => 'en' },
@@ -57,6 +70,7 @@ function fixture(options = {}) {
     'expo-clipboard': { setStringAsync: async value => { calls.push(['copied', value]); } },
     '@/components/receive/wallet-qr-code': { WalletQrCode: 'qr' },
     '@/components/receive/payment-network-icon': { PaymentNetworkIcon: 'network-icon' },
+    '@/components/receive/hedera-activation': { HederaActivation: 'hedera-activation' },
     '@/components/ui/payment-success-motion': {
       PaymentSuccessIcon: 'success-icon', PaymentSuccessMotionScrollView: 'success-motion',
     },
@@ -324,6 +338,39 @@ test('Show all coins reveals HBAR in the network picker and opens its account QR
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, '0.0.123456');
   assert.equal(nodes(screen).find(isQr).props.logo, 'hedera');
-  assert.match(text(screen), /Enter the amount in the sending wallet/);
+  assert.match(text(screen), /Your address is ready/);
   assert.equal(nodes(screen).some(node => node.type === 'button' && node.props.accessibilityLabel === 'Add amount'), false);
+});
+
+test('a wallet without a Hedera account shows address setup without a QR placeholder or spinner', async t => {
+  const app = fixture({ hederaMissing: true }); t.after(app.unmount);
+  app.render(); await app.settle(); selectHedera(app);
+  const screen = await app.settle();
+  assert.ok(nodes(screen).some(node => node.type === 'hedera-activation'));
+  assert.equal(nodes(screen).some(isQr), false);
+  assert.equal(nodes(screen).some(node => node.type === 'loading' || node.props.name === 'qr-code-outline'), false);
+  assert.doesNotMatch(text(screen), /Preparing payment code|Copy|Share/);
+});
+
+test('a newly bound Hedera account replaces setup with the ready QR without waiting for the next poll', async t => {
+  const app = fixture({ hederaMissing: true }); t.after(app.unmount);
+  app.render(); await app.settle(); selectHedera(app); await app.settle();
+  app.auth.hederaAccount = { accountId: '0.0.654321' };
+  app.render(); const screen = await app.settle();
+  assert.equal(nodes(screen).find(isQr).props.value, '0.0.654321');
+  assert.equal(nodes(screen).some(node => node.type === 'hedera-activation'), false);
+  assert.match(text(screen), /Your address is ready/);
+});
+
+test('Hedera lookup failure offers a working retry without a QR or loading spinner', async t => {
+  const options = { hederaLookupError: true };
+  const app = fixture(options); t.after(app.unmount);
+  app.render(); await app.settle(); selectHedera(app);
+  let screen = await app.settle();
+  assert.match(text(screen), /We could not check your address/);
+  assert.equal(nodes(screen).some(node => isQr(node) || node.type === 'loading' || node.type === 'hedera-activation'), false);
+  options.hederaLookupError = false;
+  nodes(screen).find(node => node.type === 'bitcoin-button' && node.props.label === 'Try again').props.onPress();
+  screen = await app.settle();
+  assert.equal(nodes(screen).find(isQr).props.value, '0.0.123456');
 });

@@ -619,7 +619,7 @@ export default function HomeScreen() {
   ];
   const totalEur = sumAssetValuesEur(assetCards.map(card => card.eurValue));
   const totalEurLabel = totalEur === null ? '—'
-    : formatEurValue(totalEur).replace('€', '').trim() + '\u00a0€';
+    : formatEurValue(totalEur).replace('€', '').trim() + '€';
   const initialBalanceReady = walletReady && displayBalances.spark !== null
     && (displayRates.btcToEur > 0 || !rates.isLoading);
   useEffect(() => {

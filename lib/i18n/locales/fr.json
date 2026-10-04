@@ -761,5 +761,17 @@
   "Sending payment": "Envoi du paiement",
   "This wallet needs a one-time Hedera account setup before it can receive HBAR.": "Ce portefeuille nécessite la création d’un compte Hedera pour recevoir des HBAR.",
   "No Hedera activation was found for this wallet. Start account activation to continue.": "Aucune activation Hedera trouvée pour ce portefeuille. Lancez l’activation du compte pour continuer.",
-  "Could not connect to Hedera account setup. Check your connection and try again.": "Impossible de joindre le service de création de compte Hedera. Vérifiez votre connexion et réessayez."
+  "Could not connect to Hedera account setup. Check your connection and try again.": "Impossible de joindre le service de création de compte Hedera. Vérifiez votre connexion et réessayez.",
+  "Your HBAR address": "Votre adresse HBAR",
+  "Create your address once to receive HBAR.": "Créez votre adresse une seule fois pour recevoir des HBAR.",
+  "Create address": "Créer une adresse",
+  "Creating your address…": "Création de votre adresse…",
+  "This can take a few minutes. Your address will appear here automatically.": "Cela peut prendre quelques minutes. Votre adresse apparaîtra ici automatiquement.",
+  "Your address is still being created. Check its status again in a moment.": "Votre adresse est toujours en cours de création. Vérifiez à nouveau son statut dans un instant.",
+  "We could not create your address. Please contact Opago support.": "Votre adresse n’a pas pu être créée. Veuillez contacter l’assistance Opago.",
+  "We could not check your address. Please try again.": "Votre adresse n’a pas pu être vérifiée. Veuillez réessayer.",
+  "Address setup is temporarily unavailable. Please try again later.": "La création d’adresses est temporairement indisponible. Veuillez réessayer plus tard.",
+  "Technical details": "Détails techniques",
+  "Checking your address…": "Vérification de votre adresse…",
+  "Your address is ready. Show this code to receive HBAR.": "Votre adresse est prête. Montrez ce code pour recevoir des HBAR."
 }
