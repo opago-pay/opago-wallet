@@ -2,16 +2,16 @@
 
 ## App Store listing
 
+The images below are historical previews, not verified screenshots of the current iOS release. Replace them from the signed build before submission; see [iOS release acceptance](docs/ios-audit-release-checklist.md).
+
 **Send, receive and pay with Bitcoin. Your everyday wallet.**
 
 <p align="center">
-  <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="OPAGO Wallet: Bitcoin for everyday life" width="168" />
   <img src="docs/app-store-assets/OPAGO_02_Scan_a_QR_Code_6_5.png" alt="Scan a Bitcoin payment QR code" width="168" />
   <img src="docs/app-store-assets/OPAGO_03_Check_Your_Payment_6_5.png" alt="Review the payment amount and fees" width="168" />
   <img src="docs/app-store-assets/OPAGO_04_Paid_Next_6_5.png" alt="Confirmed Bitcoin payment" width="168" />
   <img src="docs/app-store-assets/OPAGO_05_Fund_Your_Bitcoin_Wallet_6_5.png" alt="Top up through the Bitcoin network" width="168" />
   <img src="docs/app-store-assets/OPAGO_06_Top_Up_Lightning_6_5.png" alt="Top up over Lightning" width="168" />
-  <img src="docs/app-store-assets/OPAGO_07_Self_Custodial_Your_Money_6_5.png" alt="Self-custodial OPAGO Wallet" width="168" />
 </p>
 
 ### Description
@@ -65,7 +65,7 @@ Mainnet payments remain disabled in the default build. Hedera Mainnet code paths
 
 ## Interface readiness
 
-The app supports English, French, Spanish and German. Choose a language under **Security → Language**; the selection applies immediately and survives app restarts. On first use, a supported device language is selected, with English as the fallback. Recovery words, addresses, payment identifiers and signing data are never translated.
+The app supports English, French, Spanish, German and Italian. Choose a language under **Settings → Language**; the selection applies immediately and survives app restarts. On first use, a supported device language is selected, with English as the fallback. Recovery words, addresses, payment identifiers and signing data are never translated.
 
 Unknown balances show a loading indicator and a placeholder instead of zero. Refreshes keep the last known amounts, and failures are labeled explicitly. On Home, Bitcoin balance loading takes priority over an early expansion of HBAR or the shared history. Optional reads wait for that balance attempt, yield a UI frame, and only run for sections the user opened. A failed balance attempt or a 20-second stalled-startup deadline releases optional data without marking Bitcoin ready. Toggling HBAR does not refetch Bitcoin. Pull-to-refresh follows the same priority. The Home QR action opens a dedicated camera screen; an already granted camera permission is read without requesting it again.
 

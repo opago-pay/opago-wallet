@@ -1,3 +1,4 @@
+import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
 import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -19,6 +20,7 @@ export function RecoveryForm({ loading, onBack, onRestore }: {
 }) {
   useLanguage();
   const [state, dispatch] = useReducer(recoveryInputReducer, undefined, initialRecoveryInput);
+  useAccessibleStatus(state.error ? t(state.error) : null);
   const [otherLengths, setOtherLengths] = useState(false);
   const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const submittingRef = useRef(false);

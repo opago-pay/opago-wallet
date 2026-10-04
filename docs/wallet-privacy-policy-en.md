@@ -1,6 +1,6 @@
 # Privacy Policy for the OPAGO Wallet
 
-**Last updated: 3 October 2026.** This policy describes processing in the OPAGO Wallet mobile app. OPAGO's [website privacy policy](https://www.opago.com/privacy/) applies separately to its websites.
+**Last updated: 4 October 2026.** This policy describes processing in the OPAGO Wallet mobile app. OPAGO's [website privacy policy](https://www.opago.com/privacy/) applies separately to its websites.
 
 ## 1. Controller and contact
 
@@ -12,7 +12,7 @@ When you create or restore a wallet, the app processes your recovery words and t
 
 The app does not automatically upload recovery words to OPAGO. Never share these words with support or anyone else. Your device settings and operating system backup features may affect which local data is included in backups.
 
-According to OPAGO, the wallet functions do not connect to OPAGO servers. This is separate from connections to external network services, public blockchain data, OPAGO websites that you choose to open, and information you send to support.
+Wallet connections depend on the features available in your app version. In addition to external network services, these may include OPAGO services: if your version offers Hedera account activation through OPAGO and you start it or check its status, the public activation key, network, challenge identifier and a signature proving control of the key are sent to the activation service. Recovery words and private keys are not part of that request. Technical connection data, such as the IP address, also becomes available to the service. Public blockchain data, OPAGO websites you choose to open and support requests are separate processing activities.
 
 ## 3. Payments and network requests
 

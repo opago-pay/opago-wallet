@@ -345,3 +345,13 @@ test('backup reminder stays hidden while loading and for verified backups, but a
   status = 'verified'; assert.equal(BackupReminder(), null);
   for (status of ['required', 'deferred', 'reviewing']) assert.equal(BackupReminder().type, 'button');
 });
+
+test('shared controls expose disabled state while preserving custom roles', () => {
+  const fixture = interactionFixture();
+  for (const Control of [fixture.TouchableOpacity, fixture.Pressable]) {
+    const props = Control.render({ disabled: true, accessibilityState: { busy: true } }, null).props;
+    assert.equal(props.accessibilityRole, 'button');
+    assert.deepEqual(props.accessibilityState, { busy: true, disabled: true });
+    assert.equal(Control.render({ accessibilityRole: 'link' }, null).props.accessibilityRole, 'link');
+  }
+});

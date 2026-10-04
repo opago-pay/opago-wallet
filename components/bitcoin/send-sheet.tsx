@@ -32,10 +32,10 @@ export function BitcoinSendScreen(props: { title?: string; loading?: boolean; on
   if (!focused || !active) return <View style={styles.screen} />;
   return <WalletActivityBoundary style={[styles.screen, { paddingTop: insets.top + 24, paddingBottom: Math.max(insets.bottom, 16) }]}>
     {!!props.title && <Text ref={title} accessibilityRole="header" style={styles.title}>{props.title}</Text>}
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {props.children}
+      {props.footer && <View style={styles.footer}>{props.footer}</View>}
     </ScrollView>
-    {props.footer && <View style={styles.footer}>{props.footer}</View>}
   </WalletActivityBoundary>;
 }
 
@@ -43,5 +43,5 @@ const styles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' },
   title: { color: '#fafaf7', fontSize: 29, lineHeight: 36, fontWeight: '600', letterSpacing: -0.6, paddingHorizontal: 24, marginBottom: 24 },
   scroll: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 16 },
-  footer: { paddingHorizontal: 24, paddingTop: 16, backgroundColor: '#09090b' },
+  footer: { marginTop: 'auto', paddingTop: 16, backgroundColor: '#09090b' },
 }));

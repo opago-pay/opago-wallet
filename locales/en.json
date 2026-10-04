@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Allow Opago to use your camera to scan payment QR codes.",
+    "NSFaceIDUsageDescription": "Use Face ID to unlock your wallet, confirm payments and access your recovery phrase."
+  }
+}

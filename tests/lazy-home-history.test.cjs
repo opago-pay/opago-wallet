@@ -296,7 +296,7 @@ test('a Lightning payment keeps the recipient amount when Spark reports an amoun
   app.blur();
 });
 
-test('Receive, Send, and Buy keep their positions regardless of balance', () => {
+test('Receive and Send keep their positions regardless of balance', () => {
   for (const spark of [107, 0]) {
     const app = fixture({ spark });
     const screen = app.render();
@@ -307,7 +307,7 @@ test('Receive, Send, and Buy keep their positions regardless of balance', () => 
       React.Children.toArray(node.props?.children).forEach(collect);
     };
     collect(screen);
-    assert.deepEqual(actions.map(action => action.label), ['Receive', 'Send', 'Buy']);
+    assert.deepEqual(actions.map(action => action.label), ['Receive', 'Send']);
   }
 });
 
