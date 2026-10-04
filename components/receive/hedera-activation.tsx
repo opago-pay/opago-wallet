@@ -7,10 +7,29 @@ import { TouchableOpacity } from '@/components/ui/wallet-interaction';
 import { useLanguage } from '@/hooks/useLanguage';
 import { t } from '@/lib/i18n';
 import { normalizeHederaPublicKey } from '@/lib/hedera/keys';
+import { useWalletAuth } from '@/hooks/useWalletAuth';
+
+import { ACTIVATION_ERROR_TEXT } from '@/lib/hedera/activation-errors';
 
 export function HederaActivation({ publicKey, network }: { publicKey: string; network: string }) {
   useLanguage();
   const [showDetails, setShowDetails] = useState(false);
+  const activationAvailable = !!process.env.EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL;
+  const { activateHederaAccount, hederaActivationJob, hederaActivationError, hederaActivationBusy } = useWalletAuth();
+  const activationText = hederaActivationJob?.status === 'needs_review'
+    ? 'We need to review your Hedera account setup. Keep this wallet and contact Opago support with your public activation key.'
+    : hederaActivationJob?.status === 'failed'
+      ? 'We could not create your Hedera account. Keep this wallet and contact Opago support with your public activation key.'
+      : hederaActivationJob?.status === 'confirmed'
+        ? 'Hedera confirmed the account. Checking that its key matches this wallet…'
+        : hederaActivationJob?.status === 'pending'
+          ? 'Your Hedera account setup is in progress. You can check its status later.'
+          : !activationAvailable
+            ? 'Hedera account setup is not available in this build. Contact Opago support with your public activation key.'
+            : null;
+  const activationErrorText = hederaActivationError && !['failed', 'needs_review'].includes(hederaActivationJob?.status || '')
+    ? ACTIVATION_ERROR_TEXT[hederaActivationError] || 'Hedera account setup could not be checked. Please try again later.'
+    : null;
 
   async function copyPublicKey() {
     await Clipboard.setStringAsync(normalizeHederaPublicKey(publicKey));
@@ -20,13 +39,20 @@ export function HederaActivation({ publicKey, network }: { publicKey: string; ne
   return <View style={styles.card}>
     <Ionicons name="wallet-outline" size={30} color={adaptColor('#ffb000', 'color')} />
     <Text style={styles.title} accessibilityRole="header">{t('Activate HBAR first')}</Text>
-    <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR from HashPack.')}</Text>
-    <Text style={styles.body}>{t('HashPack requires a numeric account ID for this wallet. It does not accept this wallet’s activation alias.')}</Text>
-    <View style={styles.waiting}>
+    <Text style={styles.body}>{t('This wallet needs a one-time Hedera account setup before it can receive HBAR.')}</Text>
+    {activationAvailable && !['failed', 'needs_review'].includes(hederaActivationJob?.status || '') &&
+      <TouchableOpacity style={styles.activateButton} accessibilityRole="button"
+        accessibilityState={{ disabled: hederaActivationBusy }} disabled={hederaActivationBusy}
+        onPress={() => { void activateHederaAccount().catch(() => undefined); }}>
+        <Text style={styles.activateButtonText}>{t(hederaActivationBusy ? 'Setting up Hedera account…' :
+          hederaActivationJob ? 'Check activation status' : 'Activate Hedera account')}</Text>
+      </TouchableOpacity>}
+    {hederaActivationBusy && <View style={styles.waiting}>
       <ActivityIndicator size="small" color={adaptColor('#ffb000', 'color')} />
       <Text style={styles.waitingText}>{t('Waiting for activation on {network}', { network })}</Text>
-    </View>
-    <Text style={styles.caption}>{t('After activation, your account ID and payment QR will appear here automatically.')}</Text>
+    </View>}
+    <Text style={styles.caption}>{t(activationErrorText || activationText ||
+      'After activation, your account ID and payment QR will appear here automatically.')}</Text>
     <TouchableOpacity style={styles.detailsButton} accessibilityRole="button" accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails(value => !value)}>
       <Text style={styles.detailsLabel}>{t('Account activation details')}</Text>
       <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={18} color={adaptColor('#a5a5af', 'color')} />
@@ -54,4 +80,6 @@ const styles = adaptiveStyles(StyleSheet.create({
   key: { color: '#b5b5bf', fontFamily: 'monospace', fontSize: 13, lineHeight: 21, marginTop: 14 },
   copyButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderColor: '#33333a', borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 14 },
   copyLabel: { color: '#fff', fontSize: 14, flexShrink: 1 },
+  activateButton: { minHeight: 48, backgroundColor: '#ffb000', borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 20, padding: 12 },
+  activateButtonText: { color: '#15150e', fontSize: 15, fontWeight: '700' },
 }));

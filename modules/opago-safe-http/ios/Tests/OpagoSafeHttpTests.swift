@@ -70,6 +70,12 @@ final class OpagoSafeHttpTests: XCTestCase {
     XCTAssertThrowsError(try ScreenedResolver.screen([later], development: false))
   }
 
+  func testRetryAfterSurvivesBridge() throws {
+    let response = BoundedHTTPResponse(maxBytes: 64)
+    XCTAssertNil(try response.append(Data("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 120\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+    XCTAssertEqual(try response.endOfStream().bridgeValue["retryAfter"] as? String, "120")
+  }
+
   func testJSONTextChunkingAndBoundaries() throws {
     let json = BoundedHTTPResponse(maxBytes: 40)
     XCTAssertNil(try json.append(Data("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 8\r\n\r\n{\"ok\"".utf8)))

@@ -56,7 +56,8 @@
         "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
-        "SENTRY_HTTP_MAX_RETRIES": "1"
+        "SENTRY_HTTP_MAX_RETRIES": "1",
+        "EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL": "https://hedera-activation.opago.com"
       },
       "android": {
         "buildType": "apk"

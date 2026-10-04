@@ -31,7 +31,13 @@ import {
   loadHederaAccount,
   type HederaAccountSnapshot,
 } from '../lib/hedera/account';
-import { resolveHederaWalletAccount } from '../lib/hedera/account-binding-native';
+import { bindHederaWalletAccount, resolveHederaWalletAccount } from '../lib/hedera/account-binding-native';
+import {
+  ActivationApiError,
+  requestHederaActivation,
+  type ActivationJob,
+} from '../lib/hedera/activation-api';
+import { runHederaActivation } from '../lib/hedera/activation-flow';
 import {
   HEDERA_NETWORK,
 } from '../lib/hedera/config';
@@ -80,6 +86,10 @@ interface WalletContextValue {
   retrySparkConnection(): Promise<void>;
   hederaPublicKey: string | null;
   hederaAccount: HederaAccountSnapshot | null;
+  hederaActivationJob: ActivationJob | null;
+  hederaActivationError: string | null;
+  hederaActivationBusy: boolean;
+  activateHederaAccount(): Promise<void>;
   error: string | null;
   recoveryRequired: boolean;
   loadOrGenerateWallet(): Promise<void>;
@@ -105,6 +115,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const startupSeedRef = useRef<Uint8Array | null>(null);
   const hederaLookupRef = useRef<Promise<HederaAccountSnapshot | null> | null>(null);
+  const hederaActivationRef = useRef<Promise<void> | null>(null);
   const sparkResource = useRef(new SessionResource<SparkWalletInstance>());
   const sparkRetryRef = useRef<Promise<void> | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -115,6 +126,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const [sparkError, setSparkError] = useState<string | null>(null);
   const [hederaPublicKey, setHederaPublicKey] = useState<string | null>(null);
   const [hederaAccount, setHederaAccount] = useState<HederaAccountSnapshot | null>(null);
+  const [hederaActivationJob, setHederaActivationJob] = useState<ActivationJob | null>(null);
+  const [hederaActivationError, setHederaActivationError] = useState<string | null>(null);
+  const [hederaActivationBusy, setHederaActivationBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
 
@@ -133,6 +147,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     setInitStatus('');
     setHederaPublicKey(null);
     setHederaAccount(null);
+    setHederaActivationJob(null);
+    setHederaActivationError(null);
+    setHederaActivationBusy(false);
     setError(null);
   }, []);
 
@@ -427,6 +444,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     setHasStoredWallet(true);
     assertUnlocked();
     await initializeMnemonic(mnemonic);
+
   }), [hasStoredWallet, initializeMnemonic, runExclusive]);
 
   const restoreWallet = useCallback(
@@ -524,6 +542,52 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     finally {
       if (hederaLookupRef.current === lookup) hederaLookupRef.current = null;
     }
+  }, [walletReady]);
+
+  const activateHederaAccount = useCallback(async () => {
+    if (hederaActivationRef.current) return hederaActivationRef.current;
+    const privateKey = hederaPrivateKeyRef.current;
+    if (!walletReady || !privateKey) throw new Error('Unlock your wallet to continue.');
+    const generation = initializationGenerationRef.current;
+    const assertUnlocked = walletSession.capture();
+    const assertCurrent = () => {
+      assertUnlocked();
+      if (AppState.currentState !== 'active' || generation !== initializationGenerationRef.current ||
+          hederaPrivateKeyRef.current !== privateKey) {
+        throw new Error('Return to this wallet to continue Hedera activation.');
+      }
+    };
+    const operation = (async () => {
+      setHederaActivationBusy(true);
+      try {
+        await runHederaActivation({
+          scope: HEDERA_NETWORK + ':' + privateKey.publicKey.toStringRaw(),
+          assertCurrent,
+          request: existingOnly => requestHederaActivation(privateKey, assertCurrent, existingOnly),
+          onJob: setHederaActivationJob,
+          onError: setHederaActivationError,
+          bind: async accountId => {
+            const account = await bindHederaWalletAccount(accountId, privateKey.publicKey, assertCurrent);
+            assertCurrent();
+            setHederaAccount(account);
+          },
+        });
+      } catch (cause) {
+        if (generation === initializationGenerationRef.current && hederaPrivateKeyRef.current === privateKey &&
+            walletSession.isUnlocked()) {
+          setHederaActivationError(cause instanceof ActivationApiError ? cause.code :
+            cause instanceof Error ? cause.message : 'Hedera activation is unavailable.');
+        }
+        throw cause;
+      } finally {
+        if (generation === initializationGenerationRef.current && hederaPrivateKeyRef.current === privateKey) {
+          setHederaActivationBusy(false);
+        }
+      }
+    })();
+    hederaActivationRef.current = operation;
+    try { await operation; }
+    finally { if (hederaActivationRef.current === operation) hederaActivationRef.current = null; }
   }, [walletReady]);
 
   const sendHederaPayment = useCallback(
@@ -625,6 +689,10 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       retrySparkConnection,
       hederaPublicKey,
       hederaAccount,
+      hederaActivationJob,
+      hederaActivationError,
+      hederaActivationBusy,
+      activateHederaAccount,
       error,
       recoveryRequired,
       loadOrGenerateWallet,
@@ -640,6 +708,10 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       recoveryRequired,
       hederaAccount,
       hederaPublicKey,
+      hederaActivationJob,
+      hederaActivationError,
+      hederaActivationBusy,
+      activateHederaAccount,
       initStatus,
       isInitializing,
       loadOrGenerateWallet,

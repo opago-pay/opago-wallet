@@ -120,6 +120,7 @@ $buildSettings = @{
   NODE_ENV = 'production'
   EXPO_PUBLIC_ENABLE_MAINNET = 'false'
   EXPO_PUBLIC_ENABLE_HEDERA_MAINNET = 'true'
+  EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL = 'https://hedera-activation.opago.com'
   EXPO_PUBLIC_HEDERA_NETWORK = 'mainnet'
   EXPO_PUBLIC_HEDERA_BUILD_PROFILE = 'mainnet'
   EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL = 'https://mainnet.mirrornode.hedera.com'
