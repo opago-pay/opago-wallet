@@ -115,6 +115,11 @@
   "engines": {
     "node": "22.23.1"
   },
+  "expo": {
+    "install": {
+      "exclude": ["@sentry/react-native"]
+    }
+  },
   "private": true,
   "overrides": {
     "minimatch@3.1.5": {
