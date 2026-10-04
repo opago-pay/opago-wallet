@@ -19,6 +19,11 @@ assert.equal(appConfig.hederaNetwork, 'mainnet');
 assert.equal(appConfig.hederaBuildProfile, 'mainnet');
 assert.equal(appConfig.hederaMirrorNodeUrl, 'https://mainnet.mirrornode.hedera.com');
 assert.equal(appConfig.hederaMaxTransferHbar, 'balance');
+assert.equal(
+  process.env.EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL,
+  'https://hedera-activation.opago.com',
+  'Production must include the verified Mainnet activation service.',
+);
 assert.equal(appConfig.hederaCheckoutContractId, '0.0.10850063');
 assert.equal(
   appConfig.hederaCheckoutRuntimeSha256,

@@ -1,10 +1,12 @@
 # Hedera activation API v1: wallet integration and acceptance
 
 Checked on 2026-10-04 against https://hedera-activation.opago.com/v1/openapi.json.
-The internal `mainnet-candidate` build uses `https://hedera-activation.opago.com`
-and `network: mainnet` in every normal request. Local/default builds remain
-Testnet and have no activation service configured. This PR does not enable a
-store rollout.
+The internal `mainnet-candidate`, EAS `production` / `production-apk`, and local
+production candidate builds use `https://hedera-activation.opago.com` and
+`network: mainnet` in every normal request. The production configuration gate
+requires this URL so a release cannot silently omit activation. Local/default
+builds remain Testnet and have no activation service configured. No store
+rollout was performed.
 
 ## App behaviour
 
@@ -51,7 +53,7 @@ interruption, lost responses, restart/recovery, and wrong/deleted/expired accoun
 responses. Run `npm run phase5:verify`. The additional Swift test needs Xcode;
 Windows cannot execute it or certify an iOS runtime.
 
-## Live Mainnet result — blocked at backend account lookup
+## Live Mainnet result — confirmed after backend DNS fix
 
 On 2026-10-04, the real API accepted the wallet's raw Ed25519 signature.
 It rejected a signature without the final LF with 401 INVALID_SIGNATURE,
@@ -74,11 +76,22 @@ encrypted using Windows DPAPI. No existing user wallet or payer key was used.
   exchange-rate endpoint returned HTTP 200 from this workstation. The account
   lookup was empty. That does not prove reachability from the deployed worker.
 
-**There is no successful account-creation or returned-account verification
-claim for this live test.** The backend worker must resolve MIRROR_UNAVAILABLE,
-then the SAME job/key must be checked again. Do not create additional wallets
-to retry. The public job details above are sufficient to correlate server logs;
-private recovery material is not needed.
+On 2026-10-04 at 12:21 UTC (14:21 Europe/Berlin), a fresh-process recovery
+check with the unchanged application client from PR #33 (`21a329e`) returned
+`confirmed`, no error, account `0.0.10904683`, and transaction
+`0.0.10903266@1791105058.519714593`. No new activation was submitted.
+The actual app account validator independently matched the numerical ID and
+restored wallet's Ed25519 key against the official Mainnet Mirror Node.
+The account has zero HBAR, consistent with activation without funding.
+An independent transaction lookup returned `CRYPTOCREATEACCOUNT`, `SUCCESS`,
+and entity ID `0.0.10904683`. The earlier backend blocker is resolved for this
+job; the operator reports fixing cluster DNS. That infrastructure diagnosis
+was not independently audited.
+
+All 32 targeted activation API, flow and account tests passed again, including
+the pinned signing vector, terminal states, retry handling and recovery.
+This proves live API/client compatibility and command-line recovery; it does
+not replace the native device acceptance below.
 
 ## Backend implementation review
 
@@ -89,8 +102,9 @@ signature verification, job uniqueness is `(network, public_key)`, and the statu
 route does not create jobs. The worker stores its transaction before submission,
 collects independent receipt/Mirror evidence, and checks the resulting account
 key. These source observations do not establish the deployed image revision or
-healthy worker egress. Logs/configuration of the deployed worker and the cause
-of MIRROR_UNAVAILABLE remain an operator-side check.
+healthy worker egress in general. The successful job above verifies the live
+path for this test; deployed image identity and infrastructure remain
+operator-side checks.
 
 No production load test was performed to force 429/503 or consume the daily
 activation budget. These cases are covered by client-side controlled responses.
@@ -132,8 +146,8 @@ node scripts/verify-hedera-activation-mainnet.cjs
 node scripts/verify-hedera-activation-mainnet.cjs --create --protocol-check
 ```
 
-After the backend blocker is resolved, verify activation to confirmed and the
-exact on-network account, then test app restart and recovery with the same
-account on Android and iPhone. Also check background/lock/resume and the error
+The API now confirms the exact on-network account. Still verify activation
+to confirmed, app restart and recovery with the same account through the
+native UI on Android and iPhone. Also check background/lock/resume and the error
 screens visually. No physical device was connected during this work; no iOS
 simulator was available. A command-line recovery check is not a device UI test.
