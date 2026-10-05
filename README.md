@@ -32,6 +32,8 @@ Whether it's your first Bitcoin payment or already part of your daily routine, O
 
 Download OPAGO Wallet and start using Bitcoin in everyday life.
 
+**Production release — 5 October 2026:** The implemented Bitcoin/Lightning and HBAR wallet features are production-ready and already used and tested by more than ten people through TestFlight and Android distribution. [Download the signed Android release](https://expo.dev/artifacts/eas/63l1DUKIYeMT9plvqoGJ5ZmNTbDTR8vRDSHZvPGOdqY.apk) or view the [release builds, signing checks and Mainnet evidence](docs/PRODUCTION_RELEASE_STATUS.md).
+
 <h3 align="center">See it in action</h3>
 
 <p align="center">

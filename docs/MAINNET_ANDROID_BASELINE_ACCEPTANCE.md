@@ -1,5 +1,7 @@
 # Android Mainnet baseline acceptance
 
+**Historical record:** This August development-client run is not the current release artifact. The implemented wallet features are production-ready; signed standalone production builds and completed implemented-function user testing are recorded in [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md).
+
 - **Executed:** 31 August 2026
 - **Device:** UMIDIGI Z92, Android 14
 - **Network under test:** Hedera testnet

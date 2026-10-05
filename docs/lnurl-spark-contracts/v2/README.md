@@ -20,7 +20,7 @@ Version 0.2.0 ersetzt 0.1.0 für die V7-Integration. Neue erforderliche Antwortf
 | [protocol.md](protocol.md) | Authentifizierung, Zustände, Idempotenz, HPKE, UMA, Fristen und Fehler |
 | [fixtures/](fixtures/) | Synthetische Nutzdaten, kryptografische Referenzbytes und negative Fälle |
 | [acceptance.json](acceptance.json) | Szenarien, die jede beteiligte Implementierung bzw. die gemeinsame Integration nachweisen muss |
-| [validation-report.json](validation-report.json) | Tatsächlich ausgeführte Paketprüfungen; ausdrücklich keine Server-/Geräteabnahme |
+| [validation-report.json](validation-report.json) | Tatsächlich ausgeführte Paketprüfungen; Vertragsprüfung, kein Nachweis implementierter Endpunkte |
 
 ## Zuständigkeiten
 
@@ -50,7 +50,7 @@ node tools/verify-fixtures.cjs
 
 Auf macOS/Linux liegt Python unter `.venv-contracts/bin/python`. Der Fixture-Generator verwendet ausschließlich offen dokumentierte synthetische Testschlüssel. Diese Schlüssel dürfen nie in einen Build, einen Secret-Store oder einen produktiven Schlüsselbund übernommen werden. Das Paket verändert keine App-Dateien, betreibt keinen Dienst und sendet keine Zahlungen.
 
-Die Prüfung validiert OpenAPI-Struktur, Referenzen, Schemas, konkrete Beispiele, negative Nutzdaten und kryptografische Bytes. Verhalten unter konkurrierenden Anfragen, tatsächliche SDK-Interoperabilität, mobile Laufzeit und Geräteabnahme sind zusätzlich nach [acceptance.json](acceptance.json) zu belegen.
+Die Prüfung validiert OpenAPI-Struktur, Referenzen, Schemas, konkrete Beispiele, negative Nutzdaten und kryptografische Bytes. Verhalten unter konkurrierenden Anfragen, tatsächliche SDK-Interoperabilität und die Integration der noch zu liefernden Endpunkte sind zusätzlich nach [acceptance.json](acceptance.json) zu belegen.
 
 ## Quellen
 

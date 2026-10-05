@@ -34,7 +34,7 @@ Die drei technischen Vertragslücken aus dem V5-Review sind in V6 weitgehend unv
 1. **F2:** Externe Lightning-Zahlung auf eine serverseitig für den Nutzer erzeugte Invoice erreicht ausschließlich die richtige Spark-Wallet, auch bei offline befindlicher App; Signaturverhalten, Anbieternachweise und Privacy-Grenzen werden dokumentiert. Dieses Paket kann den Versuch nicht ersetzen.
 2. **HKA/UMA:** Mobile Implementierungen müssen die HPKE-/Signatur-Fixtures auf Android und iOS verarbeiten. UMA benötigt zusätzlich echte Interoperabilitätsnachweise mit den gepinnten offiziellen SDKs. Eine durch ein Schema akzeptierte Nachricht ist kein Signaturnachweis.
 3. **Compliance/Datenschutz:** Kategorie, Zweck/Rechtsgrundlage, Fristbeginn, Fristende, Legal Hold und Löschpfad einschließlich Backups müssen freigegeben sein. V6 bezeichnet fünf bzw. zehn Jahre ausdrücklich nur als Annahme. Die Rechtsgrundlagen in seiner Tabelle sind durch dieses technische Review nicht bestätigt.
-4. **Release:** Echte Serverimplementierung, konkurrierende Wiederholungen, Wiederanlauf, Löschung, Netzwerk- und Geräteabnahme sowie Signing und Store-Unterlagen bleiben erforderlich.
+4. **Release:** Echte Serverimplementierung, konkurrierende Wiederholungen, Wiederanlauf, Löschung, Endpunktintegration sowie Signing und Store-Unterlagen bleiben erforderlich.
 
 ## Beobachtung zum vorhandenen Code
 

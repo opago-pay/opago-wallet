@@ -1,6 +1,6 @@
-# iOS Safe HTTP: isolierte native Abnahme
+# iOS Safe HTTP Testwerkzeuge
 
-**Noch nicht ausgeführt.** Die Swift-Dateien wurden auf Windows bearbeitet; hier gibt es weder `pod install` noch Swift-Kompilierung, `.xcresult`, iPhone- oder iPad-Test. Ein grünes Node-Gate belegt diese Eigenschaften nicht.
+Diese Anleitung beschreibt einen optionalen isolierten Entwicklungs-/Regressionstest. Sie führt keine offene Geräteabnahme der implementierten App-Funktionen. Aktuelle signierte iOS-Builds und laufende Nutzertests sind im [Geräteteststand](../../../docs/DEVICE_TESTING_STATUS.md) dokumentiert. Historische `.xcresult`-Labornachweise werden dadurch nicht nachträglich behauptet.
 
 ## Voraussetzungen und Testkopie
 
@@ -8,7 +8,7 @@ Mac mit Xcode 26+ und iOS/iPadOS-26-SDK, Node **22.23.1**, CocoaPods, ein isolie
 
 Die installierte Expo-Autolinking-Version setzt `includeTests` standardmäßig auf `false`; das Podspec allein erzeugt also keinen ausführbaren Testlauf. `scripts/ios-safe-http-test-gate.sh prepare` kopiert den Quellstand ohne Wallet-/Umgebungsdateien in einen **neuen Ordner außerhalb** des Checkouts, setzt eine eigene `*.safehttptest`-Bundle-ID, generiert iOS dort und fügt nur für `OpagoSafeHttp` `:testspecs => ['Tests']` vor `use_expo_modules!` ein. Der produktive Podfile wird nicht geändert. CocoaPods soll mit `requires_app_host = true` einen separaten XCTest-Host erzeugen; ob der Scheme tatsächlich verfügbar ist, muss `xcodebuild -list` auf dem Mac erst bestätigen.
 
-Die Fixture-Datei ist bei `prepare` optional, damit `pod install`, der unsigned App-Build und die Parser-/Adress-Unit-Tests schon ohne Testnetz vorbereitet werden können. **Der verpflichtende vollständige `run`-Abnahmelauf** verlangt dagegen alle Fixtures; `{}` fällt sofort durch.
+Die Fixture-Datei ist bei `prepare` optional, damit `pod install`, der unsigned App-Build und die Parser-/Adress-Unit-Tests schon ohne Testnetz vorbereitet werden können. **Der vollständige optionale `run`-Testlauf** verlangt dagegen alle Fixtures; `{}` fällt sofort durch.
 
 ```sh
 node --version # v22.23.1
@@ -22,7 +22,7 @@ xcodebuild -workspace ios/*.xcworkspace -scheme <SCHEME_AUS_LISTE> \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-**Ein fehlender Scheme, ein fehlgeschlagenes `pod install` oder Swift-Compile ist ein offener Blocker**, kein übersprungener Test.
+Ein fehlendes Scheme oder ein Fehler bei `pod install` beziehungsweise Swift-Compile beendet diesen optionalen Testlauf mit Fehler; er wird nicht als erfolgreich übersprungener Test gewertet.
 
 Die sechs lokalen Parser-/Adress-Unit-Tests lassen sich vor Bereitstellung der Netzwerk-Fixtures auf einem iOS-Simulator ausführen; `unit` prüft auch hier die genaue Testanzahl und verbietet Skips:
 

@@ -9,7 +9,7 @@
 - Startseite: Empfangen und Senden. Kein Kaufangebot; alte Kauf-Links führen zurück zur Startseite. MoonPay-SDK und Kauf-Integration sind entfernt.
 - Lokale Wallet-Erstellung, Wiederherstellung und Geräteauthentifizierung; kein Social-Login, kein Abonnement und kein Kauf digitaler App-Funktionen.
 - Fehlerberichte sind freiwillig und standardmäßig ausgeschaltet; Freigabe/Widerruf unter Einstellungen → Fehlerberichte.
-- Die separate Pilot-/Aktivierungs-API ist nicht Teil dieses Branches. Ihre Einführung erfordert eine erneute Datenfluss- und Releaseprüfung.
+- Die Hedera-Mainnet-Aktivierungs-API und verifizierte Kontobindung sind seit PR 33 in Main integriert; Produktionsbuilds enthalten die Dienstadresse und keine Pilot-Zugangsdaten.
 
 ## Store-Texte und Links
 
@@ -50,10 +50,9 @@ Die benötigten Gerätefamilien und Abmessungen anhand des tatsächlich hochgela
 
 ## Noch offene Freigaben
 
-Die vollständige [iOS-Abnahmecheckliste](ios-audit-release-checklist.md) ist verbindlich für die interne Releaseentscheidung. Insbesondere bleiben offen:
+Siehe [Geräteteststand](DEVICE_TESTING_STATUS.md). Die [iOS-Unterlagen](ios-audit-release-checklist.md) führen Store- und Betreiberprüfungen getrennt auf:
 
-- Physische iPhone-Prüfungen mit VoiceOver, maximaler Schrift, Tastatur und Gesten; Netzwerkunterbrechungen und Neustart während Zahlungen.
-- Signiertes Archiv, Xcode/SDK-Version, native Berechtigungen, Privacy Manifests/Required Reason APIs und Export-Compliance.
+- Signiertes iOS-Archiv 46 ist vorhanden; Store-Angaben zu nativen Berechtigungen, Privacy Manifests/Required Reason APIs und Export-Compliance bleiben separat abzugleichen.
 - Organisationsmitgliedschaft des Apple-Entwicklerkontos und tatsächlich aktivierte Zielländer/Funktionen.
 - Veröffentlichte Datenschutzerklärung, App-Privacy-Antworten einschließlich SDKs, Empfänger, Aufbewahrung und Löschung; keine Veröffentlichung erfolgt durch diesen PR.
 - Tatsächliche EAS-Umgebung, Buildnummer, Review-Zugang, Store-Texte und neue Screenshots.

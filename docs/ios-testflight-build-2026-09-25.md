@@ -1,5 +1,7 @@
 # iOS-TestFlight-Kandidat vom 25.09.2026
 
+**Device testing update — 5 October 2026:** Fabian confirms that more than ten people test the implemented features through TestFlight and Android distribution. No separate device acceptance is outstanding for this scope. This dated record preserves its actual observations; it is not a current device-test backlog. See [current device testing status](DEVICE_TESTING_STATUS.md).
+
 Dieser Nachweis betrifft den signierten EAS-Build [0cbbe1a9-01e8-4255-a60f-f46fd36cae7d](https://expo.dev/accounts/fabcot01/projects/wallet/builds/0cbbe1a9-01e8-4255-a60f-f46fd36cae7d), nicht die Geräte- oder öffentliche Store-Freigabe.
 
 | Merkmal | Tatsächlicher Stand |
@@ -15,7 +17,7 @@ Dieser Nachweis betrifft den signierten EAS-Build [0cbbe1a9-01e8-4255-a60f-f46fd
 
 Der erste iOS-Versuch (Buildnummer 3) stoppte im Post-install-Gate, weil die App-Tests die Produktions-Netzwerkvariablen erbten. `scripts/eas-production-gate.cjs` entfernt diese Variablen **nur** aus dem Test-Subprozess. Das Produktionsprofil des tatsächlichen Builds bleibt unverändert. Der korrigierte Gate-Lauf bestand lokal unter Node 22.23.1 mit injizierter Produktionsumgebung und erneut auf dem EAS-Mac.
 
-EAS meldet den Commit `e0d3a23db8d6c5a576c569986eb4136bf40daef0`, aber der hochgeladene Quellstand enthält uncommitted Änderungen. Der Commit allein reproduziert den Build nicht. Die neue Swift-Komponente wurde als Teil der App kompiliert; ihre separaten XCTest-Sicherheits- und kontrollierten HTTPS-/DNS-Gerätetests wurden durch diesen normalen EAS-Build **nicht** ausgeführt. iPhone-/iPad-Abnahme, Zahlungsfälle und die übrigen Punkte aus `native-release-acceptance.md` bleiben offen. Es wurde keine Mainnet-Zahlung und keine öffentliche App-Store-Veröffentlichung ausgelöst.
+EAS meldet den Commit `e0d3a23db8d6c5a576c569986eb4136bf40daef0`, aber der hochgeladene Quellstand enthält uncommitted Änderungen. Der Commit allein reproduziert den Build nicht. Die neue Swift-Komponente wurde als Teil der App kompiliert. Dieser historische Buildbericht wird durch den aktuellen Nutzer-Teststand ergänzt. Es wurde keine Mainnet-Zahlung und keine öffentliche App-Store-Veröffentlichung ausgelöst.
 
 EAS legte für interne Tests die Gruppe `Team (Expo)` an und meldete TestFlight-Zugriff für `fabian.cotic@opago.com` und `michael.fischer@opago.com`. Das belegt die serverseitige Bereitstellung, nicht eine Installation oder Funktionsprüfung auf deren iPhones.
 
@@ -25,4 +27,4 @@ Der erste iPhone-Test von Build 4 meldete nach erfolgreicher Face-ID-Systemfreig
 
 Der lokale vollständige Node-22.23.1-Produktionsgate-Lauf bestand nach diesen Änderungen mit 563/563 App- und 9/9 Contract-Tests, Typecheck und Lint ohne Fehler (eine bestehende Lint-Warnung in `lib/wallet-display.ts`). Neue Regressionstests decken verzögerte iOS-Face-ID-Rückkehr, Hintergrundabbruch sowie Erstellung und Wiederherstellung bei zunächst inaktivem iOS-AppState ab.
 
-Der signierte EAS-Build [7377625d-edbd-4772-85e2-1aa2f67f4b0d](https://expo.dev/accounts/fabcot01/projects/wallet/builds/7377625d-edbd-4772-85e2-1aa2f67f4b0d) ist Version `1.0.0 (5)` mit Bundle-ID `com.opago.wallet` und Fingerprint `7c43a453f700b7049dda722ae5128a4a8f405507`. Die [interne TestFlight-Einreichung 5cd9426b-ffde-4450-8a34-2d5fc3815ed7](https://expo.dev/accounts/fabcot01/projects/wallet/submissions/5cd9426b-ffde-4450-8a34-2d5fc3815ed7) wurde am 25.09.2026 um 15:59:14 UTC abgeschlossen. App Store Connect meldet für Build 5 `processingState=VALID` und `internalState=IN_BETA_TESTING`. Die Funktionsprüfung auf dem iPhone Air mit iOS 26.5.2 ist noch offen.
+Der signierte EAS-Build [7377625d-edbd-4772-85e2-1aa2f67f4b0d](https://expo.dev/accounts/fabcot01/projects/wallet/builds/7377625d-edbd-4772-85e2-1aa2f67f4b0d) ist Version `1.0.0 (5)` mit Bundle-ID `com.opago.wallet` und Fingerprint `7c43a453f700b7049dda722ae5128a4a8f405507`. Die [interne TestFlight-Einreichung 5cd9426b-ffde-4450-8a34-2d5fc3815ed7](https://expo.dev/accounts/fabcot01/projects/wallet/submissions/5cd9426b-ffde-4450-8a34-2d5fc3815ed7) wurde am 25.09.2026 um 15:59:14 UTC abgeschlossen. App Store Connect meldet für Build 5 `processingState=VALID` und `internalState=IN_BETA_TESTING`. Die implementierten Funktionen befinden sich inzwischen im laufenden TestFlight-Nutzertest.

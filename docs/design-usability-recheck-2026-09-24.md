@@ -15,7 +15,7 @@ Geprüft wurde der aktuelle Arbeitsstand einschließlich aller uncommitteten Än
 
 **Wichtige Änderungen gegenüber dem ersten Audit**
 
-Die Bitcoin-Verbindung besitzt jetzt einen eigenen Zustand und einen echten Wiederverbindungsweg. Home, Senden und Empfangen zeigen diesen an. Für einen noch nicht beendeten alten Startversuch existiert außerdem eine ausdrückliche Anweisung zum vollständigen Neustart. Die Geräteprüfung bei echtem Offline-/Onlinewechsel bleibt erforderlich. Belege: [Wiederverbindung](<C:/dev/opago-wallet/hooks/useWalletAuth.ts:303>), [Verbindungsanzeige](<C:/dev/opago-wallet/components/bitcoin/connection-status.tsx:6>).
+Die Bitcoin-Verbindung besitzt jetzt einen eigenen Zustand und einen echten Wiederverbindungsweg. Home, Senden und Empfangen zeigen diesen an. Für einen noch nicht beendeten alten Startversuch existiert außerdem eine ausdrückliche Anweisung zum vollständigen Neustart. Die implementierten Funktionen werden bereits im laufenden TestFlight-/Android-Nutzertest erprobt. Belege: [Wiederverbindung](<C:/dev/opago-wallet/hooks/useWalletAuth.ts:303>), [Verbindungsanzeige](<C:/dev/opago-wallet/components/bitcoin/connection-status.tsx:6>).
 
 Einzahlungen mit erforderlicher Freigabe erhalten einen passenden Hinweis und einen direkten Einstieg in die Einzahlungsübersicht. Ausgehende Vorgänge führen zur Aktivität statt zu Empfangen. Die Übersicht benötigt weiterhin einen weiteren Tap zur konkreten Gebührenprüfung; die frühere Umleitung über die Lightning-Netzwerkauswahl entfällt. Belege: [Statushinweise](<C:/dev/opago-wallet/lib/wallet-display.ts:66>), [Navigation von Home](<C:/dev/opago-wallet/app/(tabs)/index.tsx:617>).
 

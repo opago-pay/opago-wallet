@@ -36,6 +36,6 @@ Die Authentifizierungs- und Korrekturregeln wurden bereits in 0.1.0 konkretisier
 1. Alle beteiligten Teams übernehmen dieselbe Version 0.2.0. Das in V7 benannte führende Repository opago-compliance liegt hier lokal nicht vor. Das Paket wurde nicht dorthin übertragen.
 2. F2 liefert reale externe Lightning-Zahlung an die serverseitig erzeugte Nutzer-Invoice bei offline befindlicher App, einschließlich belastbarer Anbieterbelege und Privacy-Grenzen.
 3. Teams implementieren und weisen die Fälle in acceptance.json gegen reale Dienste, konkurrierende Aufrufe und mobile Laufzeiten nach. Für UMA fehlen weiterhin die echten Python-/JS-SDK-Interoperabilitätsnachweise.
-4. Zuständige Menschen genehmigen das produktive TME-Regelwerk, erlaubte Entscheidungsfrische, Behandlung unvollständiger Nachweise und den späteren Moduswechsel. Die Aufbewahrungsmatrix, Signing-/Geräteabnahme und Store-Unterlagen bleiben erforderlich.
+4. Zuständige Menschen genehmigen das produktive TME-Regelwerk, erlaubte Entscheidungsfrische, Behandlung unvollständiger Nachweise und den späteren Moduswechsel. Die Aufbewahrungsmatrix, Signing und Store-Unterlagen bleiben erforderlich.
 
 Die Termine in V7 sind Planung; aus der DOCX folgt weder ein fertiger Backend-Stand noch ein App-Store-Go. Für einen weiteren allgemeinen Architekturumlauf sehe ich auf Basis dieses Abgleichs keinen Bedarf. Die offenen Punkte sind konkrete Umsetzung, begrenzte Betriebsentscheidungen und Nachweise.

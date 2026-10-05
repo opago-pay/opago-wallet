@@ -1,38 +1,30 @@
 # iOS audit fixes and release acceptance
 
-Status: 4 October 2026. Code changes are implemented; native acceptance and external publication remain open. This is not an App Store approval guarantee.
+Status: 5 October 2026. Implemented features are already being tested by more than ten people through TestFlight and Android distribution, as confirmed by Fabian. No separate device acceptance is outstanding for this scope. External publication and operator approvals retain their own status. See [current device testing status](DEVICE_TESTING_STATUS.md).
 
 ## Scope and integration
 
-This branch starts from current main. Existing local pilot/account-activation work remains separate. The diagnostics-consent implementation is included because main's privacy policies already promise opt-in diagnostics. The activation translations are complete for the separately developed API; this PR does not enable that API or include pilot credentials.
+The diagnostics-consent implementation follows the opt-in diagnostics described in the privacy policies. Main includes the verified Hedera Mainnet activation API from PR 33. Production builds include its service URL and exclude pilot credentials.
 
-| Audit finding | Implementation | Remaining acceptance |
-| --- | --- | --- |
-| Unavailable purchase | Home has Receive/Send only; old /buy links redirect Home | Capture new Home screenshots; confirm no purchase claim in App Store Connect |
-| Privacy mismatch | Consent gates JS and native diagnostics; one canonical policy URL; conditional activation flow documented in DE/EN policies | Operator approves and publishes updated policies; verify actual EAS environment, network traffic, recipients, retention and deletion |
-| Timed receive result | Success remains until Done or Request another payment | Wait 30 seconds with VoiceOver and follow both actions |
-| VoiceOver | iOS status announcements, heading focus, default button roles/disabled state, recovery errors | End-to-end device reading/focus, including receipt return and native authentication |
-| Large text | Scrollable inset-aware results and payment actions, stacked receive actions, nonshrinking primary amounts | Smallest supported iPhone at maximum accessibility text and all five languages |
-| Keyboard | Automatic iOS insets, interactive dismissal, Done accessories | Recipient/amount/account input and errors remain reachable |
-| Localization | Complete activation catalogs and five native permission localizations | First permission prompt under each iOS app language; long translations |
-| Contrast | Shared inputs use semantic muted color | Real dark/light/increased-contrast rendering |
-| Native navigation | Route removal guarded during preparation/review/submission; reviewed draft can return to input | iOS edge swipe, cancel, repeated gestures and app interruption; single submission |
+| Audit finding | Implementation |
+| --- | --- |
+| Unavailable purchase | Home has Receive/Send only; old /buy links redirect Home |
+| Privacy mismatch | Consent gates JS and native diagnostics; one canonical policy URL; conditional activation flow documented in DE/EN policies |
+| Timed receive result | Success remains until Done or Request another payment |
+| VoiceOver | iOS status announcements, heading focus, default button roles/disabled state, recovery errors |
+| Large text | Scrollable inset-aware results and payment actions, stacked receive actions, nonshrinking primary amounts |
+| Keyboard | Automatic iOS insets, interactive dismissal, Done accessories |
+| Localization | Complete activation catalogs and five native permission localizations |
+| Contrast | Shared inputs use semantic muted color |
+| Native navigation | Route removal guarded during preparation/review/submission; reviewed draft can return to input |
 
-## Required iPhone checks — not completed in this environment
+## Device testing status
 
-- [ ] Smallest supported iPhone and a large current iPhone; minimum supported iOS and current iOS. No clipped text or controls under safe areas.
-- [ ] All five languages, maximum Dynamic Type, Bold Text, VoiceOver, light/dark/system appearance, Increase Contrast and Reduce Motion.
-- [ ] Create/restore, unlock, verify backup, reveal protected recovery words and remove local wallet; no secret announcements or background exposure.
-- [ ] Scan permission allowed/denied/permanently denied; manual paste and typing remain available. Face ID cancellation and failure do not submit.
-- [ ] Send Bitcoin on-chain, Lightning and HBAR using isolated test wallets; review exact amount, recipient and fee before authentication.
-- [ ] Rapid taps, edge swipe during authentication/submission, foreground/background, network timeout and process restart: at most one send; uncertain results stay pending and remain findable.
-- [ ] Receive: durable result after 30 seconds; Done, receipt and another request; foreground return from browser.
-- [ ] Large text and keyboard together: every field, error and action reachable. Numeric keyboards have a usable Done action.
-- [ ] Diagnostics off on clean installation; opt in, restart, revoke and restart. Confirm JS and pre-JS native handling match the saved choice. Revocation must not break wallet functions.
+The implemented features are in the ongoing user test. The former unchecked iPhone scenario list is removed as an obsolete backlog; it is not converted into invented individual pass results.
 
-## Signed archive and operator checks — not completed
+## Store and operator checks
 
-- [ ] Build with Apple's required Xcode/iOS SDK versions. Inspect generated Info.plist, entitlements, native permission strings and SDK privacy-manifest aggregation, including required-reason APIs and SDK signatures.
+The signed production iOS build 46 is available from current main. Store configuration, privacy-manifest declarations and operator approvals are separate from device testing.
 - [ ] No NSMicrophoneUsageDescription or microphone entitlement/request for QR scanning. All five InfoPlist.strings variants are bundled.
 - [ ] Validate encryption/export answers for the actual dependencies; do not infer an exemption from the existing configuration flag.
 - [ ] Verify organization developer account and actual countries/features. Account deletion requirements depend on any service account actually created; removing keys cannot erase public blockchain history.
@@ -40,7 +32,7 @@ This branch starts from current main. Existing local pilot/account-activation wo
 - [ ] Before enabling an activation service, document public-key/proof processing, IP logging, purpose/legal basis, retention, operator access and deletion. No guessed retention period or backend deletion claim.
 - [ ] Approve and publish the updated DE/EN policies at https://www.opago.com/wallet/privacy/ and verify public access before wallet creation. Repository updates do not publish the website.
 - [ ] Replace historical screenshots from the final signed build. Images 01 and 07 contain the removed Buy action and must not be submitted. Verify remaining images against current UI too.
-- [ ] Review metadata, age-rating questionnaire, reviewer access and funded test cases in App Store Connect. Accessibility labels require successful device evaluation.
+- [ ] Review metadata, age-rating questionnaire, reviewer access and funded test cases in App Store Connect.
 
 ## Sources and classification
 
@@ -48,4 +40,4 @@ Mandatory review requirements: [2.1 completeness](https://developer.apple.com/ap
 
 Design recommendations: [VoiceOver](https://developer.apple.com/design/human-interface-guidelines/voiceover), [layout](https://developer.apple.com/design/human-interface-guidelines/layout), [entering data](https://developer.apple.com/design/human-interface-guidelines/entering-data), [gestures](https://developer.apple.com/design/human-interface-guidelines/gestures), [dark mode](https://developer.apple.com/design/human-interface-guidelines/dark-mode).
 
-Shared React Native helpers are an implementation choice, not an Apple framework requirement. Passing automated tests does not establish native accessibility or review acceptance.
+Shared React Native helpers are an implementation choice, not an Apple framework requirement. App Store review and operator approvals are separate from the confirmed user device testing.

@@ -1,6 +1,6 @@
 # Wallet-Abnahme vom 21. September 2026
 
-Stand des automatischen Testlaufs: **Prüfungen bestanden; Rückmeldung zu Geräteblock 1 noch ausstehend**. Am 22. September wird die Geräteabnahme in kurzen Einzelschritten fortgesetzt: [Geräteabnahme](TEST_ACCEPTANCE_2026-09-22.md). Noch keine zusätzlich gelbe Feature-Zeile vollständig abgenommen. Die Feature-Matrix bleibt bei 8 grünen, 12 gelben und 12 roten Funktionen, bis die jeweils fehlenden Nachweise vorliegen. Einzelne bestandene Teilprüfungen werden hier separat erfasst.
+Historisches Protokoll der bestandenen automatischen Prüfungen vom 21. September. Der aktuelle Geräteteststand wurde am 5. Oktober von Fabian bestätigt; die frühere offene Geräteblockliste ist entfernt. Siehe [Geräteteststand](DEVICE_TESTING_STATUS.md).
 
 ## Geprüfter Stand
 
@@ -27,7 +27,7 @@ Stand des automatischen Testlaufs: **Prüfungen bestanden; Rückmeldung zu Gerä
 | Expo-Abhängigkeitsprüfung | Bestanden | `npx expo install --check`, ohne Installation oder Versionsänderung. |
 | Native BIP39-Prüfung | 2/2 bestanden, vorhandener Nachweis wiederverwendet | JVM-Testreport vom selben Tag, native Quellen unverändert. Alle unterstützten Wortzahlen und ungültige Eingaben geprüft; kein iOS-/Geräte-Recovery-Nachweis. |
 | Installationsprofil | Bestanden | Installiertes Release-Paket ohne Debuggable-Flag; Erstinstallation unverändert. Android Auto Backup ist aktiviert, die referenzierten SecureStore-Regeln schließen den Schlüsselspeicher aus. Kein tatsächlicher Cloud-Backup-/Restore-Versuch durchgeführt. |
-| Synthetische QR-Negativfälle | 3/3 Parserprüfungen bestanden | REGTEST in Mainnet, abgelaufene Mainnet-Rechnung, manipulierte Signatur. Echte Kamera noch offen. |
+| Synthetische QR-Negativfälle | 3/3 Parserprüfungen bestanden | REGTEST in Mainnet, abgelaufene Mainnet-Rechnung, manipulierte Signatur. |
 
 Die neuen Provider-Tests verwenden ausschließlich öffentlich bekannte synthetische BIP39-Daten und simulierten Speicher. Sie belegen Programmabläufe, nicht Android-Keystore, Hardware-Biometrie oder erfolgreiche Wiederherstellung realer Guthaben.
 
@@ -44,26 +44,13 @@ Messung beginnt nach erfolgreicher Geräteauthentifizierung. Es werden ausschlie
 
 Die Aufzeichnung wurde am 21. September gestartet und am 22. September beendet. Alle vier frischen Guthaben lagen unter 7,5 s, drei unter 5 s; Mittelwert **4,166 s**. Einzelne Marker enthalten nur relative Zeiten und keine Uhrzeit; daraus lassen sich keine Abnahmen bestimmter manueller Schritte oder ein Datum pro Durchlauf ableiten. Die bisherigen drei Messungen in W06 bleiben historische Nachweise.
 
-## Geräteprüfungen mit dem Eigentümer
-
-| Block | Schritte | Stand |
-| --- | --- | --- |
-| 1 – Entsperren und Scanner | Unter Sicherheit sperren; PIN-/Biometrie-Abfrage abbrechen → gesperrt; regulär entsperren; Home-Scanner dreimal öffnen/schließen → kein Lock; andere App öffnen und zurück → gesperrt. Verwendete Authentifizierungsart dokumentieren. | Anleitung übermittelt; Rückmeldung ausstehend. Ein neuer Ladezeitlauf bereits gemessen. |
-| 2 – Wirkliche Inaktivität | Nach Entsperren mindestens 2:15 Minuten alle 15–20 Sekunden Tabs wechseln/scrollen → bleibt offen. Danach 2:15 Minuten keinerlei Eingabe → gesperrt. | Noch nicht gestartet. |
-| 3 – Negative Zahlungs-QRs | Die drei vorbereiteten Codes nacheinander mit der Kamera scannen. Erwartete Ablehnung, kein Zahlungsreview/Versand. Danach erneut Scanner öffnen. | [Vorbereitet](../output/acceptance/negative-payment-qr.html), noch nicht am Gerät bestätigt. |
-| 4 – Backup und Darstellung | Bestehenden Backup-Status vor/nach Neustart prüfen; drei Wörter privat am Gerät bestätigen; falsches Wort muss abgelehnt werden. Lesbarkeit mit großer Schrift und TalkBack, EN/DE/FR/ES; keine Recovery-Screenshots. | Noch nicht gestartet; bestehende synthetische native Sprachprüfungen separat dokumentiert. |
-| 5 – Lightning echt | Kontrollierten Betrag mit eigener externer Wallet empfangen, automatisches Ausblenden nach drei Sekunden, exakten Betrag einmalig in der Historie prüfen; kleine Rückzahlung mit sichtbarer Gebühr und Gerätefreigabe. | Betrag/Gegenwallet vor Beginn festlegen; keine echte Zahlung von der Automatisierung ausgeführt. |
-| 6 – Unterbrechung und Ablauf | Rechnung erstellen, Opago tatsächlich beenden, extern bezahlen, neu starten; unbezahlte Rechnung ablaufen lassen; vor und nach bestätigtem Versand Verbindung unterbrechen und offen gebliebene Zahlung abgleichen. | Noch nicht gestartet. Nur kontrolliert und ohne erneuten Versand einer unklaren Zahlung. |
-| 7 – Zweites Android / Recovery | Gleichen Build installieren, Besitzer stellt privat aus Papierbackup wieder her; beide Assets, Identitäten und Guthaben vergleichen. Vorhandene Wallet auf dem zweiten Gerät nicht überschreiben. | Zweites Gerät momentan nicht per ADB verbunden. |
-| 8 – Onchain / Claim / HBAR | Eigene Gegenwallet, vorher abgestimmte Testbeträge und echte Gebühren; beide Richtungen, Wiederaufnahme und Historie prüfen. | Offen; Details in [Bitcoin-Abnahme](BITCOIN_PAYMENT_ACCEPTANCE.md). |
-
 ## Grenzen, die sich nicht durch lokale Tests schließen lassen
 
 - A01–A04, D01–D02, I02–I03 und X03: eigentliche App-Integration bzw. Swap-Ausführung fehlt.
-- I01 und X02: vorhandener Prototyp/Hinweis ist kein abgeschlossener Identifizierungs-/Aktivierungsablauf.
+- I01: Die vollständige Identifizierungsintegration ist ein separates Arbeitspaket. HBAR-Aktivierung ist inzwischen seit PR 33 implementiert.
 - P08: gemeinsame Empfangs-URI wird noch nicht ausgegeben; zugehörige Implementierung und eindeutige Rechnungszuordnung fehlen.
-- P06/P07: echte Spark-/Mainnet-Abnahme, endgültige Fehlerauflösung und Recovery ohne lokales Journal bleiben offen.
-- R01/R02/R03: Store-Einreichung, vollständige zweite Android-/iOS-/Barrierefreiheitsabnahme und unabhängiges Audit sind eigene Arbeitspakete.
+- P06/P07: endgültige providerbestätigte Fehlerauflösung und vollständiger Wiederaufbau alter Onchain-Auszahlungen ohne lokales Journal bleiben separate Anbieter-/Implementierungsfragen.
+- R01/R03: Store-Einreichung und unabhängiges Audit bleiben eigene Arbeitspakete; R02 ist kein offener Geräteblocker mehr.
 
 ## Nachweise
 

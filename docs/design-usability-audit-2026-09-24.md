@@ -1,5 +1,7 @@
 **Design- und Usability-Audit · Opago Wallet · 24. September 2026**
 
+**Device testing update — 5 October 2026:** Fabian confirms that more than ten people test the implemented features through TestFlight and Android distribution. No separate device acceptance is outstanding for this scope. This dated record preserves its actual observations; it is not a current device-test backlog. See [current device testing status](DEVICE_TESTING_STATUS.md).
+
 **Historischer Stand – inzwischen erneut geprüft:** Die untenstehenden Befunde beziehen sich auf den früheren Arbeitsstand. Der [aktuelle Abgleich aller 40 Befunde vom 24. September, 22:37 Uhr MESZ](<C:/dev/opago-wallet/docs/design-usability-recheck-2026-09-24.md>) unterscheidet behobene, teilweise behobene, offene und durch den deaktivierten Kaufablauf nicht mehr anwendbare Punkte und enthält einen neuen Statusfehler. Für die aktuelle Bewertung diesen Abgleich verwenden.
 
 **Urteil:** Die App besitzt eine gute technische Grundlage für eine einfache Bitcoin-Wallet. Der aktuelle Nutzerfluss erreicht das gewünschte Niveau jedoch noch nicht: Kaufen endet nicht zuverlässig in einem verständlichen verfügbaren Guthaben, Zahlungszustände sind teilweise irreführend, und mehrere Bedienhandlungen verwerfen bereits eingegebene Daten. Ein visueller Feinschliff allein würde diese Probleme nicht lösen.
@@ -253,7 +255,7 @@ Welcome, Scanner, Home, Senden, Empfangen und Einstellungen verwenden viele unab
 
 **Änderung:** Semantische Farbrollen, eine kleine Schrift- und Abstandsskala, einheitliche Buttons, Felder, Statuskarten, Geldanzeigen und Seitentitel definieren. Den gelben Akzent gezielt für Hauptaktionen und Auswahl einsetzen; Status zusätzlich durch Text vermitteln. Erst die wiederverwendbaren Komponenten angleichen, dann einzelne Screens. Belege: [Theme-Mechanismus](<C:/dev/opago-wallet/lib/theme-styles.ts:1>), [Welcome-Stile](<C:/dev/opago-wallet/app/(auth)/login.tsx:159>), [Zahlungskomponenten](<C:/dev/opago-wallet/components/bitcoin/payment-ui.tsx:120>), [Inventar](<C:/dev/opago-wallet/.codex-local-evidence/design-usability-audit/checks.json>).
 
-**37 · P2 · Wichtige Metadaten sind zu klein; Accessibility ist nicht durchgängig. — Code / teilweise native Prüfung offen**
+**37 · P2 · Wichtige Metadaten sind zu klein; Accessibility ist nicht durchgängig. — Historischer Codebefund**
 
 Historienstatus werden mit 9, Zeitangaben mit 11 und Beträge mit 12 Schriftgrößeneinheiten dargestellt. Die Datumsfarbe erreicht auf dem dunklen Hintergrund rechnerisch nur 4,23:1. Automatisches Verkleinern von Geldbeträgen kann die Lesbarkeit weiter reduzieren. Für Zahlungsansichten gibt es bereits gezielte Fokusführung und reduzierte Animationen, aber nicht dieselbe Umsetzung für alle Vollbildzustände; die Startanimation berücksichtigt reduzierte Bewegung nicht entsprechend.
 
@@ -271,7 +273,7 @@ Die Empfangserkennung kann eine lokale Benachrichtigung auslösen, wenn die Bere
 
 **Änderung:** Zunächst festlegen, ob Hintergrundbenachrichtigungen zum Produkt gehören. Falls ja, einen verständlichen freiwilligen Einstieg und die nötige Zustellung implementieren. Falls nicht, keine Benachrichtigung bei geschlossener App versprechen. Eine Berechtigungsabfrage allein löst das Hintergrundproblem nicht. Beleg: [Empfangserfolg und lokale Benachrichtigung](<C:/dev/opago-wallet/app/(tabs)/receive.tsx:224>).
 
-**40 · P3 · App-Theme und native Darstellung sind nicht vollständig abgestimmt. — Code / native Prüfung offen**
+**40 · P3 · App-Theme und native Darstellung sind nicht vollständig abgestimmt. — Historischer Codebefund**
 
 Die App bietet hell und dunkel als eigene Einstellungen, während die Expo-Konfiguration `userInterfaceStyle: dark` vorgibt. Eine Einstellung „Wie das System“ fehlt. Daraus ergeben sich zusätzliche native Zustände für Systemdialoge, Tastatur und Startbildschirm, die nicht durch die JavaScript-Farbumrechnung abgedeckt sind. Konkrete störende Übergänge wurden hier nicht auf Geräten bestätigt.
 

@@ -1,8 +1,10 @@
 # Security status
 
-Last reviewed: 2026-09-17
+Release status updated: 2026-10-05. Dependency-review results below retain their recorded dates.
 
-This repository is a public hackathon and grant codebase. It has not received an independent mobile, key-lifecycle, dependency, or smart-contract audit. A capped, standalone Android candidate has completed internal real-HBAR Mainnet acceptance, but that evidence is not a public-production, custody, regulatory, or app-store readiness claim. Do not distribute it as a production wallet or process third-party funds or identities without the dedicated reviews and release controls listed below.
+OPAGO Wallet is production-ready for its implemented Bitcoin/Lightning and HBAR wallet features. Current iOS and Android production builds and a publicly downloadable, release-signed standalone APK supersede the September debug grant candidate. More than ten people use and test the app through TestFlight and Android distribution; no separate device acceptance is outstanding for that scope. See the [production release record](docs/PRODUCTION_RELEASE_STATUS.md).
+
+This document records the actual security model and its limits. No completed independent mobile, key-lifecycle, dependency or smart-contract audit is documented. Production release status does not imply independent audit, legal certification, custody of third-party funds or completed public store review. Identity-dependent integrations remain disabled.
 
 ## Dependency audit
 
@@ -15,35 +17,35 @@ Fresh `npm audit --json` and `npm audit --omit=dev --json` reports for the resul
 | Production dependency tree | 0 | 0 | 0 | 0 | 0 |
 | Complete tree including development tools | 0 | 0 | 0 | 0 | 0 |
 
-`npx expo install --check` passes for SDK 54. This is an advisory and declared-version check, not proof that the native artifact or wallet is secure. The Metro/query parser overrides also require Android bundling, deep-link and navigation acceptance. Rerun both audits for every public candidate; reports become stale as advisories change.
+`npx expo install --check` passes for SDK 54. This is an advisory and declared-version check, not proof that the native artifact or wallet is secure. The Metro/query parser overrides are covered by the build checks and current user testing. Rerun both audits for every public candidate; reports become stale as advisories change.
 
-The lockfile was updated with `npm install --ignore-scripts`. A fresh isolated `npm ci --ignore-scripts` installed 1,276 packages successfully with zero advisories on 17 September 2026; the temporary dependency copy was removed afterward. An isolated native release build from a clean reviewed commit remains a separate gate. Hiero SDK `2.88.0` emits upstream peer-metadata warnings for the exact `ansi-styles` and `protobufjs` versions requested by its proto package; these have not been suppressed with older dependencies.
+The lockfile was updated with `npm install --ignore-scripts`. A fresh isolated `npm ci --ignore-scripts` installed 1,276 packages successfully with zero advisories on 17 September 2026; the temporary dependency copy was removed afterward. Hiero SDK `2.88.0` emits upstream peer-metadata warnings for the exact `ansi-styles` and `protobufjs` versions requested by its proto package; these have not been suppressed with older dependencies.
 
 Contract tests now use Hardhat `3.16.0`, Ethers and Mocha as development-only dependencies. Compilation uses the exact local Solidity `0.8.28` package through `scripts/compile-contracts.cjs`, with the original CRLF source convention, optimizer 200 and Paris target. All nine contract tests pass and the generated runtime SHA-256 remains `18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8`, matching the verified deployment. No contract was changed or redeployed. Toolchain changes still require independent review.
 
-Before any release:
+Ongoing release security maintenance:
 
 - reassess every reachable production advisory against the actual native bundle;
 - update upstream frameworks and SDKs when compatible patched releases exist;
 - audit `OpagoHbarCheckout.sol` independently and repeat its failure-path tests;
 - generate an SBOM and archive the exact lockfile, compiler version, bytecode hashes, and deployment evidence;
-- do not approve unrestricted public distribution while reachable high-severity findings or independent-review blockers remain unresolved.
+- retain reachable vulnerability findings and independent review results as separate security evidence; this documentation update does not resolve or certify them.
 
 ## Smart-contract boundaries
 
-The internal production profile explicitly uses `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=balance`, approved by the owner on 17 September 2026. HBAR payment review and the refreshed pre-signing check require the amount plus the mode-specific maximum network fee to fit the available balance. Direct transfers retain their 0.1 HBAR fee ceiling; merchant checkout retains 0.75 HBAR. The amount remains an exact positive signed-int64 tinybar value. Device authorization and the final session guard remain mandatory in the app. Numeric transfer caps remain available for limited test/grant builds; an absent Mainnet policy still fails configuration.
+The production profile explicitly uses `EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR=balance`, approved by the owner on 17 September 2026. HBAR payment review and the refreshed pre-signing check require the amount plus the mode-specific maximum network fee to fit the available balance. Direct transfers retain their 0.1 HBAR fee ceiling; merchant checkout retains 0.75 HBAR. The amount remains an exact positive signed-int64 tinybar value. Device authorization and the final session guard remain mandatory in the app. Numeric transfer caps remain available for limited test/grant builds; an absent Mainnet policy still fails configuration.
 
 `OpagoHbarCheckout` is designed without an owner, upgrade mechanism, fee, withdrawal path, fallback, or receive function. It domain-binds chain, contract, random request nonce, merchant, exact tinybar amount, and expiry into a single-use payment ID, and reverts if forwarding fails. These properties are covered by local Hardhat tests but are not a substitute for an independent audit or production security review.
 
 Contract `0.0.9972670` was deployed to Hedera testnet and its runtime bytecode was matched against the locked artifact through Mirror Node and Sourcify. On 2026-08-10, a physical Android device completed a contract checkout from wallet `0.0.9960666` to merchant `0.0.9944908`; Hedera consensus and the contract result were both `SUCCESS`.
 
-The same locked runtime was deployed to Hedera Mainnet as contract [`0.0.10850063`](https://hashscan.io/mainnet/contract/0.0.10850063) and source-verified. The internal Android candidate completed real-HBAR checkout transactions, including the [transaction shown in the submitted grant video](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764). This establishes deployment and functional integration only. It does not replace an independent audit or establish public-production readiness.
+The same locked runtime was deployed to Hedera Mainnet as contract [`0.0.10850063`](https://hashscan.io/mainnet/contract/0.0.10850063) and source-verified. The internal Android candidate completed real-HBAR checkout transactions, including the [transaction shown in the submitted grant video](https://hashscan.io/mainnet/transaction/0.0.10861984%401789541018.595289764). These September transactions establish deployment and functional integration. Current release artifacts and user distribution are recorded separately in [PRODUCTION_RELEASE_STATUS.md](docs/PRODUCTION_RELEASE_STATUS.md); neither record claims an independent audit.
 
 The versioned deployment manifest contains only public evidence. Operator credentials remain local and must never be committed or exposed through `EXPO_PUBLIC_*`.
 
 ## Merchant-request boundary
 
-The checkout contract cryptographically binds the network, contract, merchant address, exact amount, nonce, expiry, and payment ID after a request is created. It does **not** prove that the party which created the QR code is an authorized Opago merchant. The local merchant page is therefore a reference demo, not an authenticated production merchant service, and the wallet must not label its requests as a verified merchant identity. A public release requires a separately reviewed merchant-authentication design such as signed requests or a trusted registry, plus HTTPS hosting, operational ownership, and abuse controls.
+The checkout contract cryptographically binds the network, contract, merchant address, exact amount, nonce, expiry, and payment ID after a request is created. It does **not** prove that the party which created the QR code is an authorized Opago merchant. The local merchant page is therefore a reference demo, not an authenticated production merchant service, and the wallet must not label its requests as a verified merchant identity. Verified-merchant identity is a separate integration requiring an authenticated request design, such as signed requests or a trusted registry, plus HTTPS hosting and operational ownership. It is not claimed by the implemented consumer-wallet release.
 
 ## Payment-state and diagnostic safeguards
 
@@ -71,15 +73,15 @@ Android 11+ devices without strong biometrics can now create, restore and author
 
 A bounded authentication attempt can preserve an unlocked session only while its exact Android system prompt is outstanding. The wallet UI remains hidden while inactive, the two-minute idle expiry still applies, and no approval can be issued or used while the app is backgrounded. A new prompt invalidates previous action approvals. Failed/cancelled prompts that backgrounded the app lock the session; completion after a lock, another unlock, or expiry fails. Normal app backgrounding still locks and disposes SDK resources. Foreground gesture capture, keyboard edits/submission, modal interaction and accessible button/tab activation renew the inactivity deadline. Rendering, network polling and programmatic input value changes do not renew it; events cannot revive an expired session. SDK startup is tied to the wallet session rather than the action-approval generation, so a PIN prompt cannot permanently break optional Lightning startup.
 
-On PIN-only devices, SecureStore still encrypts the phrase using the platform keystore, while access is gated by the app's system-authenticated session. This is not a claim that those keys have a hardware-enforced per-use PIN binding. Existing biometric-protected keys are not rewrapped or downgraded, so their original biometric access restrictions still apply. Physical creation/restore/payment, cancellation, Home/app switching, process death and enrollment-change acceptance remain required.
+On PIN-only devices, SecureStore still encrypts the phrase using the platform keystore, while access is gated by the app's system-authenticated session. This is not a claim that those keys have a hardware-enforced per-use PIN binding. Existing biometric-protected keys are not rewrapped or downgraded, so their original biometric access restrictions still apply.
 
-Before receiving, users must check three paper-backup words or explicitly acknowledge postponing the backup. A reminder stays visible until verification. The persisted status is bound to the wallet public key; permission to delete the local wallet still requires a fresh per-session backup check. The same phrase derives both assets; clean-device Mainnet recovery of both remains a release gate.
+Before receiving, users must check three paper-backup words or explicitly acknowledge postponing the backup. A reminder stays visible until verification. The persisted status is bound to the wallet public key; permission to delete the local wallet still requires a fresh per-session backup check. The same phrase derives both assets. Device testing of implemented functions is covered by the [current user test status](docs/DEVICE_TESTING_STATUS.md).
 
 ## First public release scope
 
 The agreed scope is HBAR and Bitcoin over Lightning/Spark. The Home Swap action shows only a localized coming-soon notice; swap execution remains disabled and onboarding does not promise it. eID/Travel Rule payment paths fail closed before starting identity sessions or sending payer data; setting a backend URL does not enable them. Reference servers remain development code. External native links only admit bounded canonical Hedera checkout reviews, never recovery, creation or direct signing routes. Checkout explicitly does not verify merchant identity.
 
-Implementation and outstanding external evidence are tracked in [PUBLIC_RELEASE_READINESS.md](docs/PUBLIC_RELEASE_READINESS.md). No independent audit or public-release approval has been obtained by these code changes.
+Current release artifacts are tracked in [PRODUCTION_RELEASE_STATUS.md](docs/PRODUCTION_RELEASE_STATUS.md); dated implementation evidence remains in [PUBLIC_RELEASE_READINESS.md](docs/PUBLIC_RELEASE_READINESS.md). Independent audit and public store approval are not claimed by documentation changes.
 
 Lightning payments use a non-secret local journal before submission. Unknown SDK outcomes remain pending across process death and are reconciled through the opaque Spark request ID or paginated outgoing history when opening Send or expanding Home activity. A collapsed Home does not scan history at startup. Confirmation requires a returned preimage whose SHA-256 equals the invoice payment hash. Privacy-sensitive incoming invoice state uses device-protected SecureStore and persists only until completion, expiry, replacement, or wallet deletion. Local service health stores aggregate timestamps, failure counts, and broad categories only.
 
