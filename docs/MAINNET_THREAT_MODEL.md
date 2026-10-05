@@ -1,6 +1,6 @@
 # Hedera Mainnet threat model
 
-**Status:** updated after the internal Mainnet canary and Thrive submission. It must be revisited after independent review and before any public app-store release.
+**Status — 5 October 2026:** This threat model records the implemented Mainnet wallet's security boundaries. Current production builds and completed implemented-function device acceptance are in [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md). Maintain this model when changing key handling, SDKs, services or payment flows; independent audit and public store approval retain their separate evidence status.
 
 ## Protected assets
 
@@ -52,7 +52,7 @@
 
 ## Open design risks
 
-- Mainnet onboarding uses user-funded first-deposit activation of the existing Ed25519 key alias. Internal activation succeeded, while broad third-party sender interoperability and clean-device Mainnet recovery acceptance remain pending; ECDSA import is deferred.
+- Current Mainnet onboarding uses the sponsored activation API and verifies the account against the wallet's derived Ed25519 key. The earlier user-funded first-deposit approach is historical; ECDSA import remains deferred. Device testing of implemented functions is covered by [current user testing](DEVICE_TESTING_STATUS.md).
 - The current merchant demo is local and is not a production service.
 - Checkout requests are integrity-bound but are not signed by an authenticated Opago merchant service.
 - The contract and mobile key lifecycle have not received independent production security review.

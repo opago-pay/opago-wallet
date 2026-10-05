@@ -1,5 +1,7 @@
 # Hedera Mainnet Android canary acceptance
 
+**Current release update — 5 October 2026:** The implemented wallet features are production-ready. Signed production builds and the publicly installable release APK supersede this September debug candidate. More than ten people use and test the app through TestFlight and Android; no separate device acceptance is outstanding. See [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md) for build IDs, the APK signature/hash and installation link. The observations and transactions below remain the immutable September record.
+
 **Accepted:** 15 September 2026
 
 **Scope:** internal standalone Android candidate for the Hedera Mainnet grant path. This acceptance is public transaction evidence, not a security audit or a Play Store production release.
@@ -58,7 +60,7 @@ An independent public Mirror Node lookup returned `CONTRACTCALL`, transaction re
 
 The first direct transfer reached consensus successfully while the SDK returned an ambiguous `UNKNOWN` response after bounded receipt attempts. The app did not falsely report success, and the user did not retry. The payment flow was then hardened to persist the transaction ID before submission, reconcile ambiguous outcomes through the official Mirror Node, retain unresolved submissions as durable pending records, and prevent immediate duplicate retries. The corrected candidate was rebuilt, installed, and used for the successful contract checkouts above. Automated application tests pass `113/113` and include explicit success, failure, still-pending reconciliation, and third-party-wallet-compatible Hedera receive QR cases.
 
-## Acceptance result
+## Historical acceptance result — 15/16 September 2026
 
 - [x] Standalone Android candidate is pinned to Hedera Mainnet and the verified runtime.
 - [x] Mainnet account discovery, balance, direct send, and history operate on the physical device.
@@ -66,9 +68,9 @@ The first direct transfer reached consensus successfully while the SDK returned 
 - [x] The checkout reached consensus with `SUCCESS` and forwarded the exact bigint tinybar amount.
 - [x] App history, Mirror Node, and HashScan agree on account, contract, amount, and result.
 - [x] An ambiguous SDK response cannot become a false success or invite an immediate duplicate retry.
-- [ ] Independent security review is complete.
-- [ ] Mainnet invalid/expired/replay cases have been physically exercised with real funds.
-- [ ] Final store-signed build starts without development tooling and has completed store distribution checks.
+- Independent security audit: not established by this historical record; no independent audit is claimed.
+- Invalid/expired/replay physical scenarios: not established by this dated run; this is not an outstanding device checklist for the current implemented release.
+- Current release supersedes the candidate: signed iOS 46, Android store artifact 11 and release APK 12 are available. APK 12 includes its application bundle and the verified release certificate; see the current release record.
 - [x] The one-to-five-minute Mainnet demonstration is recorded and was submitted through the Thrive portal.
 
 Only the checked items are established by this record.

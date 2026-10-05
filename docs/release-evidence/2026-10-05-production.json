@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "checkedOn": "2026-10-05",
+  "releaseScope": "Implemented Bitcoin/Lightning and HBAR wallet features",
+  "sourceCommit": "724ca2e6da346e181a83d72875d12ba55bca49e1",
+  "builds": [
+    {
+      "platform": "ios",
+      "version": "1.0.0",
+      "buildNumber": "46",
+      "profile": "production",
+      "distribution": "STORE",
+      "status": "FINISHED",
+      "id": "f394175c-9eff-44ae-9ca3-bb0511143ce7",
+      "completedAt": "2026-10-04T16:39:05.081Z"
+    },
+    {
+      "platform": "android",
+      "version": "1.0.0",
+      "buildNumber": "11",
+      "profile": "production",
+      "distribution": "STORE",
+      "status": "FINISHED",
+      "id": "88dbf9fb-0e29-409b-9ef0-e4e669629398",
+      "completedAt": "2026-10-04T16:15:44.924Z"
+    },
+    {
+      "platform": "android",
+      "version": "1.0.0",
+      "buildNumber": "12",
+      "profile": "production-apk",
+      "distribution": "INTERNAL",
+      "status": "FINISHED",
+      "id": "c1c4852f-88e5-410a-a0e2-7ee9064bc9f4",
+      "completedAt": "2026-10-04T16:32:56.482Z"
+    }
+  ],
+  "androidApk": {
+    "url": "https://expo.dev/artifacts/eas/63l1DUKIYeMT9plvqoGJ5ZmNTbDTR8vRDSHZvPGOdqY.apk",
+    "unauthenticatedHttpStatus": 200,
+    "packageName": "com.opago.wallet",
+    "versionCode": 12,
+    "sizeBytes": 166583276,
+    "sha256": "2022e0281500b1e30a8d1af145c31cd919fc4a6285106ed6ef35cdc46b5f68d3",
+    "signatureSchemeV2Verified": true,
+    "certificateSha256": "e1af011a9b8e07817568bc8d261ca8b8a6612cfa643e954ef4d093db37cefdb8",
+    "matchesRecordedEasReleaseCertificate": true,
+    "debuggableReportedByAapt": false,
+    "embeddedBundle": {
+      "path": "assets/index.android.bundle",
+      "sizeBytes": 11635636
+    },
+    "minSdk": 24,
+    "targetSdk": 36,
+    "tools": [
+      "Android SDK apksigner verify --verbose --print-certs",
+      "Android SDK aapt dump badging",
+      "ZIP entry inspection"
+    ]
+  },
+  "hedera": {
+    "network": "mainnet",
+    "contractId": "0.0.10850063",
+    "contractDeleted": false,
+    "evmAddress": "0x0000000000000000000000000000000000a58f0f",
+    "runtimeSha256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
+    "mirrorNode": "https://mainnet.mirrornode.hedera.com",
+    "recordedPayment": {
+      "transactionId": "0.0.10861984-1789541018-595289764",
+      "type": "CONTRACTCALL",
+      "result": "SUCCESS",
+      "contractId": "0.0.10850063",
+      "merchantAccount": "0.0.10848889",
+      "merchantAmountTinybars": 1000000,
+      "participants": "project-controlled consumer and merchant accounts"
+    }
+  },
+  "userTesting": {
+    "participants": "more than 10",
+    "channels": [
+      "TestFlight",
+      "Google Play/APK"
+    ],
+    "implementedFeatureDeviceAcceptance": "complete",
+    "evidenceType": "product owner statement"
+  },
+  "thrive": {
+    "originalSubmissionDate": "2026-09-16",
+    "newSubmissionPerformed": false,
+    "externalUserPaymentLinksProvided": false,
+    "feedbackReportsProvided": false,
+    "updatedVideoUrlProvided": false,
+    "guardianApprovalClaimed": false
+  },
+  "independentAuditClaimed": false,
+  "publicStoreApprovalClaimed": false
+}

@@ -1,6 +1,8 @@
 # Hedera Mainnet account lifecycle decision
 
-**Status:** Fabian approved user-funded first-deposit activation on 7 September 2026. The internal Mainnet candidate was activated and used successfully on a physical Android device in September. Broad third-party sender interoperability and clean-device Mainnet recovery remain unaccepted.
+**Device testing update — 5 October 2026:** Fabian confirms that more than ten people test the implemented features through TestFlight and Android distribution. No separate device acceptance is outstanding for this scope. This dated record preserves its actual observations; it is not a current device-test backlog. See [current device testing status](DEVICE_TESTING_STATUS.md).
+
+**Historical decision:** Fabian approved user-funded first-deposit activation on 7 September 2026. The internal Mainnet candidate was activated and used successfully in September. Current production builds use the Mainnet activation API and verified account binding, superseding this first-deposit-only path. The implemented wallet features are production-ready; see [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md). The decisions and steps below are retained as historical architecture evidence.
 
 ## Decision summary
 
@@ -63,19 +65,19 @@ Changing the algorithm or path without an explicit migration would cause an exis
 4. Discover or load the Mainnet account and require an exact on-chain public-key match.
 5. Show the account and balance only after validation; never create a replacement account silently when an existing binding cannot be verified.
 
-## Remaining decisions and acceptance
+## Historical first-deposit considerations
 
 The concrete Android build and Testnet procedure are in [HEDERA_ACTIVATION_TESTNET_ACCEPTANCE.md](HEDERA_ACTIVATION_TESTNET_ACCEPTANCE.md). For the internal grant canary, an Opago-controlled payer used the local activation helper to transfer `1 HBAR` to the derived Mainnet alias, creating consumer account `0.0.10861984`. This was a one-off internal acceptance action, not an app onboarding requirement or a commitment that Opago will sponsor end users. HashPack remains a sender candidate; exact-version alias interoperability has not been accepted.
 
 - Confirm specific compatible sender wallets through an actual Testnet first-deposit test; record wallet version and transaction/account IDs.
-- Verify on a physical Android device: fresh wallet, first deposit, delayed Mirror indexing, restart, repeated deposit, recovery to the same account, and foreground/background behavior.
+- Historical alias-path scenario list: fresh wallet, first deposit, delayed indexing, restart, repeated deposit, recovery and background behavior. This superseded onboarding path does not create a current device-test task.
 - Confirm pilot size, transfer limits, distribution, support and incident owners. Sponsor budgets and sponsor operators are not required for this model.
 - Keep the unique-key match requirement; arbitrary existing-account import and ECDSA/MetaMask migration remain outside this pilot.
-- Internal Mainnet canary activation is complete. Clean-device Mainnet recovery remains gated by security and public-launch approval. Never reuse exposed test keys.
+- Internal Mainnet canary activation is complete; current production onboarding and user testing are recorded separately. Never reuse exposed test keys.
 
 ## Local implementation evidence
 
 - Receive shows an SDK-generated Ed25519 key-alias QR only after an empty successful account lookup, with separate network and compatibility guidance.
 - Missing accounts keep polling; network errors remain errors. Existing accounts use the verified numeric-ID flow.
 - Automated tests exercise deterministic alias recovery, transfer serialization without submission, missing/unfunded/deleted/duplicate/mismatched accounts and lookup errors.
-- Internal Mainnet alias activation and subsequent payments are recorded in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). External sender-wallet alias interoperability remains unverified.
+- Internal Mainnet alias activation and subsequent payments are recorded in [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md). Current onboarding uses the sponsored activation API rather than requiring sender-wallet alias interoperability for first activation.

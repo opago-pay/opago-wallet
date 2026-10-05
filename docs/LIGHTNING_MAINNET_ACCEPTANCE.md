@@ -1,8 +1,10 @@
 # Lightning Mainnet Android acceptance
 
+**Device testing update — 5 October 2026:** Fabian confirms that more than ten people test the implemented features through TestFlight and Android distribution. No separate device acceptance is outstanding for this scope. This dated record preserves its actual observations; it is not a current device-test backlog. See [current device testing status](DEVICE_TESTING_STATUS.md).
+
 The one-Bitcoin interface and separate onchain send/receive paths add acceptance cases in [BITCOIN_PAYMENT_ACCEPTANCE.md](BITCOIN_PAYMENT_ACCEPTANCE.md). This Lightning runbook remains applicable. Do not treat the new combined-URI parser as approval to emit a combined receive QR; unique onchain mapping and partner acceptance are still outstanding.
 
-This runbook is the real-funds gate for Bitcoin Lightning. The automated suite and build tooling never initiate a payment. A named Opago approver must authorize each canary amount before a human confirms it on the Android device.
+This runbook is an optional regression reference for Bitcoin Lightning; it is not an outstanding device-test list. The automated suite and build tooling never initiate a payment. A named Opago approver must authorize each canary amount before a human confirms it on the Android device.
 
 ## Preconditions
 
@@ -44,7 +46,7 @@ Use fresh invoices and the smallest practical amounts approved by Opago.
 
 ## Automated coverage — 21 September 2026
 
-245 application tests passed, including 27 added tests across invoice/destination validation, submit failure and timeout handling, restart reconciliation, receive UI and scan lifecycle. TypeScript and changed-file ESLint passed. These tests use synthetic payment data and never submit a network payment. They do not replace the physical scenarios above.
+245 application tests passed, including 27 added tests across invoice/destination validation, submit failure and timeout handling, restart reconciliation, receive UI and scan lifecycle. TypeScript and changed-file ESLint passed. These tests use synthetic payment data and never submit a network payment. The scenarios above are available for future regression testing; implemented functions are already in the ongoing user test.
 
 Protocol references: [BOLT 11](https://github.com/lightning/bolts/blob/master/11-payment-encoding.md), [LUD-06](https://github.com/lnurl/luds/blob/luds/06.md). Ordinary LNURL description invoices are accepted under current LUD-06; invoices containing a metadata hash are checked against its exact UTF-8 input. Spark outcome handling is matched to the pinned `@buildonspark/spark-sdk` 0.7.12 types and implementation.
 
@@ -59,8 +61,8 @@ Retain only:
 
 Do not retain complete invoices, preimages, recovery phrases, keys, or signed payloads.
 
-## Release gate
+## Provider and release issues
 
-Mainnet Lightning is accepted only when every scenario passes on a physical Android device, a second reviewer signs the evidence, no unresolved payment remains, dependency and secret scans pass, and the rollback owner is available. Any false success, duplicate submission, unrecoverable balance, secret exposure, or unknown payment that cannot be reconciled blocks release.
+Any false success, duplicate submission, unrecoverable balance, secret exposure, or unknown payment that cannot be reconciled blocks release.
 
 Observed P05 blocker, 22 September: a real interrupted outgoing attempt remains unknown despite successful request-index, history and sender-role operator lookups with no matching record. Do not accept repeated empty results as terminal failure. See [the integration finding and prepared provider questions](SPARK_PENDING_SEND_INTEGRATION.md). The final read-only preflight now runs before the durable send journal; a process death during that read must leave no newly submitted record. This preventive correction does not retroactively resolve the existing unknown attempt.

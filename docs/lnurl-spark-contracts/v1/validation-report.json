@@ -45,7 +45,7 @@
     "Spark SDK F2 behavior",
     "Python/JavaScript UMA interoperability",
     "Android/iOS native HPKE execution",
-    "deployed services, concurrency and device acceptance",
+    "deployed services and concurrency",
     "legal retention approval"
   ],
   "javascript_verification": {

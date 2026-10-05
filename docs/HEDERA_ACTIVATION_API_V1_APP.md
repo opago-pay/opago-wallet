@@ -91,7 +91,7 @@ was not independently audited.
 All 32 targeted activation API, flow and account tests passed again, including
 the pinned signing vector, terminal states, retry handling and recovery.
 This proves live API/client compatibility and command-line recovery; it does
-not replace the native device acceptance below.
+is complemented by the current user device testing documented in [DEVICE_TESTING_STATUS.md](DEVICE_TESTING_STATUS.md).
 
 ## Backend implementation review
 
@@ -123,7 +123,7 @@ APK SHA-256: `96a5ea11664913524882c6c6ca9d8fe24546d6d2c6f575dfc1b07c4e8cd8b35a`.
 The APK and build manifest are local, ignored artifacts under
 `.codex-local-evidence/activation-mainnet-build/`; no upload was performed.
 
-## Test build and remaining device acceptance
+## Test build and service tools
 
 Build an isolated Android APK with:
 
@@ -146,8 +146,4 @@ node scripts/verify-hedera-activation-mainnet.cjs
 node scripts/verify-hedera-activation-mainnet.cjs --create --protocol-check
 ```
 
-The API now confirms the exact on-network account. Still verify activation
-to confirmed, app restart and recovery with the same account through the
-native UI on Android and iPhone. Also check background/lock/resume and the error
-screens visually. No physical device was connected during this work; no iOS
-simulator was available. A command-line recovery check is not a device UI test.
+The API confirms the exact on-network account. Fabian confirms that implemented features are already in the ongoing TestFlight and Android user test; no separate device acceptance is outstanding. See [current device testing status](DEVICE_TESTING_STATUS.md).

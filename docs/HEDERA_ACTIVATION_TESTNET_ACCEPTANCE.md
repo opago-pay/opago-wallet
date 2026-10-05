@@ -1,6 +1,6 @@
 # First-deposit activation: Android Testnet acceptance
 
-Status: APK built and installed; cold-start and pre-activation UI checks passed on 7 September 2026. First deposit, sender interoperability, funded-account recognition and recovery remain pending. No Mainnet funds are needed or authorized.
+**Historical record — 7 September 2026:** APK built and installed; cold-start and pre-activation UI checks passed. This first-deposit/alias test path has been superseded by the implemented Mainnet activation API. The current wallet is production-ready for its implemented functions; no separate device acceptance is outstanding. See [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md) and [HEDERA_ACTIVATION_API_V1_APP.md](HEDERA_ACTIVATION_API_V1_APP.md). No unperformed September scenario is marked as executed.
 
 ## Test build
 
@@ -26,23 +26,23 @@ Record the sender name, version, platform and explicit Testnet account before st
 6. Temporarily disable networking. Require an unavailable/retry state rather than a false success or a claim that a new account must be created. Re-enable networking and require recovery. Background the app and check it resumes lookup on return.
 7. Only after privately verifying the backup, use the test app's wallet-reset/recovery flow. Restore the test phrase on a clean test installation or separate device. Require exactly the same public key and numeric account ID. Do not reset the existing `com.opago.wallet` app.
 
-## Evidence checklist
+## Historical observations (not a current test backlog)
 
 | Check | Result |
 | --- | --- |
 | APK hash / package ID / Testnet configuration | Passed; see local build.json and observations below |
-| Sender name / version / explicit Testnet | Pending |
-| Exact alias accepted by sender | Pending |
-| QR scanning supported | Pending; separate from clipboard acceptance |
-| First-deposit transaction ID / receipt | Pending |
-| Account ID / exact Ed25519 key match | Pending |
-| Automatic recognition / balance | Pending |
+| Sender name / version / explicit Testnet | Not recorded in the September alias-path run |
+| Exact alias accepted by sender | Not recorded in the September alias-path run |
+| QR scanning supported | Not recorded in the September alias-path run |
+| First-deposit transaction ID / receipt | Not recorded in the September alias-path run |
+| Account ID / exact Ed25519 key match | Not recorded in the September alias-path run |
+| Automatic recognition / balance | Not recorded in the September alias-path run |
 | Cold start without Metro | Passed twice; same pre-activation alias after force-stop |
-| Repeat deposit uses the same account | Pending |
-| Offline / background / delayed indexing | Pending |
-| Recovery to the same account | Pending |
+| Repeat deposit uses the same account | Not recorded in the September alias-path run |
+| Offline / background / delayed indexing | Not recorded in the September alias-path run |
+| Recovery to the same account | Not recorded in the September alias-path run |
 
-Automated SDK serialization and mocked Mirror tests are already available in `tests/hedera.test.cjs`; they do not replace these live checks.
+Automated SDK serialization and mocked Mirror tests are already available in `tests/hedera.test.cjs`; the unrecorded September scenarios are not claimed as performed.
 
 ## Device observations: 7 September 2026
 

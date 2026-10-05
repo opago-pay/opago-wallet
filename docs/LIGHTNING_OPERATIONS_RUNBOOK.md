@@ -33,7 +33,7 @@ Because no external monitoring provider is configured, centralized alerting is n
 5. Promote only after send, receive, restart reconciliation, recovery, timeout, and negative scenarios pass.
 6. App-store signing, Play Integrity/App Attest policy, staged rollout, privacy documents, and support ownership remain mandatory distribution gates.
 
-The current dependency baseline is recorded in `SECURITY.md` (both audit scopes: zero on 17 September 2026). Run fresh audits before release. Do not use `npm audit fix --force` to silence findings; apply reviewed compatible updates and repeat native acceptance.
+The current dependency baseline is recorded in `SECURITY.md` (both audit scopes: zero on 17 September 2026). Run fresh audits before release. Do not use `npm audit fix --force` to silence findings; apply reviewed compatible updates and repeat affected regression checks.
 
 ## User-facing incident rules
 

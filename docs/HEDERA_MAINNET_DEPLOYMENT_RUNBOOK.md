@@ -1,10 +1,10 @@
 # Hedera Mainnet deployment runbook
 
-**Status:** contract `0.0.10850063` deployed and source-verified on 8 September 2026; Android Mainnet canary accepted on 15 September 2026. Do not run the deployment command again.
+**Status — 5 October 2026:** Contract `0.0.10850063` remains deployed and source-verified. Current signed production builds supersede the September grant candidate; see [PRODUCTION_RELEASE_STATUS.md](PRODUCTION_RELEASE_STATUS.md). Do not run the deployment command again.
 
 ## Grant scope
 
-This runbook supports Thrive Milestone 2: deploy the Opago HBAR checkout contract on Hedera Mainnet, bind the existing Android Hedera flow to the verified deployment, execute a real HBAR canary payment, and preserve public evidence. Lightning remains a separate development-network capability and is not represented as production-ready by this Hedera milestone.
+This runbook supports Thrive Milestone 2: deploy the Opago HBAR checkout contract on Hedera Mainnet, bind the existing Android Hedera flow to the verified deployment, execute a real HBAR canary payment, and preserve public evidence. The original September grant candidate kept Lightning on regtest; current production profiles enable Lightning Mainnet as well. This deployment runbook covers the Hedera integration.
 
 The Hedera path uses HBAR, Hedera Smart Contract Service, consensus receipts, and the official Mainnet Mirror Node. HTS and HCS are not required by this checkout use case and must not be added only to inflate the integration claim.
 
@@ -136,4 +136,4 @@ This creates and installs a standalone arm64 internal candidate under a separate
 
 Record only public IDs, URLs, timestamps, app version, commit, and artifact hashes. If deployment or canary fails, retain the failure evidence, do not relabel it as success, and do not edit the deployed contract. A replacement deployment requires a new explicit approval and a new manifest history.
 
-The physical canary completed on 15 September 2026. Consumer account `0.0.10861984` signed a `0.01 HBAR` checkout to merchant `0.0.10848889` through the pinned contract. Hedera returned `SUCCESS`, the contract forwarded exactly `1,000,000` tinybars, and the transaction appeared consistently in the app, Mirror Node, and HashScan. The immutable public transaction is [`0.0.10861984@1789478514.756946872`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872). See [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md) for the candidate hash, direct-transfer evidence, fee data, acceptance finding, and remaining gates.
+The physical canary completed on 15 September 2026. Consumer account `0.0.10861984` signed a `0.01 HBAR` checkout to merchant `0.0.10848889` through the pinned contract. Hedera returned `SUCCESS`, the contract forwarded exactly `1,000,000` tinybars, and the transaction appeared consistently in the app, Mirror Node, and HashScan. The immutable public transaction is [`0.0.10861984@1789478514.756946872`](https://hashscan.io/mainnet/transaction/0.0.10861984%401789478514.756946872). See [HEDERA_MAINNET_CANARY_ACCEPTANCE.md](HEDERA_MAINNET_CANARY_ACCEPTANCE.md) for the candidate hash, direct-transfer evidence, fee data, acceptance finding, and the dated candidate results.
