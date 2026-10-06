@@ -4,6 +4,18 @@ import XCTest
 @testable import OpagoSafeHttp
 
 final class OpagoSafeHttpTests: XCTestCase {
+  // Public fixture only; no private key is stored in the repository.
+  func testOidcRs256PublicFixtureRejectsChangedMessageAndSignature() {
+    let n = "mN3lPnwl_vuVUdVNnpBQU4_THDRsnKQu17I5m6YQlVN39cPg3EwzRO0VZMn-k2YdKGfwBbzVbivblDlgALafUbB2XVjQMoZ3MOtW2iISx3fqCNVVBUrmqOTNq5tE9jYqclYd8ThPb1Pj1XoJHd_bjD6eLeM_KpO93SkwOIe_v_OWhIk4GwSJkfWgm0VY7dNkjAQocReWMNY0vr8e-TJzzB8X06FL8OY72CC_qPQPh4R0CfVIJwPxj55mPLYQI-98ufWKBuOVukI7VfiLR1GIpN8D7Doc3I_hPeoEbQbuGyH3zQPspELY_yFBqZnsrPewa_c1P49BIhe_x603ojdKQQ"
+    let e = "AQAB"
+    let message = "c3ludGhldGljLWhlYWRlci5zeW50aGV0aWMtY2xhaW1z"
+    let signature = "UMxyFC3zgtN_GvfvlR8ABY6thySHoZ98qthr9yiNLXpIVrT600SxokmYvkkCrJsOLjflTlGZ9UAOG4fyg_3jxynMaFXu00j8it4FE1a7-fZmXSvpG7rfCKmEZsiP1cxLw4OtTJ9cI24pvS3QnWFm2iSclS4vZXhZCIWjpmqDlnB9ewaWEAhdIf2oOpwsWGMTPE_j__xRj03og_OYj0lTFX-anGx1nPaD_whJy0xbOSNMwk5BrqA7nM1ET-_bPgydrDJDVQbr28O23lqMuGT-N7qh4JTkrFV_fkYV4iX2bLoWO3k5NGzJZr4-n6u27OOXCXR7W15YQT6i_u9oYdeMcg"
+    XCTAssertTrue(verifyOidcRs256(n: n, e: e, message: message, signature: signature))
+    XCTAssertFalse(verifyOidcRs256(n: n, e: e, message: "Y2hhbmdlZA", signature: signature))
+    XCTAssertFalse(verifyOidcRs256(n: n, e: e, message: message, signature: "AAAA"))
+    XCTAssertFalse(verifyOidcRs256(n: "AQ", e: e, message: message, signature: signature))
+  }
+
   func testPublicAddressClassificationAndMixedDNS() throws {
     for address in ["127.0.0.1", "10.0.0.4", "192.168.1.1", "169.254.1.1",
                     "100.64.0.1", "198.51.100.4", "::1", "fe80::1",

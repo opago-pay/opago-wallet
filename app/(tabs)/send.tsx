@@ -219,6 +219,10 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   ) => {
     if (preparationInFlight.current) return;
     const raw = (scannedValue ?? destination).trim();
+    if (/^\$[^\s]+@[^\s]+$/.test(raw)) {
+      router.push({ pathname: '/uma-send', params: { receiver: raw } });
+      return;
+    }
     const activeSource = sourceOverride || inferPaymentSourceFromRequest(raw, 'spark');
     // A newly detected asset must never reinterpret a previous SAT/EUR amount
     // as HBAR (or the reverse). Ask for that asset's amount instead.
@@ -356,7 +360,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         setReviewPreparation(null);
       }
     }
-  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet]);
+  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet, router]);
 
   async function executeBitcoinPayment() {
     if (!pendingBitcoin || !sparkWallet || paymentInFlight.current) return;

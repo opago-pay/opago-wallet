@@ -52,6 +52,8 @@ function AppStack() {
           <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="uma-send" options={{ headerShown: false }} />
         </Stack>
         <BackupPrompt />
         </WalletGate>
