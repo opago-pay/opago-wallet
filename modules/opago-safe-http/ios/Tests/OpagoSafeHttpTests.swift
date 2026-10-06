@@ -82,6 +82,15 @@ final class OpagoSafeHttpTests: XCTestCase {
     XCTAssertThrowsError(try ScreenedResolver.screen([later], development: false))
   }
 
+  func testRequestIdSurvivesBridgeAndDuplicateIsRejected() throws {
+    let id = "00000000-0000-4000-8000-000000000001"
+    let response = BoundedHTTPResponse(maxBytes: 64)
+    XCTAssertNil(try response.append(Data("HTTP/1.1 201 Created\r\nX-Request-Id: \(id)\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+    XCTAssertEqual(try response.endOfStream().bridgeValue["requestId"] as? String, id)
+    let duplicate = BoundedHTTPResponse(maxBytes: 64)
+    XCTAssertThrowsError(try duplicate.append(Data("HTTP/1.1 200 OK\r\nX-Request-Id: \(id)\r\nX-Request-Id: \(id)\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+  }
+
   func testRetryAfterSurvivesBridge() throws {
     let response = BoundedHTTPResponse(maxBytes: 64)
     XCTAssertNil(try response.append(Data("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 120\r\nContent-Length: 2\r\n\r\n{}".utf8)))

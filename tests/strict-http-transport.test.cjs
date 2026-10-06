@@ -106,3 +106,12 @@ test('native HKA PUT/DELETE preserve envelopes and fresh-config Cache-Control; r
   await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'DELETE', body: '{}' }));
   await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'GET', body: '{}' }));
 });
+
+
+test('native response request ID survives the platform bridge for authenticated v3 validation', async () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const request = nativeTransport({ request: async () => ({ status: 201, contentType: 'application/json', body: '{}', requestId: id, cacheControl: 'no-store' }), cancel: async () => {} });
+  const response = await request('https://example.org/api/v3/report', { method: 'POST', body: '{}' });
+  assert.equal(response.headers.get('x-request-id'), id);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});

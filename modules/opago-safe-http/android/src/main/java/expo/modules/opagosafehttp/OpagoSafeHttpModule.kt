@@ -149,6 +149,7 @@ class OpagoSafeHttpModule : Module() {
                   "contentType" to (response.header("Content-Type") ?: ""),
                   "retryAfter" to (response.header("Retry-After") ?: ""),
                   "cacheControl" to (response.header("Cache-Control") ?: ""),
+                  "requestId" to (response.header("X-Request-Id") ?: ""),
                   "body" to strictUtf8(output.toByteArray()),
                 ))
               }
