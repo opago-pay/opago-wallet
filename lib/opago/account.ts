@@ -19,7 +19,7 @@ export interface WalletIdentity {
   sign(challenge: Challenge, intent: WalletAuthIntent, installationId: string): Promise<WalletAuthVerifyRequest>;
 }
 export type AccountState = { credential: AccountCredential | null; account: Account | null; session: WalletSession | null;
-  wallet: Wallet | null; deletion: DeletionReceipt | null; deletionStatus: DeletionStatus | null };
+  wallet: Wallet | null; deletion: DeletionReceipt | null; deletionStatus: DeletionStatus | null; syncGeneration?: number; syncPaused?: boolean };
 type Operation = { key: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: string; body: unknown; auth: AuthKind;
   principal: string; result?: unknown; retryAt?: number; terminalError?: string };
 export const photoMatchReady = (wallet: Wallet | null): boolean => !!wallet && wallet.status === 'active' &&
@@ -53,6 +53,9 @@ export class OpagoAccount {
     this.state.wallet = null;
   }
   async save() { await this.store.write(this.prefix + '.state', this.state); }
+  /** Fence delayed F5 work before account lifecycle side effects. Old outboxes stay
+   * isolated and cannot be resumed by a new account/ownership lifecycle. */
+  private async invalidateSync() { this.state.syncGeneration = (this.state.syncGeneration || 0) + 1; this.state.syncPaused = true; await this.save(); }
   /** A failed status refresh must still leave sign-in and ownership recovery accessible. */
   async refreshAfterLoad(): Promise<unknown> {
     let failure: unknown;
@@ -143,18 +146,19 @@ export class OpagoAccount {
   async read<T>(path: string, auth: AuthKind): Promise<T> {
     return this.api.call<T>({ method: 'GET', path, body: {}, auth, bearer: await this.bearer(auth) });
   }
-  async signIn(fresh = false) {
+  async signIn(fresh = false, resumeSync = true) {
     const credential = await this.login.login(fresh);
     if (credential.expiresAt <= this.now() || (fresh && this.now() - credential.authTime > 300_000)) throw new OpagoError('reproof_required');
     if (this.state.credential && this.state.credential.subject !== credential.subject && this.state.session) throw new OpagoError('account_mismatch');
     this.state.credential = credential;
+    if (resumeSync) delete this.state.syncPaused; // Internal fresh auth during deletion must preserve its lifecycle suspension.
     await this.save(); // Browser login can lock the local wallet; resume account lookup after unlock.
     await this.refreshAccount();
   }
   async refreshAccount() { this.state.account = await this.read<Account>('/api/v2/account', 'account'); await this.save(); }
   private async freshAccount() {
     const subject = this.state.credential?.subject;
-    if (!subject || this.now() - this.state.credential!.authTime > 300_000) await this.signIn(true);
+    if (!subject || this.now() - this.state.credential!.authTime > 300_000) await this.signIn(true, false);
     if (subject && subject !== this.state.credential?.subject) throw new OpagoError('account_mismatch');
     await this.bearer('account');
   }
@@ -263,6 +267,7 @@ export class OpagoAccount {
     await this.address(actions[intent.action as keyof typeof actions], 'name' in intent.action_params ? intent.action_params.name : undefined);
   }
   async close() {
+    await this.invalidateSync();
     await this.refresh();
     const proof = await this.proof({ action: 'wallet_close', action_params: { wallet_id: this.state.wallet!.wallet_id } }, 'wallet', 'close') as ActionProof;
     const wallet = await this.mutate<Wallet>('close.commit', 'POST', '/api/v2/wallet/close', { proof_token: proof.proof_token }, 'wallet');
@@ -271,6 +276,7 @@ export class OpagoAccount {
     this.state.wallet = wallet; this.state.session = null; await this.save(); await this.finish('close.challenge', 'close.verify', 'close.commit');
   }
   async deleteAccount() {
+    await this.invalidateSync();
     await this.freshAccount();
     const receipt = await this.mutate<DeletionReceipt>('delete', 'DELETE', '/api/v2/account', {}, 'account');
     this.state.deletion = receipt; this.state.session = null; this.state.wallet = null; this.state.account = null;
@@ -289,10 +295,11 @@ export class OpagoAccount {
     const proof = await this.proof({ action: 'onboarding_restart', action_params: {} }, 'none', 'restart') as ActionProof;
     const session = await this.mutate<WalletSession>('restart.commit', 'POST', '/api/v2/wallet/onboarding/restart', { proof_token: proof.proof_token }, 'none');
     if (session.scope !== 'onboarding') throw new Error('Restart must be enrollment only.');
-    this.state = { credential: null, account: null, wallet: null, session, deletion: null, deletionStatus: null };
+    this.state = { credential: null, account: null, wallet: null, session, deletion: null, deletionStatus: null, syncGeneration: (this.state.syncGeneration || 0) + 1 };
     await this.save(); await this.refresh(); await this.finish('restart.challenge', 'restart.verify', 'restart.commit');
   }
   async signOut() {
+    await this.invalidateSync();
     if (this.state.session) await this.mutate('logout', 'POST', '/api/v2/wallet/auth/logout', { refresh_token: this.state.session.refresh_token, installation_id: this.installationId }, 'none');
     await this.login.logout(); this.state.credential = null; this.state.account = null; this.state.session = null;
     this.state.wallet = null; await this.save(); await this.finish('logout');

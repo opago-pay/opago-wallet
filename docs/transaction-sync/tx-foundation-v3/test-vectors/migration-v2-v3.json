@@ -1,0 +1,390 @@
+{
+  "contract": "tx-foundation-v3",
+  "description": "spec.md section 11. Request: v3.body == v2.body + direction/asset/rail. Response: v2.body == v3.body without direction/asset/rail/command/transaction_id/wallet_id.",
+  "added_request_fields": {
+    "direction": "incoming",
+    "asset": "BTC",
+    "rail": "lightning"
+  },
+  "removed_response_fields": [
+    "direction",
+    "asset",
+    "rail",
+    "command",
+    "transaction_id",
+    "wallet_id"
+  ],
+  "path_map": {
+    "/api/v2/payments/registrations": "/api/v3/payments/registrations",
+    "/api/v2/payments/registrations/{registration_id}": "/api/v3/payments/registrations/{registration_id}",
+    "/api/v2/payments/registrations/{registration_id}/invoice": "/api/v3/payments/registrations/{registration_id}/invoice",
+    "/api/v2/payments/registrations/{registration_id}/cancel": "/api/v3/payments/registrations/{registration_id}/cancel"
+  },
+  "requests": [
+    {
+      "id": "MIG-REQ-1",
+      "case": "wallet receive msat",
+      "v2": {
+        "method": "POST",
+        "path": "/api/v2/payments/registrations",
+        "body": {
+          "amount_msat": 21000,
+          "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+          "description": "Coffee"
+        }
+      },
+      "v3": {
+        "method": "POST",
+        "path": "/api/v3/payments/registrations",
+        "body": {
+          "direction": "incoming",
+          "asset": "BTC",
+          "rail": "lightning",
+          "amount_msat": 21000,
+          "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+          "description": "Coffee"
+        }
+      }
+    },
+    {
+      "id": "MIG-REQ-2",
+      "case": "POS receive fiat",
+      "v2": {
+        "method": "POST",
+        "path": "/api/v2/payments/registrations",
+        "body": {
+          "amount": "12.50",
+          "currency": "EUR",
+          "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+          "description": "Table 4",
+          "external_reference": "r-0001"
+        }
+      },
+      "v3": {
+        "method": "POST",
+        "path": "/api/v3/payments/registrations",
+        "body": {
+          "direction": "incoming",
+          "asset": "BTC",
+          "rail": "lightning",
+          "amount": "12.50",
+          "currency": "EUR",
+          "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+          "description": "Table 4",
+          "external_reference": "r-0001"
+        }
+      }
+    },
+    {
+      "id": "MIG-REQ-3",
+      "case": "invoice refresh",
+      "v2": {
+        "method": "POST",
+        "path": "/api/v2/payments/registrations/{registration_id}/invoice",
+        "body": {}
+      },
+      "v3": {
+        "method": "POST",
+        "path": "/api/v3/payments/registrations/{registration_id}/invoice",
+        "body": {}
+      }
+    },
+    {
+      "id": "MIG-REQ-4",
+      "case": "cancel",
+      "v2": {
+        "method": "POST",
+        "path": "/api/v2/payments/registrations/{registration_id}/cancel",
+        "body": {}
+      },
+      "v3": {
+        "method": "POST",
+        "path": "/api/v3/payments/registrations/{registration_id}/cancel",
+        "body": {}
+      }
+    }
+  ],
+  "responses": [
+    {
+      "id": "MIG-RES-1",
+      "case": "fiat invoice issued",
+      "v3": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "invoice_issued",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "pending",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z",
+        "direction": "incoming",
+        "asset": "BTC",
+        "rail": "lightning",
+        "command": null,
+        "transaction_id": null,
+        "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+      },
+      "v2": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "invoice_issued",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "pending",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z"
+      }
+    },
+    {
+      "id": "MIG-RES-4",
+      "case": "paid",
+      "v3": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "paid",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "paid",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z",
+        "direction": "incoming",
+        "asset": "BTC",
+        "rail": "lightning",
+        "command": null,
+        "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+        "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+      },
+      "v2": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "paid",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "paid",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z"
+      }
+    },
+    {
+      "id": "MIG-RES-2",
+      "case": "rejected custodial",
+      "v3": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "rejected",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "rejected",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": true,
+        "reject_reason": "tme_rejected",
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": null,
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z",
+        "direction": "incoming",
+        "asset": "BTC",
+        "rail": "lightning",
+        "command": null,
+        "transaction_id": null,
+        "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+      },
+      "v2": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "rejected",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "rejected",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": true,
+        "reject_reason": "tme_rejected",
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": null,
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z"
+      }
+    },
+    {
+      "id": "MIG-RES-3",
+      "case": "cancelled after address change",
+      "v3": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "cancelled",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "pending",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": "address_changed",
+        "updated_at": "2026-10-03T10:00:00Z",
+        "direction": "incoming",
+        "asset": "BTC",
+        "rail": "lightning",
+        "command": null,
+        "transaction_id": null,
+        "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+      },
+      "v2": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "cancelled",
+        "custodial": true,
+        "amount_msat": 2500000,
+        "amount": "12.50",
+        "currency": "EUR",
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "enforcing",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": {
+          "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seq": 1,
+          "status": "pending",
+          "expires_at": "2026-10-03T10:05:00Z"
+        },
+        "refreshed": false,
+        "cancel_reason": "address_changed",
+        "updated_at": "2026-10-03T10:00:00Z"
+      }
+    }
+  ],
+  "not_representable_in_v2": [
+    {
+      "id": "MIG-NR-1",
+      "case": "outgoing registration",
+      "v3": {
+        "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+        "status": "paid",
+        "custodial": false,
+        "amount_msat": 1000500,
+        "amount": null,
+        "currency": null,
+        "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "pre_check_status": "ok",
+        "tme_mode": "shadow",
+        "tme_policy_version": "tme-2026-10-01",
+        "tme_policy_epoch": 3,
+        "tme_blocked": false,
+        "reject_reason": null,
+        "pre_check_valid_until": "2026-10-04T10:00:00Z",
+        "invoice": null,
+        "refreshed": false,
+        "cancel_reason": null,
+        "updated_at": "2026-10-03T10:00:00Z",
+        "direction": "outgoing",
+        "asset": "BTC",
+        "rail": "lightning",
+        "command": {
+          "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+          "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+          "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+          "dispatch_state": "succeeded",
+          "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "amount_msat": 1000500,
+          "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+          "reserved_at": "2026-10-03T10:00:00Z",
+          "dispatched_at": "2026-10-03T10:00:00Z",
+          "outcome_at": "2026-10-03T10:05:00Z"
+        },
+        "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+        "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+      },
+      "proposed_v2_error": "registration_not_found",
+      "open_question": "OQ-MIG-1"
+    }
+  ]
+}

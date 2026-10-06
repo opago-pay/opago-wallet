@@ -1,0 +1,5020 @@
+{
+  "contract": "tx-foundation-v3",
+  "description": "Each valid value MUST validate against #/$defs/<definition> of ../schemas.json; each invalid value MUST fail.",
+  "vectors": [
+    {
+      "definition": "CreateRegistration",
+      "valid": [
+        {
+          "case": "wallet receive msat",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee"
+          }
+        },
+        {
+          "case": "POS receive fiat",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "12.50",
+            "currency": "EUR",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4",
+            "external_reference": "r-0001"
+          }
+        },
+        {
+          "case": "wallet send",
+          "value": {
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "payment_request": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Invoice 42"
+          }
+        },
+        {
+          "case": "wallet send with uppercase bolt11 (QR)",
+          "value": {
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "payment_request": "LNBC10U1PJEXAMPLE0QQQSP5ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYG3ZYGS",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Invoice 42"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "v2 body without direction, asset, rail",
+          "value": {
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee"
+          }
+        },
+        {
+          "case": "HBAR registration",
+          "value": {
+            "direction": "incoming",
+            "asset": "HBAR",
+            "rail": "lightning",
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee"
+          }
+        },
+        {
+          "case": "spark rail registration",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "spark",
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee"
+          }
+        },
+        {
+          "case": "both amount forms",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee",
+            "amount": "1.00",
+            "currency": "EUR"
+          }
+        },
+        {
+          "case": "BTC as fiat currency",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "12.50",
+            "currency": "BTC",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4",
+            "external_reference": "r-0001"
+          }
+        },
+        {
+          "case": "zero fiat amount",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "0.00",
+            "currency": "EUR",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4",
+            "external_reference": "r-0001"
+          }
+        },
+        {
+          "case": "msat not multiple of 1000",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount_msat": 21500,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee"
+          }
+        },
+        {
+          "case": "outgoing POS",
+          "value": {
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "12.50",
+            "currency": "EUR",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4",
+            "external_reference": "r-0001"
+          }
+        },
+        {
+          "case": "outgoing with amount",
+          "value": {
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "payment_request": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Invoice 42",
+            "amount_msat": 1000
+          }
+        },
+        {
+          "case": "client custody flag",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount_msat": 21000,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Coffee",
+            "custodial": false
+          }
+        },
+        {
+          "case": "mixed-case bolt11",
+          "value": {
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "payment_request": "lnBC10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "description": "Invoice 42"
+          }
+        },
+        {
+          "case": "POS without external_reference",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "12.50",
+            "currency": "EUR",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4"
+          }
+        },
+        {
+          "case": "POS with null external_reference",
+          "value": {
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "amount": "12.50",
+            "currency": "EUR",
+            "pos_id": "Hk3mV9xQpL2wR8tY5nB7cD",
+            "description": "Table 4",
+            "external_reference": null
+          }
+        }
+      ]
+    },
+    {
+      "definition": "Registration",
+      "valid": [
+        {
+          "case": "incoming fiat invoice issued",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "outgoing with succeeded command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "msat registration",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "invoice_issued with invoice withheld by policy",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "fiat before approved pre-check",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": true,
+            "amount_msat": null,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "pending",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": true,
+            "reject_reason": null,
+            "pre_check_valid_until": null,
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled by user",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "late settlement after cancel",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "paid",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "enforcing block with in-flight command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": true,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "rejected",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": true,
+            "reject_reason": null,
+            "pre_check_valid_until": null,
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "dispatched",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": null
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled outgoing after failed command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "failed",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": null,
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "outgoing failed before dispatch",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "failed",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": null,
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "non-custodial shadow unavailable",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "unavailable",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": null,
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "paid after enforcing rejection race",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "rejected",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": true,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "paid",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "v2 shape without v3 fields",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "incoming with command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "outgoing with invoice",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "outgoing with null amount_msat",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": null,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "custodial in shadow",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "blocked with invoice",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": true,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "succeeded command without transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled without reason",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "open with transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "approved check but blocked",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": true,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "shadow with rejected check",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "rejected",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": null,
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "paid outgoing without command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "outgoing invoice_issued",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled outgoing with dispatched command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "dispatched",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": null
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled outgoing with settlement",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled with succeeded command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "open with reject reason",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": "custodial_not_licensed",
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "approved fiat without payable amount",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": null,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "invoice that is not BOLT11",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "not-an-invoice",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "open with cancel reason",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "paid without transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "cancelled with paid invoice but no transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "cancelled",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "paid",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": "user",
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "paid incoming without invoice",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "paid incoming with pending invoice",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "fiat amount without currency",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "no requested amount",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": null,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "dispatched without dispatched_at",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "dispatched",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": null,
+              "outcome_at": null
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "unknown with outcome_at",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "unknown",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": null,
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "failed command with transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "failed",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "unknown command with transaction",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "unknown",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": null
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "SentRegistration",
+      "valid": [
+        {
+          "case": "paid with succeeded command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "paid",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": {
+              "command_id": "d4e5f6a7-b8c9-4dae-8f01-23456789abcd",
+              "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+              "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "dispatch_state": "succeeded",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "amount_msat": 1000500,
+              "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+              "reserved_at": "2026-10-03T10:00:00Z",
+              "dispatched_at": "2026-10-03T10:00:00Z",
+              "outcome_at": "2026-10-03T10:05:00Z"
+            },
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "outgoing without command",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "open",
+            "custodial": false,
+            "amount_msat": 1000500,
+            "amount": null,
+            "currency": null,
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "shadow",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": null,
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "outgoing",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        },
+        {
+          "case": "incoming registration",
+          "value": {
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "status": "invoice_issued",
+            "custodial": true,
+            "amount_msat": 2500000,
+            "amount": "12.50",
+            "currency": "EUR",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "pre_check_status": "ok",
+            "tme_mode": "enforcing",
+            "tme_policy_version": "tme-2026-10-01",
+            "tme_policy_epoch": 3,
+            "tme_blocked": false,
+            "reject_reason": null,
+            "pre_check_valid_until": "2026-10-04T10:00:00Z",
+            "invoice": {
+              "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+              "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "seq": 1,
+              "status": "pending",
+              "expires_at": "2026-10-03T10:05:00Z"
+            },
+            "refreshed": false,
+            "cancel_reason": null,
+            "updated_at": "2026-10-03T10:00:00Z",
+            "direction": "incoming",
+            "asset": "BTC",
+            "rail": "lightning",
+            "command": null,
+            "transaction_id": null,
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "ActiveAddressBinding",
+      "valid": [
+        {
+          "case": "active",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": null
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "already deactivated",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "deactivated",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": "2026-10-03T10:05:00Z",
+            "deactivate_reason": "user"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "DeactivatedAddressBinding",
+      "valid": [
+        {
+          "case": "deactivated",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "deactivated",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": "2026-10-03T10:05:00Z",
+            "deactivate_reason": "user"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "still active",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": null
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletPaymentReport",
+      "valid": [
+        {
+          "case": "spark transfer settled",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000
+          }
+        },
+        {
+          "case": "spark lightning settled with preimage",
+          "value": {
+            "asset": "BTC",
+            "rail": "lightning",
+            "id_source": "SPARK_LIGHTNING_REQUEST_ID",
+            "source_payment_id": "lnreq-55aa",
+            "direction": "outgoing",
+            "sdk_status": "LIGHTNING_PAYMENT_SUCCEEDED",
+            "status": "settled",
+            "amount_msat": 1000500,
+            "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "preimage": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "zero-amount invoice pending without amount",
+          "value": {
+            "asset": "BTC",
+            "rail": "lightning",
+            "id_source": "SPARK_LIGHTNING_REQUEST_ID",
+            "source_payment_id": "lnreq-55aa",
+            "direction": "outgoing",
+            "sdk_status": "PENDING",
+            "status": "pending",
+            "amount_msat": null,
+            "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "preimage": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "missing source identity (quarantine)",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": null,
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000
+          }
+        },
+        {
+          "case": "unknown SDK status",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "NEW_STATUS_X",
+            "status": null,
+            "amount_msat": 21000000
+          }
+        },
+        {
+          "case": "HBAR shape (server answers asset_not_enabled)",
+          "value": {
+            "asset": "HBAR",
+            "rail": "hedera",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "network": "testnet",
+            "source_payment_id": "0.0.4512345@1759485600.123456789",
+            "direction": "incoming",
+            "sdk_status": "SUCCESS",
+            "status": "settled",
+            "amount_tinybar": 250000000,
+            "counterparty_account_id": "0.0.98765",
+            "consensus_timestamp": "1759485602.000000001"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "settled without amount",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": null
+          }
+        },
+        {
+          "case": "source id with trailing newline",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "transfer-1\n",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000
+          }
+        },
+        {
+          "case": "payment hash with trailing newline",
+          "value": {
+            "asset": "BTC",
+            "rail": "lightning",
+            "id_source": "SPARK_LIGHTNING_REQUEST_ID",
+            "source_payment_id": "lnreq-55aa",
+            "direction": "outgoing",
+            "sdk_status": "LIGHTNING_PAYMENT_SUCCEEDED",
+            "status": "settled",
+            "amount_msat": 1000500,
+            "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+            "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "preimage": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "zero amount",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 0
+          }
+        },
+        {
+          "case": "negative amount",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": -5
+          }
+        },
+        {
+          "case": "transfer with payment hash",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000,
+            "payment_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        {
+          "case": "transfer on lightning rail",
+          "value": {
+            "asset": "BTC",
+            "rail": "lightning",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000
+          }
+        },
+        {
+          "case": "preimage without payment hash",
+          "value": {
+            "asset": "BTC",
+            "rail": "lightning",
+            "id_source": "SPARK_LIGHTNING_REQUEST_ID",
+            "source_payment_id": "lnreq-55aa",
+            "direction": "outgoing",
+            "sdk_status": "LIGHTNING_PAYMENT_SUCCEEDED",
+            "status": "settled",
+            "amount_msat": 1000500,
+            "bolt11": "lnbc10u1pjexample0qqqsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygs",
+            "preimage": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "client rate",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000,
+            "fiat_rate": "61000.00"
+          }
+        },
+        {
+          "case": "client receipt time",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000,
+            "received_at": "2026-10-03T10:00:00Z"
+          }
+        },
+        {
+          "case": "HBAR with msat",
+          "value": {
+            "asset": "HBAR",
+            "rail": "hedera",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "network": "testnet",
+            "source_payment_id": "0.0.4512345@1759485600.123456789",
+            "direction": "incoming",
+            "sdk_status": "SUCCESS",
+            "status": "settled",
+            "counterparty_account_id": "0.0.98765",
+            "consensus_timestamp": "1759485602.000000001",
+            "amount_msat": 1
+          }
+        },
+        {
+          "case": "HBAR bad transaction id",
+          "value": {
+            "asset": "HBAR",
+            "rail": "hedera",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "network": "testnet",
+            "source_payment_id": "0.0.1-1759485600",
+            "direction": "incoming",
+            "sdk_status": "SUCCESS",
+            "status": "settled",
+            "amount_tinybar": 250000000,
+            "counterparty_account_id": "0.0.98765",
+            "consensus_timestamp": "1759485602.000000001"
+          }
+        },
+        {
+          "case": "BTC with Hedera id source",
+          "value": {
+            "asset": "BTC",
+            "rail": "spark",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "direction": "incoming",
+            "sdk_status": "TRANSFER_STATUS_COMPLETED",
+            "status": "settled",
+            "amount_msat": 21000000
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletPaymentReceipt",
+      "valid": [
+        {
+          "case": "linked",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:019249f3-transfer-7a1c",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "quarantined without source id",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": null,
+            "external_id": null,
+            "resolution": "quarantined",
+            "transaction_id": null,
+            "verification_status": "wallet_reported",
+            "retry_due_at": "2026-10-03T10:05:00Z"
+          }
+        },
+        {
+          "case": "unresolved",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:019249f3-transfer-7a1c",
+            "resolution": "unresolved",
+            "transaction_id": null,
+            "verification_status": "wallet_reported",
+            "retry_due_at": "2026-10-03T10:05:00Z"
+          }
+        },
+        {
+          "case": "source-less report closed as non-payment",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": null,
+            "external_id": null,
+            "resolution": "non_payment",
+            "transaction_id": null,
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "linked without transaction",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:019249f3-transfer-7a1c",
+            "resolution": "linked",
+            "transaction_id": null,
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "unresolved without retry",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:019249f3-transfer-7a1c",
+            "resolution": "unresolved",
+            "transaction_id": null,
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "known source id without external id",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": null,
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "missing source id but linked",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": null,
+            "external_id": null,
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "bad namespace",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "lnbits:abc",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "hedera source id not a transaction id",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "source_payment_id": "not-a-hedera-id",
+            "external_id": "hedera-tx:not-a-hedera-id",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "spark source id with space",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "a b",
+            "external_id": "spark-transfer:a b",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "transfer source with lightning-request namespace",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-lightning-request:019249f3-transfer-7a1c",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "hedera source with spark namespace",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "HEDERA_TRANSACTION_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:x",
+            "resolution": "linked",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": null
+          }
+        },
+        {
+          "case": "unresolved with transaction",
+          "value": {
+            "receipt_id": "f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+            "received_at": "2026-10-03T10:00:00Z",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "id_source": "SPARK_TRANSFER_ID",
+            "source_payment_id": "019249f3-transfer-7a1c",
+            "external_id": "spark-transfer:019249f3-transfer-7a1c",
+            "resolution": "unresolved",
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "verification_status": "wallet_reported",
+            "retry_due_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletPayment",
+      "valid": [
+        {
+          "case": "path B incoming provisional",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "HBAR path B with Hedera alias",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "HBAR",
+            "rail": "hedera",
+            "direction": "incoming",
+            "amount_msat": null,
+            "amount_tinybar": 250000000,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "HEDERA_TRANSACTION_ID",
+                "provider_id": "",
+                "source_id": "0.0.4512345@1759485600.123456789",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "legacy payment without aliases",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "verified",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "verified",
+            "payment_path": "legacy",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": []
+          }
+        },
+        {
+          "case": "legacy LNbits payment",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "verified",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "verified",
+            "payment_path": "legacy",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "LNBITS_CHECKING_ID",
+                "provider_id": "lnbits",
+                "source_id": "chk_9",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "path A outgoing verified",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "outgoing",
+            "amount_msat": -1000500,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "verified",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "verified",
+            "payment_path": "path_a",
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "PAYMENT_HASH",
+                "provider_id": "",
+                "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "created_at": "2026-10-03T10:00:00Z"
+              },
+              {
+                "id_source": "LNBITS_CHECKING_ID",
+                "provider_id": "lnbits",
+                "source_id": "chk_1",
+                "created_at": "2026-10-03T10:05:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "path B without aliases",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": []
+          }
+        },
+        {
+          "case": "outgoing with positive amount",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "outgoing",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "BTC with tinybar",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": 5,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "wallet_reported but verified time",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "verified",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "path B with registration",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "path A on spark rail",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_a",
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "exact duplicate alias",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              },
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "hedera alias not a transaction id",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "HEDERA_TRANSACTION_ID",
+                "provider_id": "",
+                "source_id": "x",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "payment hash alias not a hash",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "PAYMENT_HASH",
+                "provider_id": "",
+                "source_id": "abc",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "legacy on spark rail",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "legacy",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "legacy wallet_reported",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "legacy",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "path A wallet_reported",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_a",
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "BTC payment with Hedera alias",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              },
+              {
+                "id_source": "HEDERA_TRANSACTION_ID",
+                "provider_id": "",
+                "source_id": "0.0.4512345@1759485600.123456789",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "HBAR payment with Spark alias",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "HBAR",
+            "rail": "hedera",
+            "direction": "incoming",
+            "amount_msat": null,
+            "amount_tinybar": 250000000,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "path A pending",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "lightning",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "pending",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_a",
+            "registration_id": "8b2f0c4e-1a3d-4b5c-8d7e-9f0a1b2c3d4e",
+            "pre_check_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "spark alias with provider",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 21000000,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "spark",
+                "source_id": "x",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "case": "zero amount",
+          "value": {
+            "transaction_id": "e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a8b",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "asset": "BTC",
+            "rail": "spark",
+            "direction": "incoming",
+            "amount_msat": 0,
+            "amount_tinybar": null,
+            "status": "settled",
+            "verification_status": "wallet_reported",
+            "effective_time": "2026-10-03T10:00:00Z",
+            "effective_time_kind": "provisional",
+            "payment_path": "path_b",
+            "registration_id": null,
+            "pre_check_id": null,
+            "evidence_revision": 1,
+            "aliases": [
+              {
+                "id_source": "SPARK_TRANSFER_ID",
+                "provider_id": "",
+                "source_id": "019249f3-transfer-7a1c",
+                "created_at": "2026-10-03T10:00:00Z"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "definition": "CreateWalletChallenge",
+      "valid": [
+        {
+          "case": "spark bind",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "spark",
+            "identity_public_key": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        {
+          "case": "hedera bind",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "hedera",
+            "network": "mainnet",
+            "account_id": "0.0.4512345",
+            "public_key": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        },
+        {
+          "case": "session",
+          "value": {
+            "purpose": "session",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "installation_id": "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "lnbits bind",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "lnbits",
+            "identity_public_key": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        {
+          "case": "uppercase key",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "spark",
+            "identity_public_key": "02BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+          }
+        },
+        {
+          "case": "hedera without network",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "hedera",
+            "account_id": "0.0.4512345",
+            "public_key": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        },
+        {
+          "case": "client custody",
+          "value": {
+            "purpose": "bind",
+            "wallet_source": "spark",
+            "identity_public_key": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "custody_type": "non_custodial"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletChallenge",
+      "valid": [
+        {
+          "case": "spark bind",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "purpose": "bind",
+            "message": "opago-tx-foundation-v3\npurpose:bind\ntenant:opago\nsubject:2f1c9c0e-5d2a-4f61-9e1b-7a8b9c0d1e2f\nwallet_source:spark\nsource_wallet_id:02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nnetwork:-\ninstallation_id:-\nchallenge_id:a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d\nnonce:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\nexpires_at:2026-10-03T10:05:00Z",
+            "expires_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "free text message",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "purpose": "bind",
+            "message": "x",
+            "expires_at": "2026-10-03T10:05:00Z"
+          }
+        },
+        {
+          "case": "message without nonce",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "purpose": "bind",
+            "message": "opago-tx-foundation-v3\npurpose:bind\ntenant:opago\nsubject:2f1c9c0e-5d2a-4f61-9e1b-7a8b9c0d1e2f\nwallet_source:spark\nsource_wallet_id:02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\nnetwork:-\ninstallation_id:-\nchallenge_id:a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d\nexpires_at:2026-10-03T10:05:00Z",
+            "expires_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "BindWallet",
+      "valid": [
+        {
+          "case": "minimal",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "signature": "MEUCIQDx_abc-123"
+          }
+        },
+        {
+          "case": "padded base64 (encoding open, OQ-AUTH-1)",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "signature": "abc+/="
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "signature with space",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d",
+            "signature": "abc def"
+          }
+        },
+        {
+          "case": "missing signature",
+          "value": {
+            "challenge_id": "a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9c0d"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "Wallet",
+      "valid": [
+        {
+          "case": "spark active",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "lnbits inbound",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "lnbits",
+            "source_wallet_id": "a1b2c3d4e5f6",
+            "network": null,
+            "custody_type": "custodial",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": "INBOUND",
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "lnbits external",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "lnbits",
+            "source_wallet_id": "a1b2c3d4e5f7",
+            "network": null,
+            "custody_type": "custodial",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": "EXTERNAL",
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "hedera deleted",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "hedera",
+            "source_wallet_id": "0.0.4512345",
+            "network": "testnet",
+            "custody_type": "unknown",
+            "status": "deleted",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "deleted without time",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "deleted",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "spark with network",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": "mainnet",
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "spark with purpose",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": "INBOUND",
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "lnbits with unknown purpose",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "lnbits",
+            "source_wallet_id": "a1b2c3d4e5f6",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": "SAVINGS",
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "lnbits without purpose",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "lnbits",
+            "source_wallet_id": "a1b2c3d4e5f6",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "hedera without network",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "hedera",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "hedera with invalid account",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "hedera",
+            "source_wallet_id": "not-an-account",
+            "network": "testnet",
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "spark with non-key identity",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "not-a-key",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        }
+      ]
+    },
+    {
+      "definition": "BoundWallet",
+      "valid": [
+        {
+          "case": "spark bind",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "hedera bind",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "hedera",
+            "source_wallet_id": "0.0.4512345",
+            "network": "testnet",
+            "custody_type": "unknown",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "lnbits wallet",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "lnbits",
+            "source_wallet_id": "a1b2c3d4e5f6",
+            "network": null,
+            "custody_type": "custodial",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": "INBOUND",
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "inactive spark",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "unknown",
+            "status": "inactive",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        },
+        {
+          "case": "deleted hedera",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "hedera",
+            "source_wallet_id": "0.0.4512345",
+            "network": "testnet",
+            "custody_type": "unknown",
+            "status": "deleted",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": "2026-10-03T10:05:00Z"
+          }
+        },
+        {
+          "case": "known custody",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "wallet_source": "spark",
+            "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network": null,
+            "custody_type": "non_custodial",
+            "status": "active",
+            "ownership_epoch": 1,
+            "label": "Main",
+            "purpose": null,
+            "bound_at": "2026-10-03T10:00:00Z",
+            "deleted_at": null
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletList",
+      "valid": [
+        {
+          "case": "last page",
+          "value": {
+            "wallets": [
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              }
+            ],
+            "next_cursor": null
+          }
+        },
+        {
+          "case": "more pages",
+          "value": {
+            "wallets": [
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              }
+            ],
+            "next_cursor": "c2Vlay0x"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "missing cursor field",
+          "value": {
+            "wallets": [
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              }
+            ]
+          }
+        },
+        {
+          "case": "over page size",
+          "value": {
+            "wallets": [
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              },
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "active",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": null
+              }
+            ],
+            "next_cursor": null
+          }
+        },
+        {
+          "case": "deleted wallet in list",
+          "value": {
+            "wallets": [
+              {
+                "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+                "wallet_source": "spark",
+                "source_wallet_id": "02bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "network": null,
+                "custody_type": "unknown",
+                "status": "deleted",
+                "ownership_epoch": 1,
+                "label": "Main",
+                "purpose": null,
+                "bound_at": "2026-10-03T10:00:00Z",
+                "deleted_at": "2026-10-03T10:05:00Z"
+              }
+            ],
+            "next_cursor": null
+          }
+        }
+      ]
+    },
+    {
+      "definition": "CreateAddressBinding",
+      "valid": [
+        {
+          "case": "lightning address",
+          "value": {
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example"
+          }
+        },
+        {
+          "case": "hedera account",
+          "value": {
+            "kind": "hedera_account",
+            "value": "0.0.4512345"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "uppercase lightning address",
+          "value": {
+            "kind": "lightning_address",
+            "value": "Alice@pay.opago.example"
+          }
+        },
+        {
+          "case": "spark address with trailing newline",
+          "value": {
+            "kind": "spark_address",
+            "value": "sp1abc\n"
+          }
+        },
+        {
+          "case": "hedera account with leading zero",
+          "value": {
+            "kind": "hedera_account",
+            "value": "0.0.0123"
+          }
+        },
+        {
+          "case": "unknown kind",
+          "value": {
+            "kind": "lnurl",
+            "value": "x"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "AddressBinding",
+      "valid": [
+        {
+          "case": "active",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": null
+          }
+        },
+        {
+          "case": "deactivated",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "deactivated",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": "2026-10-03T10:05:00Z",
+            "deactivate_reason": "user"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "active with reason",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": "user"
+          }
+        },
+        {
+          "case": "hedera kind with invalid value",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "hedera_account",
+            "value": "not-an-account",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": null
+          }
+        },
+        {
+          "case": "uppercase lightning address",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "Alice@pay.opago.example",
+            "status": "active",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": null
+          }
+        },
+        {
+          "case": "deactivated without time",
+          "value": {
+            "address_id": "c9d0e1f2-a3b4-4c5d-9e6f-7a8b9c0d1e2f",
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "kind": "lightning_address",
+            "value": "alice@pay.opago.example",
+            "status": "deactivated",
+            "created_at": "2026-10-03T10:00:00Z",
+            "deactivated_at": null,
+            "deactivate_reason": "user"
+          }
+        }
+      ]
+    },
+    {
+      "definition": "WalletSession",
+      "valid": [
+        {
+          "case": "token",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "installation_id": "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e",
+            "access_token": "opaque-token-0123456789",
+            "expires_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ],
+      "invalid": [
+        {
+          "case": "short token",
+          "value": {
+            "wallet_id": "3f6c2a8e-6b1d-4e0a-9c55-1d2e3f4a5b6c",
+            "installation_id": "b8c9d0e1-f2a3-4b4c-8d5e-6f7a8b9c0d1e",
+            "access_token": "x",
+            "expires_at": "2026-10-03T10:05:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}
