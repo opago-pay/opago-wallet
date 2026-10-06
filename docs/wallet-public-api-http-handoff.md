@@ -23,7 +23,7 @@ Three demonstrated fixes:
 Local verification: 14 production-client-to-real-API TLS scenarios passed;
 57 focused transport/F3/F5 tests passed; full Wallet suite 832 passed, one
 pre-existing generated-iOS-project check skipped; TypeScript and lint for changed
-production files passed. Python 3.11.9 and Node 24.18.1 were used locally; the
+production files passed. Python 3.11.7 and Node 24.18.1 were used locally; the
 API integration workflow uses Node 22.23.1 and records its actual versions.
 
 The test's native socket/storage and Redis adapters are synthetic. Swift XCTest,
