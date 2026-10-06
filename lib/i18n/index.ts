@@ -3,10 +3,12 @@ import fr from './locales/fr.json';
 import es from './locales/es.json';
 import it from './locales/it.json';
 import { f3Messages } from './f3-messages';
+import { f4Messages } from './f4-messages';
 import { languagePreference, LANGUAGE_LOCALES, type AppLanguage } from './language';
 
 export const dictionaries: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = {
-  de: { ...de, ...f3Messages('de') }, fr: { ...fr, ...f3Messages('fr') }, es: { ...es, ...f3Messages('es') }, it: { ...it, ...f3Messages('it') },
+  de: { ...de, ...f3Messages('de'), ...f4Messages('de') }, fr: { ...fr, ...f3Messages('fr'), ...f4Messages('fr') },
+  es: { ...es, ...f3Messages('es'), ...f4Messages('es') }, it: { ...it, ...f3Messages('it'), ...f4Messages('it') },
 };
 export type TranslationValues = Record<string, string | number>;
 

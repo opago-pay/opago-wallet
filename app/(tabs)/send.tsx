@@ -44,6 +44,7 @@ import { lightningPaymentLifecycle, reconcileLightningPayments } from '@/lib/lig
 import { lightningPaymentJournalFor } from '@/lib/lightning/payment-journal-native';
 import { PaymentForm } from '@/components/send/payment-form';
 import { PaymentScanner } from '@/components/send/payment-scanner';
+import { isPosLinkQr } from '@/lib/opago/pos-qr-native';
 import {
   HederaReviewView,
   HederaSuccessView,
@@ -676,6 +677,10 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     label={reviewPreparation.label} onCancel={cancelPayment} />;
 
   if (entryMode === 'scan') return <PaymentScanner
+    onOtherCode={value => {
+      if (!isPosLinkQr(value)) return false;
+      router.push({ pathname: '/pos-link', params: { scanResultKey: paymentScanInbox.save(value) } }); return true;
+    }}
     onCancel={closeToHome}
     onDetected={value => {
       const key = paymentScanInbox.save(value);

@@ -30,11 +30,25 @@ function fixture(options = {}) {
     '@/lib/payment-recognition': { recognizePayment:async value=>{ calls.push(['validate',value]);return state.validate?state.validate(value):{input:value,kind:'lightning',recipient:'synthetic-hash',amount:'20',unit:'SAT'};} },
     '@/lib/payment-errors': { friendlyPaymentMessage:e=>e.message },
     '@/lib/wallet-session': { walletSession:{capture:()=>{const check=()=>{if(state.locked)throw Error('locked');};check();return check;}} },
-  }), exports=>exports.PaymentScanner({onDetected:value=>{if(state.handoffFails)throw Error('handoff unavailable');calls.push(['detected',value]);},onCancel:()=>calls.push('cancel')}));
+  }), exports=>exports.PaymentScanner({onDetected:value=>{if(state.handoffFails)throw Error('handoff unavailable');calls.push(['detected',value]);},onCancel:()=>calls.push('cancel'),onOtherCode:state.onOtherCode}));
   return {...app,calls,state,background:value=>appState(value),back:()=>back()};
 }
 const detected = app=>app.calls.filter(c=>Array.isArray(c)&&c[0]==='detected');
 const validations = app=>app.calls.filter(c=>Array.isArray(c)&&c[0]==='validate');
+
+test('POS QR recognition navigates once to its own review without payment recognition or submission',async t=>{
+ const links=[];const app=fixture({onOtherCode:value=>{links.push(value);return true;}});t.after(app.unmount);
+ const tree=await app.settle();const camera=nodes(tree).find(n=>n.type==='camera');
+ camera.props.onBarcodeScanned({data:'opaque-pos-link'});camera.props.onBarcodeScanned({data:'duplicate'});await app.settle();
+ assert.deepEqual(links,['opaque-pos-link']);assert.equal(validations(app).length,0);assert.equal(detected(app).length,0);
+ app.state.locked=true;camera.props.onBarcodeScanned({data:'late-code'});assert.equal(links.length,1);
+});
+test('POS recognition keeps ordinary payment recognition and rejects a locked wallet',async t=>{
+ const app=fixture({onOtherCode:()=>false});t.after(app.unmount);const tree=await app.settle();
+ nodes(tree).find(n=>n.type==='camera').props.onBarcodeScanned({data:'invoice'});await app.settle();assert.equal(detected(app).length,1);
+ const locked=fixture({onOtherCode:()=>{throw Error('must not run');}});t.after(locked.unmount);const lockedTree=await locked.settle();locked.state.locked=true;
+ nodes(lockedTree).find(n=>n.type==='camera').props.onBarcodeScanned({data:'pos-code'});await locked.settle();assert.equal(validations(locked).length,0);
+});
 
 test('valid QR codes with or without an amount advance once without an intermediate button', async t=>{
  for(const amount of [null,'20']) {

@@ -12,6 +12,7 @@ const { jcs, parseStrictJson, strictUtf8, utf8, unbase64url } = require('../lib/
 const { createOidcVerifier, discoverOidc } = require('../lib/opago/oidc-verifier.ts');
 const { MemoryPrivateStore } = require('../lib/opago/store.ts');
 const { nativeF3Enabled, nativeF3UpdateUrl } = require('../lib/opago/settings-native.ts');
+const { OpagoApi } = require('../lib/opago/api.ts');
 const vectors = require('../docs/lnurl-spark-contracts/v2/fixtures/hpke-vectors.json').vectors;
 const signed = require('../docs/lnurl-spark-contracts/v2/fixtures/hpke-key-document-vectors.json');
 for (const name of Object.keys(require.cache)) if (name.endsWith('.ts') && !existingModules.has(name)) delete require.cache[name];
@@ -50,6 +51,21 @@ function transportFixture(store = new MemoryPrivateStore()) {
   };
   return { state, http, transport: new NativeHkaTransport(trust, http, store, n => new Uint8Array(randomBytes(n)), () => state.now), store };
 }
+
+test('F4 POS confirmation uses the contractual wallet route through authenticated HPKE with durable logical key', async () => {
+  const f = transportFixture();
+  const pos = { pos_id: 'pos-abcdefghij', address: 'pos-abcdefghij@opago.com', binding_version: 1, wallet_id: randomUUID(), status: 'active' };
+  f.state.responseBody = jcs(pos);
+  const req = { method: 'POST', path: '/api/v2/pos/pos-abcdefghij/bindings', body: { binding_intent_id: randomUUID(), proof_token: 'synthetic-pos-proof' }, auth: 'wallet', bearer: 'synthetic-wallet-token', idempotencyKey: randomUUID() };
+  const api = new OpagoApi(f.transport);
+  assert.deepEqual(await api.call(req), pos); assert.deepEqual(await api.call(req), pos);
+  assert.equal(f.state.requests.length, 2);
+  assert.deepEqual(f.state.requests[0].clear, req.body); assert.deepEqual(f.state.requests[1].clear, req.body);
+  assert.equal(f.state.requests[0].aad.path, req.path);
+  assert.equal(f.state.requests[0].aad.idempotency_key, f.state.requests[1].aad.idempotency_key);
+  assert.notEqual(f.state.requests[0].envelope.enc, f.state.requests[1].envelope.enc);
+  assert.notEqual(f.state.requests[0].envelope.nonce, f.state.requests[1].envelope.nonce);
+});
 
 test('HKA Hermes primitives match all shared Python-generated HPKE vectors, response and photo exporters', async () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');

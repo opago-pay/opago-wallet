@@ -3,6 +3,17 @@ import { OpagoError } from './api';
 export function opagoUserError(cause: unknown): string {
   if (cause instanceof OpagoError) {
     const messages: Record<string, string> = {
+      pos_integration_unavailable: 'POS linking awaits the agreed QR format and wallet-readable backend details and status. Your existing wallet remains available.',
+      pos_qr_invalid: 'This is not a supported POS linking code. Ask the operator for a new QR code.',
+      pos_wrong_wallet: 'This linking request targets another wallet. Open it with the intended wallet.',
+      pos_details_invalid: 'The POS details could not be verified. No link is shown as complete.',
+      pos_binding_changed: 'The POS recipient or binding version changed. Ask the operator for a new QR code.',
+      pos_intent_used: 'This linking request was already used or expired. Ask the operator for a new QR code.',
+      pos_review_required: 'Refresh and review the POS details before approving this request.',
+      challenge_invalid: 'The approval challenge is invalid, used or expired. Refresh its status.',
+      challenge_expired: 'The approval challenge expired. Refresh its status and ask for a new request.',
+      action_mismatch: 'The proof does not match this wallet action. Refresh its status.',
+      revision_conflict: 'The binding version changed in another request. Refresh its status.',
       app_update_required: 'Update your app to use OPAGO account services. Your local wallet remains available.',
       session_expired: 'Your OPAGO session expired. Sign in again.', refresh_invalid: 'Your OPAGO session expired. Sign in again.',
       reproof_required: 'Please sign in again and approve this wallet action.', account_mismatch: 'This wallet does not match the signed-in OPAGO account.',

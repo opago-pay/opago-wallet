@@ -30,6 +30,7 @@ export default function OpagoAccountScreen() {
   return <OpagoPage title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
     {updateRequired && <UpdateAccountApp />}
     <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
+    <Action label="POS wallet links" disabled={busy} onPress={() => router.push({ pathname: '/pos-link', params: testOnly ? { test: '1' } : {} })} />
     {!runtime && <Card title="Account services unavailable"><Copy>{t('OPAGO account services are not available in this build. Your local wallet remains available.')}</Copy></Card>}
     {__DEV__ && <Action label={testOnly ? 'Leave contract test mode' : 'Start contract test mode'} disabled={busy} onPress={() => setTestOnly(!testOnly)} />}
     {runtime && account && state && !state.deletion && <>
