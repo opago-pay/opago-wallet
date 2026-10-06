@@ -6,7 +6,8 @@ type RestoreIntent = { action: 'wallet_restore'; action_params: { wallet_id: str
 type NameIntent = { action: 'address_bind' | 'address_rename'; action_params: { name: string } };
 type AddressIntent = { action: 'address_deactivate' | 'address_reactivate'; action_params: { address_id: string } };
 type CloseIntent = { action: 'wallet_close'; action_params: { wallet_id: string } };
-export type WalletAuthIntent = LoginIntent | BindIntent | RestoreIntent | NameIntent | AddressIntent | CloseIntent;
+type PosBindIntent = { action: 'pos_bind'; action_params: { pos_id: string; binding_intent_id: string; binding_version: number } };
+export type WalletAuthIntent = LoginIntent | BindIntent | RestoreIntent | NameIntent | AddressIntent | CloseIntent | PosBindIntent;
 export type WalletAuthChallenge = { challenge_id: string; message: string; expires_at: string };
 export type WalletAuthVerifyRequest = { challenge_id: string; signature: string; installation_id: string };
 
@@ -16,7 +17,7 @@ const nonce = /^[0-9a-f]{64}$/;
 const hex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 const utf8 = (value: string) => new TextEncoder().encode(value);
 
-/** The F3 subset of the 0.2.0 JCS action parameters; reject unexpected keys. */
+/** Supported 0.2.0 JCS action parameters; reject unexpected keys. */
 function canonicalActionParams(intent: WalletAuthIntent): string {
   if (intent.action === 'login' || intent.action === 'onboarding_restart') {
     if (Object.keys(intent.action_params).length) throw new Error('Invalid login parameters.');
@@ -25,11 +26,12 @@ function canonicalActionParams(intent: WalletAuthIntent): string {
   const params = intent.action_params as Record<string, unknown>;
   const expected = { wallet_bind: ['account_generation', 'party_id'], wallet_restore: ['account_generation', 'party_id', 'wallet_id'],
     address_bind: ['name'], address_rename: ['name'], address_deactivate: ['address_id'], address_reactivate: ['address_id'],
-    wallet_close: ['wallet_id'] }[intent.action as Exclude<WalletAuthIntent['action'], 'login' | 'onboarding_restart'>];
+    wallet_close: ['wallet_id'], pos_bind: ['binding_intent_id', 'binding_version', 'pos_id'] }[intent.action as Exclude<WalletAuthIntent['action'], 'login' | 'onboarding_restart'>];
   if (!expected || Object.keys(params).sort().join(',') !== expected.join(',')) throw new Error('Invalid action parameters.');
   for (const key of expected) {
     const value = params[key];
-    if (key === 'account_generation' ? !Number.isSafeInteger(value) || Number(value) < 1 :
+    if (key === 'account_generation' || key === 'binding_version' ? !Number.isSafeInteger(value) || Number(value) < 1 :
+        key === 'pos_id' ? typeof value !== 'string' || !/^pos-[a-z2-7]{10}$/.test(value) :
         key === 'name' ? typeof value !== 'string' || !/^(?!.*\.\.)[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/.test(value) :
         typeof value !== 'string' || !uuid.test(value)) throw new Error('Invalid action parameters.');
   }

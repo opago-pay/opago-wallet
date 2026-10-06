@@ -15,10 +15,14 @@ import { lightningPaymentLifecycle, reconcileLightningPayments } from '../lightn
 import { lightningPaymentJournalFor } from '../lightning/payment-journal-native';
 import type { BitcoinSparkWallet } from '../spark-bitcoin-wallet';
 import { nativeF3Enabled } from './settings-native';
+import { PosLinking, type PosLinkSource } from './pos-link';
+import { installPosQrSource } from './pos-qr-native';
 
 export type F3Integration = { hka: HkaTransport; accountLogin: AccountLogin; disclosure?: UmaDisclosureProvider; publicAddressOrigin: string;
   /** Jointly approved revision resolving 0.2.0 versus TRU's non-wait decision. */
-  umaContractResolution?: string };
+  umaContractResolution?: string;
+  /** Awaiting versioned QR + wallet-readable review/status/list contract. */
+  posLinkSource?: PosLinkSource };
 let integration: F3Integration | null = null;
 let initializing: Promise<void> | null = null;
 async function ensureIntegration() {
@@ -36,15 +40,18 @@ export function installF3Integration(value: F3Integration) {
   if (value.hka.mode !== 'hka' || value.accountLogin.mode !== 'oidc' || value.disclosure && value.disclosure.mode !== 'backend') throw new Error('Only reviewed live integrations can be installed.');
   const origin = new URL(value.publicAddressOrigin);
   if (origin.protocol !== 'https:' || origin.origin !== value.publicAddressOrigin || origin.username || origin.password) throw new Error('Invalid public address origin.');
+  if (value.posLinkSource?.mode === 'contract-test') throw new Error('A local POS adapter cannot be installed in the live integration.');
+  installPosQrSource(value.posLinkSource);
   integration = value;
 }
 export function f3IntegrationAvailable() { return integration !== null || nativeF3Enabled(); }
-export type F3Runtime = { account: OpagoAccount; uma: UmaSending; testOnly: boolean;
+export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinking; testOnly: boolean;
   startupError?: unknown;
   publicAddressOrigin: string;
   perform(action: () => Promise<unknown>): Promise<void>;
   prepare(): Promise<void>; confirm(): Promise<void>; reconcile(): Promise<void>;
-  setTestKya?: (status: 'draft' | 'submitted' | 'in_review' | 'approved' | 'correction_requested' | 'rejected') => Promise<void> };
+  setTestKya?: (status: 'draft' | 'submitted' | 'in_review' | 'approved' | 'correction_requested' | 'rejected') => Promise<void>;
+  startTestPos?: () => Promise<string>; confirmTestOperator?: (id: string) => Promise<void> };
 const live = new WeakMap<BitcoinSparkWallet, Promise<F3Runtime>>();
 let test: Promise<F3Runtime> | null = null;
 let accountOnly: Promise<F3Runtime> | null = null;
@@ -52,14 +59,16 @@ walletSession.subscribe(() => { test = null; accountOnly = null; });
 async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string | null, testOnly: boolean): Promise<F3Runtime> {
   const assertCurrent = walletSession.captureRuntime();
   let account: OpagoAccount; let uma: UmaSending; let testKya: F3Runtime['setTestKya'];
+  let source: PosLinkSource | undefined; let startTestPos: F3Runtime['startTestPos']; let confirmTestOperator: F3Runtime['confirmTestOperator'];
   if (testOnly) {
     if (!__DEV__) throw new Error('Contract test adapter is unavailable in production.');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { F3ContractTestBackend } = require('./test-adapter') as typeof import('./test-adapter');
-    const backend = new F3ContractTestBackend(new MemoryPrivateStore(), randomUUID,
+    const { F4ContractTestBackend } = require('./pos-test-adapter') as typeof import('./pos-test-adapter');
+    const backend = new F4ContractTestBackend(new MemoryPrivateStore(), randomUUID,
       appConfig.isMainnet ? 'mainnet' : 'regtest');
     account = backend.createAccount(); uma = new UmaSending(account, backend.disclosure, backend.peer, decodeLightningInvoice);
     testKya = async status => { await backend.setKya(status); if (account.state.session) await account.refresh(); };
+    source = backend; startTestPos = () => backend.operatorStart(); confirmTestOperator = id => backend.operatorConfirm(id);
   } else {
     await ensureIntegration(); assertCurrent();
     if (!integration) throw new Error('OPAGO backend integration is not configured.');
@@ -72,7 +81,7 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
     account = new OpagoAccount(new OpagoApi(guarded), f3PrivateStore, { publicKey: sparkKey, available: !!wallet,
       network: appConfig.isMainnet ? 'mainnet' : 'regtest', sign: async (challenge, intent, installationId) => {
         if (!wallet) throw new OpagoError('wallet_unavailable');
-        const authorized = await authorizeWalletAction('Approve OPAGO wallet ownership');
+        const authorized = await authorizeWalletAction(intent.action === 'pos_bind' ? 'Approve POS wallet recipient' : 'Approve OPAGO wallet ownership');
         authorized(); const result = await wallet.signOpagoWalletChallenge(challenge, intent, appConfig.isMainnet ? 'mainnet' : 'regtest', installationId);
         authorized(); return result;
       } }, configured.accountLogin, randomUUID);
@@ -81,12 +90,16 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
       async assertCurrent() { throw new Error('UMA integration awaits the agreed TRU contract and required data disclosure.'); },
     };
     uma = new UmaSending(account, disclosure, nativeUmaPeer, decodeLightningInvoice);
+    source = configured.posLinkSource && { mode: 'backend', decodeQr: input => configured.posLinkSource!.decodeQr(input),
+      review: async (ref, bearer) => { assertCurrent(); const value = await configured.posLinkSource!.review(ref, bearer); assertCurrent(); return value; },
+      list: async bearer => { assertCurrent(); const value = await configured.posLinkSource!.list(bearer); assertCurrent(); return value; } };
   }
   await account.load(); await uma.load();
+  const pos = new PosLinking(account, source); await pos.load();
   const startupError = testOnly ? undefined : await account.refreshAfterLoad();
   assertCurrent();
   let prepared: PreparedSparkPayment | null = null;
-  return { account, uma, testOnly, startupError, setTestKya: testKya, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
+  return { account, uma, pos, testOnly, startupError, setTestKya: testKya, startTestPos, confirmTestOperator, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
     async perform(action) { await account.exclusive(async () => { assertCurrent(); await action(); assertCurrent(); }); },
     async prepare() {
       await uma.consentAndPrepare(uma.payment!.disclosure.id, async invoice => {
