@@ -95,3 +95,14 @@ test('native Retry-After reaches the activation backoff even for proxy errors', 
   assert.equal(response.status,429);
   assert.equal(response.headers.get('retry-after'),'120');
 });
+
+test('native HKA PUT/DELETE preserve envelopes and fresh-config Cache-Control; read/delete reject bodies', async () => {
+  const calls = [];
+  const request = nativeTransport({ request: async options => { calls.push(options); return { status: 200, contentType: 'application/json', body: '{}', cacheControl: 'no-store' }; }, cancel: async () => {} });
+  const response = await request('https://api.opago.com/api/v2/wallet/address', { method: 'PUT', body: '{"encryption":"hpke-v1"}' });
+  assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(calls[0].method, 'PUT'); assert.ok(calls[0].body);
+  await request('https://api.opago.com/api/v2/account', { method: 'DELETE', headers: { 'X-Opago-Envelope': 'synthetic-envelope' } });
+  assert.equal(calls[1].method, 'DELETE'); assert.equal(calls[1].body, ''); assert.equal(calls[1].headers['x-opago-envelope'], 'synthetic-envelope');
+  await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'DELETE', body: '{}' }));
+  await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'GET', body: '{}' }));
+});

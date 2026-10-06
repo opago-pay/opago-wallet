@@ -12,8 +12,9 @@ const installationId = '00000000-0000-4000-8000-000000000003';
 const sample = (message) => ({ challenge_id: challengeId, message, expires_at: '2026-09-28T12:05:00Z' });
 const atIssue = Date.parse('2026-09-28T12:01:00Z');
 
-test('F3 login and account binding match the contract 0.2.0 message hashes', () => {
-  for (const vector of vectors.filter(v => v.action === 'login' || v.action === 'wallet_bind')) {
+test('All F3 ownership, address, binding, restore, close and restart actions match contract 0.2.0 hashes', () => {
+  for (const vector of vectors.filter(v => ['login', 'wallet_bind', 'wallet_restore', 'address_bind', 'address_rename',
+    'address_deactivate', 'address_reactivate', 'wallet_close', 'onboarding_restart'].includes(v.action))) {
     const digest = walletAuthChallengeDigest(
       sample(vector.message),
       { action: vector.action, action_params: vector.action_params },

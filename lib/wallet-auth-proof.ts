@@ -1,8 +1,12 @@
 import { sha256 } from '@noble/hashes/sha256';
 
-type LoginIntent = { action: 'login'; action_params: Record<string, never> };
+type LoginIntent = { action: 'login' | 'onboarding_restart'; action_params: Record<string, never> };
 type BindIntent = { action: 'wallet_bind'; action_params: { party_id: string; account_generation: number } };
-export type WalletAuthIntent = LoginIntent | BindIntent;
+type RestoreIntent = { action: 'wallet_restore'; action_params: { wallet_id: string; party_id: string; account_generation: number } };
+type NameIntent = { action: 'address_bind' | 'address_rename'; action_params: { name: string } };
+type AddressIntent = { action: 'address_deactivate' | 'address_reactivate'; action_params: { address_id: string } };
+type CloseIntent = { action: 'wallet_close'; action_params: { wallet_id: string } };
+export type WalletAuthIntent = LoginIntent | BindIntent | RestoreIntent | NameIntent | AddressIntent | CloseIntent;
 export type WalletAuthChallenge = { challenge_id: string; message: string; expires_at: string };
 export type WalletAuthVerifyRequest = { challenge_id: string; signature: string; installation_id: string };
 
@@ -14,16 +18,22 @@ const utf8 = (value: string) => new TextEncoder().encode(value);
 
 /** The F3 subset of the 0.2.0 JCS action parameters; reject unexpected keys. */
 function canonicalActionParams(intent: WalletAuthIntent): string {
-  if (intent.action === 'login') {
+  if (intent.action === 'login' || intent.action === 'onboarding_restart') {
     if (Object.keys(intent.action_params).length) throw new Error('Invalid login parameters.');
     return '{}';
   }
-  const { party_id, account_generation } = intent.action_params;
-  if (Object.keys(intent.action_params).sort().join(',') !== 'account_generation,party_id' ||
-      !uuid.test(party_id) || !Number.isSafeInteger(account_generation) || account_generation < 1) {
-    throw new Error('Invalid wallet binding parameters.');
+  const params = intent.action_params as Record<string, unknown>;
+  const expected = { wallet_bind: ['account_generation', 'party_id'], wallet_restore: ['account_generation', 'party_id', 'wallet_id'],
+    address_bind: ['name'], address_rename: ['name'], address_deactivate: ['address_id'], address_reactivate: ['address_id'],
+    wallet_close: ['wallet_id'] }[intent.action as Exclude<WalletAuthIntent['action'], 'login' | 'onboarding_restart'>];
+  if (!expected || Object.keys(params).sort().join(',') !== expected.join(',')) throw new Error('Invalid action parameters.');
+  for (const key of expected) {
+    const value = params[key];
+    if (key === 'account_generation' ? !Number.isSafeInteger(value) || Number(value) < 1 :
+        key === 'name' ? typeof value !== 'string' || !/^(?!.*\.\.)[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/.test(value) :
+        typeof value !== 'string' || !uuid.test(value)) throw new Error('Invalid action parameters.');
   }
-  return `{"account_generation":${account_generation},"party_id":${JSON.stringify(party_id)}}`;
+  return '{' + expected.map(k => JSON.stringify(k) + ':' + JSON.stringify(params[k])).join(',') + '}';
 }
 
 /** Verify every server-supplied field before asking the Spark identity key to sign. */

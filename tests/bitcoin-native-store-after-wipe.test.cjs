@@ -79,6 +79,7 @@ function fixture(t) {
       MNEMONIC_STORE_KEY: 'synthetic-mnemonic', WALLET_IDENTITY_KEY: 'synthetic-identity' },
     './database': { wipeTransactions: noop },
     './transaction-rates-native': { transactionRateStore: { clear: noop } },
+    './opago/store-native': { clearF3PrivateStore: noop },
     './home-balance-preview-native': { homeBalancePreviewStore: { clear: noop } },
     './hedera/account-binding-native': { clearHederaAccountBindings: noop },
     './hedera/payment-journal-native': { clearAllHederaPaymentJournals: noop },

@@ -7,6 +7,7 @@ class PendingError extends Error {}
 class FeeError extends Error {}
 function fixture(options = {}) {
   const calls = [];
+  const router = { push: route => calls.push(['navigate', route]) };
   const params = { focused: true, scanResultKey: 'scan-1', ...options };
   const auth = { walletReady: true, sparkWallet: options.wallet || null,
     hederaPublicKey: 'a'.repeat(64),
@@ -16,7 +17,7 @@ function fixture(options = {}) {
     '@react-navigation/native': { usePreventRemove() {} },
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({ remove() {} }) }, BackHandler: { addEventListener: () => ({ remove() {} }) } },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
-    'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => params,
+    'expo-router': { useRouter: () => router, useLocalSearchParams: () => params,
       useFocusEffect: fn => hooks.useEffect(() => params.focused ? fn() : undefined, [fn, params.focused]) },
     'expo-linking': { addEventListener: () => ({ remove() {} }) },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth },
@@ -71,6 +72,13 @@ test('a scan made before Spark is ready survives initialization and prepares exa
   app.auth.sparkWallet = {}; assert.equal((await app.settle()).type, 'review');
   assert.deepEqual(app.calls, ['scan', 'resolve', 'prepare']);
   await app.settle(); assert.deepEqual(app.calls, ['scan', 'resolve', 'prepare']);
+});
+
+test('explicit UMA address opens the UMA consent flow without ordinary LNURL resolution or payment', async t => {
+  const app = fixture({ scanResultKey: undefined, wallet: {} }); t.after(app.unmount);
+  const screen = await app.settle(); screen.props.onDetected('$alice@receiver.example'); await app.settle();
+  assert.ok(app.calls.some(c => Array.isArray(c) && c[0] === 'navigate' && c[1].pathname === '/uma-send'));
+  assert.equal(app.calls.includes('resolve'), false); assert.equal(app.calls.includes('prepare'), false); assert.equal(app.calls.includes('submit'), false);
 });
 test('a preparation completing after leaving Send cannot restore an obsolete payment review', async t => {
   let resolve; const pending = new Promise(done => { resolve = done; });

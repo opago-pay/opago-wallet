@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { WalletQrCode } from '@/components/receive/wallet-qr-code';
 import { PaymentNetworkIcon } from '@/components/receive/payment-network-icon';
+import { PersonalLightningAddressReceive } from '@/components/opago/lightning-address-receive';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { BackupReminder, BackupStatusNotice } from '@/components/security/backup-prompt';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -802,6 +803,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       <CloseWalletScreen dismiss={modal} />
     </View>
     <BackupReminder />
+    {network === 'lightning' && <TouchableOpacity accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }}
+      onPress={() => router.push('/opago-account')}><Text style={{ color: adaptColor('#ffb000', 'color'), fontSize: 16 }}>
+      {t('OPAGO account and Lightning address')}</Text></TouchableOpacity>}
     {walletReady && network !== 'hedera' &&
       <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
 
@@ -845,6 +849,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       </TouchableOpacity>}
     </View>}
 
+    {network === 'lightning' && <PersonalLightningAddressReceive focused={pollingEnabled} size={qrSize} />}
     {network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
         <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 16, fontWeight: '700', flexShrink: 1 }}>{t('Amount (optional)')}</Text>

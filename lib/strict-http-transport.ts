@@ -1,7 +1,7 @@
 import { appConfig } from './config';
 import { walletSession } from './wallet-session';
 
-type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string };
+type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string; cacheControl?: string };
 type NativeTransport = {
   request(options: { url: string; method: string; headers: Record<string, string>; body: string;
     maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
@@ -37,8 +37,9 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
     throw new Error('Secure network transport is unavailable on this device.');
   }
   const method = (init.method || 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'POST') throw new Error('Unsupported secure request method.');
+  if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method)) throw new Error('Unsupported secure request method.');
   if (init.body != null && typeof init.body !== 'string') throw new Error('Unsupported secure request body.');
+  if (['GET', 'DELETE'].includes(method) && init.body) throw new Error('Secure read/delete uses an envelope header.');
   if (init.signal?.aborted) throw aborted();
   const headers: Record<string, string> = {};
   new Headers(init.headers).forEach((value, key) => { headers[key] = value; });
@@ -64,6 +65,7 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
     if (typeof result.retryAfter === 'string' && result.retryAfter) {
       responseHeaders['retry-after'] = result.retryAfter;
     }
+    if (typeof result.cacheControl === 'string') responseHeaders['cache-control'] = result.cacheControl;
     const response = new Response(result.body, {
       status: result.status,
       headers: responseHeaders,

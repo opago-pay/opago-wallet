@@ -1,6 +1,7 @@
 package expo.modules.opagosafehttp
 
 import android.content.pm.ApplicationInfo
+import android.util.Base64
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -40,6 +41,14 @@ class OpagoSafeHttpModule : Module() {
 
     AsyncFunction("cancel") { requestId: String -> active[requestId]?.cancel() }
 
+    AsyncFunction("verifyRs256") { n: String, e: String, message: String, signature: String ->
+      try {
+        val flags = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        verifyOidcRs256(Base64.decode(n, flags), Base64.decode(e, flags),
+          Base64.decode(message, flags), Base64.decode(signature, flags))
+      } catch (_: Exception) { false }
+    }
+
     AsyncFunction("request") { options: Map<String, Any?>, promise: Promise ->
       try {
         val url = options["url"] as? String ?: throw IOException("Invalid URL.")
@@ -59,7 +68,8 @@ class OpagoSafeHttpModule : Module() {
           ((appContext.reactContext?.applicationInfo?.flags ?: 0) and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (uri.host.isNullOrBlank() || uri.userInfo != null ||
           (uri.scheme != "https" && !(development && uri.scheme == "http")) ||
-          method !in setOf("GET", "POST") || requestId.isBlank()) {
+          method !in setOf("GET", "POST", "PUT", "DELETE") || requestId.isBlank() ||
+          (method in setOf("GET", "DELETE") && body.isNotEmpty()) || body.toByteArray(Charsets.UTF_8).size > 1_048_576) {
           throw IOException("Invalid secure request.")
         }
         // OkHttp does not call Dns for an IP literal. Reject it before connect.
@@ -102,7 +112,7 @@ class OpagoSafeHttpModule : Module() {
             name.equals("connection", true) || name.equals("content-length", true)) continue
           builder.header(name, value)
         }
-        val requestBody = if (method == "POST") {
+        val requestBody = if (method == "POST" || method == "PUT") {
           body.toRequestBody(headers.entries.firstOrNull { it.key.equals("content-type", true) }
             ?.value?.toMediaTypeOrNull())
         } else null
@@ -138,7 +148,8 @@ class OpagoSafeHttpModule : Module() {
                   "status" to response.code,
                   "contentType" to (response.header("Content-Type") ?: ""),
                   "retryAfter" to (response.header("Retry-After") ?: ""),
-                  "body" to output.toString(Charsets.UTF_8.name()),
+                  "cacheControl" to (response.header("Cache-Control") ?: ""),
+                  "body" to strictUtf8(output.toByteArray()),
                 ))
               }
             } catch (_: Exception) {
