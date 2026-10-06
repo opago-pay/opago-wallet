@@ -13,6 +13,7 @@ const { createOidcVerifier, discoverOidc } = require('../lib/opago/oidc-verifier
 const { MemoryPrivateStore } = require('../lib/opago/store.ts');
 const { nativeF3Enabled, nativeF3UpdateUrl } = require('../lib/opago/settings-native.ts');
 const { OpagoApi } = require('../lib/opago/api.ts');
+const { HkaTransactionPort } = require('../lib/opago/tx-api.ts');
 const vectors = require('../docs/lnurl-spark-contracts/v2/fixtures/hpke-vectors.json').vectors;
 const signed = require('../docs/lnurl-spark-contracts/v2/fixtures/hpke-key-document-vectors.json');
 for (const name of Object.keys(require.cache)) if (name.endsWith('.ts') && !existingModules.has(name)) delete require.cache[name];
@@ -26,7 +27,7 @@ function configuration() { return { contract_version: '0.2.0', audience: trust.a
   min_supported_build: { ios: 1, android: 1 }, revoked_signing_key_ids: [], revoked_kids: [], oidc: { issuer: oidc.issuer, client_id: oidc.clientId, redirect_uris: [oidc.redirectUri], scopes: ['openid', 'email', 'profile'] },
   limits: { min_sendable_msat: 1000, max_sendable_msat: 100000000, photo_bytes: 10485760, photo_pixels: 24000000 } }; }
 const request = () => ({ method: 'POST', path: '/api/v2/wallet/auth/logout', body: vectors[0].plaintext, auth: 'wallet', bearer: 'synthetic-wallet-access', idempotencyKey: randomUUID() });
-function transportFixture(store = new MemoryPrivateStore()) {
+function transportFixture(store = new MemoryPrivateStore(), v3 = false) {
   const state = { now: epoch, config: configuration(), keys: clone(signed.response), requests: [], plainCalls: 0, failConfig: false, responseMode: '', status: 200 };
   const http = async (url, options) => {
     assert.ok(options.timeoutMs <= 10000); assert.equal(options.headers['Cache-Control'], 'no-store');
@@ -35,7 +36,7 @@ function transportFixture(store = new MemoryPrivateStore()) {
       return { status: 200, contentType: 'application/json', cacheControl: state.responseMode === 'cache' ? 'public' : 'no-store', body: jcs(url.endsWith('/app/config') ? state.config : state.keys) };
     }
     const envelope = options.body ? parseStrictJson(options.body) : parseStrictJson(strictUtf8(unbase64url(options.headers['X-Opago-Envelope'])));
-    const target = canonicalTarget(url.slice(trust.audience.length), options.method);
+    const target = canonicalTarget(url.slice(trust.audience.length), options.method, url.includes('/api/v3/'));
     const aad = { method: options.method, path: target.path, query: target.query, kid: envelope.kid, nonce: envelope.nonce, issued_at: envelope.issued_at, audience: trust.audience,
       idempotency_key: options.headers['Idempotency-Key'] || null };
     const context = await hpkeSuite.createRecipientContext({ recipientKey: await hpkeSuite.kem.deserializePrivateKey(hex(vectors[0].test_receiver_private_key_hex)),
@@ -47,10 +48,31 @@ function transportFixture(store = new MemoryPrivateStore()) {
     const ciphertext = gcm(key, iv, responseAad).encrypt(utf8(state.responseBody || (state.responseMode === 'duplicate' ? '{"status":"ok","status":"bad"}' : '{"status":"ok"}')));
     if (state.responseMode === 'tamper') ciphertext[0] ^= 1;
     return { status: state.responseMode === 'status' ? 403 : state.status, contentType: 'application/json', retryAfter: '3',
+      ...(v3 ? { cacheControl: state.responseMode === 'cache' ? 'public' : 'no-store', requestId: state.responseMode === 'request-id' ? 'invalid' : options.headers['X-Request-Id'] } : {}),
       body: state.responseMode === 'plaintext' ? '{"status":"ok"}' : jcs({ encryption: 'hpke-v1', nonce: b64(iv), ciphertext: b64(ciphertext) }) };
   };
-  return { state, http, transport: new NativeHkaTransport(trust, http, store, n => new Uint8Array(randomBytes(n)), () => state.now), store };
+  return { state, http, transport: new NativeHkaTransport({ ...trust, ...(v3 ? { txFoundationResolution: 'synthetic-only-reviewed-v3-hpke' } : {}) }, http, store, n => new Uint8Array(randomBytes(n)), () => state.now), store };
 }
+
+test('F5 v3 HPKE remains closed by default; opt-in reuses fresh authenticated envelopes with actual v3 AAD and required headers', async () => {
+  const walletId = randomUUID(); const id = randomUUID(); const key = randomUUID();
+  const body = { asset: 'BTC', rail: 'spark', id_source: 'SPARK_TRANSFER_ID', source_payment_id: 'transfer-test', direction: 'incoming', sdk_status: 'pending', status: 'pending', amount_msat: 1000 };
+  const req = { method: 'POST', path: '/api/v3/wallets/' + walletId + '/payments/reports', contract: 'tx-foundation-v3', body, auth: 'wallet', bearer: 'synthetic-v3-session', idempotencyKey: key };
+  await assert.rejects(transportFixture().transport.request(req), /sync_backend_pending/);
+  assert.throws(() => canonicalTarget(req.path)); assert.throws(() => canonicalTarget(req.path + '?unknown=value','POST',true));
+  const f = transportFixture(new MemoryPrivateStore(), true); f.state.status = 201;
+  const receipt = { receipt_id: id, received_at: signed.policy.now, wallet_id: walletId, id_source: body.id_source, source_payment_id: body.source_payment_id,
+    external_id: 'spark-transfer:transfer-test', resolution: 'unresolved', transaction_id: null, verification_status: 'wallet_reported', retry_due_at: '2026-09-28T12:30:00Z' };
+  f.state.responseBody = jcs(receipt);
+  const auth = { walletId, bearer: req.bearer }; const port = new HkaTransactionPort({ mode: 'hka', request: r => f.transport.request(r) }, async () => auth);
+  assert.deepEqual(await port.report(auth,body,key),receipt); assert.deepEqual(await port.report(auth,body,key),receipt);
+  const [a,b] = f.state.requests; assert.deepEqual(a.clear,body); assert.deepEqual(b.clear,body);
+  assert.equal(a.aad.path,req.path); assert.equal(b.options.headers['Idempotency-Key'],key);
+  assert.equal(a.options.headers['X-Opago-Contract'],'tx-foundation-v3'); assert.equal(a.options.headers['X-Opago-App-Build'],'10'); assert.equal(a.options.headers['X-Opago-Platform'],'android');
+  assert.notEqual(a.options.headers['X-Request-Id'],b.options.headers['X-Request-Id']); assert.notEqual(a.envelope.enc,b.envelope.enc); assert.notEqual(a.envelope.nonce,b.envelope.nonce);
+  f.state.status = 200; assert.deepEqual(await port.receipt(auth,id),receipt); assert.ok(f.state.requests[2].options.headers['X-Opago-Envelope']);
+  for (const mode of ['tamper','binding','plaintext','cache','request-id']) { f.state.responseMode = mode; await assert.rejects(port.receipt(auth,id)); }
+});
 
 test('F4 POS confirmation uses the contractual wallet route through authenticated HPKE with durable logical key', async () => {
   const f = transportFixture();

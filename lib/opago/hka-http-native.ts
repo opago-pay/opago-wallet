@@ -19,7 +19,7 @@ export const nativeHkaHttp: HkaHttp = async (url, options) => {
     if (response.redirected || response.url && response.url !== url) throw new Error('Account redirect rejected.');
     const body = await readBoundedText(response, 'OPAGO account', options.maxBytes, controller, options.maxBytes);
     if (utf8(body).length > options.maxBytes) throw new Error('Account response exceeds limit.');
-    return { status: response.status, body, contentType: response.headers.get('content-type') || '', cacheControl: response.headers.get('cache-control') || '', retryAfter: response.headers.get('retry-after') || '' };
+    return { status: response.status, body, contentType: response.headers.get('content-type') || '', cacheControl: response.headers.get('cache-control') || '', retryAfter: response.headers.get('retry-after') || '', requestId: response.headers.get('x-request-id') || '' };
   } finally { clearTimeout(timer); }
 };
 export async function nativeOidcJson(url: string): Promise<unknown> {

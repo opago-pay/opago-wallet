@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { TransactionSyncAgent } from '../components/opago/transaction-sync-agent';
 import * as Notifications from 'expo-notifications';
 import { WalletProvider } from '@/hooks/useWalletAuth';
 import { WalletGate } from '@/components/security/wallet-gate';
@@ -54,9 +55,11 @@ function AppStack() {
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
           <Stack.Screen name="pos-link" options={{ headerShown: false }} />
+          <Stack.Screen name="transaction-sync" options={{ headerShown: false }} />
           <Stack.Screen name="uma-send" options={{ headerShown: false }} />
         </Stack>
         <BackupPrompt />
+        <TransactionSyncAgent />
         </WalletGate>
         <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>

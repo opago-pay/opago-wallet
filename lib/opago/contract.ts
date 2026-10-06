@@ -2,17 +2,19 @@ import definitions from '../../docs/lnurl-spark-contracts/v2/schemas.json';
 import publicApi from '../../docs/lnurl-spark-contracts/v2/openapi-public.json';
 
 export type Schema = { $ref?: string; const?: unknown; enum?: unknown[]; oneOf?: Schema[]; anyOf?: Schema[];
-  allOf?: Schema[]; if?: Schema; then?: Schema; else?: Schema; prefixItems?: Schema[]; uniqueItems?: boolean;
+  allOf?: Schema[]; not?: Schema; if?: Schema; then?: Schema; else?: Schema; prefixItems?: Schema[]; uniqueItems?: boolean;
   type?: string; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: boolean;
   items?: Schema; maxItems?: number; minItems?: number; minLength?: number; maxLength?: number; pattern?: string;
   minimum?: number; maximum?: number; multipleOf?: number; format?: string };
 const defs = definitions.$defs as unknown as Record<string, Schema>;
-export function matchesSchema(s: Schema, value: unknown): boolean {
-  if (s.allOf && !s.allOf.every(v => matchesSchema(v, value))) return false;
-  if (s.if && !matchesSchema(matchesSchema(s.if, value) ? s.then || {} : s.else || {}, value)) return false;
-  if (s.$ref) return matchesSchema(defs[s.$ref.split('/').at(-1)!], value);
-  if (s.oneOf) return s.oneOf.filter(v => matchesSchema(v, value)).length === 1;
-  if (s.anyOf) return s.anyOf.some(v => matchesSchema(v, value));
+export function matchesSchema(s: Schema, value: unknown, definitions: Record<string, Schema> = defs): boolean {
+  const match = (schema: Schema, input: unknown) => matchesSchema(schema, input, definitions);
+  if (s.not && match(s.not, value)) return false;
+  if (s.allOf && !s.allOf.every(v => match(v, value))) return false;
+  if (s.if && !match(match(s.if, value) ? s.then || {} : s.else || {}, value)) return false;
+  if (s.$ref) { const ref = definitions[s.$ref.split('/').at(-1)!]; return !!ref && match(ref, value); }
+  if (s.oneOf) return s.oneOf.filter(v => match(v, value)).length === 1;
+  if (s.anyOf) return s.anyOf.some(v => match(v, value));
   if ('const' in s && value !== s.const) return false;
   if (s.enum && !s.enum.includes(value)) return false;
   if (s.type === 'null') return value === null;
@@ -20,7 +22,7 @@ export function matchesSchema(s: Schema, value: unknown): boolean {
   if (s.type === 'integer' || s.type === 'number') return typeof value === 'number' && Number.isSafeInteger(value) &&
     (s.minimum === undefined || value >= s.minimum) && (s.maximum === undefined || value <= s.maximum) &&
     (!s.multipleOf || value % s.multipleOf === 0);
-  if (s.type === 'string') return typeof value === 'string' &&
+  if (s.type === 'string' || typeof value === 'string' && (s.pattern || s.minLength !== undefined || s.maxLength !== undefined || s.format)) return typeof value === 'string' &&
     (s.minLength === undefined || value.length >= s.minLength) && (s.maxLength === undefined || value.length <= s.maxLength) &&
     (!s.pattern || new RegExp(s.pattern).test(value)) &&
     (s.format !== 'uuid' || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) &&
@@ -29,12 +31,12 @@ export function matchesSchema(s: Schema, value: unknown): boolean {
     (s.format !== 'uri' || (() => { try { return !!new URL(value).protocol; } catch { return false; } })());
   if (s.type === 'array') return Array.isArray(value) && (s.maxItems === undefined || value.length <= s.maxItems) &&
     (s.minItems === undefined || value.length >= s.minItems) && (!s.uniqueItems || new Set(value.map(v => JSON.stringify(v))).size === value.length) &&
-    value.every((v,i) => matchesSchema(s.prefixItems?.[i] || s.items || {}, v));
-  if (s.type === 'object' || s.properties) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    value.every((v,i) => match(s.prefixItems?.[i] || s.items || {}, v));
+  if (s.type === 'object' || s.properties || s.required) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return s.type !== 'object';
     const obj = value as Record<string, unknown>;
     return (s.required || []).every(k => Object.hasOwn(obj, k)) && Object.entries(obj).every(([k,v]) =>
-      s.properties?.[k] ? matchesSchema(s.properties[k], v) : s.additionalProperties !== false);
+      s.properties?.[k] ? match(s.properties[k], v) : s.additionalProperties !== false);
   }
   return true;
 }

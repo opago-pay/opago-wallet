@@ -3,12 +3,12 @@ import type { Error as ContractError } from './contract-types';
 
 export type AuthKind = 'none' | 'account' | 'wallet' | 'receipt';
 export type Request = { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: string; body: unknown;
-  idempotencyKey?: string; auth: AuthKind; bearer?: string };
+  idempotencyKey?: string; auth: AuthKind; bearer?: string; contract?: 'tx-foundation-v3' };
 /** HKA owns key discovery, pinned roots, fresh HPKE envelopes and authenticated decryption.
  * No legacy login encryption or plaintext fallback may satisfy this boundary. */
 export interface HkaTransport {
   readonly mode: 'hka' | 'contract-test';
-  request(request: Request): Promise<{ status: number; body: unknown; authenticated: true; retryAfterSeconds?: number }>;
+  request(request: Request): Promise<{ status: number; body: unknown; authenticated: true; retryAfterSeconds?: number; requestId?: string }>;
 }
 export class OpagoError extends Error {
   constructor(readonly code: string, readonly retryable = false, readonly status = 0, readonly retryAfterSeconds = 0) {

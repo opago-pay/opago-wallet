@@ -1,0 +1,150 @@
+{
+  "contract": "tx-foundation-v3",
+  "version": "3.0.0-draft.1",
+  "errors": [
+    {
+      "code": "invalid_request",
+      "http_status": 400,
+      "retryable": false,
+      "description": "The request does not match the schema or a field fails a syntactic rule. Nothing is stored."
+    },
+    {
+      "code": "challenge_invalid",
+      "http_status": 400,
+      "retryable": false,
+      "description": "The binding or session challenge is unknown, expired, already used, issued to another account, or the signature does not verify. One code for every case, so the answer gives no oracle."
+    },
+    {
+      "code": "payment_request_invalid",
+      "http_status": 400,
+      "retryable": false,
+      "description": "The outgoing payment request cannot be decoded, has no encoded amount, has expired, or is for another network."
+    },
+    {
+      "code": "forbidden",
+      "http_status": 403,
+      "retryable": false,
+      "description": "The credential is missing, invalid, expired, or does not authorize the target wallet, POS device, registration or tenant. A wallet of another tenant or owner gives this code, never a not-found code. Registration operations also use it for a locked customer account, an inactive wallet and a wallet with unknown custody, as v2 does."
+    },
+    {
+      "code": "custodial_not_licensed",
+      "http_status": 403,
+      "retryable": false,
+      "description": "The custodial lock is closed for this customer (custodial-license-gate.md)."
+    },
+    {
+      "code": "tme_rejected",
+      "http_status": 403,
+      "retryable": false,
+      "description": "An enforcing pre-check rejected the registration. Terminal."
+    },
+    {
+      "code": "kyc_level_insufficient",
+      "http_status": 403,
+      "retryable": false,
+      "description": "The custodial identification gate does not pass."
+    },
+    {
+      "code": "travel_rule_unidentified",
+      "http_status": 403,
+      "retryable": false,
+      "description": "The Travel Rule counterparty identification required for the custodial flow is missing."
+    },
+    {
+      "code": "registration_cancelled",
+      "http_status": 410,
+      "retryable": false,
+      "description": "The registration is cancelled; no further invoice or send is possible (v2 code)."
+    },
+    {
+      "code": "registration_not_found",
+      "http_status": 404,
+      "retryable": false,
+      "description": "No registration with this ID is visible to the principal."
+    },
+    {
+      "code": "not_found",
+      "http_status": 404,
+      "retryable": false,
+      "description": "No address binding, payment report or payment with this ID is visible to the principal."
+    },
+    {
+      "code": "idempotency_conflict",
+      "http_status": 409,
+      "retryable": false,
+      "description": "The Idempotency-Key was already used in the same scope with another request digest."
+    },
+    {
+      "code": "payment_exists",
+      "http_status": 409,
+      "retryable": false,
+      "description": "The POS external_reference is already registered for this device, or the external invoice already has a live outgoing registration on this wallet."
+    },
+    {
+      "code": "registration_paid",
+      "http_status": 409,
+      "retryable": false,
+      "description": "The registration is paid; no further invoice, send or cancellation is possible."
+    },
+    {
+      "code": "wallet_already_bound",
+      "http_status": 409,
+      "retryable": false,
+      "description": "The wallet source identity is already bound, or is reserved by a tombstone."
+    },
+    {
+      "code": "wallet_inactive",
+      "http_status": 409,
+      "retryable": false,
+      "description": "AccountBearer write on a wallet that is inactive or deleted (tombstone). A WalletBearer of such a wallet is invalid and gets 403 forbidden."
+    },
+    {
+      "code": "custody_unknown",
+      "http_status": 409,
+      "retryable": false,
+      "description": "AccountBearer address binding on a wallet whose custody type is unknown; unknown custody blocks payment enablement. Registration operations answer 403 forbidden for it, as v2 does."
+    },
+    {
+      "code": "address_taken",
+      "http_status": 409,
+      "retryable": false,
+      "description": "The address value has an active binding to another wallet."
+    },
+    {
+      "code": "asset_not_enabled",
+      "http_status": 422,
+      "retryable": false,
+      "description": "The asset is defined in this contract but not yet enabled by the governing documents (HBAR evidence and binding rules)."
+    },
+    {
+      "code": "rail_not_enabled",
+      "http_status": 422,
+      "retryable": false,
+      "description": "The rail is defined in this contract but not yet enabled for this operation (Spark and Hedera Path A issuance and settlement binding)."
+    },
+    {
+      "code": "tme_pending",
+      "http_status": 503,
+      "retryable": true,
+      "description": "The pre-check is pending; retry after Retry-After."
+    },
+    {
+      "code": "tme_unavailable",
+      "http_status": 503,
+      "retryable": true,
+      "description": "Transaction monitoring policy or engine is unavailable; retry with the same Idempotency-Key after Retry-After (default 5 s)."
+    },
+    {
+      "code": "upstream_unavailable",
+      "http_status": 503,
+      "retryable": true,
+      "description": "A provider call or reconciliation is in progress or unavailable; retry after Retry-After."
+    },
+    {
+      "code": "upstream_timeout",
+      "http_status": 504,
+      "retryable": true,
+      "description": "The provider outcome of an invoice or send is not known yet; retry with the same Idempotency-Key (v2 code)."
+    }
+  ]
+}

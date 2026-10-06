@@ -17,12 +17,16 @@ import type { BitcoinSparkWallet } from '../spark-bitcoin-wallet';
 import { nativeF3Enabled } from './settings-native';
 import { PosLinking, type PosLinkSource } from './pos-link';
 import { installPosQrSource } from './pos-qr-native';
+import { HkaTransactionPort } from './tx-api';
+import type { SyncOwner, TxAuthorization, TxPort } from './tx-sync';
 
 export type F3Integration = { hka: HkaTransport; accountLogin: AccountLogin; disclosure?: UmaDisclosureProvider; publicAddressOrigin: string;
   /** Jointly approved revision resolving 0.2.0 versus TRU's non-wait decision. */
   umaContractResolution?: string;
   /** Awaiting versioned QR + wallet-readable review/status/list contract. */
-  posLinkSource?: PosLinkSource };
+  posLinkSource?: PosLinkSource;
+  /** Explicit backend agreement resolving v3 auth/IDs/networks and HPKE framing. */
+  transactionSync?: { revision: '3.0.0-draft.1'; resolution: string; authorize(account: OpagoAccount, owner: SyncOwner): Promise<TxAuthorization> } };
 let integration: F3Integration | null = null;
 let initializing: Promise<void> | null = null;
 async function ensureIntegration() {
@@ -41,11 +45,13 @@ export function installF3Integration(value: F3Integration) {
   const origin = new URL(value.publicAddressOrigin);
   if (origin.protocol !== 'https:' || origin.origin !== value.publicAddressOrigin || origin.username || origin.password) throw new Error('Invalid public address origin.');
   if (value.posLinkSource?.mode === 'contract-test') throw new Error('A local POS adapter cannot be installed in the live integration.');
+  if (value.transactionSync && (value.transactionSync.revision !== '3.0.0-draft.1' || !value.transactionSync.resolution)) throw new Error('A reviewed transaction sync resolution is required.');
   installPosQrSource(value.posLinkSource);
   integration = value;
 }
 export function f3IntegrationAvailable() { return integration !== null || nativeF3Enabled(); }
 export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinking; testOnly: boolean;
+  transactionSyncPort?: TxPort;
   startupError?: unknown;
   publicAddressOrigin: string;
   perform(action: () => Promise<unknown>): Promise<void>;
@@ -99,7 +105,11 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
   const startupError = testOnly ? undefined : await account.refreshAfterLoad();
   assertCurrent();
   let prepared: PreparedSparkPayment | null = null;
-  return { account, uma, pos, testOnly, startupError, setTestKya: testKya, startTestPos, confirmTestOperator, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
+  const txIntegration = !testOnly ? integration : null;
+  const transactionSyncPort = txIntegration?.transactionSync ? new HkaTransactionPort({ mode: 'hka', request: async request => {
+    assertCurrent(); const result = await txIntegration.hka.request(request); assertCurrent(); return result;
+  } }, owner => txIntegration.transactionSync!.authorize(account, owner)) : undefined;
+  return { account, uma, pos, testOnly, transactionSyncPort, startupError, setTestKya: testKya, startTestPos, confirmTestOperator, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
     async perform(action) { await account.exclusive(async () => { assertCurrent(); await action(); assertCurrent(); }); },
     async prepare() {
       await uma.consentAndPrepare(uma.payment!.disclosure.id, async invoice => {
