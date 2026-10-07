@@ -78,10 +78,11 @@
         }
       ],
       "expo-sqlite",
+      ["expo-image-picker", { "cameraPermission": "Allow Opago to photograph your identity document for the photo and data comparison.", "photosPermission": "Allow Opago to select an identity document image for the photo and data comparison.", "microphonePermission": false }],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Opago to use your camera to scan payment QR codes.",
+          "cameraPermission": "Allow Opago to scan payment QR codes and photograph your identity document for the photo and data comparison.",
           "recordAudioAndroid": false,
           "microphonePermission": false
         }

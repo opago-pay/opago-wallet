@@ -1,5 +1,7 @@
 import { ed25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
+import { gcm } from '@noble/ciphers/aes';
+import { inspectPhoto, photoHash } from './identity-media';
 import { hpkeSuite, responseDecrypt } from './hpke-crypto';
 import { assertContract, routeContract, routeQueryParameters, matchesSchema } from './contract';
 import type { AppConfig, KeyDocument, HpkeResponse, HpkeRequest } from './contract-types';
@@ -8,7 +10,7 @@ import type { PrivateStore } from './store';
 import { base64url, unbase64url, jcs, parseStrictJson, strictUtf8, utf8 } from './encoding';
 import { txRoute, txDefinitions } from './tx-contract';
 
-export type HkaHttp = (url: string, options: { method: Request['method']; headers: Record<string, string>; body?: string;
+export type HkaHttp = (url: string, options: { method: Request['method']; headers: Record<string, string>; body?: string; binaryBody?: Uint8Array;
   maxBytes: number; timeoutMs: number }) => Promise<{ status: number; body: string; contentType: string; cacheControl?: string; retryAfter?: string; requestId?: string }>;
 export type HkaTrust = { audience: string; roots: Record<string, string>; platform: 'ios' | 'android'; build: number;
   oidc: { issuer: string; clientId: string; redirectUri: string }; testOnly?: boolean;
@@ -64,6 +66,7 @@ export function verifyKeyDocument(value: unknown, config: AppConfig, trust: HkaT
 /** V6/V7 contract transport. It never retries a business operation or accepts a plaintext success. */
 export class NativeHkaTransport implements HkaTransport {
   readonly mode: 'hka' | 'contract-test';
+  get audience() { return this.trust.audience; }
   private current?: { config: AppConfig; keys: KeyDocument; freshUntil: number };
   private refreshing?: Promise<{ config: AppConfig; keys: KeyDocument }>;
   constructor(readonly trust: HkaTrust, private readonly http: HkaHttp, private readonly store: PrivateStore,
@@ -113,16 +116,28 @@ export class NativeHkaTransport implements HkaTransport {
     catch (cause) { this.current = undefined; throw cause; } // Next explicit retry refreshes trust, never downgrades.
   }
   private async attempt(request: Request, renewed: boolean): Promise<{ status: number; body: unknown; authenticated: true; retryAfterSeconds?: number; requestId?: string }> {
-    const deadline = this.now() + 10_000;
+    const photoRoute = request.method === 'POST' && /^\/api\/v2\/onboarding\/kyc\/[0-9a-f-]{36}\/documents\?/.test(request.path);
+    const deadline = this.now() + (photoRoute ? 120_000 : 10_000);
     const v3 = request.contract === 'tx-foundation-v3';
     if (v3 && !this.trust.txFoundationResolution) throw new Error('sync_backend_pending');
     const target = canonicalTarget(request.path, request.method, v3);
+    if (photoRoute !== !!request.photo || photoRoute && v3) throw new Error('Invalid photo request policy.');
+    if (photoRoute) {
+      const descriptor = request.body as import('./contract-types').PhotoDescriptor;
+      assertContract('PhotoDescriptor', descriptor);
+      const image = inspectPhoto(request.photo!);
+      if (descriptor.submission_id !== target.path.split('/')[5] ||
+          String(descriptor.revision) !== new URLSearchParams(target.target.split('?')[1]).get('revision') ||
+          descriptor.side !== new URLSearchParams(target.target.split('?')[1]).get('side') ||
+          descriptor.plaintext_length !== request.photo!.length || descriptor.content_type !== image.contentType ||
+          descriptor.original_sha256 !== photoHash(request.photo!)) throw new Error('Invalid photo descriptor binding.');
+    }
     if (v3) {
       if (!matchesSchema(txRoute(request.method, target.path).request, request.body, txDefinitions)) throw new Error('sync_invalid_contract');
     } else { const contract = routeContract(request.method, target.path); assertContract(contract.request, request.body); }
     if (request.method !== 'GET' && !uuid.test(request.idempotencyKey || '') || request.auth !== 'none' && !request.bearer ||
       ['GET', 'DELETE'].includes(request.method) && jcs(request.body) !== '{}') throw new Error('Invalid HPKE request policy.');
-    const { config, keys } = await this.configuration(deadline);
+    const { config, keys } = await this.configuration(Math.min(deadline,this.now() + 10_000));
     const key = keys.document.keys.find(k => k.kid === keys.document.active_kid)!;
     const bytes = utf8(jcs(request.body)); if (bytes.length > 65_536) throw new Error('HPKE request exceeds limit.');
     const nonce = this.random(16); const entropy = this.random(32);
@@ -147,13 +162,22 @@ export class NativeHkaTransport implements HkaTransport {
       }
       if (request.auth !== 'none') headers.Authorization = 'Bearer ' + request.bearer;
       if (request.method !== 'GET') headers['Idempotency-Key'] = request.idempotencyKey!;
-      let body: string | undefined;
-      if (['GET', 'DELETE'].includes(request.method)) {
+      let body: string | undefined; let binaryBody: Uint8Array | undefined;
+      if (photoRoute) {
+        const photoKey = new Uint8Array(await context.export(utf8('opago-photo'), 32));
+        try {
+          const iv = this.random(12); if (iv.length !== 12) throw new Error('Secure randomness is unavailable.');
+          const cipher = gcm(photoKey, iv, utf8(jcs({ request_aad: aad, document: request.body }))).encrypt(request.photo!);
+          binaryBody = new Uint8Array(iv.length + cipher.length); binaryBody.set(iv); binaryBody.set(cipher, iv.length);
+        } finally { photoKey.fill(0); }
+        headers['Content-Type'] = 'application/octet-stream';
+      }
+      if (['GET', 'DELETE'].includes(request.method) || photoRoute) {
         headers['X-Opago-Envelope'] = base64url(utf8(serialized));
         if (headers['X-Opago-Envelope'].length > 16_384) throw new Error('HPKE header exceeds limit.');
       } else { body = serialized; headers['Content-Type'] = 'application/json'; }
       if (this.now() >= deadline || date(config.valid_until) <= this.now() || date(key.not_after) <= this.now()) throw new Error('HKA request expired before transmission.');
-      const result = await this.http(this.trust.audience + target.target, { method: request.method, headers, body, maxBytes: 91_500, timeoutMs: Math.max(1, deadline - this.now()) });
+      const result = await this.http(this.trust.audience + target.target, { method: request.method, headers, body, ...(binaryBody ? { binaryBody } : {}), maxBytes: 91_500, timeoutMs: Math.max(1, deadline - this.now()) });
       if (v3 && (!uuid.test(result.requestId || '') || !/(?:^|,)\s*no-store\s*(?:,|$)/i.test(result.cacheControl || ''))) throw new Error('sync_invalid_contract');
       if (this.now() >= deadline || !Number.isInteger(result.status) || result.status < 200 || result.status > 599 || result.status >= 300 && result.status < 400 ||
         !/^application\/json(?:\s*;|$)/i.test(result.contentType) || utf8(result.body).length > 91_500) throw new Error('Invalid HKA response.');

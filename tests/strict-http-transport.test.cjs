@@ -42,6 +42,17 @@ test('native JSON requests use the bounded native transport and never fall back 
   assert.equal(called, true);
 });
 
+test('P3 binary native requests carry encrypted bytes only on the contracted photo endpoint and never fall back', async () => {
+  const payload = Buffer.alloc(29,7).toString('base64'); let captured;
+  const transport = nativeTransport({ request: async options => { captured=options; return {status:201,contentType:'application/json',body:'{}'};},cancel:async()=>{} });
+  const url='https://example.org/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents?revision=1&side=front';
+  const options={method:'POST',headers:{'Content-Type':'application/octet-stream','X-Opago-Envelope':'synthetic-encrypted-descriptor'}};
+  await transport(url,options,91500,false,{base64:payload,timeoutMs:120000});
+  assert.equal(captured.bodyEncoding,'base64');assert.equal(captured.body,payload);assert.equal(captured.timeoutMs,120000);assert.equal(captured.maxBytes,91500);
+  await assert.rejects(transport('https://example.org/arbitrary',options,91500,false,{base64:payload,timeoutMs:120000}));
+  await assert.rejects(nativeTransport(null)(url,options,91500,true,{base64:payload,timeoutMs:120000}),/Secure network transport is unavailable/);
+});
+
 test('untrusted native requests fail closed when the peer-bound module is absent', async () => {
   await assert.rejects(nativeTransport(null)('https://example.org/api', {}),
     /Secure network transport is unavailable/);

@@ -4,6 +4,7 @@ import { strictFetch, readBoundedText } from '../strict-http-transport';
 import { base64url, parseStrictJson, utf8 } from './encoding';
 import type { HkaHttp } from './hka';
 import type { OidcVerifierPorts } from './oidc-verifier';
+import { Buffer } from 'buffer';
 
 function bridge() {
   const module = requireOptionalNativeModule<{ verifyRs256(n: string, e: string, message: string, signature: string): Promise<boolean> }>('OpagoSafeHttp');
@@ -13,9 +14,10 @@ function bridge() {
 export const nativeHkaHttp: HkaHttp = async (url, options) => {
   bridge(); const endpoint = new URL(url);
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) throw new Error('Invalid account endpoint.');
-  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), Math.min(10_000, options.timeoutMs));
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), Math.min(options.binaryBody ? 120_000 : 10_000, options.timeoutMs));
   try {
-    const response = await strictFetch(url, { method: options.method, headers: options.headers, body: options.body, signal: controller.signal, redirect: 'error' }, options.maxBytes);
+    const response = await strictFetch(url, { method: options.method, headers: options.headers, body: options.body, signal: controller.signal, redirect: 'error' }, options.maxBytes, false,
+      options.binaryBody ? { base64: Buffer.from(options.binaryBody).toString('base64'), timeoutMs: options.timeoutMs } : undefined);
     if (response.redirected || response.url && response.url !== url) throw new Error('Account redirect rejected.');
     const body = await readBoundedText(response, 'OPAGO account', options.maxBytes, controller, options.maxBytes);
     if (utf8(body).length > options.maxBytes) throw new Error('Account response exceeds limit.');

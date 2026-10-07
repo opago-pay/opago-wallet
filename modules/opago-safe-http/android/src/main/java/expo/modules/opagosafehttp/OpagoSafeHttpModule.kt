@@ -56,7 +56,9 @@ class OpagoSafeHttpModule : Module() {
         val body = options["body"] as? String ?: throw IOException("Invalid body.")
         // React Native's generic map bridge may represent a JS integer as Double.
         val maxBytes = boundedBridgeInteger(options["maxBytes"], 1, 8_000_000)
-        val timeoutMs = boundedBridgeInteger(options["timeoutMs"], 1, 30_000)
+        val binary = options["bodyEncoding"] == "base64"
+        if (options["bodyEncoding"] != null && !binary) throw IOException("Invalid body encoding.")
+        val timeoutMs = boundedBridgeInteger(options["timeoutMs"], 1, if (binary) 120_000 else 30_000)
         val allowPrivateDevelopment = options["allowPrivateDevelopment"] as? Boolean ?: false
         val requestId = options["requestId"] as? String ?: throw IOException("Invalid request ID.")
         val headers = (options["headers"] as? Map<*, *>)?.entries?.associate { entry ->
@@ -64,12 +66,15 @@ class OpagoSafeHttpModule : Module() {
             (entry.value as? String ?: throw IOException("Invalid header."))
         } ?: throw IOException("Invalid headers.")
         val uri = URI(url)
+        val payload = requestPayload(body, options["bodyEncoding"], method, uri.path, uri.scheme,
+          headers.entries.firstOrNull { it.key.equals("content-type", true) }?.value,
+          headers.entries.any { it.key.equals("x-opago-envelope", true) })
         val development = allowPrivateDevelopment &&
           ((appContext.reactContext?.applicationInfo?.flags ?: 0) and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (uri.host.isNullOrBlank() || uri.userInfo != null ||
           (uri.scheme != "https" && !(development && uri.scheme == "http")) ||
           method !in setOf("GET", "POST", "PUT", "DELETE") || requestId.isBlank() ||
-          (method in setOf("GET", "DELETE") && body.isNotEmpty()) || body.toByteArray(Charsets.UTF_8).size > 1_048_576) {
+          (method in setOf("GET", "DELETE") && body.isNotEmpty()) || (!binary && payload.size > 1_048_576)) {
           throw IOException("Invalid secure request.")
         }
         // OkHttp does not call Dns for an IP literal. Reject it before connect.
@@ -113,7 +118,7 @@ class OpagoSafeHttpModule : Module() {
           builder.header(name, value)
         }
         val requestBody = if (method == "POST" || method == "PUT") {
-          body.toRequestBody(headers.entries.firstOrNull { it.key.equals("content-type", true) }
+          payload.toRequestBody(headers.entries.firstOrNull { it.key.equals("content-type", true) }
             ?.value?.toMediaTypeOrNull())
         } else null
         val call = client.newCall(builder.method(method, requestBody).build())

@@ -50,6 +50,7 @@ export default function OpagoAccountScreen() {
         {state.session && <Action label="Refresh account status" disabled={busy} onPress={() => void run(() => account.refresh())} />}
       </Card>
       <Card title="Identity status">
+        <Action label="Open identity onboarding" disabled={busy || !state.session} onPress={() => router.push({ pathname: '/identity', params: testOnly ? { test: '1' } : {} })} />
         <Copy>{t(wallet?.photo_match ? kyaText[wallet.photo_match.status] : 'Identity onboarding has not been submitted.')}</Copy>
         {wallet?.photo_match?.active_approval_revision && wallet.photo_match.status !== 'approved' ?
           <Copy>{t('Your previous approved revision remains active. This does not indicate a fully verified identity.')}</Copy> : null}

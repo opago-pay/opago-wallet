@@ -33,7 +33,7 @@ test('untrusted iOS payment URLs retain the native fail-closed boundary', () => 
   const transport = read('lib/strict-http-transport.ts');
   const lnurl = read('lib/lnurl-safe.ts');
   const ocp = read('lib/ocp-safe.ts');
-  assert.match(transport, /if \(trustedFixedOrigin\) \{/);
+  assert.match(transport, /if \(trustedFixedOrigin && !photo\) \{/);
   assert.match(transport, /throw new Error\('Secure network transport is unavailable on this device\.'\)/);
   assert.match(transport, /boundedNativeResponses\.set\(response, maxBytes\)/);
   assert.doesNotMatch(lnurl, /trustedFixedOrigin\s*:\s*true/);

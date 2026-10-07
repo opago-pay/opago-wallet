@@ -30,7 +30,7 @@ const request = () => ({ method: 'POST', path: '/api/v2/wallet/auth/logout', bod
 function transportFixture(store = new MemoryPrivateStore(), v3 = false) {
   const state = { now: epoch, config: configuration(), keys: clone(signed.response), requests: [], plainCalls: 0, failConfig: false, responseMode: '', status: 200 };
   const http = async (url, options) => {
-    assert.ok(options.timeoutMs <= 10000); assert.equal(options.headers['Cache-Control'], 'no-store');
+    assert.ok(options.timeoutMs <= (options.binaryBody ? 120000 : 10000)); assert.equal(options.headers['Cache-Control'], 'no-store');
     if (url.endsWith('/app/config') || url.endsWith('/auth/hpke-key')) {
       state.plainCalls++; if (state.failConfig) throw new Error('Synthetic outage');
       return { status: 200, contentType: 'application/json', cacheControl: state.responseMode === 'cache' ? 'public' : 'no-store', body: jcs(url.endsWith('/app/config') ? state.config : state.keys) };
@@ -44,6 +44,12 @@ function transportFixture(store = new MemoryPrivateStore(), v3 = false) {
     const context = await hpkeSuite.createRecipientContext({ recipientKey: await hpkeSuite.kem.deserializePrivateKey(hex(vectors[0].test_receiver_private_key_hex)),
       enc: unbase64url(envelope.enc), info: utf8('opago-api:hpke:v1\0' + trust.audience + '\0' + envelope.kid) });
     const clear = parseStrictJson(strictUtf8(new Uint8Array(await context.open(unbase64url(envelope.ciphertext), utf8(jcs(aad))))));
+    if (options.binaryBody) {
+      const bytes = options.binaryBody;
+      const key = new Uint8Array(await context.export(utf8('opago-photo'),32));
+      state.photo = gcm(key,bytes.slice(0,12),utf8(jcs({request_aad:aad,document:clear}))).decrypt(bytes.slice(12));
+      key.fill(0);
+    }
     state.requests.push({ envelope, clear, options, aad });
     const key = new Uint8Array(await context.export(utf8('opago-response'), 32)); const iv = randomBytes(12);
     const responseAad = utf8(jcs({ request_aad: { ...aad, ...(state.responseMode === 'binding' ? { path: '/api/v2/wallet/other' } : {}) }, http_status: state.status }));
@@ -89,6 +95,19 @@ test('F4 POS confirmation uses the contractual wallet route through authenticate
   assert.equal(f.state.requests[0].aad.idempotency_key, f.state.requests[1].aad.idempotency_key);
   assert.notEqual(f.state.requests[0].envelope.enc, f.state.requests[1].envelope.enc);
   assert.notEqual(f.state.requests[0].envelope.nonce, f.state.requests[1].envelope.nonce);
+});
+
+test('P3 HKA seals actual photo bytes with the descriptor exporter/AAD and rejects descriptor, route and image mismatches before dispatch', async () => {
+  const f=transportFixture();const fixture=require('./fixtures/p3-photo.json');const photo=new Uint8Array(Buffer.from(fixture.normalized_jpeg,'base64'));
+  const {photoHash}=require('../lib/opago/identity-media.ts');const id=randomUUID();
+  const descriptor={submission_id:id,revision:1,side:'front',content_type:'image/jpeg',plaintext_length:photo.length,original_sha256:photoHash(photo),expected_edit_version:1};
+  const result={document_id:randomUUID(),submission_id:id,revision:1,side:'front',original_sha256:descriptor.original_sha256,stored_sha256:descriptor.original_sha256,edit_version:2};
+  f.state.status=201;f.state.responseBody=jcs(result);const req={method:'POST',path:'/api/v2/onboarding/kyc/'+id+'/documents?side=front&revision=1',body:descriptor,photo,auth:'wallet',bearer:'synthetic-photo-token',idempotencyKey:randomUUID()};
+  const api=new OpagoApi(f.transport);assert.deepEqual(await api.call(req),result);assert.deepEqual(f.state.photo,photo);assert.deepEqual(await api.call(req),result);
+  const [a,b]=f.state.requests;assert.equal(a.options.body,undefined);assert.ok(a.options.headers['X-Opago-Envelope']);assert.equal(a.options.headers['Content-Type'],'application/octet-stream');
+  assert.notDeepEqual(a.options.binaryBody,b.options.binaryBody);assert.notEqual(a.envelope.enc,b.envelope.enc);assert.equal(a.aad.idempotency_key,b.aad.idempotency_key);
+  for(const body of [{...descriptor,original_sha256:'0'.repeat(64)},{...descriptor,revision:2},{...descriptor,side:'back'},{...descriptor,content_type:'image/png'},{...descriptor,plaintext_length:photo.length+1}])await assert.rejects(api.call({...req,body}));
+  await assert.rejects(api.call({...req,photo:undefined}));assert.equal(f.state.requests.length,2);
 });
 
 test('HKA Hermes primitives match all shared Python-generated HPKE vectors, response and photo exporters', async () => {

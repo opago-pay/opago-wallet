@@ -1,6 +1,7 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "Erlaube Opago den Kamerazugriff, um Zahlungs-QR-Codes zu scannen.",
+    "NSCameraUsageDescription": "Erlaube Opago, Zahlungs-QR-Codes zu scannen und dein Ausweisdokument für den Foto- und Datenabgleich zu fotografieren.",
+    "NSPhotoLibraryUsageDescription": "Erlaube Opago, ein Bild deines Ausweisdokuments für den Foto- und Datenabgleich auszuwählen.",
     "NSFaceIDUsageDescription": "Verwende Face ID, um deine Wallet zu entsperren, Zahlungen zu bestätigen und deine Wiederherstellungswörter anzuzeigen."
   }
 }
