@@ -38,6 +38,11 @@ function AppStack() {
   useEffect(() => { recordDiagnosticScreen(segments); }, [segments]);
   useEffect(() => { void diagnosticsConsent.initialize(); }, []);
   useEffect(() => {
+    // Remove private media copies left by an interrupted previous process.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    void (require('../lib/opago/identity-media-native') as typeof import('../lib/opago/identity-media-native')).cleanupIdentityPhotos().catch(() => {});
+  }, []);
+  useEffect(() => {
     const stop = startEventLoopMonitor(() => AppState.currentState === 'active');
     return stop;
   }, []);
@@ -54,6 +59,7 @@ function AppStack() {
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="identity" options={{ headerShown: false }} />
           <Stack.Screen name="pos-link" options={{ headerShown: false }} />
           <Stack.Screen name="transaction-sync" options={{ headerShown: false }} />
           <Stack.Screen name="uma-send" options={{ headerShown: false }} />

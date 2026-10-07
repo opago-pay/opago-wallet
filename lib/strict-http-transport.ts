@@ -4,7 +4,7 @@ import { walletSession } from './wallet-session';
 type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string; cacheControl?: string; requestId?: string };
 type NativeTransport = {
   request(options: { url: string; method: string; headers: Record<string, string>; body: string;
-    maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
+    bodyEncoding?: 'base64'; maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
   cancel(requestId: string): Promise<void>;
 };
 
@@ -23,12 +23,14 @@ function aborted(): Error {
 }
 
 export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_097_152,
-  trustedFixedOrigin = false): Promise<Response> {
+  trustedFixedOrigin = false, photo?: { base64: string; timeoutMs: number }): Promise<Response> {
+  if (photo && (!isNativeRuntime() || init.method !== 'POST' || init.body || !/^https:\/\/[^/?#]+\/api\/v2\/onboarding\/kyc\/[0-9a-f-]{36}\/documents\?/.test(url) ||
+      photo.base64.length > 13981056 || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo.base64))) throw new Error('Invalid encrypted photo transport.');
   if (!isNativeRuntime()) return globalThis.fetch(url, { ...init, redirect: 'error' });
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const native: NativeTransport | null = require('expo-modules-core').requireOptionalNativeModule('OpagoSafeHttp');
   if (!native) {
-    if (trustedFixedOrigin) {
+    if (trustedFixedOrigin && !photo) {
       // Compatibility only for fixed provider origins when the iOS module is absent.
       // QR/LNURL/OCP-controlled URLs never receive this exception.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,8 +56,9 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
   const unsubscribeSession = walletSession.subscribe(onAbort);
   try {
     if (init.signal?.aborted) throw aborted();
-    const result = await native.request({ url, method, headers, body: (init.body as string) || '',
-      maxBytes, timeoutMs: 12_000, allowPrivateDevelopment: appConfig.allowInsecureHttp, requestId });
+    const result = await native.request({ url, method, headers, body: photo?.base64 || (init.body as string) || '',
+      ...(photo ? { bodyEncoding: 'base64' as const } : {}),
+      maxBytes, timeoutMs: photo ? Math.min(120_000, Math.max(1, photo.timeoutMs)) : 12_000, allowPrivateDevelopment: appConfig.allowInsecureHttp, requestId });
     if (wasAborted) throw aborted();
     if (!Number.isInteger(result.status) || result.status < 100 || result.status > 599 ||
       typeof result.body !== 'string' || typeof result.contentType !== 'string') {

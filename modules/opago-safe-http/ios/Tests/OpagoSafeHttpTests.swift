@@ -152,6 +152,23 @@ final class OpagoSafeHttpTests: XCTestCase {
     unsafeURL["url"] = "https://user:pass@example.com/"
     XCTAssertThrowsError(try SafeRequest(unsafeURL))
   }
+  func testBinaryPhotoRequestIsBoundedAndPreservesCiphertextBytes() throws {
+    let bytes = Data((0..<29).map { UInt8($0) })
+    var raw: [String: Any] = ["url": "https://example.com/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents?revision=1&side=front",
+      "method": "POST", "headers": ["Content-Type": "application/octet-stream", "X-Opago-Envelope": "synthetic"],
+      "body": bytes.base64EncodedString(), "bodyEncoding": "base64", "maxBytes": 91500, "timeoutMs": 120000, "requestId": "binary-test"]
+    let parsed = try SafeRequest(raw)
+    XCTAssertEqual(Data(parsed.requestData.suffix(bytes.count)),bytes)
+    raw["url"] = "https://example.com/another-route"
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["url"] = "https://example.com/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents"
+    raw["body"] = Data(repeating: 0,count: 28).base64EncodedString()
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["body"] = Data(repeating: 0,count: 10_485_789).base64EncodedString()
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["body"] = bytes.base64EncodedString(); raw["method"] = "GET"
+    XCTAssertThrowsError(try SafeRequest(raw))
+  }
 }
 
 // Run this only with a separately identified test-app and controlled DNS/TLS

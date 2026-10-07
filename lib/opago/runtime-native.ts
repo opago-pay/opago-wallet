@@ -57,7 +57,8 @@ export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinkin
   perform(action: () => Promise<unknown>): Promise<void>;
   prepare(): Promise<void>; confirm(): Promise<void>; reconcile(): Promise<void>;
   setTestKya?: (status: 'draft' | 'submitted' | 'in_review' | 'approved' | 'correction_requested' | 'rejected') => Promise<void>;
-  startTestPos?: () => Promise<string>; confirmTestOperator?: (id: string) => Promise<void> };
+  startTestPos?: () => Promise<string>; confirmTestOperator?: (id: string) => Promise<void>;
+  setTestIdentity?: (status: 'in_review'|'approved'|'correction_requested'|'rejected') => Promise<void>; loseTestIdentityResponse?: () => void };
 const live = new WeakMap<BitcoinSparkWallet, Promise<F3Runtime>>();
 let test: Promise<F3Runtime> | null = null;
 let accountOnly: Promise<F3Runtime> | null = null;
@@ -66,22 +67,24 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
   const assertCurrent = walletSession.captureRuntime();
   let account: OpagoAccount; let uma: UmaSending; let testKya: F3Runtime['setTestKya'];
   let source: PosLinkSource | undefined; let startTestPos: F3Runtime['startTestPos']; let confirmTestOperator: F3Runtime['confirmTestOperator'];
+  let setTestIdentity: F3Runtime['setTestIdentity']; let loseTestIdentityResponse: F3Runtime['loseTestIdentityResponse'];
   if (testOnly) {
     if (!__DEV__) throw new Error('Contract test adapter is unavailable in production.');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { F4ContractTestBackend } = require('./pos-test-adapter') as typeof import('./pos-test-adapter');
-    const backend = new F4ContractTestBackend(new MemoryPrivateStore(), randomUUID,
+    const { IdentityContractTestBackend } = require('./identity-test-adapter') as typeof import('./identity-test-adapter');
+    const backend = new IdentityContractTestBackend(new MemoryPrivateStore(), randomUUID,
       appConfig.isMainnet ? 'mainnet' : 'regtest');
     account = backend.createAccount(); uma = new UmaSending(account, backend.disclosure, backend.peer, decodeLightningInvoice);
     testKya = async status => { await backend.setKya(status); if (account.state.session) await account.refresh(); };
     source = backend; startTestPos = () => backend.operatorStart(); confirmTestOperator = id => backend.operatorConfirm(id);
+    setTestIdentity = status => backend.setIdentityStatus(status); loseTestIdentityResponse = () => { backend.loseNext = true; };
   } else {
     await ensureIntegration(); assertCurrent();
     if (!integration) throw new Error('OPAGO backend integration is not configured.');
     const configured = integration;
     const sparkKey = wallet ? await wallet.getIdentityPublicKey() : ''; assertCurrent();
     // Existing HKA transport owns all HPKE crypto. Guard lifecycle before and after requests.
-    const guarded: HkaTransport = { mode: 'hka', request: async request => {
+    const guarded: HkaTransport = { mode: 'hka', audience: configured.hka.audience, request: async request => {
       assertCurrent(); const result = await configured.hka.request(request); assertCurrent(); return result;
     } };
     account = new OpagoAccount(new OpagoApi(guarded), f3PrivateStore, { publicKey: sparkKey, available: !!wallet,
@@ -109,7 +112,7 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
   const transactionSyncPort = txIntegration?.transactionSync ? new HkaTransactionPort({ mode: 'hka', request: async request => {
     assertCurrent(); const result = await txIntegration.hka.request(request); assertCurrent(); return result;
   } }, owner => txIntegration.transactionSync!.authorize(account, owner)) : undefined;
-  return { account, uma, pos, testOnly, transactionSyncPort, startupError, setTestKya: testKya, startTestPos, confirmTestOperator, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
+  return { account, uma, pos, testOnly, transactionSyncPort, startupError, setTestKya: testKya, startTestPos, confirmTestOperator, setTestIdentity, loseTestIdentityResponse, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
     async perform(action) { await account.exclusive(async () => { assertCurrent(); await action(); assertCurrent(); }); },
     async prepare() {
       await uma.consentAndPrepare(uma.payment!.disclosure.id, async invoice => {

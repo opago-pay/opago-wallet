@@ -114,7 +114,7 @@ test('F3: invoice amount, network, hash, description binding, expiry and exchang
   const expected = { exchangeId: response.exchange_id, amountMsat: 100_000, network: account.identity.network, now: account.now() };
   for (const changed of [ { amount_msat: 101_000 }, { network: expected.network === 'regtest' ? 'mainnet' : 'regtest' },
     { payment_hash: '08'.repeat(32) }, { invoice_description_hash: '09'.repeat(32) }, { expires_at: new Date(account.now() - 1).toISOString() },
-    { exchange_id: randomUUID() }, { bolt11: response.bolt11.slice(0, -1) + 'q' },
+    { exchange_id: randomUUID() }, { bolt11: response.bolt11.slice(0, -1) + (response.bolt11.endsWith('q') ? 'p' : 'q') },
     { bolt11: invoice(101, Math.floor(account.now() / 1000), { descriptionHash: response.invoice_description_hash, paymentHash: response.payment_hash }) } ]) {
     assert.throws(() => validateUmaInvoice({ ...response, ...changed }, expected, decodeLightningInvoice));
   }

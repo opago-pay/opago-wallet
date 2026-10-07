@@ -14,6 +14,8 @@ struct SafeRequest {
   let requestId: String
 
   init(_ raw: [String: Any]) throws {
+    let binary = raw["bodyEncoding"] as? String == "base64"
+    guard raw["bodyEncoding"] == nil || binary else { throw SafeHTTPFailure.rejected }
     guard let urlString = raw["url"] as? String, urlString.utf8.count <= 8192,
           let components = URLComponents(string: urlString),
           let scheme = components.scheme?.lowercased(),
@@ -25,7 +27,7 @@ struct SafeRequest {
           let requestId = raw["requestId"] as? String,
           !requestId.isEmpty, requestId.utf8.count <= 128,
           let maxBytes = Self.integer(raw["maxBytes"], min: 1, max: 8_000_000),
-          let timeoutMs = Self.integer(raw["timeoutMs"], min: 1, max: 30_000) else {
+          let timeoutMs = Self.integer(raw["timeoutMs"], min: 1, max: binary ? 120_000 : 30_000) else {
       throw SafeHTTPFailure.rejected
     }
     let host = rawHost.hasPrefix("[") && rawHost.hasSuffix("]")
@@ -42,8 +44,21 @@ struct SafeRequest {
           !(["GET", "DELETE"].contains(method) && !body.isEmpty) else { throw SafeHTTPFailure.rejected }
     let portNumber = components.port ?? (scheme == "https" ? 443 : 80)
     guard (1...65535).contains(portNumber) else { throw SafeHTTPFailure.rejected }
-    let payload = Data(body.utf8)
-    guard payload.count <= 1_048_576 else { throw SafeHTTPFailure.rejected }
+    let payload: Data
+    if binary {
+      guard scheme == "https", method == "POST",
+            components.path.range(of: "^/api/v2/onboarding/kyc/[0-9a-f-]{36}/documents$", options: .regularExpression) != nil,
+            headers.first(where: { $0.key.lowercased() == "content-type" })?.value == "application/octet-stream",
+            headers.contains(where: { $0.key.lowercased() == "x-opago-envelope" }),
+            body.utf8.count <= 13_981_056, let decoded = Data(base64Encoded: body),
+            decoded.count >= 29, decoded.count <= 10_485_788, decoded.base64EncodedString() == body else {
+        throw SafeHTTPFailure.rejected
+      }
+      payload = decoded
+    } else {
+      payload = Data(body.utf8)
+      guard payload.count <= 1_048_576 else { throw SafeHTTPFailure.rejected }
+    }
     let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
     let target = path + (components.percentEncodedQuery.map { "?" + $0 } ?? "")
     guard target.utf8.count <= 8192, !target.contains("\r"), !target.contains("\n") else {
