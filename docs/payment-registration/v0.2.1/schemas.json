@@ -1,0 +1,696 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CreateRegistration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "amount_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "wallet_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount_msat",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 15,
+              "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+              "description": "Fiat amount as a decimal string with at most two fraction digits; must be greater than zero.",
+              "not": {
+                "pattern": "^0(\\.0{1,2})?$"
+              }
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z]{3}$",
+              "description": "ISO 4217 fiat currency code; Bitcoin units use amount_msat.",
+              "not": {
+                "enum": [
+                  "BTC",
+                  "SAT",
+                  "XBT"
+                ]
+              }
+            },
+            "wallet_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount",
+            "currency",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "amount_msat": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            "pos_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "description": "Server-issued POS device ID (the LNbits device ID registered for the device). The POS never constructs it."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount_msat",
+            "pos_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 15,
+              "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+              "description": "Fiat amount as a decimal string with at most two fraction digits; must be greater than zero.",
+              "not": {
+                "pattern": "^0(\\.0{1,2})?$"
+              }
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z]{3}$",
+              "description": "ISO 4217 fiat currency code; Bitcoin units use amount_msat.",
+              "not": {
+                "enum": [
+                  "BTC",
+                  "SAT",
+                  "XBT"
+                ]
+              }
+            },
+            "pos_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "description": "Server-issued POS device ID (the LNbits device ID registered for the device). The POS never constructs it."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount",
+            "currency",
+            "pos_id",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Empty": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "details"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "code": {
+                    "const": "tme_rejected"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "retryable": {
+                    "const": false
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "tme_pending",
+                      "tme_unavailable"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "retryable": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "error",
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "Invoice": {
+      "type": "object",
+      "properties": {
+        "bolt11": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "payment_hash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "paid",
+            "expired",
+            "voided",
+            "orphaned"
+          ]
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "bolt11",
+        "payment_hash",
+        "seq",
+        "status",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "Registration": {
+      "type": "object",
+      "properties": {
+        "registration_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "invoice_issued",
+            "expired_awaiting_refresh",
+            "paid",
+            "cancelled",
+            "rejected"
+          ]
+        },
+        "custodial": {
+          "type": "boolean"
+        },
+        "amount_msat": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991,
+              "multipleOf": 1000
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payable amount in msat. For a fiat registration it is fixed by each approved pre-check and is null until then."
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 15,
+              "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+              "description": "Fiat amount as a decimal string with at most two fraction digits; must be greater than zero.",
+              "not": {
+                "pattern": "^0(\\.0{1,2})?$"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requested fiat amount; null for an msat registration."
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "pattern": "^[A-Z]{3}$",
+              "description": "ISO 4217 fiat currency code; Bitcoin units use amount_msat.",
+              "not": {
+                "enum": [
+                  "BTC",
+                  "SAT",
+                  "XBT"
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requested fiat currency; null for an msat registration."
+        },
+        "pre_check_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "rejected",
+            "pending",
+            "unavailable"
+          ]
+        },
+        "tme_mode": {
+          "type": "string",
+          "enum": [
+            "shadow",
+            "enforcing"
+          ]
+        },
+        "tme_policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "tme_policy_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "tme_blocked": {
+          "type": "boolean"
+        },
+        "reject_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "custodial_not_licensed",
+                "travel_rule_unidentified",
+                "kyc_level_insufficient",
+                "tme_rejected"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_valid_until": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30,
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invoice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Invoice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refreshed": {
+          "type": "boolean"
+        },
+        "cancel_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "user",
+                "license_disabled",
+                "address_changed",
+                "address_deactivated",
+                "wallet_closed",
+                "account_deleted"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updated_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      },
+      "required": [
+        "registration_id",
+        "status",
+        "custodial",
+        "amount_msat",
+        "amount",
+        "currency",
+        "pre_check_id",
+        "pre_check_status",
+        "tme_mode",
+        "tme_policy_version",
+        "tme_policy_epoch",
+        "tme_blocked",
+        "reject_reason",
+        "pre_check_valid_until",
+        "invoice",
+        "refreshed",
+        "cancel_reason",
+        "updated_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tme_blocked": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "invoice": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tme_mode": {
+                "const": "enforcing"
+              },
+              "pre_check_status": {
+                "enum": [
+                  "rejected",
+                  "pending",
+                  "unavailable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_blocked": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tme_mode": {
+                "const": "shadow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_blocked": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pre_check_status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pre_check_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 36,
+                "format": "uuid"
+              },
+              "pre_check_valid_until": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30,
+                "format": "date-time",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "custodial": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_mode": {
+                "const": "enforcing"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reject_reason": {
+                "type": "string"
+              },
+              "invoice": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reject_reason": {
+                "const": "tme_rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "rejected"
+              },
+              "tme_mode": {
+                "const": "enforcing"
+              },
+              "tme_blocked": {
+                "const": true
+              },
+              "pre_check_status": {
+                "const": "rejected"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

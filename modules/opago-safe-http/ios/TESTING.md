@@ -24,7 +24,7 @@ xcodebuild -workspace ios/*.xcworkspace -scheme <SCHEME_AUS_LISTE> \
 
 Ein fehlendes Scheme oder ein Fehler bei `pod install` beziehungsweise Swift-Compile beendet diesen optionalen Testlauf mit Fehler; er wird nicht als erfolgreich übersprungener Test gewertet.
 
-Die sechs lokalen Parser-/Adress-Unit-Tests lassen sich vor Bereitstellung der Netzwerk-Fixtures auf einem iOS-Simulator ausführen; `unit` prüft auch hier die genaue Testanzahl und verbietet Skips:
+Die sieben lokalen Parser-/Adress-/Header-Unit-Tests lassen sich vor Bereitstellung der Netzwerk-Fixtures auf einem iOS-Simulator ausführen; `unit` prüft auch hier die genaue Testanzahl und verbietet Skips:
 
 ```sh
 bash scripts/ios-safe-http-test-gate.sh unit /tmp/opago-safe-http-test \
@@ -35,7 +35,7 @@ bash scripts/ios-safe-http-test-gate.sh unit /tmp/opago-safe-http-test \
 
 `controlled-Fixtures.json` enthält ausschließlich HTTPS-URLs zu synthetischen Testdaten und alle 18 Schlüssel:
 
-Für den vollständigen `run`-Lauf eine **neue** Testkopie mit dem vierten `prepare`-Argument `/path/to/controlled-Fixtures.json` erstellen. Die ohne Fixtures gebaute Kopie dient nur der Kompilierung und den sechs Unit-Tests.
+Für den vollständigen `run`-Lauf eine **neue** Testkopie mit dem vierten `prepare`-Argument `/path/to/controlled-Fixtures.json` erstellen. Die ohne Fixtures gebaute Kopie dient nur der Kompilierung und den sieben Unit-Tests.
 
 `json`, `text`, `rebinding`, `private`, `mixed`, `redirect`, `invalidCertificate`, `gzip`, `oversizedNoLength`, `oversizedFalseLength`, `malformedLength`, `timeout`, `slow`, `proxyOnly`, `nat64Public`, `nat64Private`, `nat64Mixed`, `nat64DnsChange`.
 

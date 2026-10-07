@@ -35,6 +35,8 @@ function transportFixture(store = new MemoryPrivateStore(), v3 = false) {
       state.plainCalls++; if (state.failConfig) throw new Error('Synthetic outage');
       return { status: 200, contentType: 'application/json', cacheControl: state.responseMode === 'cache' ? 'public' : 'no-store', body: jcs(url.endsWith('/app/config') ? state.config : state.keys) };
     }
+    assert.equal(options.headers['X-Opago-App-Build'], String(trust.build));
+    assert.equal(options.headers['X-Opago-Platform'], trust.platform);
     const envelope = options.body ? parseStrictJson(options.body) : parseStrictJson(strictUtf8(unbase64url(options.headers['X-Opago-Envelope'])));
     const target = canonicalTarget(url.slice(trust.audience.length), options.method, url.includes('/api/v3/'));
     const aad = { method: options.method, path: target.path, query: target.query, kid: envelope.kid, nonce: envelope.nonce, issued_at: envelope.issued_at, audience: trust.audience,

@@ -1,7 +1,7 @@
 import { appConfig } from './config';
 import { walletSession } from './wallet-session';
 
-type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string; cacheControl?: string };
+type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string; cacheControl?: string; requestId?: string };
 type NativeTransport = {
   request(options: { url: string; method: string; headers: Record<string, string>; body: string;
     maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
@@ -66,6 +66,7 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
       responseHeaders['retry-after'] = result.retryAfter;
     }
     if (typeof result.cacheControl === 'string') responseHeaders['cache-control'] = result.cacheControl;
+    if (typeof result.requestId === 'string' && result.requestId) responseHeaders['x-request-id'] = result.requestId;
     const response = new Response(result.body, {
       status: result.status,
       headers: responseHeaders,

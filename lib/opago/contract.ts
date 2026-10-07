@@ -1,5 +1,6 @@
 import definitions from '../../docs/lnurl-spark-contracts/v2/schemas.json';
 import publicApi from '../../docs/lnurl-spark-contracts/v2/openapi-public.json';
+import paymentDefinitions from '../../docs/payment-registration/v0.2.1/schemas.json';
 
 export type Schema = { $ref?: string; const?: unknown; enum?: unknown[]; oneOf?: Schema[]; anyOf?: Schema[];
   allOf?: Schema[]; not?: Schema; if?: Schema; then?: Schema; else?: Schema; prefixItems?: Schema[]; uniqueItems?: boolean;
@@ -41,7 +42,10 @@ export function matchesSchema(s: Schema, value: unknown, definitions: Record<str
   return true;
 }
 export function assertContract<T>(name: string, value: unknown): asserts value is T {
-  if (!defs[name] || !matchesSchema(defs[name], value)) throw new Error('Invalid OPAGO contract response: ' + name);
+  const payment = name.startsWith('payment-0.2.1:');
+  const schemas = payment ? paymentDefinitions.$defs as unknown as Record<string, Schema> : defs;
+  const key = payment ? name.slice('payment-0.2.1:'.length) : name;
+  if (!schemas[key] || !matchesSchema(schemas[key], value, schemas)) throw new Error('Invalid OPAGO contract response: ' + name);
 }
 export function routeContract(method: string, path: string): { request: string; response: string; status: number } {
   path = path.split('?')[0];
@@ -50,8 +54,9 @@ export function routeContract(method: string, path: string): { request: string; 
   const template = Object.keys(paths).find(p => new RegExp('^' + p.replace(/\{[^}]+\}/g, '[^/]+') + '$').test(path));
   const op = template && paths[template][method.toLowerCase()];
   if (!op || !op['x-opago-plaintext-request'] || !op['x-opago-plaintext-response']) throw new Error('Unsupported wallet contract route.');
-  return { request: op['x-opago-plaintext-request'].$ref.split('/').at(-1)!,
-    response: op['x-opago-plaintext-response'].$ref.split('/').at(-1)!,
+  const prefix = template?.startsWith('/api/v2/payments/registrations') ? 'payment-0.2.1:' : '';
+  return { request: prefix + op['x-opago-plaintext-request'].$ref.split('/').at(-1)!,
+    response: prefix + op['x-opago-plaintext-response'].$ref.split('/').at(-1)!,
     status: Number(Object.keys(op.responses).find(k => /^2\d\d$/.test(k))) };
 }
 export function routeQueryParameters(method: string, path: string): { name: string; required?: boolean; schema: Schema }[] {

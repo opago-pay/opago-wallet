@@ -137,12 +137,13 @@ export class NativeHkaTransport implements HkaTransport {
     try {
       const envelope: HpkeRequest = { encryption: 'hpke-v1', kid: key.kid, enc: base64url(new Uint8Array(context.enc)), nonce: aad.nonce,
         issued_at: aad.issued_at, ciphertext: base64url(new Uint8Array(await context.seal(bytes, utf8(jcs(aad))))) };
-      const serialized = jcs(envelope); const headers: Record<string, string> = { Accept: 'application/json', 'Cache-Control': 'no-store' };
+      const serialized = jcs(envelope); const headers: Record<string, string> = { Accept: 'application/json', 'Cache-Control': 'no-store',
+        'X-Opago-App-Build': String(this.trust.build), 'X-Opago-Platform': this.trust.platform };
       if (v3) {
         const requestBytes = this.random(16); requestBytes[6] = requestBytes[6] & 15 | 64; requestBytes[8] = requestBytes[8] & 63 | 128;
         const hex = Array.from(requestBytes, b => b.toString(16).padStart(2, '0')).join('');
         headers['X-Request-Id'] = hex.slice(0,8) + '-' + hex.slice(8,12) + '-' + hex.slice(12,16) + '-' + hex.slice(16,20) + '-' + hex.slice(20);
-        headers['X-Opago-Contract'] = 'tx-foundation-v3'; headers['X-Opago-App-Build'] = String(this.trust.build); headers['X-Opago-Platform'] = this.trust.platform;
+        headers['X-Opago-Contract'] = 'tx-foundation-v3';
       }
       if (request.auth !== 'none') headers.Authorization = 'Bearer ' + request.bearer;
       if (request.method !== 'GET') headers['Idempotency-Key'] = request.idempotencyKey!;
