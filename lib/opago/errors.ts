@@ -18,7 +18,7 @@ export function opagoUserError(cause: unknown): string {
       session_expired: 'Your OPAGO session expired. Sign in again.', refresh_invalid: 'Your OPAGO session expired. Sign in again.',
       reproof_required: 'Please sign in again and approve this wallet action.', account_mismatch: 'This wallet does not match the signed-in OPAGO account.',
       wallet_unavailable: 'Connect Lightning to prove or restore wallet ownership. Account sign-in and deletion remain available.',
-      kyc_required: 'Complete identity onboarding and wait for the backend comparison result.',
+      kyc_required: 'This service is not enabled for your account. Contact support; no identity photos are required in MVP registration.',
       address_pending_kyc: 'Your Lightning address is not active yet. Refresh its status before sending with UMA.',
       account_deleted: 'OPAGO account access has been revoked.', wallet_closed: 'Restore your OPAGO wallet link with the owning account.',
       operation_conflict: 'An earlier operation is unfinished or conflicts with this change. Recover it before starting another.',

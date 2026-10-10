@@ -10,10 +10,6 @@ import QRCode from 'react-native-qrcode-svg';
 import { View } from 'react-native';
 import { UpdateAccountApp } from '../components/opago/update-account-app';
 
-const kyaText = { draft: 'Identity details are still a draft.', submitted: 'Identity details submitted.', in_review: 'The photo and data comparison is in progress.',
-  approved: 'Photo and data comparison passed. This is not a fully verified identity. UMA status: NOT_VERIFIED.',
-  correction_requested: 'Please correct the requested fields in identity onboarding and submit a new revision.',
-  rejected: 'The photo and data comparison was rejected. Contact support.' };
 export default function OpagoAccountScreen() {
   const params = useLocalSearchParams<{ test?: string }>();
   const [testOnly, setTestOnly] = useState(__DEV__ && params.test === '1');
@@ -30,14 +26,15 @@ export default function OpagoAccountScreen() {
   return <OpagoPage title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
     {updateRequired && <UpdateAccountApp />}
     <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
+    {!state?.credential && <Action label="Create an OPAGO account" disabled={busy} onPress={() => router.push('/opago-signup')} />}
     <Action label="POS wallet links" disabled={busy} onPress={() => router.push({ pathname: '/pos-link', params: testOnly ? { test: '1' } : {} })} />
     <Action label="Transaction synchronization" disabled={busy} onPress={() => router.push({ pathname: '/transaction-sync', params: testOnly ? { test: '1' } : {} })} />
     {!runtime && <Card title="Account services unavailable"><Copy>{t('OPAGO account services are not available in this build. Your local wallet remains available.')}</Copy></Card>}
     {__DEV__ && <Action label={testOnly ? 'Leave contract test mode' : 'Start contract test mode'} disabled={busy} onPress={() => setTestOnly(!testOnly)} />}
     {runtime && account && state && !state.deletion && <>
       <Card title="Account sign-in">
-        <Copy>{t(state.credential ? 'Signed in to OPAGO. Wallet ownership is proved separately.' : 'Sign in or create an account in the OPAGO browser window.')}</Copy>
-        <Action label={state.credential ? 'Sign in again' : 'Sign in or register'} disabled={busy} onPress={() => void run(() => account.signIn())} />
+        <Copy>{t(state.credential ? 'Signed in to OPAGO. Wallet ownership is proved separately.' : 'Sign in to your existing account in the OPAGO browser window.')}</Copy>
+        <Action label={state.credential ? 'Sign in again' : 'Sign in to OPAGO'} disabled={busy} onPress={() => void run(() => account.signIn())} />
         {state.credential && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
       </Card>
       <Card title="Wallet ownership and binding">
@@ -49,21 +46,8 @@ export default function OpagoAccountScreen() {
           <Action label="Restore my OPAGO wallet link" disabled={busy || !account.walletAvailable} onPress={() => void run(() => account.restore())} /></>}
         {state.session && <Action label="Refresh account status" disabled={busy} onPress={() => void run(() => account.refresh())} />}
       </Card>
-      <Card title="Identity status">
-        <Action label="Open identity onboarding" disabled={busy || !state.session} onPress={() => router.push({ pathname: '/identity', params: testOnly ? { test: '1' } : {} })} />
-        <Copy>{t(wallet?.photo_match ? kyaText[wallet.photo_match.status] : 'Identity onboarding has not been submitted.')}</Copy>
-        {wallet?.photo_match?.active_approval_revision && wallet.photo_match.status !== 'approved' ?
-          <Copy>{t('Your previous approved revision remains active. This does not indicate a fully verified identity.')}</Copy> : null}
-        {!!wallet?.photo_match?.correction_fields.length && <Copy>{wallet.photo_match.correction_fields.join(', ')}</Copy>}
-        <Copy>{t('Identity data and photo capture are provided by identity onboarding. The backend decides the comparison status.')}</Copy>
-        {runtime.setTestKya && <>
-          <Action label="Test: comparison in progress" disabled={busy} onPress={() => void run(() => runtime.setTestKya!('in_review'))} />
-          <Action label="Test: comparison passed" disabled={busy} onPress={() => void run(() => runtime.setTestKya!('approved'))} />
-          <Action label="Test: correction requested" disabled={busy} onPress={() => void run(() => runtime.setTestKya!('correction_requested'))} />
-          <Action label="Test: comparison rejected" disabled={busy} onPress={() => void run(() => runtime.setTestKya!('rejected'))} />
-        </>}
-      </Card>
       <Card title="Personal Lightning address">
+        {!photoMatchReady(wallet || null) && <Copy>{t('This address service is not available for your account yet. Registration does not automatically activate it. Your local wallet remains available.')}</Copy>}
         {account.hasPendingAddressOperation && <Action label="Recover unfinished address operation" disabled={busy}
           onPress={() => void run(() => account.resumeAddress())} />}
         {active ? <>

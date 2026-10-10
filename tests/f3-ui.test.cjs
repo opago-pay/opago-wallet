@@ -62,7 +62,7 @@ test('F3 account UI keeps local recovery optional, separates binding, and hides 
   const runtime = await runtimeFixture(); const app = screenFixture(t, 'app/opago-account.tsx', runtime);
   let tree = app.render(); assert.match(content(tree), /12 recovery words/); assert.equal(nodes(tree).some(n => n.type === 'qr'), false);
   assert.equal(action(tree, 'Link this wallet to my OPAGO account').props.disabled, true);
-  action(tree, 'Sign in or register').props.onPress(); tree = await app.afterAction();
+  action(tree, 'Sign in to OPAGO').props.onPress(); tree = await app.afterAction();
   assert.equal(runtime.account.state.session, null); assert.equal(action(tree, 'Link this wallet to my OPAGO account').props.disabled, true);
   action(tree, 'Prove wallet ownership').props.onPress(); tree = await app.afterAction();
   assert.equal(action(tree, 'Link this wallet to my OPAGO account').props.disabled, false);
@@ -70,7 +70,8 @@ test('F3 account UI keeps local recovery optional, separates binding, and hides 
   await runtime.backend.setKya('approved'); await runtime.account.refresh();
   tree = app.render(); nodes(tree).find(n => n.type === 'input').props.onChangeText('alice-test'); tree = app.render();
   action(tree, 'Activate my Lightning address').props.onPress(); tree = await app.afterAction();
-  assert.match(content(tree), /NOT_VERIFIED/); assert.match(content(tree), /Synthetic test address/);
+  assert.equal(action(tree, 'Open identity onboarding'), undefined);
+  assert.doesNotMatch(content(tree), /Identity details submitted|fully verified identity/); assert.match(content(tree), /Synthetic test address/);
   assert.equal(nodes(tree).some(n => n.type === 'qr'), false); assert.equal(action(tree, 'Send with UMA').props.disabled, false);
   // Live display uses only a fresh, backend-confirmed canonical address.
   const liveScreen = screenFixture(t, 'app/opago-account.tsx', runtime, {});
