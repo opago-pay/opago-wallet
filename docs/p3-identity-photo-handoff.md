@@ -1,5 +1,10 @@
 # P3 Identifizierung und Foto-Upload
 
+> Historischer Stand: Der MVP-Beschluss vom 10.10.2026 hat diesen Nutzerablauf abgelöst.
+> Foto-Intake ist nicht mehr über Navigation oder `/identity` erreichbar.
+> Daten und Sicherheitsbausteine bleiben erhalten; siehe [MVP-Signup-Übergabe](mvp-signup-handoff.md).
+
+
 ## Bestandsübersicht vor Änderungen (07.10.2026)
 
 Wallet-Basis: `origin/mvp-branch` / `c67bdf26b466f636d2703dc757aa9bb04cf8184b`.

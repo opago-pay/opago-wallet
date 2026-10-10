@@ -9,13 +9,13 @@ async function setup(t,{dev=true}={}){const old=global.__DEV__;global.__DEV__=de
   let now=Date.UTC(2026,9,7),background,focus=true,canceled=false,denied=false,picks=0,cleaned=0,pickerWait;
   const walletSession=new WalletSession(()=>now);walletSession.unlock();const backend=new IdentityContractTestBackend(new MemoryPrivateStore(),randomUUID,'regtest',()=>now);const account=backend.createAccount();await account.load();await account.proveOwnership();
   const runtime={account,perform:fn=>account.exclusive(fn),setTestIdentity:s=>backend.setIdentityStatus(s),loseTestIdentityResponse:()=>backend.loseNext=true};
-  const app=hookFixture('app/identity.tsx',()=>({'expo-router':{useLocalSearchParams:()=>({test:'1'})},'@react-navigation/native':{useIsFocused:()=>focus},
-    buffer:require('buffer'),'../tests/fixtures/p3-photo.json':fixtureImage,
+  const app=hookFixture('components/opago/legacy-identity-screen.tsx',()=>({'expo-router':{useLocalSearchParams:()=>({test:'1'})},'@react-navigation/native':{useIsFocused:()=>focus},
+    buffer:require('buffer'),'../../tests/fixtures/p3-photo.json':fixtureImage,
     'react-native':{AppState:{currentState:'active',addEventListener:(_,fn)=>{background=fn;return{remove(){}};}},Image:'image',View:'view',KeyboardAvoidingView:'keyboard',Platform:{OS:'android'}},
-    'expo-screen-capture':{usePreventScreenCapture(){}},'../hooks/useOpagoAccount':{useOpagoAccount:()=>({runtime})},'../lib/opago/identity':identity,
-    '../lib/opago/identity-media-native':{cleanupIdentityPhotos:async()=>cleaned++,removeIdentityPhoto:async p=>{p.bytes.fill(0);cleaned++;},selectIdentityPhoto:async(_source,side,guard)=>{picks++;guard();if(pickerWait)await pickerWait;guard();if(denied)throw new Error('identity_camera_denied');return canceled?null:{side,bytes:new Uint8Array(Buffer.from(fixtureImage.normalized_jpeg,'base64')),uri:'file:///synthetic/photo.jpg'};}},
-    '../lib/wallet-session':{walletSession},'../lib/opago/api':require('../lib/opago/api.ts'),'../lib/theme-styles':{themeColor:()=> '#fff'},'../lib/i18n':{t:(s,v)=>s.replace(/\{(\w+)\}/g,(_,k)=>v?.[k]??k)},
-    '../components/opago/opago-ui':{Action:'action',Copy:'copy',Card:'card',OpagoPage:'page',TextInput:'input',ui:{input:{}}},
+    'expo-screen-capture':{usePreventScreenCapture(){}},'../../hooks/useOpagoAccount':{useOpagoAccount:()=>({runtime})},'../../lib/opago/identity':identity,
+    '../../lib/opago/identity-media-native':{cleanupIdentityPhotos:async()=>cleaned++,removeIdentityPhoto:async p=>{p.bytes.fill(0);cleaned++;},selectIdentityPhoto:async(_source,side,guard)=>{picks++;guard();if(pickerWait)await pickerWait;guard();if(denied)throw new Error('identity_camera_denied');return canceled?null:{side,bytes:new Uint8Array(Buffer.from(fixtureImage.normalized_jpeg,'base64')),uri:'file:///synthetic/photo.jpg'};}},
+    '../../lib/wallet-session':{walletSession},'../../lib/opago/api':require('../lib/opago/api.ts'),'../../lib/theme-styles':{themeColor:()=> '#fff'},'../../lib/i18n':{t:(s,v)=>s.replace(/\{(\w+)\}/g,(_,k)=>v?.[k]??k)},
+    './opago-ui':{Action:'action',Copy:'copy',Card:'card',OpagoPage:'page',TextInput:'input',ui:{input:{}}},
   }),m=>m.default());app.render();await app.settle();t.after(()=>app.unmount());
   const action=label=>nodes(app.render()).find(n=>n.type==='action'&&n.props.label===label);
   const click=async label=>{const n=action(label);assert.ok(n,label);assert.equal(!!n.props.disabled,false,label);n.props.onPress();return app.settle();};
