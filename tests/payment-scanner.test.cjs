@@ -36,6 +36,24 @@ function fixture(options = {}) {
 const detected = app=>app.calls.filter(c=>Array.isArray(c)&&c[0]==='detected');
 const validations = app=>app.calls.filter(c=>Array.isArray(c)&&c[0]==='validate');
 
+test('actual OPAGO POS recognition stays in scanner with a useful refusal and no payment handoff', async t => {
+ require('./register-typescript.cjs');
+ const { recognizePayment } = require('../lib/payment-recognition.ts');
+ const { POS_PAYER_PENDING_MESSAGE } = require('../lib/opago/pos-payment.ts');
+ const { bech32 } = require('bech32');
+ const qr = 'lightning:' + bech32.encode('lnurl', bech32.toWords(Buffer.from('https://api.opago.com/lnpos/api/v1/lnurl/pos-a?p=synthetic')), 2000);
+ let requests = 0;
+ t.mock.method(global, 'fetch', async () => { requests++; throw Error('unexpected request'); });
+ const app = fixture({ validate: recognizePayment }); t.after(app.unmount);
+ const tree = await app.settle(); nodes(tree).find(n => n.type === 'camera').props.onBarcodeScanned({ data: qr });
+ const refused = await app.settle();
+ assert.ok(nodes(refused).some(n => n.props.children === POS_PAYER_PENDING_MESSAGE));
+ assert.equal(detected(app).length, 0); assert.equal(requests, 0);
+ assert.equal(app.calls.includes('haptic'), false);
+ button(refused, 'Scan again').props.onPress();
+ assert.ok(nodes(await app.settle()).some(n => n.type === 'camera'));
+});
+
 test('POS QR recognition navigates once to its own review without payment recognition or submission',async t=>{
  const links=[];const app=fixture({onOtherCode:value=>{links.push(value);return true;}});t.after(app.unmount);
  const tree=await app.settle();const camera=nodes(tree).find(n=>n.type==='camera');

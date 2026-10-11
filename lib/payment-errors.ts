@@ -1,6 +1,8 @@
 import { t } from './i18n';
+import { OpagoPosPayerUnavailableError, POS_PAYER_PENDING_MESSAGE } from './opago/pos-payment';
 
 export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): string {
+  if (cause instanceof OpagoPosPayerUnavailableError) return t(POS_PAYER_PENDING_MESSAGE);
   const message = cause instanceof Error ? cause.message : '';
   const normalized = message.toLowerCase();
   if (message === 'The EUR exchange rate is unavailable.') return t('EUR estimate unavailable');
