@@ -59,6 +59,7 @@ function AppStack() {
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-signup" options={{ headerShown: false }} />
           <Stack.Screen name="identity" options={{ headerShown: false }} />
           <Stack.Screen name="pos-link" options={{ headerShown: false }} />
           <Stack.Screen name="transaction-sync" options={{ headerShown: false }} />
