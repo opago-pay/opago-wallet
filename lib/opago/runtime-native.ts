@@ -59,10 +59,10 @@ export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinkin
   setTestKya?: (status: 'draft' | 'submitted' | 'in_review' | 'approved' | 'correction_requested' | 'rejected') => Promise<void>;
   startTestPos?: () => Promise<string>; confirmTestOperator?: (id: string) => Promise<void>;
   setTestIdentity?: (status: 'in_review'|'approved'|'correction_requested'|'rejected') => Promise<void>; loseTestIdentityResponse?: () => void };
-const live = new WeakMap<BitcoinSparkWallet, Promise<F3Runtime>>();
+let live = new WeakMap<BitcoinSparkWallet, Promise<F3Runtime>>();
 let test: Promise<F3Runtime> | null = null;
 let accountOnly: Promise<F3Runtime> | null = null;
-walletSession.subscribe(() => { test = null; accountOnly = null; });
+walletSession.subscribe(() => { live = new WeakMap(); test = null; accountOnly = null; });
 async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string | null, testOnly: boolean): Promise<F3Runtime> {
   const assertCurrent = walletSession.captureRuntime();
   let account: OpagoAccount; let uma: UmaSending; let testKya: F3Runtime['setTestKya'];

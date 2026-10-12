@@ -143,7 +143,12 @@ export class F3ContractTestBackend implements HkaTransport {
       this.state.account.party_id = this.uuid(); this.state.account.wallets = []; this.state.account.wallet_photo_match_status = 'none';
       this.state.deletion = false; this.state.deleted = false; output = this.session();
     } else if (req.path.startsWith('/api/v2/wallet/address')) {
-      if (wallet.status !== 'active' || !wallet.photo_match?.active_approval_revision) return this.failure('kyc_required', 403);
+      // Simulation of an authoritative no-photo MVP activation, not evidence that
+      // the deployed backend has implemented the required contract transition.
+      if (wallet.status !== 'active' || wallet.party_id !== this.state.account.party_id) return this.failure('account_mismatch', 403);
+      const proof = this.proofs.get(String(body.proof_token));
+      const expected = req.method === 'PUT' ? ['address_bind', 'address_rename'] : [req.path.endsWith('/deactivate') ? 'address_deactivate' : 'address_reactivate'];
+      if (!proof || proof.walletId !== wallet.wallet_id || !expected.includes(proof.action)) return this.failure('action_mismatch', 403);
       if (req.method === 'PUT') { wallet.address = this.address(String(body.name), 'active'); output = wallet.address; }
       else if (wallet.address) { wallet.address.status = req.path.endsWith('/deactivate') ? 'deactivated' : 'active'; output = wallet.address; }
       else return this.failure('address_not_found', 404);

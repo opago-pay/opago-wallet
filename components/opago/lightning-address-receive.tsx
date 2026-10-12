@@ -12,16 +12,16 @@ export function PersonalLightningAddressReceive(props: { focused: boolean; size:
   return f3IntegrationAvailable() ? <LinkedLightningAddress {...props} /> : null;
 }
 function LinkedLightningAddress({ focused, size }: { focused: boolean; size: number }) {
-  const { runtime, run } = useOpagoAccount(false);
+  const { runtime, run, busy } = useOpagoAccount(false);
   const runRef = useRef(run); runRef.current = run;
   useEffect(() => {
     if (!focused || !runtime?.account.state.session) return;
-    const refresh = () => { void runRef.current(() => runtime.account.refresh()); };
+    const refresh = () => { void runRef.current(async () => { await runtime.account.refreshAccount(); await runtime.account.refresh(); }); };
     refresh(); const timer = setInterval(refresh, 30_000);
     return () => clearInterval(timer);
   }, [runtime, focused]);
   if (!focused || !runtime?.account.state.session) return null;
-  const address = activeLightningAddress(runtime.account, runtime.publicAddressOrigin);
+  const address = !busy && activeLightningAddress(runtime.account, runtime.publicAddressOrigin);
   return <View style={{ gap: 12, marginBottom: 24, alignItems: 'center' }}>
     <Text style={{ color: themeColor('text'), fontSize: 20, fontWeight: '600' }}>{t('Personal Lightning address')}</Text>
     {address ? <>

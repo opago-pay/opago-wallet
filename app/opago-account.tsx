@@ -4,10 +4,12 @@ import { useOpagoAccount } from '../hooks/useOpagoAccount';
 import { Action, Card, Copy, OpagoPage, TextInput, ui } from '../components/opago/opago-ui';
 import { activeLightningAddress } from '../lib/opago/address';
 import { photoMatchReady } from '../lib/opago/account';
+import { OpagoError } from '../lib/opago/api';
+import * as Clipboard from 'expo-clipboard';
 import { themeColor } from '../lib/theme-styles';
 import { t } from '../lib/i18n';
 import QRCode from 'react-native-qrcode-svg';
-import { View } from 'react-native';
+import { Share, View } from 'react-native';
 import { UpdateAccountApp } from '../components/opago/update-account-app';
 
 export default function OpagoAccountScreen() {
@@ -17,10 +19,19 @@ export default function OpagoAccountScreen() {
   const router = useRouter(); const [name, setName] = useState(''); const [deleteText, setDeleteText] = useState('');
   const [closing, setClosing] = useState(false);
   const account = runtime?.account; const state = account?.state; const wallet = state?.wallet;
-  const active = account ? activeLightningAddress(account, runtime!.publicAddressOrigin) : null;
+  const active = !busy && account ? activeLightningAddress(account, runtime!.publicAddressOrigin) : null;
+  const addressReady = account?.addressReady();
+  const shareAddress = async (copy: boolean) => {
+    if (!account || !runtime) return;
+    await account.refreshAccount(); await account.refresh();
+    const confirmed = activeLightningAddress(account, runtime.publicAddressOrigin);
+    if (!confirmed) throw new OpagoError('address_changed');
+    if (copy) await Clipboard.setStringAsync(confirmed.address);
+    else await Share.share({ message: confirmed.address });
+  };
   useEffect(() => {
     if (!runtime?.account.state.session || busy) return;
-    const timer = setInterval(() => { void run(() => runtime.account.refresh()); }, 30_000);
+    const timer = setInterval(() => { void run(async () => { await runtime.account.refreshAccount(); await runtime.account.refresh(); }); }, 30_000);
     return () => clearInterval(timer);
   }, [runtime, busy, run]);
   return <OpagoPage title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
@@ -47,7 +58,7 @@ export default function OpagoAccountScreen() {
         {state.session && <Action label="Refresh account status" disabled={busy} onPress={() => void run(() => account.refresh())} />}
       </Card>
       <Card title="Personal Lightning address">
-        {!photoMatchReady(wallet || null) && <Copy>{t('This address service is not available for your account yet. Registration does not automatically activate it. Your local wallet remains available.')}</Copy>}
+        {!addressReady && <Copy>{t('Sign in and connect this Spark wallet to manage your personal address. The server must confirm activation before you can share it.')}</Copy>}
         {account.hasPendingAddressOperation && <Action label="Recover unfinished address operation" disabled={busy}
           onPress={() => void run(() => account.resumeAddress())} />}
         {active ? <>
@@ -55,15 +66,17 @@ export default function OpagoAccountScreen() {
           {!testOnly && <View style={{ alignSelf: 'center', padding: 14, backgroundColor: '#fff' }} accessibilityLabel={active.address}>
             <QRCode value={active.qr_payload} size={210} color="#000" backgroundColor="#fff" />
           </View>}
+          {!testOnly && <><Action label="Copy Lightning address" disabled={busy} onPress={() => void run(() => shareAddress(true))} />
+            <Action label="Share Lightning address" disabled={busy} onPress={() => void run(() => shareAddress(false))} /></>}
         </> : <Copy>{t(wallet?.address?.status === 'deactivated' ? 'Your address is deactivated.' : 'Your address is not active. It becomes usable only after the backend confirms activation.')}</Copy>}
         <TextInput value={name} onChangeText={setName} editable={!busy} autoCapitalize="none" autoCorrect={false} maxLength={32}
           accessibilityLabel={t('Lightning address name')} placeholder={t('Lightning address name')}
           placeholderTextColor={themeColor('muted')} style={[ui.input, { color: themeColor('text'), borderColor: themeColor('border') }]} />
-        <Action label={wallet?.address ? 'Change address name' : 'Activate my Lightning address'} disabled={busy || !photoMatchReady(wallet || null) || !name}
+        <Action label={wallet?.address ? 'Change address name' : 'Activate my Lightning address'} disabled={busy || !addressReady || !name}
           onPress={() => void run(() => account.address(wallet?.address ? 'rename' : 'set', name))} />
-        {wallet?.address && <Action label={wallet.address.status === 'active' ? 'Deactivate my address' : 'Reactivate my address'} disabled={busy}
+        {wallet?.address && <Action label={wallet.address.status === 'active' ? 'Deactivate my address' : 'Reactivate my address'} disabled={busy || !addressReady}
           onPress={() => void run(() => account.address(wallet.address!.status === 'active' ? 'deactivate' : 'reactivate'))} />}
-        <Action label="Send with UMA" disabled={busy || !active} onPress={() => router.push({ pathname: '/uma-send', params: testOnly ? { test: '1' } : {} })} />
+        <Action label="Send with UMA" disabled={busy || !active || !photoMatchReady(wallet || null)} onPress={() => router.push({ pathname: '/uma-send', params: testOnly ? { test: '1' } : {} })} />
       </Card>
       {state.credential && <Card title="OPAGO service management">
         <Copy>{t('Closing the OPAGO wallet link deactivates its address. It can be restored with the owning account and wallet proof. Your local funds and keys stay on this device.')}</Copy>
