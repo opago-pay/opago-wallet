@@ -82,6 +82,10 @@ test('F3 account UI keeps local recovery optional, separates binding, and hides 
   assert.equal(runtime.copied, 'alice-test@opago.com');
   action(liveScreen.render(), 'Share Lightning address').props.onPress(); await liveScreen.afterAction();
   assert.equal(runtime.shared, 'alice-test@opago.com');
+  const oldShare = action(liveScreen.render(), 'Share Lightning address'); runtime.shared = undefined;
+  runtime.backend.state.wallet.address.status = 'deactivated';
+  oldShare.props.onPress(); await assert.rejects(liveScreen.afterAction(), /address_changed/);
+  assert.equal(runtime.shared, undefined);
   runtime.account.state.wallet.address.status = 'pending_kyc';
   assert.equal(nodes(liveScreen.render()).some(n => n.type === 'qr'), false);
 });

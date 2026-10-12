@@ -120,6 +120,17 @@ test('MVP personal address: an older read cannot override a newer deactivated ad
   assert.equal(account.state.wallet.address.status, 'deactivated'); assert.equal(activeLightningAddress(account), null);
 });
 
+test('MVP personal address: a delayed successful mutation cannot publish into another session', async () => {
+  const { backend, account } = await personalAddress();
+  const request = backend.request.bind(backend), entered = deferred(), release = deferred();
+  backend.request = async req => { const result = await request(req); if (req.path === '/api/v2/wallet/address') { entered.resolve(); await release.promise; } return result; };
+  const pending = account.address('rename', 'new-name'), rejected = assert.rejects(pending, /account_mismatch/);
+  await entered.promise; account.state.session = { ...account.state.session, access_token: 'replacement-session' };
+  release.resolve(); await rejected;
+  assert.equal(activeLightningAddress(account), null); assert.equal(account.hasPendingAddressOperation, true);
+  assert.equal(account.state.wallet.address.name, 'alice-test');
+});
+
 test('MVP personal address: backend locks, revoked sessions, name conflicts and rename rules are not bypassed', async () => {
   for (const code of ['account_locked', 'session_revoked', 'name_taken', 'name_reserved', 'rename_limit_reached', 'rename_rate_limited', 'kyc_required']) {
     const { backend, account } = await personalAddress(); const request = backend.request.bind(backend);
