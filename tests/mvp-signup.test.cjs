@@ -32,11 +32,15 @@ function screen(t) {
   };
 }
 
-test('three-field preparation validates known constraints without guessing phone format or IdP rules', () => {
+test('three-field preparation validates E.164 without guessing a country or realm policy', () => {
   assert.deepEqual(Object.keys(signup.validateSignup(signup.emptySignup())), ['email', 'phone', 'password']);
   assert.ok(signup.validateSignup({ email: 'invalid', phone: ' ', password: 'short' }).email);
-  const fields = { email: ' PRIVATE@example.test ', phone: ' 0123456 ', password: '  secret-test  ' };
-  assert.deepEqual(signup.preparePrivateSignup(fields), { username: 'private@example.test', phone: '0123456', pw_signup: fields.password, customer_kind: 'private' });
+  const fields = { email: ' PRIVATE@example.test ', phone: ' +49123456789 ', password: '  secret-test  ' };
+  assert.deepEqual(signup.preparePrivateSignup(fields), { username: 'private@example.test', phone: '+49123456789', pw_signup: fields.password, customer_kind: 'private' });
+  for (const phone of ['0123456', '0049123456', '+0123456', '+49 123456', '+49-123456', '+1234567890123456', '+4', '+４９１２３']) {
+    assert.ok(signup.validateSignup({ ...fields, phone }).phone);
+    assert.throws(() => signup.preparePrivateSignup({ ...fields, phone }));
+  }
   assert.equal(signup.signupAvailable, false);
   assert.throws(() => signup.preparePrivateSignup(signup.emptySignup()), /Invalid signup fields/);
 });

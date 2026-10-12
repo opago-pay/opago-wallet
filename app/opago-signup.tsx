@@ -43,7 +43,7 @@ export default function SignupScreen() {
     <Copy warning>{t('Registration is not available yet. This form does not send or save your details and cannot create an account.')}</Copy>
     {visible && <Card title="Account details">
       {input('email', 'Email address')}{input('phone', 'Mobile number')}{input('password', 'Password')}
-      <Copy>{t('Entering a mobile number does not verify it. The required number format and any contact confirmation will be shown when registration becomes available.')}</Copy>
+      <Copy>{t('Use + and the country code for your mobile number. Entering it does not verify it. No SMS confirmation is required in this release; email confirmation will use an email link.')}</Copy>
       <Action label="Create private account" disabled={!signupAvailable} onPress={() => { clear(); }} />
     </Card>}
     <Copy>{t('If you already submitted a registration and its result is unknown, do not submit it again. Try signing in or contact support.')}</Copy>

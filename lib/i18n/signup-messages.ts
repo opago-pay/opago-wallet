@@ -62,6 +62,12 @@ const messages: Record<string, string[]> = {
     "Introduce tu número de móvil.",
     "Inserisci il tuo numero di cellulare."
   ],
+  "Enter your mobile number with + and country code, using digits only.": [
+    "Gib deine Handynummer mit + und Ländervorwahl ein, danach nur Ziffern.",
+    "Saisissez votre numéro avec + et l’indicatif du pays, puis uniquement des chiffres.",
+    "Introduce tu móvil con + y el código de país, seguido solo de dígitos.",
+    "Inserisci il numero con + e prefisso internazionale, seguito solo da cifre."
+  ],
   "Use at least 8 characters for your password.": [
     "Verwende mindestens 8 Zeichen für dein Passwort.",
     "Utilisez au moins 8 caractères pour votre mot de passe.",
@@ -80,11 +86,11 @@ const messages: Record<string, string[]> = {
     "El registro aún no está disponible. Este formulario no envía ni guarda tus datos y no puede crear una cuenta.",
     "La registrazione non è ancora disponibile. Questo modulo non invia né salva i tuoi dati e non può creare un account."
   ],
-  "Entering a mobile number does not verify it. The required number format and any contact confirmation will be shown when registration becomes available.": [
-    "Die Eingabe bestätigt deine Handynummer nicht. Das benötigte Nummernformat und eine mögliche Kontaktbestätigung werden angezeigt, sobald die Registrierung verfügbar ist.",
-    "Saisir un numéro ne le vérifie pas. Le format requis et toute confirmation de contact seront indiqués lorsque l’inscription sera disponible.",
-    "Introducir un móvil no lo verifica. El formato requerido y cualquier confirmación de contacto se mostrarán cuando el registro esté disponible.",
-    "Inserire un numero non lo verifica. Il formato richiesto e le eventuali conferme del contatto saranno indicati quando la registrazione sarà disponibile."
+  "Use + and the country code for your mobile number. Entering it does not verify it. No SMS confirmation is required in this release; email confirmation will use an email link.": [
+    "Gib deine Handynummer mit + und Ländervorwahl an. Die Eingabe bestätigt sie nicht. In dieser Version ist keine SMS-Bestätigung nötig; die E-Mail-Adresse wird über einen E-Mail-Link bestätigt.",
+    "Utilisez + et l’indicatif du pays. La saisie ne vérifie pas le numéro. Aucune confirmation SMS n’est requise dans cette version ; l’e-mail sera confirmé par un lien.",
+    "Usa + y el código de país. Introducir el número no lo verifica. Esta versión no requiere confirmación SMS; el correo se confirmará mediante un enlace.",
+    "Usa + e il prefisso internazionale. L’inserimento non verifica il numero. Questa versione non richiede conferma SMS; l’e-mail sarà confermata tramite un link."
   ],
   "If you already submitted a registration and its result is unknown, do not submit it again. Try signing in or contact support.": [
     "Wenn du eine Registrierung bereits abgesendet hast und das Ergebnis unklar ist, sende sie nicht erneut ab. Versuche dich anzumelden oder kontaktiere den Support.",
