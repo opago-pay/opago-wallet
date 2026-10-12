@@ -1,5 +1,6 @@
 import { assertSafeRemoteUrl } from './config';
 import { readBoundedText, strictFetch } from './strict-http-transport';
+import { assertNotOpagoPosPaymentUrl } from './opago/pos-payment';
 
 export interface FetchJsonOptions {
   purpose: string;
@@ -14,6 +15,8 @@ export async function fetchJson<T>(
   init: RequestInit = {},
   options: FetchJsonOptions,
 ): Promise<T> {
+  // Covers direct LNURL and OCP callers too: even P01 is a backend mutation.
+  assertNotOpagoPosPaymentUrl(rawUrl);
   const url = assertSafeRemoteUrl(rawUrl, options.purpose);
   const controller = new AbortController();
   const parentSignal = init.signal;

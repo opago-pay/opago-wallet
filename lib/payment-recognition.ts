@@ -4,6 +4,7 @@ import { resolveLightningAddress, resolveLNURL } from './lnurl-safe';
 import { resolveOcpUrl } from './ocp-safe';
 import { loadPaymentEndpoint } from './payment-endpoint';
 import { inferPaymentSourceFromRequest } from './payment-input';
+import { assertNotOpagoPosPayment } from './opago/pos-payment';
 
 export type RecognizedPayment = {
   input: string;
@@ -18,6 +19,7 @@ export type RecognizedPayment = {
 export async function recognizePayment(input: string): Promise<RecognizedPayment> {
   const raw = input.trim();
   if (!raw || raw.length > 16_384) throw new Error('Could not read this payment code.');
+  assertNotOpagoPosPayment(raw);
   if (inferPaymentSourceFromRequest(raw) === 'hedera') {
     const [{ parseHederaCheckoutRequest }, { parseHederaPaymentRequest, formatTinybars }] = await Promise.all([
       import('./hedera/checkout'), import('./hedera/payments'),

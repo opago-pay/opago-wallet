@@ -74,6 +74,21 @@ test('a scan made before Spark is ready survives initialization and prepares exa
   await app.settle(); assert.deepEqual(app.calls, ['scan', 'resolve', 'prepare']);
 });
 
+test('actual OPAGO POS resolver refuses send-screen input before fee preparation, authorization or submission', async t => {
+ const { resolveLightningDestination } = require('../lib/lightning-destination.ts');
+ const { bech32 } = require('bech32');
+ const raw = 'lightning:' + bech32.encode('lnurl', bech32.toWords(Buffer.from('https://api.opago.com/lnpos/api/v1/lnurl/pos-a?p=synthetic')), 2000);
+ let requests = 0;
+ t.mock.method(global, 'fetch', async () => { requests++; throw Error('unexpected request'); });
+ const app = fixture({ scanResultKey: undefined, wallet: {}, resolve: resolveLightningDestination }); t.after(app.unmount);
+ (await app.settle()).props.onDetected(raw); const screen = await app.settle();
+ assert.equal(app.calls.includes('alert'), true);
+ assert.equal(app.calls.includes('prepare'), false);
+ assert.equal(app.calls.includes('authorize'), false);
+ assert.equal(app.calls.includes('submit'), false);
+ assert.notEqual(screen.type, 'review'); assert.equal(requests, 0);
+});
+
 test('explicit UMA address opens the UMA consent flow without ordinary LNURL resolution or payment', async t => {
   const app = fixture({ scanResultKey: undefined, wallet: {} }); t.after(app.unmount);
   const screen = await app.settle(); screen.props.onDetected('$alice@receiver.example'); await app.settle();
