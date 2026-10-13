@@ -70,7 +70,11 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
     }
     if (typeof result.cacheControl === 'string') responseHeaders['cache-control'] = result.cacheControl;
     if (typeof result.requestId === 'string' && result.requestId) responseHeaders['x-request-id'] = result.requestId;
-    const response = new Response(result.body, {
+    // Fetch forbids a body (even an empty string) for these HTTP statuses.
+    // In particular the public account logout returns 204, not a JSON object.
+    const bodyless = [204, 205, 304].includes(result.status);
+    if (bodyless && result.body !== '') throw new Error('Secure network transport returned an unexpected response body.');
+    const response = new Response(bodyless ? null : result.body, {
       status: result.status,
       headers: responseHeaders,
     });

@@ -78,7 +78,7 @@ The API companion pins the tested wallet commit for real-client HTTPS tests with
 an owned Redis and simulated Compliance. These do not prove live deployment,
 backend acceptance, native device networking or authenticated POS payments.
 
-Local `npm run phase5:verify`: typecheck and lint passed; 930 wallet tests passed,
+Local `npm run phase5:verify`: typecheck and lint passed; 931 wallet tests passed,
 one existing iOS-project test skipped; all nine checkout contract tests passed.
 New tests exercise real HPKE ciphertext, invalid config, server acknowledgement,
 no credential retries, unauthorized identities, storage isolation and UI races.
