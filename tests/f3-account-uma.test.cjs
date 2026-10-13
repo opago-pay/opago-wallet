@@ -14,6 +14,7 @@ const { decodeLightningInvoice } = require('../lib/lightning.ts');
 const { appConfig } = require('../lib/config.ts');
 const { assertContract } = require('../lib/opago/contract.ts');
 const { invoice } = require('./lightning-invoice-fixture.cjs');
+const { OpagoError } = require('../lib/opago/api.ts');
 // The existing aggregate runner shares one module cache. Keep this suite's captured
 // dependencies without preloading the configuration used by later Hedera/HTTP suites.
 for (const name of Object.keys(require.cache)) if (name.endsWith('.ts') && !existingModules.has(name)) delete require.cache[name];
@@ -31,14 +32,125 @@ async function fixture(ready = true) {
 async function review(uma) { await uma.reviewDisclosure('$alice@receiver.example', 100, 10); }
 async function prepare(uma) { await uma.consentAndPrepare(uma.payment.disclosure.id, async () => 2); }
 
-test('F3: account sign-in, ownership, binding, KYA and backend activation are distinct', async () => {
+async function personalAddress() {
+  const f = await fixture(false);
+  await f.account.signIn(); await f.account.proveOwnership(); await f.account.bind();
+  await f.account.address('set', 'alice-test');
+  assert.equal(f.account.state.wallet.photo_match, null);
+  return f;
+}
+function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+
+test('MVP personal address: no photo for rename, deactivate, restart and explicit restore/reactivation', async () => {
+  const { backend, account, store } = await personalAddress();
+  await account.address('rename', 'alice-new'); assert.equal(activeLightningAddress(account).address, 'alice-new@opago.com');
+  await account.address('deactivate'); assert.equal(activeLightningAddress(account), null);
+  await account.address('reactivate'); assert.ok(activeLightningAddress(account));
+  const restarted = backend.createAccount(); await restarted.load(); assert.equal(activeLightningAddress(restarted), null);
+  await restarted.refreshAfterLoad(); assert.ok(activeLightningAddress(restarted));
+  await restarted.close(); assert.equal(activeLightningAddress(restarted), null);
+  const restored = new OpagoAccount(new OpagoApi(backend), store, backend.identity, backend.login, randomUUID, account.now);
+  await restored.load(); await restored.signIn(true); await restored.restore(); assert.equal(activeLightningAddress(restored), null);
+  await restored.address('reactivate'); assert.equal(activeLightningAddress(restored).address, 'alice-new@opago.com');
+  assert.equal(restored.state.account.identification_status, 'unidentified');
+  assert.equal(restored.state.wallet.photo_match, null);
+});
+
+test('MVP personal address: account, wallet, custody, scope, expiry and state remain mandatory', async () => {
+  for (const change of [
+    a => { a.state.credential = null; }, a => { a.state.credential.expiresAt = 0; },
+    a => { a.state.account = null; }, a => { a.state.account.email_verified = false; },
+    a => { a.state.account.party_id = randomUUID(); }, a => { a.state.session.scope = 'onboarding'; },
+    a => { a.state.session.wallet_id = randomUUID(); }, a => { a.state.session.access_expires_at = '2000-01-01T00:00:00Z'; },
+    a => { a.state.session = { ...a.state.session, access_token: 'replacement-session' }; },
+    a => { a.state.wallet.party_id = null; }, a => { a.state.wallet.custodial = true; },
+    a => { a.state.wallet.wallet_pubkey = '02' + '99'.repeat(32); },
+    a => { a.state.wallet.status = 'closed'; }, a => { a.state.wallet.address.status = 'deactivated'; },
+    a => { a.state.wallet.address.status = 'pending_kyc'; }, a => { a.state.wallet.address.status = 'inactive'; },
+  ]) { const { account } = await personalAddress(); change(account); assert.equal(activeLightningAddress(account), null); }
+  const { account, backend } = await fixture(false); await account.signIn(); await account.proveOwnership();
+  await assert.rejects(account.address('set', 'alice-test'), /wallet_binding_required/);
+  assert.equal(backend.calls.some(c => c.path === '/api/v2/wallet/address'), false);
+});
+
+test('MVP personal address: successful write stays hidden until matching wallet readback', async () => {
+  for (const mode of ['lost', 'unconfirmed', 'wrong-wallet', 'pending']) {
+    const { backend, account } = await personalAddress();
+    const request = backend.request.bind(backend); let written = false;
+    backend.request = async req => {
+      const result = await request(req);
+      if (req.path === '/api/v2/wallet/address') written = true;
+      if (written && req.path === '/api/v2/wallet/me') {
+        assert.equal(activeLightningAddress(account), null);
+        if (mode === 'lost') throw new Error('Synthetic readback loss');
+        if (mode === 'unconfirmed') result.body.address.name = 'old-name';
+        if (mode === 'wrong-wallet') result.body.wallet_id = randomUUID();
+        if (mode === 'pending') result.body.address.status = 'pending_kyc';
+      }
+      return result;
+    };
+    await assert.rejects(account.address('rename', 'new-name'));
+    assert.equal(activeLightningAddress(account), null); assert.equal(account.hasPendingAddressOperation, true);
+    backend.request = request; await account.resumeAddress();
+    assert.equal(activeLightningAddress(account).name, 'new-name');
+    assert.equal(backend.calls.filter(c => c.path === '/api/v2/wallet/address' && c.body.name === 'new-name').length, 1);
+  }
+});
+
+test('MVP personal address: delayed wallet status cannot cross account/session/wallet changes or logout', async () => {
+  for (const mode of ['account', 'session', 'wallet', 'logout']) {
+    const { backend, account } = await personalAddress();
+    const request = backend.request.bind(backend), entered = deferred(), release = deferred();
+    backend.request = async req => { const result = await request(req); if (req.path === '/api/v2/wallet/me') { entered.resolve(); await release.promise; } return result; };
+    const pending = account.refresh(); const rejected = assert.rejects(pending, /account_mismatch/); await entered.promise;
+    if (mode === 'account') account.state.credential = { ...account.state.credential, subject: 'other-account' };
+    if (mode === 'session') account.state.session = { ...account.state.session, access_token: 'other-session' };
+    if (mode === 'wallet') account.identity.publicKey = '02' + '11'.repeat(32);
+    if (mode === 'logout') await account.signOut();
+    release.resolve(); await rejected; assert.equal(activeLightningAddress(account), null);
+  }
+});
+
+test('MVP personal address: an older read cannot override a newer deactivated address', async () => {
+  const { backend, account } = await personalAddress();
+  const request = backend.request.bind(backend), entered = deferred(), release = deferred(); let first = true;
+  backend.request = async req => { const result = await request(req); if (req.path === '/api/v2/wallet/me' && first) { first = false; entered.resolve(); await release.promise; } return result; };
+  const pending = account.refresh(), rejected = assert.rejects(pending, /address_changed/); await entered.promise;
+  backend.state.wallet.address.status = 'deactivated'; await account.refresh(); release.resolve(); await rejected;
+  assert.equal(account.state.wallet.address.status, 'deactivated'); assert.equal(activeLightningAddress(account), null);
+});
+
+test('MVP personal address: a delayed successful mutation cannot publish into another session', async () => {
+  const { backend, account } = await personalAddress();
+  const request = backend.request.bind(backend), entered = deferred(), release = deferred();
+  backend.request = async req => { const result = await request(req); if (req.path === '/api/v2/wallet/address') { entered.resolve(); await release.promise; } return result; };
+  const pending = account.address('rename', 'new-name'), rejected = assert.rejects(pending, /account_mismatch/);
+  await entered.promise; account.state.session = { ...account.state.session, access_token: 'replacement-session' };
+  release.resolve(); await rejected;
+  assert.equal(activeLightningAddress(account), null); assert.equal(account.hasPendingAddressOperation, true);
+  assert.equal(account.state.wallet.address.name, 'alice-test');
+});
+
+test('MVP personal address: backend locks, revoked sessions, name conflicts and rename rules are not bypassed', async () => {
+  for (const code of ['account_locked', 'session_revoked', 'name_taken', 'name_reserved', 'rename_limit_reached', 'rename_rate_limited', 'kyc_required']) {
+    const { backend, account } = await personalAddress(); const request = backend.request.bind(backend);
+    backend.request = async req => { if (req.path === '/api/v2/wallet/address') throw new OpagoError(code, false, code === 'rename_rate_limited' ? 429 : 403, 60); return request(req); };
+    await assert.rejects(account.address('rename', 'another-name'), e => e.code === code);
+    assert.equal(activeLightningAddress(account), null);
+    assert.equal(backend.state.wallet.address.name, 'alice-test');
+  }
+});
+
+test('F3: no-photo address requires account, ownership, binding and confirmed backend activation', async () => {
   const { backend, account } = await fixture(false);
   assert.equal(account.state.session, null);
   await account.signIn(); assert.equal(account.state.wallet, null); assert.equal(account.state.session, null);
   await account.proveOwnership(); assert.equal(account.state.wallet.status, 'unbound'); assert.equal(account.state.session.scope, 'onboarding');
   assert.equal(activeLightningAddress(account), null);
   await account.bind(); assert.equal(account.state.wallet.party_id, account.state.account.party_id); assert.equal(account.state.session.scope, 'wallet');
-  await assert.rejects(account.address('set', 'alice-test'), /kyc_required/);
+  await account.address('set', 'alice-test');
+  assert.equal(account.state.wallet.photo_match, null);
+  assert.equal(activeLightningAddress(account).address, 'alice-test@opago.com');
   for (const status of ['draft', 'submitted', 'in_review', 'correction_requested', 'rejected']) {
     await backend.setKya(status); await account.refresh(); assert.equal(photoMatchReady(account.state.wallet), false);
   }

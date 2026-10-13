@@ -44,7 +44,9 @@ function screenFixture(t, file, runtime, params = { test: '1' }) {
     '../components/opago/opago-ui': { Action: 'action', Card: 'card', Copy: 'copy', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
     '../lib/opago/account': { photoMatchReady }, '../lib/opago/address': { activeLightningAddress },
     '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/config': { appConfig }, '../lib/i18n': { t: translate },
-    'react-native-qrcode-svg': { default: 'qr', __esModule: true }, 'react-native': { View: 'view' },
+    'react-native-qrcode-svg': { default: 'qr', __esModule: true }, 'react-native': { View: 'view', Share: { share: async value => { runtime.shared = value.message; } } },
+    'expo-clipboard': { setStringAsync: async value => { runtime.copied = value; } },
+    '../lib/opago/api': require('../lib/opago/api.ts'),
   }), exports => exports.default()); t.after(app.unmount); return { ...app, afterAction: async () => { await pending; return app.render(); } };
 }
 
@@ -67,17 +69,69 @@ test('F3 account UI keeps local recovery optional, separates binding, and hides 
   action(tree, 'Prove wallet ownership').props.onPress(); tree = await app.afterAction();
   assert.equal(action(tree, 'Link this wallet to my OPAGO account').props.disabled, false);
   action(tree, 'Link this wallet to my OPAGO account').props.onPress(); await app.afterAction();
-  await runtime.backend.setKya('approved'); await runtime.account.refresh();
+  await runtime.account.refresh();
   tree = app.render(); nodes(tree).find(n => n.type === 'input').props.onChangeText('alice-test'); tree = app.render();
   action(tree, 'Activate my Lightning address').props.onPress(); tree = await app.afterAction();
   assert.equal(action(tree, 'Open identity onboarding'), undefined);
   assert.doesNotMatch(content(tree), /Identity details submitted|fully verified identity/); assert.match(content(tree), /Synthetic test address/);
-  assert.equal(nodes(tree).some(n => n.type === 'qr'), false); assert.equal(action(tree, 'Send with UMA').props.disabled, false);
+  assert.equal(nodes(tree).some(n => n.type === 'qr'), false); assert.equal(action(tree, 'Send with UMA').props.disabled, true);
   // Live display uses only a fresh, backend-confirmed canonical address.
   const liveScreen = screenFixture(t, 'app/opago-account.tsx', runtime, {});
   assert.equal(nodes(liveScreen.render()).find(n => n.type === 'qr').props.value, runtime.account.state.wallet.address.qr_payload);
+  action(liveScreen.render(), 'Copy Lightning address').props.onPress(); await liveScreen.afterAction();
+  assert.equal(runtime.copied, 'alice-test@opago.com');
+  action(liveScreen.render(), 'Share Lightning address').props.onPress(); await liveScreen.afterAction();
+  assert.equal(runtime.shared, 'alice-test@opago.com');
+  const oldShare = action(liveScreen.render(), 'Share Lightning address'); runtime.shared = undefined;
+  runtime.backend.state.wallet.address.status = 'deactivated';
+  oldShare.props.onPress(); await assert.rejects(liveScreen.afterAction(), /address_changed/);
+  assert.equal(runtime.shared, undefined);
   runtime.account.state.wallet.address.status = 'pending_kyc';
   assert.equal(nodes(liveScreen.render()).some(n => n.type === 'qr'), false);
+});
+
+test('F3 hook discards an old wallet and its pending action feedback on a wallet switch', async t => {
+  const first = { sparkWallet: {}, hederaPublicKey: 'first' }, second = { sparkWallet: {}, hederaPublicKey: 'second' };
+  let auth = first, finish;
+  const a = { perform: async action => action() }, b = { perform: async action => action() };
+  const app = hookFixture('hooks/useOpagoAccount.ts', () => ({
+    './useWalletAuth': { useWalletAuth: () => auth },
+    '../lib/opago/runtime-native': { getF3Runtime: async wallet => wallet === first.sparkWallet ? a : b },
+    '../lib/opago/errors': { opagoUserError: () => 'old failure' },
+    '../lib/opago/api': require('../lib/opago/api.ts'),
+  }), exports => exports.useOpagoAccount(false)); t.after(app.unmount);
+  app.render(); await Promise.resolve(); let state = app.render(); assert.equal(state.runtime, a);
+  const pending = state.run(() => new Promise((_resolve, reject) => { finish = reject; }));
+  app.render(); auth = second; assert.equal(app.render().runtime, null);
+  await Promise.resolve(); assert.equal(app.render().runtime, b);
+  finish(new Error('Old wallet operation')); await pending;
+  state = app.render(); assert.equal(state.runtime, b); assert.equal(state.error, ''); assert.equal(state.busy, false);
+});
+
+test('F3 runtime rebuilds for the same Spark object after lock/unlock', async t => {
+  let changeSession; let generation = 1;
+  class Account {
+    constructor() { this.state = {}; }
+    async load() {}
+    async refreshAfterLoad() {}
+  }
+  class Service { async load() {} }
+  const module = hookFixture('lib/opago/runtime-native.ts', () => ({
+    'expo-crypto': { randomUUID }, './api': { OpagoApi: class {} }, './account': { OpagoAccount: Account },
+    './uma': { UmaSending: Service }, './pos-link': { PosLinking: Service }, './pos-qr-native': { installPosQrSource() {} },
+    '../config': { appConfig: { isMainnet: false } }, './settings-native': { nativeF3Enabled: () => true },
+    '../wallet-session': { walletSession: {
+      subscribe: callback => { changeSession = callback; },
+      captureRuntime: () => { const initial = generation; return () => assert.equal(generation, initial); },
+    } },
+  }), exports => exports); t.after(module.unmount);
+  const runtime = module.render();
+  runtime.installF3Integration({ hka: { mode: 'hka' }, accountLogin: { mode: 'oidc' }, publicAddressOrigin: 'https://opago.com' });
+  const wallet = { getIdentityPublicKey: async () => '02' + '11'.repeat(32) };
+  const before = await runtime.getF3Runtime(wallet, 'key');
+  generation++; changeSession();
+  const after = await runtime.getF3Runtime(wallet, 'key');
+  assert.notEqual(before, after);
 });
 test('F3 UMA UI shows receiver, amount, fees and provider data before consent and a separate payment confirmation', async t => {
   const runtime = await runtimeFixture(true); const app = screenFixture(t, 'app/uma-send.tsx', runtime);
