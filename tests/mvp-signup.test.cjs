@@ -153,7 +153,7 @@ test('historical identity deep link redirects without importing photo intake or 
   assert.equal(app.render().type, 'redirect'); assert.equal(app.render().props.href, '/opago-signup'); app.unmount();
 });
 
-test('account screen offers signup even when services are unavailable, with no photo onboarding entry', t => {
+test('contract account screen offers signup even when services are unavailable, with no photo onboarding entry', t => {
   const old = global.__DEV__; global.__DEV__ = false; t.after(() => { global.__DEV__ = old; });
   const navigation = [];
   const app = hookFixture('app/opago-account.tsx', () => ({
@@ -162,7 +162,7 @@ test('account screen offers signup even when services are unavailable, with no p
     '../lib/opago/address': { activeLightningAddress: () => null }, '../lib/opago/account': { photoMatchReady: () => false },
     '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
     '../components/opago/opago-ui': { Action: 'action', Copy: 'copy', Card: 'card', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
-  }), module => module.default());
+  }), module => module.ContractAccountScreen());
   t.after(() => app.unmount());
   const actions = nodes(app.render()).filter(n => n.type === 'action');
   assert.equal(actions.some(n => /identity|photo/i.test(n.props.label)), false);
@@ -191,7 +191,7 @@ test('unmount aborts transport and an older response cannot replace a later wall
   assert.deepEqual(unmounted.navigation, []);
 });
 
-test('signed-in pending email is shown as a binding prerequisite and account status can refresh without a wallet session', async t => {
+test('contract signed-in pending email is shown as a binding prerequisite and account status can refresh without a wallet session', async t => {
   const old = global.__DEV__; global.__DEV__ = false; t.after(() => { global.__DEV__ = old; });
   let reads = 0;
   const state = { credential: {}, account: { email_verified: false }, wallet: null, session: null };
@@ -202,7 +202,7 @@ test('signed-in pending email is shown as a binding prerequisite and account sta
     '../lib/opago/address': { activeLightningAddress: () => null }, '../lib/opago/account': { photoMatchReady: () => false },
     '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
     '../components/opago/opago-ui': { Action: 'action', Copy: 'copy', Card: 'card', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
-  }), module => module.default());
+  }), module => module.ContractAccountScreen());
   t.after(() => app.unmount());
   const action = label => nodes(app.render()).find(n => n.type === 'action' && n.props.label === label);
   assert.match(text(app.render()), /You are signed in. Confirm your email before linking/);
