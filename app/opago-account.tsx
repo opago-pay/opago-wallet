@@ -46,13 +46,17 @@ export default function OpagoAccountScreen() {
       <Card title="Account sign-in">
         <Copy>{t(state.credential ? 'Signed in to OPAGO. Wallet ownership is proved separately.' : 'Sign in to your existing account in the OPAGO browser window.')}</Copy>
         <Action label={state.credential ? 'Sign in again' : 'Sign in to OPAGO'} disabled={busy} onPress={() => void run(() => account.signIn())} />
+        {state.credential && state.account && !state.account.email_verified && <>
+          <Copy>{t('You are signed in. Confirm your email before linking this wallet, then refresh your account details.')}</Copy>
+          <Action label="Refresh account details" disabled={busy} onPress={() => void run(() => account.refreshAccount())} />
+        </>}
         {state.credential && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
       </Card>
       <Card title="Wallet ownership and binding">
         <Copy>{t(wallet?.party_id ? 'This wallet is explicitly linked to your OPAGO account.' : state.session ? 'Wallet ownership proved. The wallet is not linked to an account yet.' : 'Prove ownership of this local wallet to OPAGO.')}</Copy>
         {!account.walletAvailable && <Copy>{t('Connect Lightning to prove or restore wallet ownership. Account sign-in and deletion remain available.')}</Copy>}
         <Action label="Prove wallet ownership" disabled={busy || !account.walletAvailable} onPress={() => void run(() => account.proveOwnership())} />
-        {!wallet?.party_id && <Action label="Link this wallet to my OPAGO account" disabled={busy || !state.credential || !state.session} onPress={() => void run(() => account.bind())} />}
+        {!wallet?.party_id && <Action label="Link this wallet to my OPAGO account" disabled={busy || !state.credential || !state.session || !state.account?.email_verified} onPress={() => void run(() => account.bind())} />}
         {state.credential && <><Copy>{t('After restoring your 12 words, restore the OPAGO link with the owning account. Address reactivation is a separate step.')}</Copy>
           <Action label="Restore my OPAGO wallet link" disabled={busy || !account.walletAvailable} onPress={() => void run(() => account.restore())} /></>}
         {state.session && <Action label="Refresh account status" disabled={busy} onPress={() => void run(() => account.refresh())} />}

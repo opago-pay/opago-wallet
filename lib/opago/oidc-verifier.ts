@@ -70,10 +70,12 @@ export function createOidcVerifier(discovery: OidcDiscovery, accessAudience: str
       return claims;
     }
     const id = await verify(tokens.id_token, true); const access = await verify(tokens.access_token, false);
-    if (id.sub !== access.sub || id.nonce !== nonce || id.email_verified !== true || typeof id.email !== 'string' || !id.email ||
+    // Released signup permits login before email confirmation. A signed false or
+    // absent contact claim grants no email assurance; account/binding rules remain separate.
+    if (id.sub !== access.sub || id.nonce !== nonce || id.email_verified !== undefined && typeof id.email_verified !== 'boolean' || typeof id.email !== 'string' || !id.email ||
       access.typ !== undefined && access.typ !== 'Bearer' || id.auth_time !== undefined && second(id.auth_time) > now() + 30_000 ||
       id.at_hash !== undefined && id.at_hash !== base64url(sha256(utf8(tokens.access_token)).slice(0, 16))) throw new Error('OIDC account or nonce mismatch.');
     return { issuer: config.issuer, audience: config.clientId, subject: id.sub as string, expiresAt: second(id.exp), authTime: second(id.auth_time),
-      nonce, emailVerified: true, accessAudience, accessExpiresAt: second(access.exp) };
+      nonce, emailVerified: id.email_verified === true, accessAudience, accessExpiresAt: second(access.exp) };
   };
 }

@@ -31,7 +31,7 @@ export class OidcAccountLogin implements AccountLogin {
     const claims = await this.platform.verify(tokens, this.config, nonce);
     active();
     if (claims.issuer !== this.config.issuer || claims.audience !== this.config.clientId || claims.nonce !== nonce || !claims.subject ||
-        !claims.emailVerified || claims.expiresAt <= this.now() || claims.accessExpiresAt <= this.now() ||
+        typeof claims.emailVerified !== 'boolean' || claims.expiresAt <= this.now() || claims.accessExpiresAt <= this.now() ||
         claims.accessAudience !== this.trusted.accessAudience || claims.authTime > this.now() + 30_000 ||
         fresh && this.now() - claims.authTime > 300_000) throw new Error('OIDC authentication did not satisfy the account contract.');
     await this.store.write('f3.oidc.' + this.config.issuer, { tokens, nonce, subject: claims.subject });

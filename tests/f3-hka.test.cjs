@@ -200,7 +200,7 @@ test('F3 OIDC verifier validates real RS256 signatures, issuer, both audiences, 
   const f = oidcFixture(); const claims = await f.verifier(f.tokens(), f.config, f.id.nonce);
   assert.equal(claims.subject, f.id.sub); assert.equal(claims.accessAudience, f.access.aud); assert.equal(claims.authTime, f.now * 1000);
   const bad = f.tokens(); bad.access_token = bad.access_token.slice(0, -5) + 'AAAAA'; await assert.rejects(f.verifier(bad, f.config, f.id.nonce));
-  for (const [kind, patch] of [['id', { nonce: 'wrong' }], ['id', { email_verified: false }], ['id', { aud: 'other-client' }], ['access', { aud: 'other-api' }], ['access', { sub: 'other-subject' }], ['access', { azp: 'other-client' }], ['access', { exp: f.now - 1 }], ['id', { iss: 'https://evil.example' }]]) {
+  for (const [kind, patch] of [['id', { nonce: 'wrong' }], ['id', { email_verified: 'true' }], ['id', { aud: 'other-client' }], ['access', { aud: 'other-api' }], ['access', { sub: 'other-subject' }], ['access', { azp: 'other-client' }], ['access', { exp: f.now - 1 }], ['id', { iss: 'https://evil.example' }]]) {
     const saved = { ...f[kind] }; Object.assign(f[kind], patch); await assert.rejects(f.verifier(f.tokens(), f.config, 'synthetic-nonce')); Object.assign(f[kind], saved);
   }
 });
@@ -249,5 +249,15 @@ test('HKA minimum build provides a typed update state and accepts only locally p
   } finally {
     if (original === undefined) delete process.env.EXPO_PUBLIC_OPAGO_F3_ANDROID_UPDATE_URL; else process.env.EXPO_PUBLIC_OPAGO_F3_ANDROID_UPDATE_URL = original;
     if (enabled === undefined) delete process.env.EXPO_PUBLIC_OPAGO_F3_ENABLED; else process.env.EXPO_PUBLIC_OPAGO_F3_ENABLED = enabled;
+  }
+});
+
+test('OIDC cryptographic verifier preserves false and absent email assurance without blocking login', async () => {
+  for (const value of [false, undefined]) {
+    const f = oidcFixture();
+    if (value === undefined) delete f.id.email_verified; else f.id.email_verified = value;
+    const claims = await f.verifier(f.tokens(), f.config, f.id.nonce);
+    assert.equal(claims.emailVerified, false);
+    assert.equal(claims.subject, f.id.sub);
   }
 });
