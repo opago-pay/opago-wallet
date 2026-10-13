@@ -53,6 +53,12 @@ test('public account uses runtime config and real HPKE; only /me supplies identi
   assert.deepEqual(f.calls.map(c => c.path), ['/api/v2/app/config', '/api/v2/auth/login/hpke-key', '/api/v2/auth/token', '/api/v2/auth/me']);
   assert.equal(Object.hasOwn(session, 'subject'), false); assert.equal(Object.hasOwn(session, 'authTime'), false);
 });
+
+test('public account uses fresh server time when the device clock is two minutes ahead', async () => {
+  const f = await fixture(); f.now += 120000;
+  await f.login();
+  assert.equal(f.plaintext.issued_at, f.metadata.server_time);
+});
 for (const [name, mutate] of [
   ['wrong audience', f => { f.config.audience = 'https://api.opago-pay.com'; }],
   ['expired config', f => { f.config.valid_until = stamp(f.now - 1); }],

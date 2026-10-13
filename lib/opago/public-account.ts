@@ -104,7 +104,7 @@ export class PublicAccountClient {
       const nonce = this.random(16); if (nonce.length !== 16) throw new Error();
       const publicKey = await hpkeSuite.kem.deserializePublicKey(raw.slice().buffer);
       const sender = await hpkeSuite.createSenderContext({ recipientPublicKey: publicKey, info: utf8('opago-api:auth:hpke:v1\0' + PUBLIC_API_ORIGIN + '\0' + key.kid).buffer });
-      const plaintext = utf8(JSON.stringify({ username, password, issued_at: Math.floor(this.now() / 1000), nonce: base64url(nonce) }));
+      const plaintext = utf8(JSON.stringify({ username, password, issued_at: key.server_time, nonce: base64url(nonce) }));
       password = ''; if (plaintext.length > 8192) { plaintext.fill(0); throw new PublicAccountError('invalid'); }
       try {
         const ciphertext = await sender.seal(plaintext.slice().buffer);
