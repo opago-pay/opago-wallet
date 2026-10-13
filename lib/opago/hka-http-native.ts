@@ -15,14 +15,17 @@ export const nativeHkaHttp: HkaHttp = async (url, options) => {
   bridge(); const endpoint = new URL(url);
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) throw new Error('Invalid account endpoint.');
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), Math.min(options.binaryBody ? 120_000 : 10_000, options.timeoutMs));
+  const abort = () => controller.abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  if (options.signal?.aborted) controller.abort();
   try {
-    const response = await strictFetch(url, { method: options.method, headers: options.headers, body: options.body, signal: controller.signal, redirect: 'error' }, options.maxBytes, false,
+    const response = await strictFetch(url, { method: options.method, headers: options.headers, body: options.body, signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store' }, options.maxBytes, false,
       options.binaryBody ? { base64: Buffer.from(options.binaryBody).toString('base64'), timeoutMs: options.timeoutMs } : undefined);
     if (response.redirected || response.url && response.url !== url) throw new Error('Account redirect rejected.');
     const body = await readBoundedText(response, 'OPAGO account', options.maxBytes, controller, options.maxBytes);
     if (utf8(body).length > options.maxBytes) throw new Error('Account response exceeds limit.');
     return { status: response.status, body, contentType: response.headers.get('content-type') || '', cacheControl: response.headers.get('cache-control') || '', retryAfter: response.headers.get('retry-after') || '', requestId: response.headers.get('x-request-id') || '' };
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
 };
 export async function nativeOidcJson(url: string): Promise<unknown> {
   const response = await nativeHkaHttp(url, { method: 'GET', headers: { Accept: 'application/json', 'Cache-Control': 'no-store' }, maxBytes: 65_536, timeoutMs: 10_000 });

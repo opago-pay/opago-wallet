@@ -39,13 +39,27 @@ test('F3 OIDC uses external browser, code + PKCE S256, random state/nonce and ac
   assert.ok(f.form().get('code_verifier')); assert.equal((await f.login.refresh()).subject, result.subject);
   await f.login.logout(); await assert.rejects(f.login.refresh());
 });
-test('F3 OIDC rejects callback attacks, cancelled browser, unsigned claims, stale auth and unverified contact', async () => {
+test('F3 OIDC permits pending email on login and refresh without claiming contact verification', async () => {
+  const f = oidcFixture(); f.claims.emailVerified = false;
+  const credential = await f.login.login(false);
+  assert.equal(credential.subject, f.claims.subject);
+  assert.equal((await f.login.refresh()).subject, credential.subject);
+  const backend = new F3ContractTestBackend(new MemoryPrivateStore(), randomUUID, 'regtest');
+  backend.state.account.email_verified = false;
+  const account = backend.createAccount(); await account.load(); await account.signIn();
+  assert.ok(account.state.credential); assert.equal(account.state.account.email_verified, false);
+  assert.equal(account.state.session, null); assert.equal(account.state.wallet, null);
+  await assert.rejects(account.bind(), /reproof_required/);
+  assert.equal(backend.calls.some(call => call.path === '/api/v2/account/wallets'), false);
+});
+
+test('F3 OIDC rejects callback attacks, cancelled browser, unsigned claims, stale auth and malformed contact claims', async () => {
   for (const callback of [null, config.redirectUri + '?code=a&state=wrong', config.redirectUri + '?code=a&state=a&state=b',
     'opagowallet://other?code=a&state=a', config.redirectUri + '?code=a&state=a#code=b']) {
     const f = oidcFixture(); f.platform.browser = async () => callback; await assert.rejects(f.login.login(false));
   }
   for (const patch of [{ issuer: 'https://other.example' }, { audience: 'other-client' }, { accessAudience: 'other-api' },
-    { emailVerified: false }, { expiresAt: 0 }, { authTime: 0 }]) {
+    { emailVerified: 'true' }, { expiresAt: 0 }, { authTime: 0 }]) {
     const f = oidcFixture(); Object.assign(f.claims, patch); await assert.rejects(f.login.login(true));
   }
   const invalidSignature = oidcFixture(); invalidSignature.platform.verify = async () => { throw new Error('Synthetic signature rejection'); };

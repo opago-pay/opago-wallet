@@ -11,7 +11,7 @@ import { base64url, unbase64url, jcs, parseStrictJson, strictUtf8, utf8 } from '
 import { txRoute, txDefinitions } from './tx-contract';
 
 export type HkaHttp = (url: string, options: { method: Request['method']; headers: Record<string, string>; body?: string; binaryBody?: Uint8Array;
-  maxBytes: number; timeoutMs: number }) => Promise<{ status: number; body: string; contentType: string; cacheControl?: string; retryAfter?: string; requestId?: string }>;
+  maxBytes: number; timeoutMs: number; signal?: AbortSignal }) => Promise<{ status: number; body: string; contentType: string; cacheControl?: string; retryAfter?: string; requestId?: string }>;
 export type HkaTrust = { audience: string; roots: Record<string, string>; platform: 'ios' | 'android'; build: number;
   oidc: { issuer: string; clientId: string; redirectUri: string }; testOnly?: boolean;
   /** Backend-agreed HPKE + v3 binding/session revision. No bootstrap/environment default. */
