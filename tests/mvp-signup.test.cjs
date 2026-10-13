@@ -190,3 +190,25 @@ test('unmount aborts transport and an older response cannot replace a later wall
   finish(success); await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(unmounted.navigation, []);
 });
+
+test('signed-in pending email is shown as a binding prerequisite and account status can refresh without a wallet session', async t => {
+  const old = global.__DEV__; global.__DEV__ = false; t.after(() => { global.__DEV__ = old; });
+  let reads = 0;
+  const state = { credential: {}, account: { email_verified: false }, wallet: null, session: null };
+  const account = { state, walletAvailable: true, addressReady: () => false, refreshAccount: async () => { reads++; state.account.email_verified = true; } };
+  const app = hookFixture('app/opago-account.tsx', () => ({
+    'expo-router': { useLocalSearchParams: () => ({}), useRouter: () => ({ push() {} }) },
+    '../hooks/useOpagoAccount': { useOpagoAccount: () => ({ runtime: { account }, busy: false, error: '', run: fn => fn() }) },
+    '../lib/opago/address': { activeLightningAddress: () => null }, '../lib/opago/account': { photoMatchReady: () => false },
+    '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
+    '../components/opago/opago-ui': { Action: 'action', Copy: 'copy', Card: 'card', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
+  }), module => module.default());
+  t.after(() => app.unmount());
+  const action = label => nodes(app.render()).find(n => n.type === 'action' && n.props.label === label);
+  assert.match(text(app.render()), /You are signed in. Confirm your email before linking/);
+  assert.equal(action('Sign in again').props.disabled, false);
+  assert.equal(action('Link this wallet to my OPAGO account').props.disabled, true);
+  action('Refresh account details').props.onPress(); await app.settle();
+  assert.equal(reads, 1); assert.doesNotMatch(text(app.render()), /Confirm your email before linking/);
+  assert.equal(state.wallet, null); assert.equal(state.session, null);
+});
