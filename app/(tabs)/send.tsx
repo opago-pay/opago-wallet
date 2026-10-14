@@ -81,7 +81,7 @@ import type {
 
 const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : t('Payment failed.');
 
-export default function SendScreen({ modal = false }: { modal?: boolean } = {}) {
+export default function SendScreen({ modal = false, initialAccount = 'bitcoin_spark' }: { modal?: boolean; initialAccount?: 'bitcoin_spark' | 'hedera' } = {}) {
   useLanguage();
   useColorMode();
   useEffect(() => { markNavigationReady('send'); }, []);
@@ -90,23 +90,25 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     if (modal && router.canGoBack()) router.back();
     else router.replace('/(tabs)');
   };
-  const { hederaRequest, hederaRequestKey, scanResultKey, manualEntryKey } = useLocalSearchParams<{
+  const { hederaRequest, hederaRequestKey, scanResultKey, manualEntryKey, account, destination: initialDestination, amountSats: initialAmount } = useLocalSearchParams<{
+    account?: string; destination?: string; amountSats?: string;
     hederaRequest?: string | string[];
     hederaRequestKey?: string | string[];
     scanResultKey?: string | string[];
     manualEntryKey?: string | string[];
   }>();
   const [entryMode, setEntryMode] = useState<'scan' | 'manual'>(
-    typeof scanResultKey === 'string' || typeof manualEntryKey === 'string' || typeof hederaRequestKey === 'string' ? 'manual' : 'scan',
+    typeof initialDestination === 'string' || typeof scanResultKey === 'string' || typeof manualEntryKey === 'string' || typeof hederaRequestKey === 'string' ? 'manual' : 'scan',
   );
   const [localScanKey, setLocalScanKey] = useState<string | null>(null);
   const activeScanKey = localScanKey ?? scanResultKey;
   const rates = useExchangeRates();
   const ratesRef = useRef(rates);
   ratesRef.current = rates;
-  const [source, setSource] = useState<PaymentSource>('spark');
+  const [source, setSource] = useState<PaymentSource>(initialAccount === 'hedera' ? 'hedera' : 'spark');
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const {
+    onchainWallet,
     sparkWallet,
     sparkStatus,
     sparkError,
@@ -130,11 +132,11 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     enableSpark: false,
     enableHedera: advancedExpanded || source === 'hedera',
   });
-  const [destination, setDestination] = useState('');
-  const [amountInput, setAmountInput] = useState('');
+  const [destination, setDestination] = useState(typeof initialDestination === 'string' ? initialDestination : '');
+  const [amountInput, setAmountInput] = useState(typeof initialAmount === 'string' ? initialAmount : '');
   const [amountRequirement, setAmountRequirement] = useState<LightningAmountRequirement | null>(null);
   const [currency, setCurrency] = useState<PaymentCurrency>('SAT');
-  const [sourceSelected, setSourceSelected] = useState(false);
+  const [sourceSelected, setSourceSelected] = useState(initialAccount==='hedera'||!!account);
   const [loading, setLoading] = useState(false);
   const [paymentPhase, setPaymentPhase] = useState<'authorizing' | 'sending' | null>(null);
   const [lightningResult, setLightningResult] = useState<SparkPaymentResult | null>(null);
@@ -290,6 +292,10 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         if (requested && bitcoin.amountSats !== null && requested !== bitcoin.amountSats) throw new Error('The Bitcoin request contains conflicting amounts.');
         const amount = bitcoin.amountSats ?? requested;
         if (bitcoin.route === 'onchain') {
+          if (account !== 'bitcoin_spark') {
+            router.push({ pathname: '/onchain-send' as '/send-flow', params: { address: bitcoin.address!, ...(amount ? { amountSats: String(amount) } : {}) } });
+            setReviewPreparation(null); return;
+          }
           setReviewPreparation(null);
           setAmountRequirement(amount ? null : { minSats: 1, maxSats: null });
           // Recognition (scan/paste/first Continue) never calls the signing quote
@@ -346,6 +352,16 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
       );
     } catch (cause) {
       if (!isCurrent()) return;
+      if(activeSource==='spark'&&cause instanceof Error&&/Insufficient Lightning balance|insufficient.*fee/i.test(cause.message)){
+        const own=await onchainWallet?.balance().catch(()=>null);
+        if(!isCurrent())return;
+        if(own&&own.availableSats>0){
+          Alert.alert(t('Move to Lightning'),t('Moving Bitcoin to Lightning has fees and needs Bitcoin confirmation. Review this payment again afterwards.'),[
+            {text:t('Cancel'),style:'cancel'},
+            {text:t('Move to Lightning'),onPress:()=>router.push({pathname:'/exchange-flow',params:{account:'bitcoin_onchain'}})},
+          ]);return;
+        }
+      }
       Alert.alert(
         t('Check this payment'),
         t(friendlyPaymentMessage(
@@ -361,7 +377,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         setReviewPreparation(null);
       }
     }
-  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet, router]);
+  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet, router, account,onchainWallet]);
 
   async function executeBitcoinPayment() {
     if (!pendingBitcoin || !sparkWallet || paymentInFlight.current) return;

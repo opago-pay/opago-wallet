@@ -3,6 +3,10 @@ import type { TransactionRate } from './transaction-rates';
 
 export interface PaymentHistoryItem {
   key: string;
+  account?: 'bitcoin_onchain';
+  onchainOperationId?: string;
+  legacyDeposit?: boolean;
+  internalTransfer?: 'to_lightning'|'from_lightning';
   type: 'incoming' | 'outgoing';
   amountDisplay: string;
   /** Numeric amount in the displayed asset unit (SAT or HBAR). */
@@ -98,6 +102,7 @@ export function paymentMethodLabel(item: PaymentHistoryItem): string {
 }
 
 export function paymentDetailStatus(item: PaymentHistoryItem): string {
+  if (item.status === 'refunded') return 'Returned to on-chain';
   if (item.status === 'action_required') return item.operation?.kind === 'deposit' ? 'Claim required' : 'Needs attention';
   if (item.status === 'broadcast' && item.asset === 'SAT' && item.route === 'onchain') {
     return 'Broadcast to the Bitcoin network';

@@ -1,3 +1,4 @@
+import { onchainErrorMessage } from '../lib/onchain/errors';
 import React, {
   createContext,
   ReactNode,
@@ -13,6 +14,7 @@ import { generateMnemonic } from 'bip39';
 import type { PrivateKey } from '@hiero-ledger/sdk';
 import * as Crypto from 'expo-crypto';
 import { initializeSparkWallet } from '../lib/spark';
+import type { OnchainWallet } from '../lib/onchain/types';
 import {
   deleteSecureItem,
   getBiometricallyProtectedMnemonic,
@@ -80,6 +82,10 @@ interface WalletContextValue {
   isInitializing: boolean;
   initStatus: string;
   walletReady: boolean;
+  onchainWallet: OnchainWallet | null;
+  onchainStatus: 'idle' | 'connecting' | 'ready' | 'error';
+  onchainError: string | null;
+  retryOnchainConnection(): Promise<void>;
   sparkWallet: SparkWalletInstance | null;
   sparkStatus: 'idle' | 'connecting' | 'ready' | 'error';
   sparkError: string | null;
@@ -116,6 +122,12 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const startupSeedRef = useRef<Uint8Array | null>(null);
   const hederaLookupRef = useRef<Promise<HederaAccountSnapshot | null> | null>(null);
   const hederaActivationRef = useRef<Promise<void> | null>(null);
+  const onchainResource = useRef(new SessionResource<OnchainWallet>());
+  const onchainSeedRef=useRef<Uint8Array|null>(null);
+  const onchainRetryRef = useRef<Promise<void> | null>(null);
+  const [onchainWallet, setOnchainWallet] = useState<OnchainWallet | null>(null);
+  const [onchainStatus, setOnchainStatus] = useState<WalletContextValue['onchainStatus']>('idle');
+  const [onchainError, setOnchainError] = useState<string | null>(null);
   const sparkResource = useRef(new SessionResource<SparkWalletInstance>());
   const sparkRetryRef = useRef<Promise<void> | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -136,6 +148,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     initializationGenerationRef.current += 1;
     startupSeedRef.current?.fill(0);
     startupSeedRef.current = null;
+    onchainSeedRef.current?.fill(0);onchainSeedRef.current=null;
+    onchainResource.current.reset();
+    setOnchainWallet(null); setOnchainStatus('idle'); setOnchainError(null);
     sparkResource.current.reset();
     setSparkWallet(null);
     setSparkStatus('idle');
@@ -155,6 +170,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
 
   useEffect(() => {
     const runtime = sparkResource.current;
+    const onchainRuntime = onchainResource.current;
     const unsubscribe = walletSession.subscribe(() => {
       const unlocked = walletSession.isUnlocked();
       setIsLocked(!unlocked);
@@ -194,6 +210,8 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       startupSeedRef.current = null;
       hederaPrivateKeyRef.current = null;
       runtime.reset();
+      onchainSeedRef.current?.fill(0);onchainSeedRef.current=null;
+      onchainRuntime.reset();
     };
   }, [clearRuntimeState]);
 
@@ -241,6 +259,46 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       if (startupSeedRef.current === seed) startupSeedRef.current = null;
     }
   }, []);
+
+  const connectOnchain = useCallback(async (seed: Uint8Array, generation: number) => {
+    onchainSeedRef.current=seed;
+    try {
+      const assertRuntime = walletSession.captureRuntime();
+      setOnchainStatus('connecting'); setOnchainError(null);
+      const wallet = await onchainResource.current.initialize(async signal => {
+        const { initializeOnchainWallet } = await import('../lib/onchain/wallet-native');
+        const current = () => {
+          assertRuntime();
+          if (signal.aborted || initializationGenerationRef.current !== generation) throw new Error('Wallet changed.');
+        };
+        current(); return initializeOnchainWallet(seed, current,signal);
+      });
+      if (!wallet || initializationGenerationRef.current !== generation) return;
+      assertRuntime(); setOnchainWallet(wallet); setOnchainStatus('ready');
+    } catch (cause) {
+      if (initializationGenerationRef.current !== generation) return;
+      setOnchainStatus('error'); setOnchainError(onchainErrorMessage(cause));
+    } finally { seed.fill(0);if(onchainSeedRef.current===seed)onchainSeedRef.current=null; }
+  }, []);
+
+  const retryOnchainConnection = useCallback(async () => {
+    if (onchainWallet || !walletReady || !hederaPublicKey) return;
+    if (onchainRetryRef.current) return onchainRetryRef.current;
+    if (onchainResource.current.hasUnsettledStartup()) throw new Error('Bitcoin startup is still running.');
+    const retry = (async () => {
+      const guard = walletSession.captureRuntime();
+      const generation = initializationGenerationRef.current;
+      let seed: Uint8Array | null = null;
+      try {
+        const mnemonic = await withProtectedWalletAccess(() => getSecureItem(MNEMONIC_STORE_KEY));
+        guard(); if (!mnemonic) throw new Error('Wallet recovery words are unavailable.');
+        seed = await deriveAuthenticatedWalletSeed(mnemonic); guard();
+        if (deriveHederaPrivateKeyFromSeed(seed).publicKey.toStringRaw().toLowerCase() !== hederaPublicKey) throw new Error('Wallet changed.');
+        await connectOnchain(seed,generation);
+      } finally { seed?.fill(0); }
+    })().finally(() => { onchainRetryRef.current = null; });
+    onchainRetryRef.current = retry; return retry;
+  }, [connectOnchain,hederaPublicKey,onchainWallet,walletReady]);
 
   const initializeMnemonic = useCallback(
     async (mnemonic: string) => {
@@ -303,13 +361,14 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
 
         // Show the wallet shell immediately while Bitcoin connects in the
         // background. Keys and network readiness are separate states.
+        void connectOnchain(Uint8Array.from(seed), generation);
         void connectSpark(seed, generation);
         handedToSpark = true;
       } finally {
         if (!handedToSpark) eraseSeed();
       }
     },
-    [connectSpark],
+    [connectSpark, connectOnchain],
   );
 
   const retrySparkConnection = useCallback(async () => {
@@ -683,6 +742,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       isInitializing,
       initStatus,
       walletReady,
+      onchainWallet, onchainStatus, onchainError, retryOnchainConnection,
       sparkWallet,
       sparkStatus,
       sparkError,
@@ -721,6 +781,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       sendHederaPayment,
       sparkError,
       sparkStatus,
+      onchainWallet, onchainStatus, onchainError, retryOnchainConnection,
       sparkWallet,
       walletReady,
       wipeWallet,

@@ -134,7 +134,7 @@ export function createBitcoinSqliteStore(open: () => Promise<Database>, legacy: 
     list(scope: string) { return exclusive(() => list(scope)); },
     listActive(scope: string) { return exclusive(async () => {
       const rows = await (await db()).getAllAsync<SavedRow>(`SELECT record_json FROM bitcoin_operations
-        WHERE scope = ? AND state NOT IN ('confirmed', 'failed', 'aborted') ORDER BY created_ms, id_sort`, scope);
+        WHERE scope = ? AND state NOT IN ('confirmed', 'refunded', 'failed', 'aborted') ORDER BY created_ms, id_sort`, scope);
       return rows.map(row => decode(row)!);
     }); },
     listWithdrawalRequestIds(scope: string) { return exclusive(async () => {
@@ -218,7 +218,7 @@ export function createBitcoinSqliteStore(open: () => Promise<Database>, legacy: 
           const duplicate = await transaction.getFirstAsync<{ id: string }>(
             `SELECT id FROM bitcoin_operations WHERE scope = ? AND
               (id = ? OR (? = 'withdrawal' AND kind = 'withdrawal' AND
-              state NOT IN ('confirmed', 'failed', 'aborted'))) LIMIT 1`,
+              state NOT IN ('confirmed', 'refunded', 'failed', 'aborted'))) LIMIT 1`,
             operation.scope, operation.id, operation.kind);
           if (duplicate) throw new Error('A Bitcoin payment is still being checked. Do not send it again.');
           await save(transaction, operation);

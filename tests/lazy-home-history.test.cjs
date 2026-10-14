@@ -76,6 +76,9 @@ function fixture(data = {}) {
       bitcoinIncoming: data.bitcoinIncoming ?? null,
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }); } },
+    '@/lib/onchain/history': require('../lib/onchain/history.ts'),
+    '@/hooks/useOnchainBalance': { useOnchainBalance: () => ({ network:data.onchainNetwork, state: { value: data.onchain === null ? null : {totalSats:data.onchain??0,availableSats:data.onchain??0},status:data.onchain===null?'loading':'ready',updatedAt:1 }, operations:[],refresh:async()=>{} }) },
+    '@/components/onchain/account-details': { AccountDetails:'account-details', AccountIcon:'account-icon' },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
@@ -142,7 +145,7 @@ function fixture(data = {}) {
     name => deps[name] || {}, exports, callback => setImmediate(callback), clearImmediate,
     (callback, ms) => { const id={};intervals.set(id,{callback,ms});return id; }, id=>intervals.delete(id),
   );
-  const render = () => { cursor = 0; focusEffects.length = 0; return exports.default(); };
+  const render = () => { cursor = 0; focusEffects.length = 0; const result=exports.default();return result.type===React.Fragment?React.Children.toArray(result.props.children)[0]:result; };
   const blur = () => { cleanups.forEach(cleanup => cleanup?.()); cleanups = []; };
   const refocus = () => { blur(); cleanups = focusEffects.map(focus => focus()); };
   return { reads, requests, pushes, render, refocus, blur,
@@ -188,7 +191,7 @@ test('Home keeps its primary balance and reads HBAR activity without waiting for
   assert.ok(texts.includes('Balance'));
   assert.equal(texts.some(text => text.includes('Bitcoin balance:') || text.includes('Your money')), false);
   assert.ok(texts.includes('Latest activity'));
-  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);
+  assert.ok(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'));
   assert.equal(advanced(screen).props.label, 'All coins');
 });
 
@@ -199,7 +202,7 @@ test('Home headline adds every displayed coin and waits for missing holdings', (
   assert.equal(data.balanceParams.enableHedera, true);
   const headline = find(screen, node => node.type === 'text' && node.props.accessibilityLabel?.startsWith('Total estimated balance:'));
   assert.equal(headline.props.accessibilityLabel, 'Total estimated balance: 75002€');
-  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'bitcoin').props.fiatValue, '≈ 75000');
+  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning').props.fiatValue, '≈ 75000');
 
   data.hbarTinybars = null;
   screen = app.render();
@@ -489,9 +492,9 @@ test('Home and incoming Bitcoin amounts render without Intl.formatToParts on iOS
         {id:'pending-deposit',kind:'deposit',state:'pending',amountSats:200},
       ]:[]});
       const screen=app.render();
-      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
       assert.ok(btc);
-      assert.equal(btc.props.value,'0.00000107 BTC');
+      assert.equal(btc.props.value,'107 SAT');
       assert.deepEqual(btc.props.notes,incoming?['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']:[]);
     }
   } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
@@ -503,22 +506,22 @@ test('All coins shows available BTC and HBAR holdings, EUR values, unit prices a
   });
   let screen=app.render();
   assert.equal(advanced(screen).props.label,'All coins');
-  const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+  const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
   const hbar=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera');
-  assert.equal(btc.props.value,'1.5 BTC');assert.equal(btc.props.fiatValue,'≈ 75000');
-  assert.equal(btc.props.subtitle,'1 BTC = 50000');
+  assert.equal(btc.props.value,'150,000,000 SAT');assert.equal(btc.props.fiatValue,'≈ 75000');
+  assert.equal(btc.props.subtitle,'Bitcoin');
   assert.equal(btc.props.description,undefined);
   assert.deepEqual(btc.props.notes,['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']);
   assert.equal(hbar.props.value,'20 HBAR');assert.equal(hbar.props.fiatValue,'≈ 2');
-  assert.equal(hbar.props.subtitle,'1 HBAR = 0.1');
+  assert.equal(hbar.props.subtitle,'Hedera');assert.equal(hbar.props.description,'1 HBAR = 0.1');
   const unavailable=fixture({spark:null,btcRate:0,hbarRate:0,sparkStatus:'error',sparkError:'unavailable'});screen=unavailable.render();
-  const unknown=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
-  assert.equal(unknown.props.value,'— BTC');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
+  const unknown=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
+  assert.equal(unknown.props.value,'— SAT');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
 });
 
 test('known coin holdings keep their values and layout during background balance refresh',()=>{
   const app=fixture({sparkStatus:'loading',hederaStatus:'loading'});const screen=app.render();
-  for(const asset of ['bitcoin','hedera']) {
+  for(const asset of ['bitcoin','lightning','hedera']) {
     const card=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset===asset);
     assert.equal(card.props.loading,false);
     assert.equal(card.props.statusText,undefined);
@@ -564,8 +567,8 @@ test('coin unit prices use their own timestamps when only the other asset was re
   const now=Date.now();
   const app=fixture({btcRatesAt:now-301_000,hbarRatesAt:now});
   const screen=app.render();
-  assert.match(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin').props.subtitle,/last known/);
-  assert.doesNotMatch(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera').props.subtitle,/last known/);
+  assert.match(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin').props.description,/last known/);
+  assert.doesNotMatch(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera').props.description,/last known/);
 });
 
 test('a known HBAR receipt stays visible while a slower fresh page is still loading',async()=>{
@@ -622,4 +625,18 @@ test('a historical HBAR quote arriving later updates an already opened detail vi
   assert.equal(require('../lib/payment-details.ts').paymentEurQuote(details.props.payment,details.props.rates).eurValue,1);
   assert.equal(details.props.payment.transactionRatePending,false);
   app.blur();
+});
+
+test('home counts onchain and Lightning once each and keeps All coins collapsed initially',()=>{
+ const app=fixture({onchain:100000000,spark:150000000,hbarTinybars:2000000000n});const screen=app.render();
+ assert.equal(advanced(screen).props.expanded,false);
+ assert.equal(find(screen,node=>node.type==='text'&&node.props.accessibilityLabel?.startsWith('Total estimated balance:')).props.accessibilityLabel,'Total estimated balance: 125002€');
+ const cards=['bitcoin','lightning','hedera'].map(asset=>find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset===asset));
+ assert.deepEqual(cards.map(card=>card.props.account),['bitcoin_onchain','bitcoin_spark','hedera']);
+ cards[0].props.onOpen();app.render();assert.equal(advanced(app.render()).props.expanded,false);
+});
+
+test('the onchain holding displays its own test network instead of inheriting the Spark network',()=>{
+ const app=fixture({onchainNetwork:'signet'});const card=find(app.render(),node=>node.type?.name==='BalanceCard'&&node.props.account==='bitcoin_onchain');
+ assert.equal(card.props.networkBadge,'SIGNET');
 });

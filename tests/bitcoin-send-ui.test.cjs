@@ -10,7 +10,7 @@ function fixture(options = {}) {
     '@react-navigation/native': { usePreventRemove: (blocked, onAttempt) => { removal = { blocked, onAttempt }; } },
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({remove(){}}) }, BackHandler: { addEventListener: () => ({remove(){}}) } },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
-    'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({ scanResultKey: 'synthetic-scan' }), useFocusEffect: fn => hooks.useEffect(fn, [fn]) },
+    'expo-router': { useRouter: () => ({push:route=>calls.push(['route',route])}), useLocalSearchParams: () => ({ account: options.defaultSource?undefined:'bitcoin_spark', scanResultKey: 'synthetic-scan' }), useFocusEffect: fn => hooks.useEffect(fn, [fn]) },
     'expo-linking': { addEventListener: () => ({remove(){}}) },
     '@/hooks/useWalletAuth': { useWalletAuth: () => ({ walletReady: true, sparkWallet: {} }) },
     '@/hooks/useExchangeRates': { useExchangeRates: () => ({ btcToEur: 50000, updatedAt: Date.now() }) },
@@ -67,4 +67,11 @@ test('wallet removal drains prior history writes and rejects stale writes waitin
   }),exports=>exports);
   const db=fixture.render();const stale=db.addTransaction('incoming',20,'SAT');const clear=db.wipeTransactions();opened(database);
   await Promise.all([stale,clear]);assert.deepEqual(writes,['wipe']);await db.addTransaction('incoming',30,'SAT');assert.deepEqual(writes,['wipe','insert']);
+});
+
+test('a Bitcoin address defaults to the own onchain balance without obtaining a Spark quote',async t=>{
+ const app=fixture({defaultSource:true});t.after(app.unmount);await app.settle();
+ const route=app.calls.find(call=>Array.isArray(call)&&call[0]==='route');
+ assert.equal(route[1].pathname,'/onchain-send');assert.equal(route[1].params.address,'synthetic-address');
+ assert.equal(app.calls.includes('authenticate'),false);assert.equal(app.calls.some(call=>Array.isArray(call)&&call[0]==='quote'),false);
 });
