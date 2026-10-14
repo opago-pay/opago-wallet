@@ -1,87 +1,150 @@
-# Wallet account login through the public API
+# Website account entry — Wallet PR #49
 
-## Implemented scope
+Updated 14 October 2026. Target: Friday, 16 October 2026.
+Task: [recLCk3wB7o4Xlqwa](https://airtable.com/app9EBdodbucfeYyT/tblqZkPBT6xUXVuGl/recLCk3wB7o4Xlqwa).
+This supersedes the native signup/login release instructions. **Draft preparation;
+no completed browser authentication, build approval or Turnstile activation.**
 
-The native account screen uses the existing public customer session protocol at
-`https://api.opago.com`. It no longer launches an OIDC browser or contacts
-Keycloak discovery, token, JWKS or refresh endpoints. Local BTC, Lightning, HBAR,
-recovery words and existing balances are independent of these services.
+## Implemented wallet boundary
 
-The sole bootstrap constant is the approved API origin. Before login, session
-resume, signup or password reset, the client fetches `/api/v2/app/config` and
-validates its pinned 0.2.0 contract, origin/audience, timestamps and minimum build.
-A 503, expired/invalid document or unsupported build prevents the dependent
-request. There is no environment-specific issuer, API alias or guessed fallback.
-The old `oidc` fields are still required by the shared schema but never used as
-destinations. A changed configuration shape needs a reviewed contract revision.
+The production account screen offers Sign in, Create account, Check again and
+Continue using my wallet. It collects no credentials, invokes no native signup,
+login or password-reset API and never opens a guessed password-recovery URL.
+`/opago-signup` redirects to `/opago-account`; historical `/identity` navigation
+therefore reaches the same entry. Production ignores contract-test parameters.
+The existing native-intent handler accepts only a restricted checkout review;
+unknown auth links go to `/`. There is no new callback/token parser.
 
-Login uses the **existing dedicated login** key discovery
-`GET /api/v2/auth/login/hpke-key`, then one encrypted
-`POST /api/v2/auth/token`, then authenticated `GET /api/v2/auth/me`.
-Both discovery and login send `X-OPAGO-Login-Context: public-customer`. The wallet
-requires the new discovery acknowledgement `login_context: public-customer`
-before it encrypts/sends credentials. An older API that silently ignores the
-header cannot make the wallet enter staff login. Only the verified customer UUID,
-tenant and exactly one public customer role are accepted.
+`RuntimeConfigClient` fetches only `https://api.opago.com/api/v2/app/config`, with
+the existing strict 0.2.0 schema, no-store requirement, bounded JSON, audience,
+expiry and minimum-build checks. No public schema or validator was relaxed.
+`website-account-config.ts` currently returns unavailable even for valid 0.2.0:
+that schema has no confirmed website destinations or wallet-session handoff.
+A 503, redirect, invalid/expired config, missing handoff or closed build opt-in
+leaves the actions disabled with a short localized message and explicit retry.
+Production standard is **opago.com**, but no production path is inferred from it.
+The Workers register address may only come from a future confirmed **test**
+configuration; it is not a bundled fallback.
 
-The existing login HPKE protocol is **not** the signed F3 key-document protocol
-at `/api/v2/auth/hpke-key`. These are deliberately not interchanged. Native HTTPS
-verification, redirect rejection, response bounds, HPKE freshness and server-side
-Redis replay protection remain in use. No shared secret is bundled.
+`WebsiteAccountFlow` serializes checking, login and signup and rechecks fresh
+configuration before every launch. Its internal readiness/destination types are
+application ports, not proposed backend fields. `website-account-native.ts`
+wires Expo's system browser to `createWebsiteBrowser`: Android Custom Tabs
+returns `opened` immediately, so the adapter waits for app return; iOS waits for
+dismissal. This browser adapter is prepared and exercised with synthetic ready
+values only. It cannot run with the currently published configuration contract.
+Selection of an auth-session return primitive must follow the confirmed handoff;
+`openAuthSessionAsync` is deliberately not given an invented redirect URI.
 
-Verified public sessions have their own SecureStore slot. No password is persisted.
-Resume rechecks `/me`; expiry requires a new login. Logout clears local state even
-if the server is unavailable. Lock, backgrounding, navigation and wallet changes
-cancel pending work and reject late responses. The screen supports the existing
-neutral password-reset request and the three-field signup screen.
+A browser return or dismissal has only `returned`/`cancelled` status. Neither
+contains nor persists account authority. The future verified session exchange is
+a separate integration step; it must not be replaced by cookies, JS injection,
+a WebView success message, or a token copied from a deep link. Existing public
+customer sessions, F3 credentials, wallet bindings and seeds are neither read nor
+deleted by this entry. Old sessions are preserved in their existing secure slots,
+not displayed as newly verified and never promoted to F3 AccountBearer. There is
+no automatic resume, migration, logout or session replacement on opening this UI.
 
-## Release gates and remaining contract work
+Cancellation, unmount, navigation, wallet identity changes, lock/unlock and late
+configuration/browser responses are fenced. The native browser also has a mutex
+while an aborted native opening remains unresolved and a two-minute timeout.
+Only an expected browser switch uses the existing device-authentication lease:
+previous payment approvals are invalidated and new wallet-action captures are
+blocked during it. Its returned authorization is discarded. Idle lock still
+applies, and no signing/payment rule was relaxed. Local BTC, Lightning, HBAR,
+app unlock and recovery with the 12 words remain independent.
 
-`EXPO_PUBLIC_OPAGO_F3_ENABLED` remains a build opt-in and is not enabled by this PR.
-The API companion introduces `WALLET_PUBLIC_ACCOUNT_LOGIN_ENABLED`, default closed.
-Public login/key/profile/logout exposure needs that flag **and**
-`PUBLIC_DASHBOARD_LOGIN_ENABLED=true`; edge allowlisting must match the API inventory.
-`SIGNUP_ENABLED` and the other wallet flags remain separate. No flag, deployment,
-EAS build or installed application is changed by this implementation.
+## Published evidence and required contracts
 
-Do not activate a new account-creation release on the strength of these tests:
-the following backend/runtime acceptance remains open.
+Checked on 14 October 2026:
 
-1. At reviewed Compliance main `b7e98b280b17e650ac02bc09175cdb490dbe4634`,
-   `docs/wallet-account-bearer.md` and `wallet_account_bearer.py` still require a
-   Keycloak AccountBearer for F3. Public customer sessions cannot satisfy that
-   verifier. Supply a binding contract for server-side exchange/validation via
-   the facade, including identity, audience, auth time, expiry, revocation and
-   required reauthentication. Do not synthesize or reinterpret either token.
-2. Define the initial trust anchor for the signed F3 HPKE document, consistent
-   with runtime configuration and no privately provisioned app configuration.
-   A signing root fetched alongside an untrusted key is not independent pinning.
-3. Publish the corresponding config revision, including any Lightning origin
-   field (`https://opago.com`) and removal/migration of legacy OIDC metadata.
-4. Restore native account deletion, wallet binding/recovery, personal Lightning
-   address and dependent POS/sync wiring using that reviewed authority contract;
-   then perform live signup, email confirmation, login, deletion and refusal tests.
+- Wallet PR #49 started from `93723587b8bdc409626974742721e8a546f9c626`,
+  targeting `mvp-branch`, as an open Draft. Existing worktrees were clean and
+  left unchanged; work uses a separate checkout without rewriting history.
+- API #569 is still a separate Draft at `1ae78295ff442967f60705bf64297b35f270b0ed`.
+  Its body/comments provide the superseded native customer-login design, not a
+  website-to-wallet handoff. No API changes were made.
+- Public config and the supplied Workers `/register/` URL both returned HTTP 302
+  to Cloudflare Access in this environment. No config body or website behavior
+  was accepted from those redirects; no Access bypass was attempted.
+- Michael's [handoff task rec8qvpGaIKA8zprY](https://airtable.com/app9EBdodbucfeYyT/tblqZkPBT6xUXVuGl/rec8qvpGaIKA8zprY)
+  and [configuration task rec2JcYQUMFQIUtRj](https://airtable.com/app9EBdodbucfeYyT/tblqZkPBT6xUXVuGl/rec2JcYQUMFQIUtRj)
+  both said **Not started**, due Thursday, 15 October 2026. Their notes are
+  requirements/questions, not published contracts. No browser-contract revision
+  has been delivered or implemented. The only consumed wire schema remains
+  checked-in AppConfig **0.2.0**; `/api/v2/auth/hpke-key` is a separate signed F3
+  key-document contract, never browser login configuration.
 
-Until then `createNativeF3Integration()` refuses with a specific pending-contract
-error. It does not fall back to direct Keycloak. Existing F3 protocol components
-and synthetic contract screens remain for implementing the eventual adapter;
-the production screen cannot select contract mode. The local wallet stays usable.
-References to retired OPAGO domains in POS rejection code are deny-recognition,
-not service destinations: removing that guard would accidentally permit an
-anonymous fallback for an old OPAGO payment QR.
+Before connecting the dependent path, read those two tasks again and record the
+published document/spec revisions. Required details:
 
-## Verification and coordination
+1. Exact login/register URLs and versioned AppConfig field names, validity and
+   production/test separation. Confirm wallet registration's private-customer
+   context and where/how it is supplied, without accepting arbitrary role input.
+2. Website login/registration request and response schemas, errors, email
+   confirmation behavior and password recovery within the website flow.
+3. Exact approved return mechanism/URIs, attempt correlation, replay protection,
+   cancellation/expiry, cold-start behavior and platform requirements.
+4. API session exchange/verification: endpoint/method, request/response, identity,
+   audience, expiry, revocation, storage, reauthentication and old-session policy.
+   A website cookie alone is not a wallet API session.
+5. Explicit authority for wallet binding, Lightning addresses, POS identity and
+   other F3 operations, including the separate signed-key trust bootstrap.
 
-Wallet base: `4a6029d39b844dca8c6ceb4bbf90910b576f2570` (`mvp-branch`).
-API base: `0cf12c37248cae82a9fb9eb5f300faacc1eea234` (`main`).
-The API companion pins the tested wallet commit for real-client HTTPS tests with
-an owned Redis and simulated Compliance. These do not prove live deployment,
-backend acceptance, native device networking or authenticated POS payments.
+There are no concrete additional API routes to implement yet: naming any exchange
+endpoint now would invent a contract. Michael's team must publish the config and
+session handoff first; any resulting facade changes will then be identified
+against that revision. The wallet must never communicate directly with Keycloak.
 
-Local `npm run phase5:verify`: typecheck and lint passed; 932 wallet tests passed,
-one existing iOS-project test skipped; all nine checkout contract tests passed.
-New tests exercise real HPKE ciphertext, invalid config, server acknowledgement,
-no credential retries, unauthorized identities, storage isolation and UI races.
-Deploy/review the API companion before distributing a new wallet build; coordinate
-the missing runtime contracts with Michael. No additional minimum supported POS
-build is asserted by this change.
+## API #569 and shared consumer tests
+
+The new entry no longer depends on #569's native login HPKE discovery,
+`X-OPAGO-Login-Context`, native `/auth/token`, `/auth/me` or `/auth/logout` exposure,
+`WALLET_PUBLIC_ACCOUNT_LOGIN_ENABLED`, or native `/user/signup`/password reset.
+Its configuration transport and the earlier bodyless-204 HTTP correction remain.
+#569 is no longer an unconditional API-before-wallet release instruction.
+
+`public-account.ts`, `public-account-session.ts` and `signup.ts` remain compatibility
+clients with their isolated tests, not installed production adapters. Their native
+adapters were removed. API #569's shared tests explicitly load `public-account.ts`
+and `signup.ts`; those clients and their dependency implementation are unchanged.
+`tests/wallet_http/revisions.json` in #569 still pins Wallet
+`93723587b8bdc409626974742721e8a546f9c626`. That pin was inspected, not silently
+advanced. Its existing CI is evidence for that old revision only, not this browser
+entry. The separate POS suite still pins Wallet `0382e4e3d1ed96f348c908f5bfc0862e795f9b25`; its consumers are unchanged too.
+Updating the cross-repository pin/suite belongs to a deliberate API follow-up
+once the browser handoff exists. No historical shared-suite count is claimed as a
+current browser/Turnstile acceptance result.
+
+## Verification, device acceptance and build prerequisites
+
+Automated coverage exercises the actual account screen, flow and Expo adapter
+wiring with synthetic browser/configuration responses: both actions, missing or
+invalid configuration, 503, no password writes, duplicate taps, Android immediate
+open vs return, iOS cancellation, explicit retry, stale results, wallet switches,
+locks, payment-approval invalidation, route/deep-link guards, storage isolation
+and local-wallet navigation. On 14 October 2026, `npm run phase5:verify` passed
+locally on Node 24.18.1: typecheck, lint (no warnings), 968 application tests
+passed with one existing iOS-project skip, all nine checkout contract tests,
+configuration/patch and syntax checks. An earlier sandbox run could not spawn
+Node subprocesses in three existing tests (EPERM); the complete rerun with
+permitted test subprocesses passed. GitHub CI uses the pinned Node 22.23.1; its
+result and exact tested commit are recorded in PR #49. These tests do not validate a real website,
+Turnstile, a live API session or installed-device behavior.
+
+Still required on Android (and platform acceptance on iOS): real registration in
+the private-customer context, email confirmation, login, correct return/correlation,
+verified API session, cancellation/retry, foreground/background/lock, cold start,
+wallet switch, expiry/errors and independent BTC/Lightning/HBAR/recovery. Verify
+old sessions are preserved or migrated only under the agreed policy; confirm no
+binding/address/POS identity appears from a browser success page alone.
+
+Prerequisites for a new device build: published and recorded revisions for both
+contracts; implemented and reviewed adapters/session verification; required API
+and website behavior available in the agreed test environment; confirmed URLs,
+return-link app configuration and trust requirements; passing current automated
+checks; and explicit build authorization. No build, deployment, store upload,
+merge or feature activation is performed here. `EXPO_PUBLIC_OPAGO_F3_ENABLED`
+remains unchanged. Michael owns API Turnstile; its switch stays **off** until
+registration, email confirmation, login and return have passed together with the
+new device build. Browser-code completion alone is not that release gate.

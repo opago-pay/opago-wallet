@@ -45,3 +45,5 @@ Commands and source paths in these documents are relative to the repository root
 - [Usability review, 2026-09-24](design-usability-recheck-2026-09-24.md)
 
 Additional dated investigations and protocol specifications are retained alongside these documents.
+
+Website registration/login preparation and its pending contract/build gates: [Wallet PR #49 handoff](public-account-login-handoff.md).

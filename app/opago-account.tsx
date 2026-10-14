@@ -15,7 +15,7 @@ import { UpdateAccountApp } from '../components/opago/update-account-app';
 export default function OpagoAccountScreen() {
   const params = useLocalSearchParams<{ test?: string }>();
   if (__DEV__ && params.test === '1') return <ContractAccountScreen />;
-  // Keep the native customer flow independent of legacy F3/OIDC initialization.
+  // Keep website entry independent of legacy F3/OIDC initialization.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PublicAccountScreen } = require('../components/opago/public-account-screen') as typeof import('../components/opago/public-account-screen');
   return <PublicAccountScreen />;
