@@ -18,7 +18,7 @@ Zusätzliche automatisierte Prüfungen nach dem POS-Feedback: 932 Tests, davon 9
 
 Grenzen: kein Mainnet-Geld bewegt, kein iOS-Gerätetest, kein vollständiger Geräte-E2E-Lauf mit Spark-Claim/Refund, kein produktiver Onchain-Kontoabgleich. Diese Nachweise werden nicht behauptet. Die Geräteprüfung ist ein Nachweis für direkte Onchain-Funktionen auf Android, keine allgemeine Produktionsabnahme.
 
-Die automatische Sicherheitsprüfung hat eine globale Mainnet-Aktivierung abgelehnt. Ein separat freizugebendes Android-POS-Testprofil ist vorbereitet; die regulären Produktionsprofile und iOS bleiben bis dahin gesperrt. Eine Freigabe muss ihren begrenzten Umfang ausdrücklich festhalten.
+Der Nutzer hat am 14. Oktober 2026 nach ausdrücklichem Hinweis auf die oben genannten offenen Prüfungen die allgemeine Integration angeordnet: „nicht nur für testbuild ganz generell einbauen“. Bitcoin Mainnet ist daher in der regulären Produktionskonfiguration aktiviert; `production-apk` erbt diese Einstellung. Es gibt kein gesondertes Pilotprofil und keine plattformspezifische Vollsperre. Die offenen Nachweise bleiben offen und werden durch diese Produktentscheidung nicht als bestanden gewertet. Der explizite Mainnet-Schalter, HTTPS-Prüfungen, Gerätefreigabe, Gebührenprüfung, UTXO-Reservierung und dauerhafte Speicherung vor Broadcast bleiben wirksam.
 
 Öffentliche Testresultate:
 

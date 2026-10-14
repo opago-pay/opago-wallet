@@ -30,5 +30,11 @@ assert.equal(
   '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
 );
 assert.equal(appConfig.allowInsecureHttp, false);
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET, 'true');
+const { resolveOnchainPolicy } = require('../lib/onchain/policy.ts');
+assert.deepEqual(resolveOnchainPolicy({network:process.env.EXPO_PUBLIC_BITCOIN_NETWORK,
+  esploraUrl:process.env.EXPO_PUBLIC_BITCOIN_ESPLORA_URL,
+  mainnetEnabled:process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET === 'true',allowLocal:appConfig.allowInsecureHttp}),
+  {network:'mainnet',esploraUrl:'https://mempool.space/api'});
 
-process.stdout.write('Verified: Hedera and Lightning Mainnet production profile.\n');
+process.stdout.write('Verified: Bitcoin onchain, Lightning and Hedera Mainnet production profile.\n');

@@ -1,4 +1,3 @@
-import { assertOnchainRelease } from './release';
 import { appConfig, assertSafeRemoteUrl } from '../config';
 import { resolveOnchainPolicy } from './policy';
 import { strictFetch, readBoundedText } from '../strict-http-transport';
@@ -8,7 +7,6 @@ export function onchainProvider() {
     esploraUrl:process.env.EXPO_PUBLIC_BITCOIN_ESPLORA_URL,
     mainnetEnabled:process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET==='true',allowLocal:appConfig.allowInsecureHttp,
   });
-  assertOnchainRelease(policy.network);
   assertSafeRemoteUrl(policy.esploraUrl,'Bitcoin provider');return policy;
 }
 export async function onchainRequest(path:string,init?:RequestInit,limit=100_000):Promise<string>{

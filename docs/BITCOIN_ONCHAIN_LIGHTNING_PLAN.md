@@ -1,6 +1,6 @@
 # Bitcoin Onchain und Lightning mit getrennten Guthaben
 
-Stand: 14. Oktober 2026. Grundlage ist `origin/mvp-branch` bei `4a6029d39b844dca8c6ceb4bbf90910b576f2570` mit Spark SDK 0.7.12. Status: Wallet-Implementierung im isolierten Zweig `codex/bitcoin-onchain-balances`; noch keine Mainnet-Freigabe. Der folgende Produktplan bleibt die Abnahmegrundlage.
+Stand: 14. Oktober 2026. Grundlage ist `origin/mvp-branch` bei `4a6029d39b844dca8c6ceb4bbf90910b576f2570` mit Spark SDK 0.7.12. Status: Wallet-Implementierung im isolierten Zweig `codex/bitcoin-onchain-balances`; reguläre Mainnet-Aktivierung auf ausdrücklichen Nutzerwunsch vom 14. Oktober 2026; offene Prüfungen siehe unten. Der folgende Produktplan bleibt die Abnahmegrundlage.
 
 OPAGO erhält eine eigene Bitcoin-Onchain-Wallet neben dem bestehenden Spark-Guthaben für Lightning. Eingehende BTC bleiben standardmäßig auf der gewählten Empfangsseite. Nutzer können BTC halten, direkt onchain versenden oder einen selbst gewählten Betrag in beide Richtungen übertragen. Home behält **Empfangen** und **Senden**. Sobald der Euro-Kauf über MoonPay verfügbar ist, kommt **Kaufen** als dritte Aktion hinzu. Die Übertragung zwischen eigenen Guthaben ist über die Guthabeneinträge unter **Alle Coins** erreichbar. Diese Navigation ersetzt den ursprünglichen Vorschlag eines globalen Tauschen-Buttons und wurde am 14. Oktober bestätigt.
 
@@ -12,11 +12,11 @@ Home zeigt Bitcoin onchain und Lightning unter dem unverändert zunächst eingek
 
 BDK 1.1.0 wird für Android arm64-v8a und x86_64 eingebunden; 32-Bit-Android ist damit nicht unterstützt. Die iOS-Pakete enthalten arm64 für Gerät und Simulator; Intel-Simulatoren sind nicht abgedeckt.
 
-Nachgewiesen sind der vollständige native Android-Debug-Build für arm64-v8a und x86_64 sowie der Android/Hermes-Bundle-Export. Automatisierte Prüfungen decken BIP84-Vektoren, Schlüssel-/Netzwerktrennung, SQLite-Reservierungen, Wiederaufnahme, Claim-/Refund-Konflikte, Kontobindung, verlorene Antworten, Verlauf und bestehende Wallet-Funktionen ab. Native Lifecycle-Tests ersetzen Geräteprüfungen nicht. Letzter vollständiger Lauf: 922 Tests, davon 921 bestanden, einer übersprungen, kein Fehler; TypeScript und ESLint ohne Fehler. Der zusätzliche Testnetz-Hinweis folgt dem tatsächlichen Onchain-Netzwerk, auch wenn Spark anders konfiguriert ist.
+Nachgewiesen sind der vollständige native Android-Debug-Build für arm64-v8a und x86_64 sowie der Android/Hermes-Bundle-Export. Automatisierte Prüfungen decken BIP84-Vektoren, Schlüssel-/Netzwerktrennung, SQLite-Reservierungen, Wiederaufnahme, Claim-/Refund-Konflikte, Kontobindung, verlorene Antworten, Verlauf und bestehende Wallet-Funktionen ab. Native Lifecycle-Tests ersetzen Geräteprüfungen nicht. Vollständiger Lauf nach den POS-Korrekturen: 932 Tests, davon 931 bestanden, einer übersprungen, kein Fehler; TypeScript und ESLint ohne Fehler. Der zusätzliche Testnetz-Hinweis folgt dem tatsächlichen Onchain-Netzwerk, auch wenn Spark anders konfiguriert ist.
 
 Die direkte Android-Empfangs-, Versand- und Wiederherstellungsprüfung auf dem POS ist inzwischen bestanden; siehe [Gerätenachweis](validation/2026-10-14-onchain-android.md).
 
-**Noch erforderliche Freigaben:** iOS-Build und Geräteprüfung; echte Regtest-End-to-End-Transaktionen einschließlich Restore, Wechselgeld, Claim und Refund; produktiver Backend-Vertrag und dessen Ende-zu-Ende-Synchronisierung. Es wurden keine echten Gelder verwendet. `lib/onchain/release.ts` sperrt Mainnet unabhängig vom Umgebungs-Schalter, bis diese Nachweise vorliegen. Eine Veröffentlichung ohne Konto-Synchronisierung erfüllt den vereinbarten Umfang nicht.
+**Noch offene Validierung und Integration:** iOS-Build und Geräteprüfung; Ende-zu-Ende-Übertragungen mit Spark einschließlich Claim und Refund; produktiver Backend-Vertrag und dessen Ende-zu-Ende-Synchronisierung. Direkter Empfang, Versand, Wechselgeld und Seed-Restore auf Android sind mit Bitcoin Core Regtest nachgewiesen. Es wurden keine echten Gelder verwendet. Der Nutzer hat nach Hinweis auf die offenen Punkte ausdrücklich die allgemeine Integration statt eines gesonderten Testbuilds angeordnet. Die reguläre Produktionskonfiguration aktiviert deshalb Mainnet; die frühere pauschale Vollsperre wurde entfernt. Dies behauptet weder bestandene iOS-/Transferprüfungen noch eine fertige Kontosynchronisierung. Die Kontosynchronisierung bleibt Teil des vereinbarten Gesamtumfangs und ist als Backend-Abhängigkeit offen.
 
 ### Konto-Synchronisierung: konkret vorbereitete Schnittstelle
 
@@ -194,7 +194,7 @@ Eine vollständig neue Transaktion an eine alte geteilte Adresse muss auch nach 
 | 5 Bitcoin zu Lightning und Rückholung | Einzahlung, zweite Claim-Freigabe, passende Gutschrift; Refund bei offenem Eingang | exakte Outpoint-Zuordnung, abgelehnte/verteuerte Quote, erfolgreiche Rückholung, Ausschluss paralleler Claim-/Refund-Aufträge |
 | 6 Gesamtabnahme und Einführung | Migration, Wallet-Wiederherstellung, Übersetzungen, vollständige Konto-Synchronisierung und Geräteprüfung | vollständige Testmatrix, kontrollierte End-to-End-Testnetz-Transaktionen einschließlich Backend-Sync, Startzeiten und bestehende Lightning-/HBAR-/Checkout-Tests ohne Regression |
 
-Paket 4 ist der erste vollständige Umbuchungsweg, weil der Auszahlungsadapter bereits vorhanden ist. Das Produktziel bleibt die Freigabe beider Richtungen. Ein unfertiger Gegenweg erscheint nicht als funktionsfähige Aktion. Neue Zahlungspfade werden erst nach ihrer Geräte- und Wiederherstellungsprüfung aktiviert.
+Paket 4 ist der erste vollständige Umbuchungsweg, weil der Auszahlungsadapter bereits vorhanden ist. Das Produktziel bleibt die Freigabe beider Richtungen. Ein unfertiger Gegenweg erscheint nicht als funktionsfähige Aktion. Die reguläre Mainnet-Aktivierung folgt der späteren ausdrücklichen Nutzerentscheidung vom 14. Oktober; der Gerätenachweis und die verbleibenden Prüfungen sind oben getrennt dokumentiert.
 
 ## Testfälle mit besonderer Bedeutung
 

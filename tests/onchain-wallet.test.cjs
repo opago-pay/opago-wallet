@@ -196,8 +196,24 @@ test('lost refund broadcast acknowledgement reuses signed bytes and preserves ex
  f.setLost(false);await f.fake.submitMoveRefund(f.wallet,f.spark,f.move,f.plan,()=>{});
  assert.deepEqual(f.calls,[['sign'],['broadcast','saved-raw'],['broadcast','saved-raw']]);f.journal.close();
 });
-test('mainnet is unavailable until all required release evidence exists',()=>{
- const {assertOnchainRelease}=require('../lib/onchain/release.ts');assert.throws(()=>assertOnchainRelease('mainnet'),/not available/);assertOnchainRelease('regtest');
+test('ordinary production enables Bitcoin mainnet while explicit network and HTTPS checks remain enforced',()=>{
+ const profile=require('../eas.json').build.production;
+ const saved=Object.fromEntries(Object.keys(profile.env).map(key=>[key,process.env[key]]));
+ Object.assign(process.env,profile.env);
+ try{
+  let checkedUrl;
+  const provider=hookFixture('lib/onchain/provider.ts',()=>({
+   '../config':{appConfig:{isMainnet:true,allowInsecureHttp:false},assertSafeRemoteUrl:url=>{checkedUrl=url;}},
+   './policy':policy,
+  }),exports=>exports).render();
+  assert.deepEqual(provider.onchainProvider(),{network:'mainnet',esploraUrl:'https://mempool.space/api'});
+  assert.equal(checkedUrl,'https://mempool.space/api');
+  process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET='false';
+  assert.throws(()=>provider.onchainProvider(),/not been enabled/);
+  process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET='true';
+  process.env.EXPO_PUBLIC_BITCOIN_ESPLORA_URL='http://unsafe.test';
+  assert.throws(()=>provider.onchainProvider(),/HTTPS/);
+ }finally{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
 });
 
 test('native messages cannot expose descriptor/key material in the UI',()=>{
