@@ -58,9 +58,11 @@ function fixture(data = {}) {
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', Pressable: 'pressable' },
     '@/lib/i18n': { t: (value, values = {}) => value.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match), appLocale: () => 'en' },
     '@/hooks/useLanguage': { useLanguage: () => {} },
+    '@/hooks/useBitcoinOnly': { useBitcoinOnly: () => ({ bitcoinOnly: data.bitcoinOnly ?? false, ready: true }) },
+    '@/lib/onchain/errors': require('../lib/onchain/errors.ts'),
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
-    'expo-router': { useRouter: () => ({ push: path => pushes.push(path) }), useFocusEffect: callback => { focusEffects.push(callback); } },
+    'expo-router': { useLocalSearchParams: () => data.params ?? {}, useRouter: () => ({ push: path => pushes.push(path) }), useFocusEffect: callback => { focusEffects.push(callback); } },
     '@expo/vector-icons': { Ionicons: 'icon' },
     'expo-image': { Image: 'image' },
     'expo-haptics': { impactAsync: async () => {}, ImpactFeedbackStyle: { Light: 'light' } },
@@ -77,7 +79,7 @@ function fixture(data = {}) {
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }); } },
     '@/lib/onchain/history': require('../lib/onchain/history.ts'),
-    '@/hooks/useOnchainBalance': { useOnchainBalance: () => ({ network:data.onchainNetwork, state: { value: data.onchain === null ? null : {totalSats:data.onchain??0,availableSats:data.onchain??0},status:data.onchain===null?'loading':'ready',updatedAt:1 }, operations:[],refresh:async()=>{} }) },
+    '@/hooks/useOnchainBalance': { useOnchainBalance: () => ({ network:data.onchainNetwork, state: { value: data.onchain === null ? null : {totalSats:data.onchain??0,availableSats:data.onchain??0},status:data.onchain===null?'loading':'ready',updatedAt:1 }, operations:data.onchainOperations??[],transactions:data.onchainTransactions??[],refresh:async()=>{} }) },
     '@/components/onchain/account-details': { AccountDetails:'account-details', AccountIcon:'account-icon' },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
@@ -639,4 +641,21 @@ test('home counts onchain and Lightning once each and keeps All coins collapsed 
 test('the onchain holding displays its own test network instead of inheriting the Spark network',()=>{
  const app=fixture({onchainNetwork:'signet'});const card=find(app.render(),node=>node.type?.name==='BalanceCard'&&node.props.account==='bitcoin_onchain');
  assert.equal(card.props.networkBadge,'SIGNET');
+});
+
+test('Bitcoin Only hides HBAR holdings and excludes them from the headline while keeping its activity',async()=>{
+  const data={bitcoinOnly:true,onchain:100000000,spark:150000000,hbarTinybars:2000000000n,local:[record(1,'2026-09-23T10:00:00Z','HBAR')]};
+  const app=fixture(data);let screen=app.render();
+  assert.equal(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.account==='hedera'),null);
+  assert.equal(find(screen,node=>node.type==='text'&&node.props.accessibilityLabel?.startsWith('Total estimated balance:')).props.accessibilityLabel,'Total estimated balance: 125000€');
+  assert.equal(data.balanceParams.enableHedera,false);
+  app.refocus();await settle();screen=app.render();assert.equal(latestRow(screen).props.transaction.asset,'HBAR');
+  data.bitcoinOnly=false;screen=app.render();assert.ok(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.account==='hedera'));app.blur();
+});
+test('onchain receipts appear in All activity and open their own payment details without a separate history',()=>{
+  const txid='a'.repeat(64);const app=fixture({onchainNetwork:'signet',onchainTransactions:[{txid,receivedSats:1000,sentSats:0,feeSats:null,confirmed:true,observedAt:Date.now()}]});
+  const home=app.render();assert.equal(find(home,node=>node.type==='text'&&node.props.children==='Bitcoin activity'),null);
+  const page=openHistory(app);assert.equal(page.type.name,'HistoryPage');
+  const row=latestRow(home);row.props.openTransaction(row.props.transaction);
+  const details=app.render();assert.equal(details.type,'payment-details');assert.equal(details.props.payment.txId,txid);assert.deepEqual(app.pushes,[]);
 });

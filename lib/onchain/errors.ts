@@ -16,6 +16,10 @@ const safe=new Set([
   'Both Bitcoin balances must be available.',
   'Bitcoin provider is unavailable.',
 ]);
+export function isOnchainUnavailable(message: string | null | undefined): boolean {
+  return message === 'Bitcoin onchain mainnet has not been enabled for this build.' ||
+    message === 'Bitcoin on-chain is being prepared. Mainnet support is not available in this build.';
+}
 export function onchainErrorMessage(cause:unknown):string{
   const message=cause instanceof Error?cause.message:'';
   if(safe.has(message))return message;

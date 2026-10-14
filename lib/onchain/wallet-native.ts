@@ -134,7 +134,9 @@ export async function initializeOnchainWallet(seed: Uint8Array, assertCurrent: (
         try { return wallet!.isMine(parsed.scriptPubkey()); } finally { destroy(parsed); }
       },
       receiveAddress: () => serialize(async () => {
-        if (!scanned) await result.sync();
+        // Derivation is local. A slow/offline provider must not block receiving.
+        // nextUnusedAddress reuses a persisted address until a scan observes use;
+        // a restored wallet may therefore reuse an address, but cannot lose funds.
         check();
         const address=wallet!.nextUnusedAddress(bdk.KeychainKind.External);
         persist(); return address.address.toString();

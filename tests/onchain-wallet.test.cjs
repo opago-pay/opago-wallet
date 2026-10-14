@@ -234,9 +234,9 @@ function nativeFixture(options={}){
  }),exports=>exports).render();
  return {calls,descriptors,lock(){current=false;},fail(){failPersist=true;},pause(){releaseScan={};return ()=>releaseScan.resolve();},start:signal=>initializeOnchainWallet(mnemonicToSeedSync(phrase),()=>{if(!current||signal?.aborted)throw new Error('locked');},signal)};
 }
-test('native wallet persists only public descriptors and scans recovery before displaying an address',async()=>{
+test('native wallet persists public descriptors and returns a receive address without network access',async()=>{
  const f=nativeFixture();const wallet=await f.start();const address=await wallet.receiveAddress();
- assert.equal(address,'synthetic-address');assert.ok(f.calls.indexOf('scan')<f.calls.indexOf('address'));
+ assert.equal(address,'synthetic-address');assert.equal(f.calls.includes('scan'),false);
  assert.equal(f.calls.at(-1),'persist');await wallet.cleanupConnections();
  assert.ok(f.descriptors.filter(d=>/tprv/.test(d.value)).every(d=>d.destroyed));
 });

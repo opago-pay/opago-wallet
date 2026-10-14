@@ -16,6 +16,7 @@ function load(file, dependencies, allowUnusedImports = false) {
   }).outputText;
   const exports = {};
   new Function('require', 'exports', code)(name => {
+    if (name === '@/hooks/useBitcoinOnly') return { useBitcoinOnly: () => ({ bitcoinOnly: false, ready: true }) };
     if (name === '../lib/onchain/errors') return require('../lib/onchain/errors.ts');
     if (name === 'react/jsx-runtime') return require(name);
     if (name === '@/lib/theme-styles') return { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' };

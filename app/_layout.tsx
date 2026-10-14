@@ -12,6 +12,7 @@ import * as Notifications from 'expo-notifications';
 import { WalletProvider } from '@/hooks/useWalletAuth';
 import { WalletGate } from '@/components/security/wallet-gate';
 import { BackupPrompt } from '@/components/security/backup-prompt';
+import { BitcoinOnlyProvider } from '@/hooks/useBitcoinOnly';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
 import { SecurityPreferencesProvider } from '@/hooks/useSecurityPreferences';
@@ -80,5 +81,5 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><AppStack /></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
+  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><BitcoinOnlyProvider><AppStack /></BitcoinOnlyProvider></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
 }

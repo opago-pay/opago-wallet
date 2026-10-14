@@ -5,20 +5,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWalletMotion } from '@/hooks/useWalletMotion';
 import { useLanguage } from '@/hooks/useLanguage';
 import { Pressable, WalletActivityBoundary } from '@/components/ui/wallet-interaction';
-import { AssetIcon } from '@/components/ui/asset-icon';
+import { PaymentNetworkIcon } from '@/components/receive/payment-network-icon';
 import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import type { WalletAccount } from '@/lib/onchain/types';
 
 export function AccountIcon({account,size=44}:{account:WalletAccount;size?:number}) {
-  if(account==='bitcoin_spark')return <View style={{width:size,height:size,borderRadius:size/2,backgroundColor:'#ffb000',alignItems:'center',justifyContent:'center'}}>
-    <Ionicons name="flash" size={size*.58} color="#151513" accessibilityLabel={t('Lightning')}/>
-  </View>;
-  return <AssetIcon asset={account==='hedera'?'hedera':'bitcoin'} size={size}/>;
+  return <PaymentNetworkIcon network={account==='bitcoin_spark'?'lightning':account==='hedera'?'hedera':'bitcoin'} size={size}/>;
 }
 export function AccountDetails(props:{
   account:WalletAccount|null; title:string; balance:string; fiat:string; available?:string; status?:string;
-  identifier?:string; onClose():void; onReceive():void; onSend():void; onTransfer():void; onCopy?():void;
+  identifier?:string; onchainUnavailable?:boolean; onClose():void; onReceive():void; onSend():void; onTransfer():void; onCopy?():void;
 }) {
   useLanguage();
   const insets=useSafeAreaInsets();const {height}=useWindowDimensions();const motion=useWalletMotion();const heading=useRef<Text>(null);
@@ -41,10 +38,10 @@ export function AccountDetails(props:{
           {!!props.status&&<Text style={styles.note} accessibilityLiveRegion="polite">{props.status}</Text>}
           {props.account==='bitcoin_spark'&&<Text style={styles.note}>{t('Your Lightning balance uses Spark. Bitcoin stays here until you send it or move it to on-chain.')}</Text>}
           <View style={styles.actions}>
-            <Action icon="arrow-down" label={t('Receive')} onPress={props.onReceive}/>
-            <Action icon="arrow-up" label={t('Send')} onPress={props.onSend}/>
+            <Action icon="arrow-down" label={t('Receive')} disabled={props.account==='bitcoin_onchain'&&props.onchainUnavailable} onPress={props.onReceive}/>
+            <Action icon="arrow-up" label={t('Send')} disabled={props.account==='bitcoin_onchain'&&props.onchainUnavailable} onPress={props.onSend}/>
           </View>
-          {props.account!=='hedera'&&<Pressable style={styles.transfer} onPress={props.onTransfer} accessibilityRole="button">
+          {props.account!=='hedera'&&<Pressable style={[styles.transfer,props.onchainUnavailable&&{opacity:0.45}]} disabled={props.onchainUnavailable} accessibilityState={{disabled:props.onchainUnavailable}} onPress={props.onTransfer} accessibilityRole="button">
             <Ionicons name="swap-horizontal" size={22} color={adaptColor('#ffb000','color')}/>
             <View style={{flex:1}}><Text style={styles.actionLabel}>{t(props.account==='bitcoin_onchain'?'Move to Lightning':'Move to on-chain')}</Text>
               <Text style={styles.note}>{t('Move Bitcoin between your balances. Fees apply.')}</Text></View>
@@ -58,8 +55,8 @@ export function AccountDetails(props:{
     </View>
   </Modal>;
 }
-function Action({icon,label,onPress}:{icon:'arrow-up'|'arrow-down';label:string;onPress():void}) {
-  return <Pressable style={styles.action} onPress={onPress} accessibilityRole="button">
+function Action({icon,label,onPress,disabled=false}:{icon:'arrow-up'|'arrow-down';label:string;disabled?:boolean;onPress():void}) {
+  return <Pressable style={[styles.action,disabled&&{opacity:0.45}]} disabled={disabled} accessibilityState={{disabled}} onPress={onPress} accessibilityRole="button">
     <Ionicons name={icon} size={23} color={adaptColor('#fff','color')}/><Text style={styles.actionLabel}>{label}</Text>
   </Pressable>;
 }

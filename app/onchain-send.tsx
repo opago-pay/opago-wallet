@@ -1,7 +1,7 @@
 import { onchainErrorMessage } from '@/lib/onchain/errors';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useOnchainBalance } from '@/hooks/useOnchainBalance';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -106,7 +106,7 @@ export default function OnchainSendFlow() {
       {operation.state==='prepared'&&<BitcoinButton label={t('Cancel preparation')} secondary disabled={busy} onPress={()=>void run(async()=>{
         walletSession.capture()();await onchainJournal().update(operation.scope,operation.id,{state:'aborted'});current();setOperation(null);void balance.refresh();
       })}/>}
-      <BitcoinButton label={t('Activity')} secondary onPress={()=>router.push('/onchain-activity' as Href)}/>
+      <BitcoinButton label={t('Activity')} secondary onPress={()=>router.replace({pathname:'/(tabs)',params:{activity:'all'}})}/>
     </View>}
     {!wallet&&<View style={styles.box}><Text style={styles.note}>{t(onchainError||'Loading Bitcoin balance…')}</Text>
       <BitcoinButton label={t('Try again')} secondary onPress={()=>void run(retryOnchainConnection)}/></View>}

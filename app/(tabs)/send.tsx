@@ -1,3 +1,5 @@
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { bitcoinOnlyPreference, isBitcoinAsset } from '@/lib/bitcoin-only';
 import { t } from '@/lib/i18n';
 import { beginSendTiming } from '@/lib/send-timing';
 import { beginPerformanceSpan, markNavigationReady, measurePerformance } from '@/lib/performance-trace';
@@ -84,6 +86,7 @@ const messageOf = (cause: unknown) => cause instanceof Error ? cause.message : t
 export default function SendScreen({ modal = false, initialAccount = 'bitcoin_spark' }: { modal?: boolean; initialAccount?: 'bitcoin_spark' | 'hedera' } = {}) {
   useLanguage();
   useColorMode();
+  const { bitcoinOnly } = useBitcoinOnly();
   useEffect(() => { markNavigationReady('send'); }, []);
   const router = useRouter();
   const closeToHome = () => {
@@ -105,7 +108,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
   const rates = useExchangeRates();
   const ratesRef = useRef(rates);
   ratesRef.current = rates;
-  const [source, setSource] = useState<PaymentSource>(initialAccount === 'hedera' ? 'hedera' : 'spark');
+  const [source, setSource] = useState<PaymentSource>(!bitcoinOnly && initialAccount === 'hedera' ? 'hedera' : 'spark');
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const {
     onchainWallet,
@@ -130,7 +133,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
     // Send preparation reads a fresh spendable balance itself. A parallel
     // display read here only competes with scanning and fee preparation.
     enableSpark: false,
-    enableHedera: advancedExpanded || source === 'hedera',
+    enableHedera: !bitcoinOnly && (advancedExpanded || source === 'hedera'),
   });
   const [destination, setDestination] = useState(typeof initialDestination === 'string' ? initialDestination : '');
   const [amountInput, setAmountInput] = useState(typeof initialAmount === 'string' ? initialAmount : '');
@@ -160,6 +163,13 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
   const pendingScan = useRef<string | null>(null);
   const preparationGeneration = useRef(0);
   const preparationInFlight = useRef(false);
+  useEffect(() => {
+    if (!bitcoinOnly || source !== 'hedera' || paymentInFlight.current || hederaResult) return;
+    preparationGeneration.current += 1;
+    preparationInFlight.current = false;
+    setPendingHedera(null); setSource('spark'); setSourceSelected(false);
+    setDestination(''); setAmountInput(''); setLoading(false); setReviewPreparation(null);
+  }, [bitcoinOnly, source, hederaResult]);
 
   useFocusEffect(useCallback(() => {
     if (!sparkWallet || !hederaPublicKey) return;
@@ -193,6 +203,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       return;
     }
     consumedHederaRequestKey.current = hederaRequestKey;
+    if (bitcoinOnly) { Alert.alert(t('Bitcoin Only'), t('Turn off Bitcoin Only in Settings to use other coins.')); return; }
     setEntryMode('manual');
     setSource('hedera');
     setSourceSelected(true);
@@ -201,7 +212,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
     setAmountRequirement(null);
     setPendingHedera(null);
     setHederaResult(null);
-  }, [hederaRequest, hederaRequestKey]);
+  }, [hederaRequest, hederaRequestKey, bitcoinOnly]);
 
   const prepareLightningInvoice = useCallback(async (
     invoice: string,
@@ -227,6 +238,10 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       return;
     }
     const activeSource = sourceOverride || inferPaymentSourceFromRequest(raw, 'spark');
+    if (activeSource === 'hedera' && bitcoinOnlyPreference.getSnapshot().bitcoinOnly) {
+      setReviewPreparation(null); setSource('spark'); setSourceSelected(false); setDestination('');
+      Alert.alert(t('Bitcoin Only'), t('Turn off Bitcoin Only in Settings to use other coins.')); return;
+    }
     // A newly detected asset must never reinterpret a previous SAT/EUR amount
     // as HBAR (or the reverse). Ask for that asset's amount instead.
     const enteredAmountInput = scannedValue === undefined && activeSource === source ? amountInput : '';
@@ -408,6 +423,9 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
   }
 
   async function executeHederaPayment() {
+    if (bitcoinOnlyPreference.getSnapshot().bitcoinOnly) {
+      Alert.alert(t('Bitcoin Only'), t('Turn off Bitcoin Only in Settings to use other coins.')); return;
+    }
     if (!pendingHedera || paymentInFlight.current) return;
     paymentInFlight.current = true;
     const finishPerformance = beginPerformanceSpan('send.submit');
@@ -500,6 +518,9 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
 
   async function executeOcpPayment() {
     if (!ocpState || !selectedOcpOption) return;
+    if (bitcoinOnlyPreference.getSnapshot().bitcoinOnly && !isBitcoinAsset(selectedOcpOption.asset)) {
+      Alert.alert(t('Bitcoin Only'), t('Turn off Bitcoin Only in Settings to use other coins.')); return;
+    }
     setLoading(true);
     try {
       const payload = await fetchOcpExecutionPayload(
@@ -720,6 +741,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       currency={currency}
       source={source}
       sourceSelected={sourceSelected}
+      bitcoinOnly={bitcoinOnly}
       advancedExpanded={advancedExpanded}
       onAdvancedChange={setAdvancedExpanded}
       balances={balances}
@@ -739,6 +761,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       onAmountChange={setAmountInput}
       onCurrencyChange={setCurrency}
       onSourceChange={nextSource => {
+        if (bitcoinOnly && nextSource === 'hedera') return;
         setSource(nextSource);
         setAdvancedExpanded(false);
         setSourceSelected(true);

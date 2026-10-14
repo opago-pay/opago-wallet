@@ -1,5 +1,6 @@
-import { onchainErrorMessage } from '@/lib/onchain/errors';
+import { onchainErrorMessage, isOnchainUnavailable } from '@/lib/onchain/errors';
 import { adaptColor, themeColor } from '@/lib/theme-styles';
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
@@ -86,6 +87,7 @@ function receiveAmountError(cause: unknown, rateLoading: boolean): string {
 export default function ReceiveScreen({ modal = false, initialNetwork = 'lightning' }: { modal?: boolean; initialNetwork?: ReceiveNetwork } = {}) {
   useLanguage();
   const { mode } = useColorMode();
+  const { bitcoinOnly } = useBitcoinOnly();
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -111,7 +113,9 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     backupStatus,
     beginBackup,
   } = useWalletAuth();
-  const [network, setNetwork] = useState<ReceiveNetwork>(initialNetwork);
+  const [selectedNetwork, setNetwork] = useState<ReceiveNetwork>(initialNetwork);
+  const network = bitcoinOnly && selectedNetwork === 'hedera' ? 'lightning' : selectedNetwork;
+  const onchainUnavailable = network === 'onchain' && isOnchainUnavailable(walletOnchainError);
   const [networkPickerOpen, setNetworkPickerOpen] = useState(false);
   const [amountEditorOpen, setAmountEditorOpen] = useState(false);
   const receiveScrollRef = useRef<ScrollView>(null);
@@ -159,6 +163,11 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
   }, [backupStatus]);
   const ownerKey = walletReady && hederaPublicKey ? `${appConfig.sparkNetwork}:${hederaPublicKey}` : null;
   const restoreComplete = !!ownerKey && restoredOwnerKey === ownerKey;
+  useEffect(() => {
+    setOnchainAddress(null);
+    setOnchainError(null);
+    setOnchainLoading(false);
+  }, [ownerKey, onchainWallet]);
   const activeOwnerKey = useRef(ownerKey);
   activeOwnerKey.current = ownerKey;
   const restoredLightningRequest = useRef<string | null>(null);
@@ -199,8 +208,6 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     setInvoicePaymentHash(null);
     setInvoiceExpiresAt(null);
     setInvoiceExpired(false);
-    setOnchainAddress(null);
-    setOnchainError(null);
     setLoading(false);
     lastInvoiceAttempt.current = null;
     const generation = receiveGeneration.current;
@@ -765,7 +772,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet' },
     { id: 'onchain', label: 'Bitcoin network', description: 'Receive from a Bitcoin wallet' },
   ];
-  if (showAllCoins || network === 'hedera') receiveRoutes.push({
+  if (!bitcoinOnly && (showAllCoins || network === 'hedera')) receiveRoutes.push({
     id: 'hedera', label: 'HBAR', description: 'Receive from a Hedera account',
   });
 
@@ -814,7 +821,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
         </View>
         {network === item.id && <Ionicons name="checkmark" size={19} color={themeColor('accentText')} />}
       </TouchableOpacity>)}
-      {!showAllCoins && network !== 'hedera' && <TouchableOpacity
+      {!bitcoinOnly && !showAllCoins && network !== 'hedera' && <TouchableOpacity
         onPress={() => setShowAllCoins(true)}
         accessibilityRole="button"
         accessibilityLabel={t('Show all coins')}
@@ -827,7 +834,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     </View>}
 
     {network === 'lightning' && <PersonalLightningAddressReceive focused={pollingEnabled} size={qrSize} />}
-    {network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
+    {!onchainUnavailable && network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
         <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 16, fontWeight: '700', flexShrink: 1 }}>{t('Amount (optional)')}</Text>
         <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -848,7 +855,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
         <TextInput
           value={amountInput}
           onChangeText={changeAmount}
-          editable={restoreComplete}
+          editable={network === 'onchain' ? !!onchainWallet : restoreComplete}
           keyboardType="decimal-pad" inputAccessoryViewID="receive-amount-done"
           placeholder="0"
           placeholderTextColor={themeColor('muted')}
@@ -862,7 +869,12 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
       }}>{network === 'lightning' ? requestError : draftAmountError}</Text>}
     </View>}
 
-    {(network !== 'hedera' || hederaReadyForQr) && <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
+    {onchainUnavailable && <View style={[bitcoinStyles.box,{gap:14}]} accessibilityLiveRegion="polite">
+      <Text accessibilityRole="header" style={bitcoinStyles.value}>{t('Onchain receiving is not available yet')}</Text>
+      <Text style={bitcoinStyles.note}>{t('Onchain receiving is not enabled in this build. Use Lightning to receive Bitcoin.')}</Text>
+      <BitcoinButton label={t('Receive with Lightning')} onPress={() => switchNetwork('lightning')} />
+    </View>}
+    {!onchainUnavailable && (network !== 'hedera' || hederaReadyForQr) && <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
       {qrValue ? <View style={mode === 'light'
         ? { backgroundColor: '#fff', borderRadius: 20, padding: 12, overflow: 'hidden' }
         : { backgroundColor: '#fff', borderRadius: 24, padding: 20, overflow: 'hidden' }}>
@@ -883,7 +895,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
       </View>}
     </View>}
 
-    {network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
+    {!onchainUnavailable && network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
       onPress={() => {
         setNetworkPickerOpen(false);
         setAmountEditorOpen(true);
@@ -905,7 +917,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
         receiveStatus === 'processing' ? 'Payment is processing. Waiting for confirmation.' : 'Show this code to receive Bitcoin.')}
     </Text>}
     {network==='onchain'&&onchainWallet&&onchainWallet.network!=='mainnet'&&<Text style={bitcoinStyles.warning}>{onchainWallet.network.toUpperCase()} · {t('TEST MODE')}</Text>}
-    {network === 'onchain' && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+    {network === 'onchain' && !onchainUnavailable && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
       {t('Bitcoin stays in your onchain balance. You choose when to send it or move it to Lightning.')}
     </Text>}
     {network === 'hedera' && !hederaReadyForQr && (hederaMissing && hederaPublicKey
@@ -941,7 +953,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
         void rates.refresh();
       }
     }} />}
-    {(onchainError || walletOnchainError || (eurRateMissing && !rates.isLoading)) && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
+    {!onchainUnavailable && (onchainError || walletOnchainError || (eurRateMissing && !rates.isLoading)) && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
       setOnchainError(null);
       setRetryVersion(value => value + 1);
       if (!onchainWallet) void retryOnchainConnection().catch(() => undefined);

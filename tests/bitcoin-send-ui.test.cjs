@@ -7,6 +7,8 @@ function fixture(options = {}) {
   let locked = false;
   let removal;
   const app = hookFixture('app/(tabs)/send.tsx', hooks => ({
+    '@/hooks/useBitcoinOnly': {useBitcoinOnly:()=>({bitcoinOnly:!!options.bitcoinOnly,ready:true})},
+    '@/lib/bitcoin-only': {bitcoinOnlyPreference:{getSnapshot:()=>({bitcoinOnly:!!options.bitcoinOnly})},isBitcoinAsset:asset=>asset==='SAT'},
     '@react-navigation/native': { usePreventRemove: (blocked, onAttempt) => { removal = { blocked, onAttempt }; } },
     'react-native': { Alert: { alert: () => calls.push('alert') }, AppState: { addEventListener: () => ({remove(){}}) }, BackHandler: { addEventListener: () => ({remove(){}}) } },
     '@/lib/i18n': { t: key => key }, '@/hooks/useLanguage': { useLanguage() {} },
@@ -17,7 +19,7 @@ function fixture(options = {}) {
     '@/hooks/useWalletBalances': { useWalletBalances: () => ({ balances: {}, balanceStates: { spark: {}, hedera: {} } }) },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: [], refresh() {} }) },
     '@/lib/payment-scan': { paymentScanInbox: { take: () => 'synthetic-address' } },
-    '@/lib/payment-input': { inferPaymentSourceFromRequest: () => 'spark', parsePaymentAmount: value => Number(value || 0) },
+    '@/lib/payment-input': { inferPaymentSourceFromRequest: () => options.hedera?'hedera':'spark', parsePaymentAmount: value => Number(value || 0) },
     '@/lib/bitcoin/destination': { parseBitcoinDestination: () => ({ asset: 'bitcoin', route: 'onchain', address: 'synthetic-address', amountSats: null }) },
     '@/lib/config': { appConfig: { sparkNetwork: 'REGTEST' } },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'synthetic-scope', prepareBitcoinWithdrawal: async (_,__,address,amount,authorize) => {
@@ -74,4 +76,10 @@ test('a Bitcoin address defaults to the own onchain balance without obtaining a 
  const route=app.calls.find(call=>Array.isArray(call)&&call[0]==='route');
  assert.equal(route[1].pathname,'/onchain-send');assert.equal(route[1].params.address,'synthetic-address');
  assert.equal(app.calls.includes('authenticate'),false);assert.equal(app.calls.some(call=>Array.isArray(call)&&call[0]==='quote'),false);
+});
+
+test('Bitcoin Only blocks scanned HBAR before quote, authorization or payment preparation',async t=>{
+  const app=fixture({bitcoinOnly:true,hedera:true});t.after(app.unmount);
+  const screen=await app.settle();assert.equal(screen.type,'form');assert.equal(screen.props.source,'spark');
+  assert.equal(screen.props.bitcoinOnly,true);assert.deepEqual(app.calls,['alert']);
 });
