@@ -21,6 +21,21 @@ Auf `ce82ba1`: **1.558 Tests bestanden, ein optionaler HPKE-JS-Test übersprunge
 darunter 150 Brokerfälle; Ruff-Selektoren und Formatcheck bestanden.
 Simulation und Live-Grenzen unten gelten unverändert.
 
+Beim Abgleich um 16:11 Uhr Europe/Berlin ist #578 weiterhin offen bei
+`a499fa0b0940e0158899ee31da9cc90720fa35a0`, wurde aber auf **main**
+(`422ce4a269e77344349222c596ea11fb8e78db2e`) umgestellt. Die vorbereitete
+Veröffentlichung respektiert diese neue Basis, ohne selbst einen PR umzuhängen.
+Die Beschreibung ist unverändert. Der vorherige Beschreibungs-Fehlalarm im
+Publisher kam vom UTF-8/OEM-Transport der Windows-PowerShell-Ausgabe; die
+CLI-JSON-Antwort wird jetzt ASCII-kodiert übertragen und ausdrücklich als UTF-8
+dekodiert. Echte Änderungen an Beschreibung, Branch oder Commit bleiben gesperrt.
+
+Die offenen Stack-Heads sind inzwischen #570 `75e8580b02d5e149fca00c8933404594c4ed95ce`,
+#571 `aa381f4dcf6f3fc4dc8363eaa58e8ecaee48724d` und
+#572 `6c59a9acb85057da52cc717c13b6fb601c127c2c`.
+Diese neueren Zwischenstände sind kein Bestandteil der lokalen Testrevision
+`ce82ba1`; die Stack-Abhängigkeiten sind vor einem Merge erneut abzugleichen.
+
 #576 steht weiterhin auf `328f42582e62b10498578a429c229a227439ba96`.
 Der veröffentlichbare API-Folgebranch bleibt ein Fast-forward des vorhandenen
 #578; dessen vier fehlende neuere Abhängigkeitscommits sind vor einem Merge
