@@ -1,5 +1,10 @@
 # Website account entry — Wallet PR #49
 
+Follow-up on 15 October: see [the local contract review and handoff](auth-contract-review-2026-10-15.md)
+for the independently fixed browser-start failure, verified #577/#578 sources,
+current local test results and remaining integration/write-policy blockers.
+The historical application CI observations below were not rerun remotely.
+
 Updated 15 October 2026. Target: Friday, 16 October 2026.
 Task: [recLCk3wB7o4Xlqwa](https://airtable.com/app9EBdodbucfeYyT/tblqZkPBT6xUXVuGl/recLCk3wB7o4Xlqwa).
 This supersedes the native signup/login release instructions. **Draft preparation;

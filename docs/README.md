@@ -47,3 +47,6 @@ Commands and source paths in these documents are relative to the repository root
 Additional dated investigations and protocol specifications are retained alongside these documents.
 
 Website registration/login preparation and its pending contract/build gates: [Wallet PR #49 handoff](public-account-login-handoff.md).
+
+Current local contract-review limits, browser-start correction and test handoff:
+[Website-/Wallet-Auth review, 15 October 2026](auth-contract-review-2026-10-15.md).
