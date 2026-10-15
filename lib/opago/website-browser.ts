@@ -39,10 +39,16 @@ export function createWebsiteBrowser(system: SystemBrowser, wallet: WalletSessio
       const dismiss = () => { try { void system.dismiss().catch(() => undefined); } catch { /* Unsupported on Android. */ } };
       const abort = () => { finish(new WebsiteAccountError('cancelled')); dismiss(); };
       const timer = setTimeout(() => { finish(new WebsiteAccountError()); dismiss(); }, 120_000);
-      unsubscribe = system.subscribe(state => {
-        if (state !== 'active') away = true;
-        else if (away && nativeSettled) { outcome ||= 'returned'; finish(); }
-      });
+      try {
+        unsubscribe = system.subscribe(state => {
+          if (state !== 'active') away = true;
+          else if (away && nativeSettled) { outcome ||= 'returned'; finish(); }
+        });
+      } catch {
+        // No native opening was started. Release the lease, timer and mutex so
+        // an AppState failure cannot strand wallet actions or an explicit retry.
+        nativeSettled = true; finish(new WebsiteAccountError()); return;
+      }
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) { nativeSettled = true; abort(); return; }
       // Keep the mutex if an aborted native opening is still unresolved.

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { account, nativeFixture, ready, config, response, tick, RuntimeConfigClient, sanitizeNativeIntent } = require('./website-account-fixture.cjs');
+const { account, createWebsiteBrowser, WalletSession, nativeFixture, ready, config, response, tick, RuntimeConfigClient, sanitizeNativeIntent } = require('./website-account-fixture.cjs');
 
 for (const action of ['login', 'signup']) test('production ' + action + ' checks fresh config but never guesses a website or sends credentials', async () => {
   const f = nativeFixture();
@@ -80,6 +80,32 @@ test('browser error is retryable and exposes no raw backend details', async () =
   const f = nativeFixture({ availability: async () => ready(), open: async () => { throw new Error('sensitive'); } });
   await assert.rejects(f.flow.run('login', f.wallet.captureRuntime()), e => e instanceof account.WebsiteAccountError && !e.message.includes('sensitive'));
   assert.equal(f.listeners.size, 0); assert.doesNotThrow(f.wallet.capture());
+});
+
+test('AppState subscription failure releases browser and wallet authorization without opening a browser', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const wallet = new WalletSession(); wallet.unlock();
+  const previousApproval = wallet.capture();
+  let subscriptions = 0, opens = 0, removals = 0, dismissals = 0;
+  const browser = createWebsiteBrowser({
+    state: () => 'active',
+    subscribe: () => {
+      if (++subscriptions === 1) throw new Error('sensitive-native-detail');
+      return () => { removals++; };
+    },
+    open: async () => { opens++; return { type: 'cancel' }; },
+    dismiss: async () => { dismissals++; },
+  }, wallet);
+  await assert.rejects(browser.open(ready().destinations.login, new AbortController().signal),
+    e => e instanceof account.WebsiteAccountError && !e.message.includes('sensitive'));
+  assert.equal(opens, 0);
+  assert.throws(previousApproval);
+  assert.doesNotThrow(wallet.capture());
+  assert.equal(await browser.open(ready().destinations.login, new AbortController().signal), 'cancelled');
+  assert.equal(opens, 1); assert.equal(removals, 1);
+  t.mock.timers.tick(120001); // A failed startup must leave no timeout behind.
+  assert.equal(dismissals, 0);
+  assert.doesNotThrow(wallet.capture());
 });
 test('idle timeout during browser still locks the wallet and rejects return', async () => {
   let now = 0; const f = nativeFixture({ now: () => now, availability: async () => ready() });
