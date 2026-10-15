@@ -1,6 +1,6 @@
 # Website account entry — Wallet PR #49
 
-Updated 14 October 2026. Target: Friday, 16 October 2026.
+Updated 15 October 2026. Target: Friday, 16 October 2026.
 Task: [recLCk3wB7o4Xlqwa](https://airtable.com/app9EBdodbucfeYyT/tblqZkPBT6xUXVuGl/recLCk3wB7o4Xlqwa).
 This supersedes the native signup/login release instructions. **Draft preparation;
 no completed browser authentication, build approval or Turnstile activation.**
@@ -56,7 +56,7 @@ app unlock and recovery with the 12 words remain independent.
 
 ## Published evidence and required contracts
 
-Checked on 14 October 2026:
+Initial check on 14 October 2026:
 
 - Wallet PR #49 started from `93723587b8bdc409626974742721e8a546f9c626`,
   targeting `mvp-branch`, as an open Draft. Existing worktrees were clean and
@@ -91,10 +91,56 @@ published document/spec revisions. Required details:
 5. Explicit authority for wallet binding, Lightning addresses, POS identity and
    other F3 operations, including the separate signed-key trust bootstrap.
 
-There are no concrete additional API routes to implement yet: naming any exchange
-endpoint now would invent a contract. Michael's team must publish the config and
-session handoff first; any resulting facade changes will then be identified
-against that revision. The wallet must never communicate directly with Keycloak.
+### Contract publication checked on 15 October 2026
+
+Both Airtable tasks now say **In progress**. The handoff task links
+[API PR #577](https://github.com/opago-pay/opago-api/pull/577), merged at
+08:51:40 UTC on 15 October. Reviewed document revision:
+[`docs/contracts/auth-login-and-app-handover.md` at `b5f9a01d43845f5c7ca7038dcee08b64b11515f7`](https://github.com/opago-pay/opago-api/blob/b5f9a01d43845f5c7ca7038dcee08b64b11515f7/docs/contracts/auth-login-and-app-handover.md).
+Merge commit: `422ce4a269e77344349222c596ea11fb8e78db2e`. No later document
+revision appeared in the published file history when checked.
+
+This is published documentation, but its A2 handoff and decisions D1-D6 remain
+explicitly **proposed, open for decision**. The merge and successful document
+checks do not resolve those decisions. It documents existing password-login
+request/response and signup/email errors; it does not deliver a confirmed
+website-to-wallet session exchange. No proposed callback, endpoint, token
+lifetime or field from that section is implemented in this Wallet change.
+The only wire schema consumed by the browser entry remains AppConfig **0.2.0**.
+
+The document confirms `customer_kind=private` for the signup API, but leaves how
+the website establishes the Wallet's private-customer context unresolved. It
+also proposes an API-owned authorization page, while the Wallet task requires
+website sign-in. Michael must align that entry decision. The configuration task
+still supplies no published versioned fields or confirmed login/register paths.
+The document expressly says legacy `oidc.redirect_uris` and synthetic fixture
+URLs are not a website-handoff contract. The production adapter stays unavailable.
+
+Concrete API prerequisites identified by that source, for Michael's team:
+
+- Publish a versioned AppConfig schema with confirmed login/register destinations,
+  production/test separation and private-customer context. AppConfig 0.2.0 is
+  closed and cannot accept guessed additional fields.
+- Confirm and publish the app-session exchange, its error/cancellation/cold-start
+  rules, verification and API acceptance, refresh/revocation, and old-session
+  policy. The A2 routes and callback remain proposals; they are not implementation
+  instructions. F3 binding/address/POS authority must be explicit and separate
+  from the old public-login bearer.
+- Establish server-side customer/staff-role separation. The inspected facade
+  validates role types but does not itself exclude staff roles.
+- For the documented website password flow, provide reviewed public exposure for
+  `POST /api/v2/auth/token` and `GET /api/v2/auth/login/hpke-key`, with their
+  preflights. The signed Wallet `/api/v2/auth/hpke-key` is a different contract;
+  the earlier Airtable draft's route shorthand must not conflate them.
+- Publish the session verification/logout scope and exact environment-specific
+  CORS and Cloudflare Access policies. No blanket auth-path bypass is implied.
+
+PRs #571 and #572 remain open. Their heads when checked were respectively
+`4d1f5475b824c887d0d7b1c4f0946820be5963d1` and
+`d45a0b2b28d101fc45de0f0bd68f62b374013cb0`, later than the pending revisions cited
+inside #577. No runtime or deployment claim is inferred from either PR, and no
+Turnstile work or API change was made here. The wallet must never communicate
+directly with Keycloak.
 
 ## API #569 and shared consumer tests
 
@@ -116,6 +162,14 @@ Updating the cross-repository pin/suite belongs to a deliberate API follow-up
 once the browser handoff exists. No historical shared-suite count is claimed as a
 current browser/Turnstile acceptance result.
 
+At API #577's merge commit `422ce4a269e77344349222c596ea11fb8e78db2e`, the main
+API suite instead pins `wallet_test_revision=b11022e47f45a33436e2dee2420dc829bb5da470`
+and `wallet_baseline=00a63de470f343363a68dfae3aabd5da58f3de28`; its POS suite still
+pins `0382e4e3d1ed96f348c908f5bfc0862e795f9b25`. These are distinct from #569's
+consumer pin and from Wallet `a1bba360106be0be49de0e2656d07742a817e865`. The green
+shared checks reported on #577 therefore do not verify the prepared browser
+entry. No consumer pins were changed and no new shared test run is claimed.
+
 ## Verification, device acceptance and build prerequisites
 
 Automated coverage exercises the actual account screen, flow and Expo adapter
@@ -131,6 +185,10 @@ Node subprocesses in three existing tests (EPERM); the complete rerun with
 permitted test subprocesses passed. GitHub CI uses the pinned Node 22.23.1; its
 result and exact tested commit are recorded in PR #49. These tests do not validate a real website,
 Turnstile, a live API session or installed-device behavior.
+
+The 15 October follow-up updates documentation only. Whitespace/diff checks were
+run; the application checks above remain the evidence for the unchanged code at
+`a1bba360106be0be49de0e2656d07742a817e865`. No live or device test was performed.
 
 Still required on Android (and platform acceptance on iOS): real registration in
 the private-customer context, email confirmation, login, correct return/correlation,
