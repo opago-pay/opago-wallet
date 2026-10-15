@@ -1,5 +1,51 @@
 # Website-/Wallet-Auth: Review und Übergabe, 15. Oktober 2026
 
+## Nachtrag: neuer PR-Stand und Veröffentlichung über Fabians CLI
+
+Der erneute GitHub-Abgleich hat #578 inzwischen bei
+`a499fa0b0940e0158899ee31da9cc90720fa35a0` gefunden (ein neuer Commit nach
+dem unten dokumentierten `c4a0eb3`). Dieser neue Stand korrigiert bereits
+Lease-Besitzer, Redirects und private Preflights. Diese Änderungen werden
+**nicht nochmals eingespielt**.
+
+Der aktuelle minimale Folgebranch liegt unter
+`C:/dev/opago-api/scratch/auth-broker-latest-20261015`,
+`codex/auth-broker-latest-followup-20261015`.
+Er enthält CI-Ergänzung `924ba4341aa2e444f4cac16ae89363749515a4e4` und
+Korrektur `ce82ba15547dcd2c146b23435a625f2d52b1c171`:
+Code-/Refreshablauf nach Signierung unmittelbar vor Commit sowie atomare
+Behandlung einer bereits belegten Nachfolger-ID. Zehn zusätzliche Testfälle
+prüfen auch die schon übernommenen Lease-Sicherungen; fünf davon scheiterten
+vor der verbleibenden Korrektur auf `a499fa0`.
+Auf `ce82ba1`: **1.558 Tests bestanden, ein optionaler HPKE-JS-Test übersprungen**,
+darunter 150 Brokerfälle; Ruff-Selektoren und Formatcheck bestanden.
+Simulation und Live-Grenzen unten gelten unverändert.
+
+#576 steht weiterhin auf `328f42582e62b10498578a429c229a227439ba96`.
+Der veröffentlichbare API-Folgebranch bleibt ein Fast-forward des vorhandenen
+#578; dessen vier fehlende neuere Abhängigkeitscommits sind vor einem Merge
+durch den Stack-Verantwortlichen abzugleichen. Der unten dokumentierte
+Kombinationsstand `e84182f` und seine 1.557 Tests sind **historische Evidenz**,
+kein Test der neuen Revision `ce82ba1` auf dem gesamten aktuellen Stack.
+Es wurde kein Merge vorgenommen.
+
+**Die alte API-Patchdatei `api-auth-followup-20261015.patch` ist durch
+`api-auth-followup-latest-20261015.patch` ersetzt.** Nur die neue Datei bzw.
+den aktuellen Folgebranch für #578 verwenden.
+
+Fabians normale PowerShell erreicht GitHub über `gh api`. Der verweigerte
+CLI-Netzzugriff und die nicht interaktive Schreibfreigabe betreffen diese
+Agentensitzung. In
+`C:/dev/opago-api/scratch/auth-handoff-20261015/publish-auth-prs.ps1`
+ist ein manuell in Fabians normaler PowerShell ausführbares Skript vorbereitet.
+Es prüft beide PRs, Berechtigungen, lokale Commits und unveränderte Beschreibungen
+vor dem ersten Push. Es verwendet keine Force-Pushes, verändert keine
+Proxy-/Authentifizierungs-/Freigabeeinstellungen und aktiviert keine Features.
+Bei fremden neuen Commits oder Beschreibungen bricht es ab.
+Bis zur erfolgreichen manuellen Ausführung sind die PRs **nicht aktualisiert**.
+
+---
+
 Für Fabian, Michael und Andi. **Der durchgehende Ablauf ist noch nicht abnahmebereit.**
 Die belegbaren Sicherheitslücken sind lokal korrigiert. Website-Konfiguration,
 Backend-Authentifizierung und die Akzeptanz der Broker-Sitzung müssen noch
