@@ -1,3 +1,9 @@
+# Historical native signup handoff — superseded 14 October 2026
+
+The native signup screen and its release instructions below are retired.
+Current work and build/device gates: [Website account handoff](public-account-login-handoff.md).
+Do not use this historical plan to enable native signup, native login or Turnstile.
+
 # Private signup handoff — 13 October 2026
 
 Wallet #45 and #47 are merged. The former missing-public-contract blocker is

@@ -42,6 +42,16 @@ test('native JSON requests use the bounded native transport and never fall back 
   assert.equal(called, true);
 });
 
+test('native bodyless HTTP responses preserve logout status and reject unexpected data', async () => {
+  for (const status of [204, 205, 304]) {
+    const transport = body => nativeTransport({ request: async () => ({ status, contentType: '', body, cacheControl: 'no-store' }), cancel: async () => {} });
+    const response = await transport('')('https://api.opago.com/api/v2/auth/logout', { method: 'POST' });
+    assert.equal(response.status, status); assert.equal(await response.text(), '');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    await assert.rejects(transport('{}')('https://api.opago.com/api/v2/auth/logout', { method: 'POST' }), /unexpected response body/);
+  }
+});
+
 test('P3 binary native requests carry encrypted bytes only on the contracted photo endpoint and never fall back', async () => {
   const payload = Buffer.alloc(29,7).toString('base64'); let captured;
   const transport = nativeTransport({ request: async options => { captured=options; return {status:201,contentType:'application/json',body:'{}'};},cancel:async()=>{} });

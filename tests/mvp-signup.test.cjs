@@ -1,10 +1,10 @@
+// Legacy API client compatibility tests; not a production signup path.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { hookFixture } = require('./react-hooks-fixture.cjs');
 const previous = new Set(Object.keys(require.cache));
 require('./register-typescript.cjs');
 const signup = require('../lib/opago/signup.ts');
-const { WalletSession } = require('../lib/wallet-session.ts');
 const { signupMessages } = require('../lib/i18n/signup-messages.ts');
 for (const file of Object.keys(require.cache)) if (file.endsWith('.ts') && !previous.has(file)) delete require.cache[file];
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object' ? [tree, ...nodes(tree.props?.children)] : [];
@@ -12,32 +12,6 @@ const text = tree => Array.isArray(tree) ? tree.map(text).join(' ') : tree && ty
 const fields = { email: ' PRIVATE@example.test ', phone: ' +49123456789 ', password: '  secret-test  ' };
 const success = { status: 'created', account_state: 'active', email_verification: 'pending' };
 const response = (data = success, status = 201, extra = {}) => ({ status, body: JSON.stringify(data), contentType: 'application/json', ...extra });
-function screen(t, send = async () => success) {
-  let focused = true, background;
-  const auth = { hederaPublicKey: 'existing-wallet', sparkWallet: {}, isLocked: false };
-  const session = new WalletSession(); session.unlock();
-  const navigation = [], calls = [];
-  const app = hookFixture('app/opago-signup.tsx', () => ({
-    '@react-navigation/native': { useIsFocused: () => focused },
-    'expo-router': { useRouter: () => ({ replace: path => navigation.push(path) }) },
-    'react-native': { AppState: { currentState: 'active', addEventListener: (_, fn) => { background = fn; return { remove() {} }; } } },
-    'expo-screen-capture': { usePreventScreenCapture() {} },
-    '../hooks/useWalletAuth': { useWalletAuth: () => auth },
-    '../lib/wallet-session': { walletSession: session }, '../lib/opago/signup': signup,
-    '../lib/opago/signup-native': { submitPrivateSignup: (...args) => { calls.push({ fields: { ...args[0] }, language: args[1], signal: args[2] }); return send(...args); } },
-    '../lib/i18n/language': { languagePreference: { getSnapshot: () => ({ language: 'de' }) } },
-    '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
-    '../components/opago/opago-ui': { Action: 'action', Card: 'card', Copy: 'copy', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
-    '../components/legal/legal-links': { LegalLinks: 'legal' },
-  }), module => module.default());
-  app.render(); t.after(() => app.unmount());
-  return { app, auth, session, navigation, calls, background: state => background(state), focus: value => { focused = value; },
-    inputs: () => nodes(app.render()).filter(node => node.type === 'input'),
-    action: label => nodes(app.render()).find(node => node.type === 'action' && node.props.label === label),
-    fill: () => { const values = [fields.email, fields.phone, fields.password]; nodes(app.render()).filter(node => node.type === 'input').forEach((node, i) => node.props.onChangeText(values[i])); app.render(); },
-  };
-}
-
 test('validation normalizes contact data only, preserves password and counts API Unicode characters', () => {
   assert.deepEqual(Object.keys(signup.validateSignup(signup.emptySignup())), ['email', 'phone', 'password']);
   assert.deepEqual(signup.preparePrivateSignup(fields), { username: 'private@example.test', phone: '+49123456789', pw_signup: fields.password, customer_kind: 'private' });
@@ -91,55 +65,6 @@ test('safe error classifications never retry or retain server data and honor num
   await assert.rejects(client.signup(fields, 'en', controller.signal)); assert.equal(calls, 1);
 });
 
-test('screen single-flight and pending email success transition do not log in or mutate an existing wallet', async t => {
-  let resolve; const f = screen(t, () => new Promise(r => { resolve = r; }));
-  const original = { ...f.auth }; f.fill();
-  const action = f.action('Create private account'); action.props.onPress(); action.props.onPress();
-  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].fields.password, fields.password);
-  assert.equal(f.inputs()[2].props.value, ''); assert.ok(f.inputs().every(n => n.props.editable === false));
-  resolve(success); await f.app.settle();
-  assert.match(text(f.app.render()), /Email confirmation is pending.*You can sign in now/);
-  assert.match(text(f.app.render()), /does not sign you in, link your wallet/);
-  assert.deepEqual(f.navigation, []); assert.deepEqual(f.auth, original);
-  f.action('Sign in to OPAGO').props.onPress();
-  assert.deepEqual(f.navigation, ['/opago-account']); assert.ok(f.inputs().every(n => n.props.value === ''));
-});
-
-test('lost response permits only explicit continuation using original contact data and reentered password', async t => {
-  let attempts = 0;
-  const f = screen(t, async () => { if (++attempts === 1) throw new signup.SignupError('unknown'); return { ...success, status: 'resumed' }; });
-  f.fill(); f.action('Create private account').props.onPress(); await f.app.settle();
-  assert.equal(attempts, 1); assert.match(text(f.app.render()), /result is unknown/);
-  assert.equal(f.inputs()[2].props.value, ''); assert.equal(f.inputs()[0].props.editable, false);
-  f.inputs()[2].props.onChangeText(fields.password); f.app.render();
-  f.action('Continue registration with the same details').props.onPress(); await f.app.settle();
-  assert.equal(attempts, 2); assert.deepEqual(f.calls[0].fields, f.calls[1].fields);
-  assert.match(text(f.app.render()), /registration has been resumed/);
-});
-
-test('closed signup and conflict direct to login; rate limit blocks premature resubmission', async t => {
-  for (const problem of ['closed', 'conflict', 'rateLimited']) {
-    const f = screen(t, async () => { throw new signup.SignupError(problem, problem === 'rateLimited' ? 60 : 0); });
-    f.fill(); f.action('Create private account').props.onPress(); await f.app.settle();
-    assert.equal(f.action(problem === 'rateLimited' ? 'Continue registration with the same details' : 'Create private account').props.disabled, true);
-    assert.equal(f.action('Already have an account? Sign in').props.disabled, undefined);
-  }
-});
-
-test('abort, background, lock, session and wallet changes erase inputs and ignore delayed success', async t => {
-  for (const invalidate of [f => f.session.lock(), f => f.session.unlock(), f => { f.auth.hederaPublicKey = 'other'; },
-    f => { f.auth.sparkWallet = {}; }, f => { f.auth.isLocked = true; }, f => f.focus(false), f => f.background('inactive'),
-    f => f.background('background'), f => f.action('Continue using my wallet').props.onPress()]) {
-    let resolve; const f = screen(t, () => new Promise(r => { resolve = r; }));
-    f.fill(); f.action('Create private account').props.onPress(); invalidate(f); f.app.render();
-    assert.equal(f.calls[0].signal.aborted, true);
-    resolve(success); await f.app.settle();
-    assert.doesNotMatch(text(f.app.render()), /Your private account has been created/);
-    f.focus(true); f.background('active'); f.auth.isLocked = false; f.app.render();
-    assert.ok(f.inputs().every(n => n.props.value === ''));
-  }
-});
-
 test('every new signup UI/error message has all supported translations', () => {
   const fs = require('node:fs'); const path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '../app/opago-signup.tsx'), 'utf8');
@@ -153,7 +78,7 @@ test('historical identity deep link redirects without importing photo intake or 
   assert.equal(app.render().type, 'redirect'); assert.equal(app.render().props.href, '/opago-signup'); app.unmount();
 });
 
-test('account screen offers signup even when services are unavailable, with no photo onboarding entry', t => {
+test('contract account screen offers signup even when services are unavailable, with no photo onboarding entry', t => {
   const old = global.__DEV__; global.__DEV__ = false; t.after(() => { global.__DEV__ = old; });
   const navigation = [];
   const app = hookFixture('app/opago-account.tsx', () => ({
@@ -162,7 +87,7 @@ test('account screen offers signup even when services are unavailable, with no p
     '../lib/opago/address': { activeLightningAddress: () => null }, '../lib/opago/account': { photoMatchReady: () => false },
     '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
     '../components/opago/opago-ui': { Action: 'action', Copy: 'copy', Card: 'card', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
-  }), module => module.default());
+  }), module => module.ContractAccountScreen());
   t.after(() => app.unmount());
   const actions = nodes(app.render()).filter(n => n.type === 'action');
   assert.equal(actions.some(n => /identity|photo/i.test(n.props.label)), false);
@@ -171,27 +96,7 @@ test('account screen offers signup even when services are unavailable, with no p
   assert.match(text(app.render()), /local BTC, Lightning and HBAR wallet works without an OPAGO account/);
 });
 
-test('unmount aborts transport and an older response cannot replace a later wallet registration', async t => {
-  const replies = [];
-  const f = screen(t, () => new Promise(resolve => replies.push(resolve)));
-  f.fill(); f.action('Create private account').props.onPress();
-  f.session.unlock(); f.app.render();
-  f.fill(); f.action('Create private account').props.onPress();
-  assert.equal(f.calls.length, 2); assert.equal(f.calls[0].signal.aborted, true);
-  replies[0](success); await f.app.settle();
-  assert.equal(f.action('Create private account').props.disabled, true);
-  assert.doesNotMatch(text(f.app.render()), /Your private account has been created/);
-  replies[1]({ ...success, status: 'resumed' }); await f.app.settle();
-  assert.match(text(f.app.render()), /registration has been resumed/);
-  let finish;
-  const unmounted = screen(t, () => new Promise(resolve => { finish = resolve; }));
-  unmounted.fill(); unmounted.action('Create private account').props.onPress();
-  unmounted.app.unmount(); assert.equal(unmounted.calls[0].signal.aborted, true);
-  finish(success); await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(unmounted.navigation, []);
-});
-
-test('signed-in pending email is shown as a binding prerequisite and account status can refresh without a wallet session', async t => {
+test('contract signed-in pending email is shown as a binding prerequisite and account status can refresh without a wallet session', async t => {
   const old = global.__DEV__; global.__DEV__ = false; t.after(() => { global.__DEV__ = old; });
   let reads = 0;
   const state = { credential: {}, account: { email_verified: false }, wallet: null, session: null };
@@ -202,7 +107,7 @@ test('signed-in pending email is shown as a binding prerequisite and account sta
     '../lib/opago/address': { activeLightningAddress: () => null }, '../lib/opago/account': { photoMatchReady: () => false },
     '../lib/theme-styles': { themeColor: () => '#fff' }, '../lib/i18n': { t: s => s },
     '../components/opago/opago-ui': { Action: 'action', Copy: 'copy', Card: 'card', OpagoPage: 'page', TextInput: 'input', ui: { input: {} } },
-  }), module => module.default());
+  }), module => module.ContractAccountScreen());
   t.after(() => app.unmount());
   const action = label => nodes(app.render()).find(n => n.type === 'action' && n.props.label === label);
   assert.match(text(app.render()), /You are signed in. Confirm your email before linking/);
