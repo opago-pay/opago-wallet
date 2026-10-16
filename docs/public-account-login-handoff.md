@@ -1,5 +1,15 @@
 # Website account entry — Wallet PR #49
 
+Current contract check, 16 October 2026: see
+[the published website-ticket contract and remaining prerequisites](auth-contract-check-2026-10-16.md).
+API #585 now specifies website-only login, the Wallet callback and ticket/code
+handover; the earlier statement that all A2/D1-D6 decisions remain proposals is
+historical. Website/AppConfig fields, the Wallet signup context and API/F3 token
+acceptance remain incomplete. The production adapter stays unavailable.
+Application code is unchanged from `604b05cf9198c43c53f84df3e07dc72c7762f952`,
+whose GitHub quality gate passed. The dated reports below retain their original
+observations; they are not current deployment or device-acceptance evidence.
+
 Follow-up on 15 October: see [the local contract review and handoff](auth-contract-review-2026-10-15.md)
 for the independently fixed browser-start failure, verified #577/#578 sources,
 current local test results and remaining integration/write-policy blockers.
