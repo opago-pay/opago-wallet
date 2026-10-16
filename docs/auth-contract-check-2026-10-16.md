@@ -1,6 +1,8 @@
 # Wallet #49: published contract check, 16 October 2026
 
-Checked at approximately 15:45–15:50 Europe/Berlin. Target remains 16 October.
+Final check at approximately 17:50 Europe/Berlin; earlier check at 15:45–15:50.
+The authorized monitoring automation was deleted at the start of this final run,
+before the 16 October, 18:00 deadline. The full integration target is not complete.
 The website-ticket protocol is now published. The complete registration and
 Wallet API-session integration is still blocked by missing configuration,
 signup-context and API-acceptance contracts. This update changes documentation
@@ -8,6 +10,18 @@ only. PR #49 remains Draft; no build, deployment or feature activation is approv
 
 ## Reviewed published revisions
 
+- Latest: [API #587](https://github.com/opago-pay/opago-api/pull/587), merged on
+  16 October at 14:21:18 UTC as
+  `fb984a345d7765e76e89dbba7f44a0a8f11f794d`. Reviewed source/document revision:
+  `1f2637a5e2e9524c5ea32ec3fb402ae313d3a393`. The four documents linked below
+  now have changes at this revision: exact configured website origins and
+  atomic ticket consumption before authoritative session revalidation. The
+  [current normative contract](https://github.com/opago-pay/opago-api/blob/1f2637a5e2e9524c5ea32ec3fb402ae313d3a393/docs/contracts/wallet-auth-broker.md)
+  and changed broker/config source were checked. Ticket issuance/redemption,
+  website redirect and public-route handling are now implemented in that API
+  source. `AUTHENTICATOR = DisabledAuthenticator()` remains; both website-session
+  verification ports fail closed until the private adapter exists. This is
+  published implementation evidence, not a live deployment or successful login.
 - [API #585](https://github.com/opago-pay/opago-api/pull/585), merged on
   16 October at 12:51:28 UTC as
   `c345d1e6f9a8db3443c00ccf7d2da08d4884373c`.
@@ -35,8 +49,8 @@ The app creates PKCE S256, state and nonce, then opens the API broker. The broke
 redirects to website login on `https://opago.com`. The website uses an active
 verified session or completes its HPKE login and required factors, requests a
 single-use ticket, and returns to the broker with the original app parameters.
-After authoritative session/account revalidation and atomic ticket consumption,
-the broker returns a code. The app checks state and issuer, exchanges the code
+After atomic ticket consumption and subsequent authoritative session/account
+revalidation, the broker returns a code. The app checks state and issuer, exchanges the code
 with its verifier and validates the resulting tokens. Signup alone creates no
 session. Credentials and website bearer tokens never enter an app callback.
 
@@ -64,13 +78,19 @@ endpoint belongs to a different session type.
    private-customer context. AppConfig 0.2.0 remains closed. The Signup API's
    `customer_kind=private` does not define a website query parameter or carry
    that context through authorization. `https://opago.com/login` is explicitly
-   still a proposal. Workers is not an authorized ticket origin or production
-   fallback; any test use needs an explicit, compatible test contract.
-2. Implement the published ticket request and exact-origin preflight, website
-   redirect and atomic consume behavior. Replace the API credential form/POST
-   path as required by #585. Preserve the original request binding and enforce
-   expiry, replay, query-size limits and redaction. This is API/website work;
-   no such implementation is added in this Wallet update.
+   still a proposal. #587 now permits explicitly configured exact origins from
+   `opago.com`, `www.opago.com` and the temporary Workers host; its documents call
+   all three production origins. This differs from the user's Wallet requirement:
+   production remains opago.com and Workers may come only from confirmed test
+   configuration. The broader server allowlist is not a Wallet URL or environment
+   contract. API/website owners must reconcile production/test separation before
+   Wallet integration; no Workers production destination is adopted here.
+2. Integrate the now-published #587 ticket core with the actual website and
+   authoritative session adapter, and prove the agreed environment configuration.
+   The current source rejects credential POSTs at authorization. The PR retains
+   unused legacy credential helpers/template for a separate cleanup; their
+   presence is not permission to restore API-owned login. Preserve original
+   binding, expiry, replay, query limits and redaction. No API work is added here.
 3. Supply reviewed private Compliance routes and adapters for both
    `verify_website_session` and `verify_website_session_reference`, including
    original authentication time, full customer roles and current session/account
@@ -98,6 +118,9 @@ No temporary native login or parallel Turnstile work is required.
 
 Application revision remains `604b05cf9198c43c53f84df3e07dc72c7762f952`.
 Its [GitHub Wallet quality gate passed](https://github.com/opago-pay/opago-wallet/actions/runs/38751686373/job/116479426116).
+The [quality gate on documentation revision `3de351747c932c5c337df270be91f4fe550304fb`](https://github.com/opago-pay/opago-wallet/actions/runs/38911689011/job/117008837983)
+also passed and was rechecked during the final run. This final update is again
+documentation only; application code is unchanged.
 The earlier local follow-up recorded 50 focused screen/browser/configuration
 tests, typecheck and lint passing, plus local full-suite failures documented in
 the [15 October review](auth-contract-review-2026-10-15.md). Those local failures
@@ -111,7 +134,8 @@ local wallet use. It does not verify a live website, ticket, API session or devi
 This documentation-only update is checked for diff/whitespace and source accuracy;
 no new local application or cross-repository test run is claimed.
 
-Consumer pins rechecked at API main `c345d1e6f9a8db3443c00ccf7d2da08d4884373c`:
+Consumer pins rechecked at API main `fb984a345d7765e76e89dbba7f44a0a8f11f794d`
+remain unchanged from `c345d1e6f9a8db3443c00ccf7d2da08d4884373c`:
 
 | Source | Wallet revision |
 | --- | --- |
@@ -125,6 +149,9 @@ these shared consumer pins covers Wallet #49's current browser entry or the new
 ticket contract. Advancing pins and running the matching joint contract tests
 remain part of the integration; no shared-CI result is promoted to device or
 Turnstile acceptance.
+API #587's published Wallet/POS HTTP and synthetic configuration checks passed,
+but the shared HTTP checks still use these older consumers. These checks do not
+close the missing Wallet browser, private-session adapter or live/device evidence.
 
 ## Outstanding device and live tests
 
