@@ -195,7 +195,7 @@ try {
     standalone = $true
     hederaNetwork = 'mainnet'
     lightningNetwork = 'mainnet'
-    sparkSdkVersion = '0.7.12'
+    sparkSdkVersion = '0.14.0'
     lightningMaximumFeeSats = 100
     checkoutContractId = $expectedContractId
     runtimeBytecodeSha256 = $expectedRuntimeSha256

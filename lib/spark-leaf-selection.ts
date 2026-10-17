@@ -74,7 +74,7 @@ type LeafManager = {
 const installed = new WeakSet<object>();
 
 /**
- * Pinned SDK 0.7.12 extension of ONLY its synchronous selection functions.
+ * Pinned SDK 0.14.0 extension of ONLY its synchronous selection functions.
  * The SDK still owns the mutex, AVAILABLE filtering, lock/state transitions,
  * renewal, network swap, failure recovery and actual transfer execution.
  */
