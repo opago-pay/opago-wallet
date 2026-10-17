@@ -80,8 +80,8 @@ and WASM paths are not proof of mobile native compatibility.
 
 ## Automated evidence and boundaries
 
-- Baseline application suite on 0.7.12: 893 pass, 1 pre-existing skip.
-- 0.14 application suite: 892 pass, 1 pre-existing skip (obsolete pipeline tests
+- Baseline application suite on 0.7.12: 893 pass, 1 pre-existing generated-iOS-project check skipped.
+- 0.14 application suite: 892 pass, 1 pre-existing generated-iOS-project check skipped (obsolete pipeline tests
   replaced, not disabled to obtain green results).
 - TypeScript and ESLint pass; 9 contract tests pass and contracts compile.
 - Android and iOS **production-mode Metro exports with Hermes bytecode** pass
@@ -107,8 +107,9 @@ iOS device is available. Native gRPC cancellation/reconnect, FROST/primitives
 loading, secure randomness, Hermes startup without Metro, background/foreground,
 cold restart, old-wallet upgrade on isolated test devices and end-to-end
 regtest deposit/claim/send/receive/withdraw must be exercised before rollout.
-No isolated SO/SSP stack is configured, so the pre-existing opt-in regtest test
-remains skipped. No EAS/cloud build, store upload, real-wallet installation,
+No isolated SO/SSP stack is configured; the separate regtest integration
+scripts were not run. The one application-suite skip is the generated iOS
+project privacy/startup integration check, because no native iOS project exists. No EAS/cloud build, store upload, real-wallet installation,
 merge or deployment was performed.
 
 ## Stored data and rollback
