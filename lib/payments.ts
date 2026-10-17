@@ -1,3 +1,5 @@
+import { lightningTransferId } from './lightning/transfer-id';
+import { sparkTransferAmount } from './lightning/transfer-amount';
 import { sha256 } from '@noble/hashes/sha256';
 import { readBitcoinBalance, type SparkBalanceResponse } from './bitcoin/amount';
 import { withTimeout } from './promise-timeout';
@@ -84,7 +86,7 @@ export interface SparkWalletLike {
     invoice: string;
     maxFeeSats: number;
     amountSatsToSend?: number;
-    idempotencyKey?: string;
+    transferId?: import('@buildonspark/spark-sdk').UUID;
   }): Promise<{
     id?: string;
     status?: string;
@@ -292,7 +294,7 @@ async function submitPreparedSparkPayment(
       invoice: invoice.invoice,
       maxFeeSats,
       amountSatsToSend: invoice.amountSats === null ? amountSats : undefined,
-      idempotencyKey: 'opago-' + invoice.paymentHash,
+      transferId: lightningTransferId(invoice.paymentHash),
     }), 45_000, 'Lightning payment status timed out.');
   } catch (cause) {
     recordLightningRecoveryStage('send_sdk_unresolved');
@@ -395,13 +397,14 @@ export function sparkTransferMatchesInvoice(
   transfer: unknown,
   paymentHash: string,
   amountSats: number,
-): transfer is { id: string; totalValue: number } {
+): transfer is { id: string; valueReceivedByWallet: number } {
   if (!transfer || typeof transfer !== 'object') return false;
   const item = transfer as {
     id?: unknown;
     transferDirection?: unknown;
     status?: unknown;
-    totalValue?: unknown;
+    valueReceivedByWallet?: unknown;
+    valueSentByWallet?: unknown;
     userRequest?: {
       invoice?: { paymentHash?: unknown };
       status?: unknown;
@@ -411,15 +414,17 @@ export function sparkTransferMatchesInvoice(
   const transferHash = item.userRequest?.invoice?.paymentHash;
   const isCompleted = String(item.status || '').toUpperCase() === 'COMPLETED';
   const isReceiveCompleted = String(item.userRequest?.status || '').toUpperCase() === 'TRANSFER_COMPLETED';
+  let received: number;
+  try { received = sparkTransferAmount(item); } catch { return false; }
   const metadataMatches = (
     typeof item.id === 'string' &&
     String(item.transferDirection).toUpperCase() === 'INCOMING' &&
     (isCompleted || isReceiveCompleted) &&
     typeof transferHash === 'string' &&
     transferHash.toLowerCase() === paymentHash.toLowerCase() &&
-    Number.isSafeInteger(Number(item.totalValue)) &&
-    Number(item.totalValue) > 0 &&
-    (amountSats === 0 || Number(item.totalValue) === amountSats)
+    Number.isSafeInteger(received) &&
+    received > 0 &&
+    (amountSats === 0 || received === amountSats)
   );
   if (!metadataMatches) return false;
   try {
