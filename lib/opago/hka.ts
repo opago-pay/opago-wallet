@@ -9,10 +9,12 @@ import { OpagoError, type HkaTransport, type Request } from './api';
 import type { PrivateStore } from './store';
 import { base64url, unbase64url, jcs, parseStrictJson, strictUtf8, utf8 } from './encoding';
 import { txRoute, txDefinitions } from './tx-contract';
+import { HPKE_SIGNING_ROOTS, HPKE_ROOT_MAX_KEY_EXPIRY } from './hpke-roots';
+import { PUBLIC_API_ORIGIN } from './public-account-origin';
 
 export type HkaHttp = (url: string, options: { method: Request['method']; headers: Record<string, string>; body?: string; binaryBody?: Uint8Array;
   maxBytes: number; timeoutMs: number; signal?: AbortSignal }) => Promise<{ status: number; body: string; contentType: string; cacheControl?: string; retryAfter?: string; requestId?: string }>;
-export type HkaTrust = { audience: string; roots: Record<string, string>; platform: 'ios' | 'android'; build: number;
+export type HkaTrust = { audience: string; roots?: Readonly<Record<string, string>>; platform: 'ios' | 'android'; build: number;
   oidc: { issuer: string; clientId: string; redirectUri: string }; testOnly?: boolean;
   /** Backend-agreed HPKE + v3 binding/session revision. No bootstrap/environment default. */
   txFoundationResolution?: string };
@@ -21,6 +23,9 @@ export type RequestAad = { method: string; path: string; query: [string, string]
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const publishedTestRoot = '6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw';
 type Watermark = { issuedAt: string; digest: string };
+function pinnedRoots(trust: HkaTrust): Readonly<Record<string, string>> {
+  return trust.roots ?? (trust.audience === PUBLIC_API_ORIGIN ? HPKE_SIGNING_ROOTS : {});
+}
 function date(s: string) { const ms = Date.parse(s); if (!Number.isFinite(ms)) throw new Error('Invalid key timestamp.'); return ms; }
 function digest(value: unknown) { return base64url(sha256(utf8(jcs(value)))); }
 function encode(s: string) { return encodeURIComponent(s).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
@@ -50,7 +55,11 @@ export function canonicalTarget(raw: string, method = 'GET', v3 = false): { path
 export function verifyKeyDocument(value: unknown, config: AppConfig, trust: HkaTrust, now: number, last?: Watermark): KeyDocument {
   assertContract<KeyDocument>('KeyDocument', value);
   const document = value.document;
-  const root = trust.roots[value.signing_key_id];
+  const root = pinnedRoots(trust)[value.signing_key_id];
+  if (root && root === HPKE_SIGNING_ROOTS[value.signing_key_id] &&
+    (trust.audience !== PUBLIC_API_ORIGIN || document.keys.some(key => date(key.not_after) > date(HPKE_ROOT_MAX_KEY_EXPIRY)))) {
+    throw new Error('HPKE signing root is outside its approved audience or validity.');
+  }
   if (!root || config.revoked_signing_key_ids.includes(value.signing_key_id) || document.audience !== trust.audience ||
     date(document.issued_at) > now + 300_000 || last && (document.issued_at < last.issuedAt || document.issued_at === last.issuedAt && digest(document) !== last.digest)) throw new Error('Untrusted HPKE key document.');
   const rootBytes = unbase64url(root); const signature = unbase64url(value.signature);
@@ -72,8 +81,9 @@ export class NativeHkaTransport implements HkaTransport {
   constructor(readonly trust: HkaTrust, private readonly http: HkaHttp, private readonly store: PrivateStore,
     private readonly random: (length: number) => Uint8Array, private readonly now: () => number = Date.now) {
     const origin = new URL(trust.audience);
+    const roots = pinnedRoots(trust);
     if (origin.protocol !== 'https:' || origin.origin !== trust.audience || origin.username || origin.password || !Number.isSafeInteger(trust.build) || trust.build < 1 ||
-      Object.keys(trust.roots).length < 1 || Object.keys(trust.roots).length > 4 || Object.entries(trust.roots).some(([id, key]) => !/^[A-Za-z0-9._-]{1,64}$/.test(id) || unbase64url(key).length !== 32 || !trust.testOnly && key === publishedTestRoot)) throw new Error('Invalid pinned HKA configuration.');
+      Object.keys(roots).length < 1 || Object.keys(roots).length > 4 || Object.entries(roots).some(([id, key]) => !/^[A-Za-z0-9._-]{1,64}$/.test(id) || unbase64url(key).length !== 32 || !trust.testOnly && key === publishedTestRoot)) throw new Error('Invalid pinned HKA configuration.');
     if (!trust.testOnly && (origin.hostname.endsWith('.invalid') || origin.hostname === 'localhost')) throw new Error('Test endpoint cannot be used for live HKA.');
     this.mode = trust.testOnly ? 'contract-test' : 'hka';
   }
