@@ -232,11 +232,11 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
           </TouchableOpacity>}
         </> : <View style={styles.cameraMessage}>
           {permissionBusy || (!permission && !cameraError) ? <><ActivityIndicator color="#ffb000" /><Text style={[styles.message, { color: '#d4d4da' }]}>{t('Opening camera…')}</Text></>
-            : <><Ionicons name="camera-outline" size={38} color="#ffb000" /><Text style={[styles.message, { color: '#d4d4da' }]}>{t(cameraError || 'Allow camera access to scan a payment QR code.')}</Text>
+            : <><Ionicons name="camera-outline" size={38} color="#ffb000" /><Text style={[styles.message, { color: '#d4d4da' }]}>{t(cameraError || 'Camera access is used to scan payment QR codes.')}</Text>
               {Platform.OS !== 'web' && <TouchableOpacity style={styles.permissionButton} accessibilityRole="button" onPress={() => {
                 if (permission && !permission.granted && !permission.canAskAgain) void Linking.openSettings().catch(() => setCameraError('Open your device settings to allow camera access for Opago.'));
                 else void checkPermission(true);
-              }}><Text style={styles.permissionText}>{t(permission?.granted ? 'Try again' : permission?.canAskAgain === false ? 'Open device settings' : 'Allow camera')}</Text></TouchableOpacity>}
+              }}><Text style={styles.permissionText}>{t(permission?.granted ? 'Try again' : permission?.canAskAgain === false ? 'Open device settings' : 'Continue')}</Text></TouchableOpacity>}
             </>}
         </View>}
         {!!error && !manual && <View style={styles.errorBox}><Text style={[styles.error, { color: '#ffc1ac' }]} accessibilityRole="alert">{t(error)}</Text>
