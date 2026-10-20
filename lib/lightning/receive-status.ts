@@ -1,3 +1,4 @@
+import { sparkTransferAmount } from './transfer-amount';
 import { sparkTransferMatchesInvoice, verifyPaymentPreimage } from '../payments';
 import { withTimeout } from '../promise-timeout';
 import { loadSparkTransfersPaginated, type SparkHistoryWalletLike, type SparkUserRequestLike, type SparkTransferLike } from './spark-history';
@@ -52,7 +53,7 @@ export async function resolveLightningReceiveOutcome(
   const matched = transfers.find(transfer => sparkTransferMatchesInvoice(transfer, saved.paymentHash, saved.amountSats));
   const matchedTime = (matched as SparkTransferLike | undefined)?.createdTime;
   return matched
-    ? { state: 'confirmed', amountSats: saved.amountSats || Number(matched.totalValue),
+    ? { state: 'confirmed', amountSats: saved.amountSats || sparkTransferAmount(matched),
       ...(matchedTime && Number.isFinite(new Date(matchedTime).getTime())
         ? { transactionAt: new Date(matchedTime).toISOString() } : {}) }
     : { state: 'processing', amountSats: null };

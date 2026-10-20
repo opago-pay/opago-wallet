@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Base64 } = require('js-base64');
-const { updateTransport, esmBody } = require('../scripts/patch-spark-xhr-transport.cjs');
+const grpc = require('nice-grpc-common');
 
 function bundle(ext) {
   return fs.readFileSync(path.join(__dirname, '..', 'node_modules', '@buildonspark',
@@ -18,7 +18,7 @@ function fixture(ext) {
   assert.ok(start >= 0 && end > start);
   let instance;
   class XMLHttpRequest {
-    static HEADERS_RECEIVED = 2;
+    static HEADERS_RECEIVED = 2; static DONE = 4;
     constructor() { instance = this; this.status = 200; this.response = new Uint8Array([42]).buffer; this.headers = []; }
     open() {}
     setRequestHeader(name, value) { this.headers.push([name, value]); }
@@ -31,9 +31,10 @@ function fixture(ext) {
   const binding = ext === 'cjs' ? { Base64 } : Base64;
   const xhrPost = new Function('XMLHttpRequest', 'GrpcCallData', name,
     'headersToMetadata', 'getStatusFromHttpCode', 'getErrorDetailsFromHttpResponse',
+    'NoopLogger', 'nice_grpc_common', 'Status', 'ClientError',
     source.slice(start, end) + '\nreturn xhrPost;')(
     XMLHttpRequest, GrpcCallData, binding, value => ({ raw: value }),
-    status => status === 200 ? 0 : 2, () => 'Network error');
+    status => status === 200 ? 0 : 2, () => 'Network error', {}, grpc, grpc.Status, grpc.ClientError);
   return { xhrPost, current: () => instance };
 }
 
@@ -42,43 +43,40 @@ for (const ext of ['cjs', 'js']) {
     const f = fixture(ext);
     const pending = f.xhrPost('https://synthetic.example', [
       ['content-type', ['application/grpc']], ['test-bin', [new Uint8Array([1, 2])]],
-    ], new Uint8Array([3]), {});
+    ], new Uint8Array([3]), {}, undefined, undefined, 60000);
     assert.deepEqual(f.current().headers,
       [['content-type', 'application/grpc'], ['test-bin', 'AQI=']]);
     assert.equal(f.current().sent, true);
-    assert.equal(f.current().timeout, 45_000);
+    assert.equal(f.current().timeout, 60000);
     f.current().readyState = f.current().constructor.HEADERS_RECEIVED;
     f.current().onreadystatechange();
-    f.current().onload();
+    f.current().readyState = 4; f.current().onreadystatechange(); f.current().onloadend();
     const result = await pending;
     assert.equal(result.grpcStatus, 0);
     assert.deepEqual(Array.from(result.responseChunks[0]), [42]);
     assert.match(result.responseHeaders.raw, /application\/grpc/);
   });
 
-  test(`Spark ${ext} rejects network errors, timeouts and aborts`, async () => {
+  test(`Spark ${ext} preserves network error, timeout and abort status`, async () => {
     for (const failure of ['network', 'timeout', 'abort']) {
       const f = fixture(ext);
       const controller = new AbortController();
-      const pending = f.xhrPost('https://synthetic.example', [], new Uint8Array(), {}, controller.signal);
-      if (failure === 'network') f.current().onerror();
+      const pending = f.xhrPost('https://synthetic.example', [], new Uint8Array(), {}, undefined, controller.signal, 60000);
+      if (failure === 'network') { f.current().onerror(); f.current().readyState = 4; f.current().onreadystatechange(); }
       if (failure === 'timeout') f.current().ontimeout();
       if (failure === 'abort') controller.abort();
-      await assert.rejects(pending, failure === 'network' ? /Network error/ :
-        failure === 'timeout' ? /timed out/ : /aborted/);
+      f.current().onloadend(); // late completion must not overwrite failure
+      const result = await pending;
+      assert.equal(result.grpcStatus, failure === 'network' ? grpc.Status.UNKNOWN : failure === 'timeout' ? grpc.Status.DEADLINE_EXCEEDED : grpc.Status.CANCELLED);
       if (failure === 'abort') assert.equal(f.current().aborted, true);
     }
   });
 }
 
-test('strict patch check detects stale V1 ESM body and installer repairs it', () => {
-  const relative = 'dist/native/index.react-native.js';
-  const current = bundle('js');
-  const stale = current.replace('OPAGO_XHR_ABORT_TIMEOUT_V2', 'OPAGO_XHR_ABORT_TIMEOUT_V1')
-    .replace('Base64.fromUint8Array(value)', 'js_base64.Base64.fromUint8Array(value)');
-  assert.notEqual(stale, current);
-  assert.throws(() => updateTransport(stale, esmBody, relative, true), /not patched/);
-  const repaired = updateTransport(stale, esmBody, relative, false);
-  assert.equal(repaired, current);
-  assert.equal(updateTransport(repaired, esmBody, relative, true), current);
-});
+for (const ext of ['cjs', 'js']) {
+  test(`Spark ${ext} pre-aborted request is never sent`, async () => {
+    const f = fixture(ext); const controller = new AbortController(); controller.abort();
+    const result = await f.xhrPost('https://synthetic.example', [], new Uint8Array(), {}, undefined, controller.signal, 60000);
+    assert.equal(f.current().sent, undefined); assert.equal(result.grpcStatus, grpc.Status.CANCELLED);
+  });
+}

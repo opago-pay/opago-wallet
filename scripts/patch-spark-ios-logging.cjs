@@ -1,6 +1,6 @@
 'use strict';
 
-// Spark SDK 0.7.12 logs native method parameters, including the ECIES private
+// Spark SDK 0.14.0 logs native method parameters, including the ECIES private
 // identity key. Patch the installed iOS source on every clean dependency install.
 // Fail closed when the pinned SDK changes so a release cannot silently regain
 // the logging path.
@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const sdkRoot = path.join(__dirname, '..', 'node_modules', '@buildonspark', 'spark-sdk');
 const version = JSON.parse(fs.readFileSync(path.join(sdkRoot, 'package.json'), 'utf8')).version;
-if (version !== '0.7.12') throw new Error(`Review native Spark logging before using SDK ${version}.`);
+if (version !== '0.14.0') throw new Error(`Review native Spark logging before using SDK ${version}.`);
 
 const swiftPath = path.join(sdkRoot, 'ios', 'SparkFrostModule.swift');
 const source = fs.readFileSync(swiftPath, 'utf8');

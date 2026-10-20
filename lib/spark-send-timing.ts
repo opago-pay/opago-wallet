@@ -35,7 +35,7 @@ function hookOperatorClient(client: unknown): void {
   }
 }
 
-/** Opt-in, pinned SDK 0.7.12 structure. No request/response data is inspected. */
+/** Opt-in, pinned SDK 0.14.0 structure. No request/response data is inspected. */
 export function attachSparkSendTiming(value: unknown): void {
   if (!sendTimingEnabled()) return;
   const wallet = target(value);

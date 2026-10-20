@@ -3,17 +3,14 @@ import { sats } from './bitcoin/amount';
 import { installSparkLeafSelection } from './spark-leaf-selection';
 import { PaymentScopedSparkSigner } from './spark-signer-cache';
 import { installSparkHtlcPreparation } from './spark-htlc-preparation';
-import { installSparkLightningPipeline } from './spark-lightning-pipeline';
 import type { WalletAuthChallenge, WalletAuthIntent } from './wallet-auth-proof';
 
 /** Bitcoin payment reads must not wait for unrelated Spark-token services. */
 export class BitcoinSparkWallet extends SparkWallet {
-  private readonly lightningPipeline: { close(): void };
   constructor(...args: ConstructorParameters<typeof SparkWallet>) {
     super(...args);
     installSparkLeafSelection(this.leafManager);
     installSparkHtlcPreparation(this.signingService, this.config?.signer);
-    this.lightningPipeline = installSparkLightningPipeline(this.transferService, this.lightningService);
   }
 
   protected override async initWallet(
@@ -52,18 +49,17 @@ export class BitcoinSparkWallet extends SparkWallet {
     return signWalletAuthChallenge(this.config.signer, challenge, intent, network, installationId);
   }
 
-  override async cleanupConnections() {
-    this.lightningPipeline.close();
+  override async cleanup() {
     const signer = this.config.signer;
     if (signer instanceof PaymentScopedSparkSigner) signer.clearSendKeyCache();
-    return super.cleanupConnections();
+    return super.cleanup();
   }
 
   async getBitcoinBalance() {
-    // Follow pinned SDK 0.7.12 getBalance's fresh AVAILABLE-leaf path, including
+    // Follow SDK 0.14.0 getBalance's cross-operator consistency-checked path, including
     // key validation/recovery and cache eviction. Never use the display cache
     // or sum owned/incoming leaves as spendable funds.
-    const freshLeaves = await this.getLeaves(true);
+    const freshLeaves = await this.getLeaves();
     const available = BigInt(sats(freshLeaves.reduce(
       (sum, leaf) => sum + BigInt(sats(leaf.value)), 0n,
     )));

@@ -134,10 +134,10 @@ test('cache is bounded and late derivations after cleanup cannot refill it', asy
 test('wallet scopes the cache around SDK submission and clears it when connections close', async () => {
   const signer = await signerFixture();
   const oldPay = sdk.SparkWallet.prototype.payLightningInvoice;
-  const oldClose = sdk.SparkWallet.prototype.cleanupConnections;
+  const oldClose = sdk.SparkWallet.prototype.cleanup;
   // The inherited methods may live higher in the prototype chain.
   const hadPay = Object.hasOwn(sdk.SparkWallet.prototype, 'payLightningInvoice');
-  const hadClose = Object.hasOwn(sdk.SparkWallet.prototype, 'cleanupConnections');
+  const hadClose = Object.hasOwn(sdk.SparkWallet.prototype, 'cleanup');
   let finish; const gate = new Promise(resolve => { finish = resolve; });
   const result = { preimage: 'synthetic-only' };
   sdk.SparkWallet.prototype.payLightningInvoice = async function (input) {
@@ -146,18 +146,18 @@ test('wallet scopes the cache around SDK submission and clears it when connectio
     await signer.getPublicKeyFromDerivation(leaf('synthetic-leaf'));
     await gate; return result;
   };
-  sdk.SparkWallet.prototype.cleanupConnections = async function () { assert.equal(this.config.signer.sendCache, null); };
+  sdk.SparkWallet.prototype.cleanup = async function () { assert.equal(this.config.signer.sendCache, null); };
   try {
     const wallet = new BitcoinSparkWallet({ network: 'MAINNET' }, signer);
     const pending = wallet.payLightningInvoice({ invoice: 'synthetic-only', maxFeeSats: 1 });
     await new Promise(resolve => setImmediate(resolve));
     const owned = [...signer.sendCache.privateKeys.values()][0];
-    await wallet.cleanupConnections();
+    await wallet.cleanup();
     assert.ok(owned.every(byte => byte === 0));
     finish(); assert.equal(await pending, result);
     assert.equal(signer.sendCache, null);
   } finally {
     if (hadPay) sdk.SparkWallet.prototype.payLightningInvoice = oldPay; else delete sdk.SparkWallet.prototype.payLightningInvoice;
-    if (hadClose) sdk.SparkWallet.prototype.cleanupConnections = oldClose; else delete sdk.SparkWallet.prototype.cleanupConnections;
+    if (hadClose) sdk.SparkWallet.prototype.cleanup = oldClose; else delete sdk.SparkWallet.prototype.cleanup;
   }
 });
