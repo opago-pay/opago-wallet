@@ -81,7 +81,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Opago to use your camera to scan payment QR codes.",
+          "cameraPermission": "Opago uses the camera to scan payment QR codes.",
           "recordAudioAndroid": false,
           "microphonePermission": false
         }
