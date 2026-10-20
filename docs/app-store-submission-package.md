@@ -1,6 +1,6 @@
 # OPAGO Wallet – Apple-Einreichungspaket
 
-**Stand: 19. Oktober 2026.** Dieses Dokument beschreibt den aktuellen Quellstand. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
+**Stand: 20. Oktober 2026.** Dieses Dokument beschreibt den aktuellen Quellstand. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
 
 ## Produktumfang
 
@@ -35,7 +35,7 @@
 
 ## Screenshots
 
-Sechs bestehende Grafiken liegen in [app-store-assets](app-store-assets/README.md), dort mit Upload-Reihenfolge. Die Bilder 01, 07 und 09 zeigten den entfernten Buy-Einstieg und wurden aus dem Ordner und der README entfernt. Auch Bild 09 im dunklen Design war betroffen. Diese drei Bilder müssen zusätzlich aus allen betroffenen Screenshot-Sätzen in App Store Connect entfernt werden. Die verbleibenden sechs Bilder zeigen kein Kaufangebot; sie sind gegen den finalen signierten Build zu prüfen. Für neue Home-Aufnahmen kontrollierte Testdaten verwenden; keine privaten Wiederherstellungswörter oder fremden Zahlungsdaten zeigen.
+Acht Grafiken liegen in [app-store-assets](app-store-assets/README.md), dort mit Upload-Reihenfolge. Bilder 01 und 09 enthalten jetzt die am 20. Oktober von Fabian gelieferten aktuellen iPhone-Aufnahmen in Hell und Dunkel, eingesetzt in das bisherige Design. Sie zeigen die deutsche Oberfläche mit Empfangen und Senden ohne Buy; die englischen Werbetexte bleiben erhalten. Bild 07 bleibt mangels aktueller Aufnahme mit aufgeklappter Coin-Liste ausgeschlossen. In App Store Connect die alten Bilder 01 und 09 ersetzen und Bild 07 entfernen. Alle Bilder gegen den finalen signierten Build und die ausgewählte Store-Sprache prüfen.
 
 Die benötigten Gerätefamilien und Abmessungen anhand des tatsächlich hochgeladenen iPhone-Builds und der [aktuellen Screenshot-Spezifikation](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications) auswählen. Aus der früheren supportsTablet-Konfiguration folgt keine aktuelle iPad-Screenshotpflicht.
 
