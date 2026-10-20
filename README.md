@@ -37,6 +37,10 @@ Download OPAGO Wallet and start using Bitcoin in everyday life.
 <h3 align="center">See it in action</h3>
 
 <p align="center">
+  <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="Bitcoin for everyday life — current OPAGO Wallet home screen" width="600" />
+</p>
+
+<p align="center">
   <img src="docs/app-store-assets/OPAGO_02_Scan_a_QR_Code_6_5.png" alt="Scan a QR code to start a Bitcoin payment" width="600" />
 </p>
 
@@ -58,6 +62,10 @@ Download OPAGO Wallet and start using Bitcoin in everyday life.
 
 <p align="center">
   <img src="docs/app-store-assets/OPAGO_08_Receive_HBAR_6_5.png" alt="Receive HBAR by sharing your QR code" width="600" />
+</p>
+
+<p align="center">
+  <img src="docs/app-store-assets/OPAGO_09_Self_Custodial_Your_Money_6_5.png" alt="Self-custodial. Your money. — current OPAGO Wallet in dark mode" width="600" />
 </p>
 
 ---

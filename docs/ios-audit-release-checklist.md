@@ -32,7 +32,7 @@ The signed production iOS build 46 is available from current main. Store configu
 - [ ] Before enabling an activation service, document public-key/proof processing, IP logging, purpose/legal basis, retention, operator access and deletion. No guessed retention period or backend deletion claim.
 - [ ] Approve and publish the updated DE/EN policies at https://www.opago.com/wallet/privacy/ and verify public access before wallet creation. Repository updates do not publish the website.
 - [ ] Upload a new iOS build with the 19 October camera copy fix: Continue before the system permission request, neutral purpose descriptions in all five languages, Paste/Type available after denial.
-- [ ] Remove historical screenshots 01, 07 and 09 from App Store Connect; all three contain the removed Buy action and have been removed from the repository set. Compare the six remaining images with the final signed build. Capture any replacement Home images from the actual iOS app.
+- [ ] Replace historical screenshots 01 and 09 in App Store Connect with the updated artwork using Fabian's 20 October light/dark iPhone captures. Remove old image 07, whose expanded coin-list capture has not been replaced. Compare all eight images with the final signed build and intended store locale; the two new Home captures show German UI within the existing English marketing artwork.
 - [ ] Review metadata, age-rating questionnaire, reviewer access and funded test cases in App Store Connect.
 
 ## Sources and classification
