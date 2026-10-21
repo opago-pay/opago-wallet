@@ -3,6 +3,7 @@ import { ed25519 } from '@noble/curves/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
 import { base64url, unbase64url, parseStrictJson, strictUtf8, utf8 } from './encoding';
 import type { OidcPlatform, OidcConfig } from './oidc';
+import { PUBLIC_API_ORIGIN } from './public-account-origin';
 
 type Json = Record<string, unknown>;
 export type OidcVerifierPorts = { json(url: string): Promise<unknown>;
@@ -28,9 +29,15 @@ function second(value: unknown): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0 || !Number.isSafeInteger((value as number) * 1000)) throw new Error('Invalid token timestamp.'); return (value as number) * 1000;
 }
 export function createOidcVerifier(discovery: OidcDiscovery, accessAudience: string, ports: OidcVerifierPorts,
-  now: () => number = Date.now, allowedAlgorithms = ['RS256', 'ES256']) : OidcPlatform['verify'] {
+  now: () => number = Date.now, allowedAlgorithms = ['RS256', 'ES256'], profile: 'oidc' | 'wallet-broker' = 'oidc') : OidcPlatform['verify'] {
   if (!accessAudience || allowedAlgorithms.length === 0 || allowedAlgorithms.some(a => !['RS256', 'ES256', 'EdDSA'].includes(a))) throw new Error('Invalid OIDC verification policy.');
   return async (tokens, config: OidcConfig, nonce) => {
+    if (profile === 'wallet-broker' && (config.issuer !== PUBLIC_API_ORIGIN || config.clientId !== 'opago-wallet' ||
+      config.redirectUri !== 'com.opago.wallet:/oauth/callback' || accessAudience !== 'opago-account' ||
+      discovery.authorization_endpoint !== config.issuer + '/api/v2/auth/authorize' ||
+      discovery.token_endpoint !== config.issuer + '/api/v2/auth/oauth/token' ||
+      discovery.jwks_uri !== config.issuer + '/api/v2/auth/oauth/jwks' ||
+      config.authorizationEndpoint !== discovery.authorization_endpoint || config.tokenEndpoint !== discovery.token_endpoint)) throw new Error('Invalid Wallet broker configuration.');
     if (config.issuer !== discovery.issuer) throw new Error('OIDC issuer changed.');
     // Fetch fresh JWKS for each login/refresh. Server-side session/key revocation remains authoritative.
     const set = object(await ports.json(discovery.jwks_uri));
@@ -44,6 +51,7 @@ export function createOidcVerifier(discovery: OidcDiscovery, accessAudience: str
       if (typeof header.alg !== 'string' || !allowedAlgorithms.includes(header.alg) || typeof header.kid !== 'string' ||
         header.crit !== undefined || header.b64 !== undefined || header.jku !== undefined || header.x5u !== undefined || header.jwk !== undefined ||
         (id ? header.typ !== undefined && header.typ !== 'JWT' : !['JWT', 'at+jwt'].includes(header.typ as string))) throw new Error('Unsupported OIDC token header.');
+      if (profile === 'wallet-broker' && (header.alg !== 'ES256' || header.typ !== (id ? 'JWT' : 'at+jwt'))) throw new Error('Invalid broker token header.');
       const key = keys.find(k => k.kid === header.kid);
       if (!key || key.use !== undefined && key.use !== 'sig' || key.alg !== undefined && key.alg !== header.alg ||
         key.key_ops !== undefined && (!Array.isArray(key.key_ops) || key.key_ops.length !== 1 || key.key_ops[0] !== 'verify') ||
@@ -67,9 +75,23 @@ export function createOidcVerifier(discovery: OidcDiscovery, accessAudience: str
         second(claims.exp) <= now() || second(claims.iat) > now() + 30_000 || second(claims.iat) >= second(claims.exp) ||
         claims.nbf !== undefined && second(claims.nbf) > now() + 30_000 ||
         claims.azp !== undefined && claims.azp !== config.clientId || (Array.isArray(claims.aud) && claims.aud.length > 1 || !id) && claims.azp !== config.clientId) throw new Error('Invalid OIDC token claims.');
+      if (profile === 'wallet-broker') {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(claims.sub as string) ||
+          claims.aud !== (id ? config.clientId : accessAudience) || claims.azp !== config.clientId ||
+          second(claims.auth_time) > second(claims.iat) || second(claims.exp) - second(claims.iat) < 60_000 ||
+          second(claims.exp) - second(claims.iat) > 900_000 ||
+          !Array.isArray(claims.amr) || !claims.amr.length || claims.amr.some(v => typeof v !== 'string' || !v) ||
+          ['tenant', 'tenant_id', 'tenantId'].some(k => k in claims)) throw new Error('Invalid broker identity.');
+        if (!id && (claims.client_id !== config.clientId || typeof claims.jti !== 'string' || !claims.jti ||
+          !Array.isArray(claims.roles) || !claims.roles.length || new Set(claims.roles).size !== claims.roles.length ||
+          claims.roles.some(v => !['Merchant', 'PrivateCustomer'].includes(v as string)))) throw new Error('Invalid broker customer claims.');
+      }
       return claims;
     }
     const id = await verify(tokens.id_token, true); const access = await verify(tokens.access_token, false);
+    if (profile === 'wallet-broker' && (id.auth_time !== access.auth_time ||
+      id.at_hash !== base64url(sha256(utf8(tokens.access_token)).slice(0, 16)) ||
+      typeof id.email_verified !== 'boolean')) throw new Error('Broker token pair mismatch.');
     // Released signup permits login before email confirmation. A signed false or
     // absent contact claim grants no email assurance; account/binding rules remain separate.
     if (id.sub !== access.sub || id.nonce !== nonce || id.email_verified !== undefined && typeof id.email_verified !== 'boolean' || typeof id.email !== 'string' || !id.email ||
@@ -78,4 +100,13 @@ export function createOidcVerifier(discovery: OidcDiscovery, accessAudience: str
     return { issuer: config.issuer, audience: config.clientId, subject: id.sub as string, expiresAt: second(id.exp), authTime: second(id.auth_time),
       nonce, emailVerified: id.email_verified === true, accessAudience, accessExpiresAt: second(access.exp) };
   };
+}
+
+/** Protocol validation only. This does not enable native login or grant AccountBearer authority.
+ * AppConfig selection and API acceptance must be integrated separately. Server-side revocation
+ * remains authoritative; a valid signature does not establish a live account session.
+ */
+export function createWalletBrokerVerifier(discovery: OidcDiscovery, ports: OidcVerifierPorts,
+  now: () => number = Date.now): OidcPlatform['verify'] {
+  return createOidcVerifier(discovery, 'opago-account', ports, now, ['ES256'], 'wallet-broker');
 }

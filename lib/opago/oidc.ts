@@ -17,6 +17,17 @@ export interface OidcPlatform {
    * issuer/audience/type/expiry and revocation as applicable. Never decode-only. */
   verify(tokens: Tokens, config: OidcConfig, nonce: string): Promise<VerifiedClaims>;
 }
+type SessionControl = { generation: number; writes: Promise<unknown>; loginGeneration?: number;
+  refresh?: { generation: number; promise: Promise<AccountCredential> } };
+// Native runtimes can recreate adapters; coordinate all instances sharing a store/slot.
+const controls = new WeakMap<PrivateStore, Map<string, SessionControl>>();
+function sessionControl(store: PrivateStore, slot: string): SessionControl {
+  let slots = controls.get(store);
+  if (!slots) { slots = new Map(); controls.set(store, slots); }
+  let control = slots.get(slot);
+  if (!control) { control = { generation: 0, writes: Promise.resolve() }; slots.set(slot, control); }
+  return control;
+}
 export class OidcAccountLogin implements AccountLogin {
   readonly mode = 'oidc' as const;
   constructor(readonly config: OidcConfig, readonly trusted: { issuers: string[]; redirectUris: string[]; accessAudience: string },
@@ -27,6 +38,23 @@ export class OidcAccountLogin implements AccountLogin {
       if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.origin !== new URL(config.issuer).origin) throw new Error('Untrusted OIDC endpoint.');
     }
   }
+  private get slot() { return 'f3.oidc.' + this.config.issuer; }
+  private get control() { return sessionControl(this.store, this.slot); }
+  private capture(replace = false) {
+    const control = this.control;
+    if (replace) { control.generation++; control.refresh = undefined; }
+    const generation = control.generation;
+    const current = this.platform.start?.() || (() => {});
+    return () => {
+      if (generation !== control.generation) throw new Error('Account authentication was cancelled.');
+      current();
+    };
+  }
+  private write<T>(action: () => Promise<T>): Promise<T> {
+    const control = this.control;
+    const result = control.writes.catch(() => undefined).then(action);
+    control.writes = result; return result;
+  }
   private async accept(tokens: Tokens, nonce: string, fresh: boolean, active: () => void): Promise<AccountCredential> {
     const claims = await this.platform.verify(tokens, this.config, nonce);
     active();
@@ -34,12 +62,24 @@ export class OidcAccountLogin implements AccountLogin {
         typeof claims.emailVerified !== 'boolean' || claims.expiresAt <= this.now() || claims.accessExpiresAt <= this.now() ||
         claims.accessAudience !== this.trusted.accessAudience || claims.authTime > this.now() + 30_000 ||
         fresh && this.now() - claims.authTime > 300_000) throw new Error('OIDC authentication did not satisfy the account contract.');
-    await this.store.write('f3.oidc.' + this.config.issuer, { tokens, nonce, subject: claims.subject });
+    await this.write(async () => {
+      active();
+      await this.store.write(this.slot, { tokens, nonce, subject: claims.subject });
+      // A lock/logout/new login may arrive while secure storage is writing.
+      // Cleanup stays inside the queue so it cannot erase a newer session.
+      try { active(); } catch (cause) { await this.store.remove(this.slot); throw cause; }
+    });
     active();
     return { accessToken: tokens.access_token, expiresAt: claims.accessExpiresAt, authTime: claims.authTime, subject: claims.subject };
   }
   async login(fresh: boolean) {
-    const active = this.platform.start?.() || (() => {});
+    const active = this.capture(true); active();
+    const control = this.control; const generation = control.generation;
+    control.loginGeneration = generation;
+    try { return await this.loginOnce(fresh, active); }
+    finally { if (control.loginGeneration === generation) control.loginGeneration = undefined; }
+  }
+  private async loginOnce(fresh: boolean, active: () => void) {
     const verifier = encodeBase64url(this.platform.randomBytes(32));
     const state = encodeBase64url(this.platform.randomBytes(32));
     const nonce = encodeBase64url(this.platform.randomBytes(32));
@@ -55,21 +95,38 @@ export class OidcAccountLogin implements AccountLogin {
     const base = new URL(this.config.redirectUri);
     if (result.protocol !== base.protocol || result.host !== base.host || result.pathname !== base.pathname || result.hash ||
         result.username || result.password || [...result.searchParams.keys()].some((k, i, keys) => keys.indexOf(k) !== i) ||
-        result.searchParams.get('state') !== state || result.searchParams.has('error') || !result.searchParams.get('code')) throw new Error('Invalid OIDC callback.');
+        result.searchParams.get('state') !== state || result.searchParams.get('iss') !== this.config.issuer || result.searchParams.has('error') || !result.searchParams.get('code')) throw new Error('Invalid OIDC callback.');
     const tokens = await this.platform.token(this.config.tokenEndpoint, new URLSearchParams({ grant_type: 'authorization_code',
       client_id: this.config.clientId, redirect_uri: this.config.redirectUri, code: result.searchParams.get('code')!, code_verifier: verifier }));
     active(); return this.accept(tokens, nonce, fresh, active);
   }
   async refresh() {
-    const active = this.platform.start?.() || (() => {});
-    const saved = await this.store.read<{ tokens: Tokens; nonce: string; subject: string }>('f3.oidc.' + this.config.issuer);
+    const active = this.capture(); active();
+    const control = this.control;
+    if (control.loginGeneration === control.generation) throw new Error('Account sign-in is in progress.');
+    let flight = control.refresh;
+    if (!flight || flight.generation !== control.generation) {
+      flight = { generation: control.generation, promise: this.refreshOnce(active) };
+      control.refresh = flight;
+    }
+    try { const credential = await flight.promise; active(); return credential; }
+    finally { if (control.refresh === flight) control.refresh = undefined; }
+  }
+  private async refreshOnce(active: () => void) {
+    await this.control.writes.catch(() => undefined); active();
+    const saved = await this.store.read<{ tokens: Tokens; nonce: string; subject: string }>(this.slot);
+    active();
     if (!saved?.tokens.refresh_token) throw new Error('Sign in to your OPAGO account again.');
     const tokens = await this.platform.token(this.config.tokenEndpoint, new URLSearchParams({ grant_type: 'refresh_token',
       client_id: this.config.clientId, refresh_token: saved.tokens.refresh_token }));
+    active();
     const claims = await this.platform.verify(tokens, this.config, saved.nonce);
     active();
     if (claims.subject !== saved.subject) throw new Error('OIDC account changed during refresh.');
     return this.accept(tokens, saved.nonce, false, active);
   }
-  async logout() { await this.store.remove('f3.oidc.' + this.config.issuer); }
+  async logout() {
+    this.control.generation++; this.control.refresh = undefined;
+    await this.write(() => this.store.remove(this.slot));
+  }
 }
