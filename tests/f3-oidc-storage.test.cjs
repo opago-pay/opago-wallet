@@ -23,7 +23,7 @@ function oidcFixture() {
     authTime: now, emailVerified: true, accessAudience: trusted.accessAudience, accessExpiresAt: now + 900_000 };
   const platform = {
     randomBytes: n => new Uint8Array(n).fill(++count),
-    async browser(url, redirect) { authorize = new URL(url); nonce = authorize.searchParams.get('nonce'); return redirect + '?code=synthetic-code&state=' + authorize.searchParams.get('state'); },
+    async browser(url, redirect) { authorize = new URL(url); nonce = authorize.searchParams.get('nonce'); return redirect + '?code=synthetic-code&state=' + authorize.searchParams.get('state') + '&iss=' + encodeURIComponent(config.issuer); },
     async token(_url, body) { form = body; return { access_token: 'synthetic-access', id_token: 'synthetic-id', refresh_token: 'synthetic-refresh' }; },
     async verify(_tokens, _config, expectedNonce) { assert.equal(expectedNonce, nonce); return { ...claims, nonce }; },
   };
@@ -66,6 +66,20 @@ test('F3 OIDC rejects callback attacks, cancelled browser, unsigned claims, stal
   await assert.rejects(invalidSignature.login.login(false), /signature rejection/);
   assert.throws(() => new OidcAccountLogin({ ...config, issuer: 'https://evil.example' }, trusted, invalidSignature.platform, new MemoryPrivateStore()));
 });
+for (const issuer of [null, 'https://other.example', config.issuer + '/']) {
+  test('OIDC rejects missing or mismatched callback issuer before token exchange: ' + issuer, async () => {
+    const f = oidcFixture(); let exchanged = false;
+    f.platform.browser = async (url, redirect) => {
+      const query = new URLSearchParams({ code: 'synthetic-code', state: new URL(url).searchParams.get('state') });
+      if (issuer !== null) query.set('iss', issuer);
+      return redirect + '?' + query;
+    };
+    f.platform.token = async () => { exchanged = true; throw new Error('Must not exchange'); };
+    await assert.rejects(f.login.login(false), /Invalid OIDC callback/);
+    assert.equal(exchanged, false);
+  });
+}
+
 test('F3 retryable encrypted error retains key/input with bounded backoff and Retry-After; hard errors do not retry', async () => {
   let now = Date.now(); const delays = []; const store = new MemoryPrivateStore();
   const backend = new F3ContractTestBackend(store, randomUUID, 'regtest', () => now); const original = backend.request.bind(backend);

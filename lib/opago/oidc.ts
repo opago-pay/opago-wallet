@@ -55,7 +55,7 @@ export class OidcAccountLogin implements AccountLogin {
     const base = new URL(this.config.redirectUri);
     if (result.protocol !== base.protocol || result.host !== base.host || result.pathname !== base.pathname || result.hash ||
         result.username || result.password || [...result.searchParams.keys()].some((k, i, keys) => keys.indexOf(k) !== i) ||
-        result.searchParams.get('state') !== state || result.searchParams.has('error') || !result.searchParams.get('code')) throw new Error('Invalid OIDC callback.');
+        result.searchParams.get('state') !== state || result.searchParams.get('iss') !== this.config.issuer || result.searchParams.has('error') || !result.searchParams.get('code')) throw new Error('Invalid OIDC callback.');
     const tokens = await this.platform.token(this.config.tokenEndpoint, new URLSearchParams({ grant_type: 'authorization_code',
       client_id: this.config.clientId, redirect_uri: this.config.redirectUri, code: result.searchParams.get('code')!, code_verifier: verifier }));
     active(); return this.accept(tokens, nonce, fresh, active);
