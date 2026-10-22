@@ -59,7 +59,7 @@ export function ContractAccountScreen() {
           <Copy>{t('You are signed in. Confirm your email before linking this wallet, then refresh your account details.')}</Copy>
           <Action label="Refresh account details" disabled={busy} onPress={() => void run(() => account.refreshAccount())} />
         </>}
-        {state.credential && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
+        {(state.credential || state.logoutPending) && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
       </Card>
       <Card title="Wallet ownership and binding">
         <Copy>{t(wallet?.party_id ? 'This wallet is explicitly linked to your OPAGO account.' : state.session ? 'Wallet ownership proved. The wallet is not linked to an account yet.' : 'Prove ownership of this local wallet to OPAGO.')}</Copy>
