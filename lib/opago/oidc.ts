@@ -63,15 +63,10 @@ export class OidcAccountLogin implements AccountLogin {
     control.writes = result; return result;
   }
   private async accept(tokens: Tokens, nonce: string, fresh: boolean, active: () => void): Promise<AccountCredential> {
-    const claims = await this.platform.verify(tokens, this.config, nonce);
-    active();
-    if (claims.issuer !== this.config.issuer || claims.audience !== this.config.clientId || claims.nonce !== nonce || !claims.subject ||
-        typeof claims.emailVerified !== 'boolean' || claims.expiresAt <= this.now() || claims.accessExpiresAt <= this.now() ||
-        claims.accessAudience !== this.trusted.accessAudience || claims.authTime > this.now() + 30_000 ||
-        fresh && this.now() - claims.authTime > 300_000) throw new Error('OIDC authentication did not satisfy the account contract.');
+    const credential = await this.verifiedCredential(tokens, nonce, fresh, active);
     await this.write(async () => {
       active();
-      await this.store.write(this.slot, { tokens, nonce, subject: claims.subject });
+      await this.store.write(this.slot, { tokens, nonce, subject: credential.subject, expiresAt: credential.expiresAt });
       // A lock/logout/new login may arrive while secure storage is writing.
       // Cleanup stays inside the queue so it cannot erase a newer session.
       try { active(); } catch (cause) {
@@ -82,6 +77,15 @@ export class OidcAccountLogin implements AccountLogin {
       }
     });
     active();
+    return credential;
+  }
+  private async verifiedCredential(tokens: Tokens, nonce: string, fresh: boolean, active: () => void): Promise<AccountCredential> {
+    const claims = await this.platform.verify(tokens, this.config, nonce);
+    active();
+    if (claims.issuer !== this.config.issuer || claims.audience !== this.config.clientId || claims.nonce !== nonce || !claims.subject ||
+        typeof claims.emailVerified !== 'boolean' || claims.expiresAt <= this.now() || claims.accessExpiresAt <= this.now() ||
+        claims.accessAudience !== this.trusted.accessAudience || claims.authTime > this.now() + 30_000 ||
+        fresh && this.now() - claims.authTime > 300_000) throw new Error('OIDC authentication did not satisfy the account contract.');
     return { accessToken: tokens.access_token, expiresAt: claims.accessExpiresAt, authTime: claims.authTime, subject: claims.subject };
   }
   async login(fresh: boolean) {
@@ -108,7 +112,7 @@ export class OidcAccountLogin implements AccountLogin {
     for (const [k,v] of Object.entries(params)) url.searchParams.set(k, v);
     const callback = await this.platform.browser(url.toString(), this.config.redirectUri);
     active();
-    if (!callback) throw new Error('Account sign-in cancelled.');
+    if (!callback) throw new OpagoError('account_login_cancelled');
     const result = new URL(callback);
     const base = new URL(this.config.redirectUri);
     if (result.protocol !== base.protocol || result.host !== base.host || result.pathname !== base.pathname || result.hash ||
@@ -117,6 +121,21 @@ export class OidcAccountLogin implements AccountLogin {
     const tokens = await this.platform.token(this.config.tokenEndpoint, new URLSearchParams({ grant_type: 'authorization_code',
       client_id: this.config.clientId, redirect_uri: this.config.redirectUri, code: result.searchParams.get('code')!, code_verifier: verifier }));
     active(); return this.accept(tokens, nonce, fresh, active);
+  }
+  /** Restore only cryptographically verified credentials; expired access uses refresh. */
+  async restore(): Promise<AccountCredential | null> {
+    const active = this.capture(); active();
+    if (this.control.loginGeneration === this.control.generation) throw new Error('Account sign-in is in progress.');
+    if (this.control.refresh?.generation === this.control.generation) return this.refresh();
+    await this.control.writes.catch(() => undefined); active();
+    const saved = await this.store.read<{ tokens: Tokens; nonce: string; subject: string; expiresAt?: number }>(this.slot);
+    active();
+    if (!saved) return null;
+    if (!Number.isFinite(saved.expiresAt) || saved.expiresAt! <= this.now()) return this.refresh();
+    const credential = await this.verifiedCredential(saved.tokens, saved.nonce, false, active);
+    if (credential.subject !== saved.subject) throw new Error('OIDC account changed during restore.');
+    // Read-only: never overwrite a concurrently rotated refresh token.
+    return credential;
   }
   async refresh() {
     const active = this.capture(); active();
