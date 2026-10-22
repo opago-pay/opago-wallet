@@ -19,7 +19,7 @@ export interface WalletIdentity {
   sign(challenge: Challenge, intent: WalletAuthIntent, installationId: string): Promise<WalletAuthVerifyRequest>;
 }
 export type AccountState = { credential: AccountCredential | null; account: Account | null; session: WalletSession | null;
-  wallet: Wallet | null; deletion: DeletionReceipt | null; deletionStatus: DeletionStatus | null; syncGeneration?: number; syncPaused?: boolean };
+  wallet: Wallet | null; deletion: DeletionReceipt | null; deletionStatus: DeletionStatus | null; syncGeneration?: number; syncPaused?: boolean; logoutPending?: boolean };
 type Operation = { key: string; method: 'GET' | 'POST' | 'PUT' | 'DELETE'; path: string; body: unknown; auth: AuthKind;
   principal: string; result?: unknown; retryAt?: number; terminalError?: string };
 export const photoMatchReady = (wallet: Wallet | null): boolean => !!wallet && wallet.status === 'active' &&
@@ -366,8 +366,19 @@ export class OpagoAccount {
   }
   async signOut() {
     await this.invalidateSync();
-    if (this.state.session) await this.mutate('logout', 'POST', '/api/v2/wallet/auth/logout', { refresh_token: this.state.session.refresh_token, installation_id: this.installationId }, 'none');
-    await this.login.logout(); this.state.credential = null; this.state.account = null; this.state.session = null;
-    this.state.wallet = null; await this.save(); await this.finish('logout');
+    let failure: unknown;
+    try {
+      const pending = await this.store.read<Operation>(this.operationKey('logout'));
+      const body = this.state.session ? { refresh_token: this.state.session.refresh_token, installation_id: this.installationId } : pending?.body;
+      if (body) await this.mutate('logout', 'POST', '/api/v2/wallet/auth/logout', body, 'none');
+      await this.finish('logout');
+    } catch (cause) { failure = cause; }
+    try { await this.login.logout(); } catch (cause) { failure = cause; }
+    finally {
+      this.state.credential = null; this.state.account = null; this.state.session = null; this.state.wallet = null;
+      this.state.logoutPending = !!failure;
+      await this.save();
+    }
+    if (failure) throw failure;
   }
 }
