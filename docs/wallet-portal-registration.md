@@ -8,8 +8,9 @@ The Wallet never receives or stores the browser password or Turnstile token.
 
 ## Delivery order
 
-1. Deploy the Dashboard Wallet-handover change (branch
-   `codex/portal-wallet-auth-context`) before distributing this Wallet build.
+1. Merge Dashboard [#181](https://github.com/opago-pay/opago-dashboard/pull/181),
+   then [#182](https://github.com/opago-pay/opago-dashboard/pull/182), and deploy
+   the combined Portal before distributing this Wallet build.
 2. Operations must point the Broker website login URL at the deployed Portal
    login route and verify that public API authorization, token, JWKS and the
    required discovery routes are accessible to the native client.
