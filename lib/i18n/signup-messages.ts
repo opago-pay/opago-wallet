@@ -1,5 +1,12 @@
 import type { AppLanguage } from './language';
 const messages: Record<string, string[]> = {
+  "Please sign in again.": ["Bitte melde dich erneut an.", "Veuillez vous reconnecter.", "Vuelve a iniciar sesión.", "Accedi di nuovo."],
+  "Sign out of OPAGO": ["Bei OPAGO abmelden", "Se déconnecter d’OPAGO", "Cerrar sesión en OPAGO", "Esci da OPAGO"],
+  "Signed in to OPAGO.": ["Bei OPAGO angemeldet.","Connecté à OPAGO.","Sesión iniciada en OPAGO.","Accesso a OPAGO effettuato."],
+  "Signed out of this wallet.": ["Aus dieser Wallet abgemeldet.","Déconnecté de ce portefeuille.","Sesión cerrada en esta cartera.","Disconnesso da questo wallet."],
+  "Wallet sign-out could not be confirmed. Please retry.": ["Die Wallet-Abmeldung konnte nicht bestätigt werden. Bitte erneut versuchen.","La déconnexion du portefeuille n’a pas pu être confirmée. Réessayez.","No se pudo confirmar el cierre de sesión de la cartera. Inténtalo de nuevo.","Impossibile confermare la disconnessione dal wallet. Riprova."],
+  "Registration from the wallet is not available yet.": ["Die Registrierung aus der Wallet ist noch nicht verfügbar.","L’inscription depuis le portefeuille n’est pas encore disponible.","El registro desde la cartera aún no está disponible.","La registrazione dal wallet non è ancora disponibile."],
+  "Your account is signed in. Linking this wallet is a separate step.": ["Du bist bei deinem Konto angemeldet. Die Verknüpfung dieser Wallet erfolgt separat.","Votre compte est connecté. L’association de ce portefeuille est une étape distincte.","Has iniciado sesión en tu cuenta. Vincular esta cartera es un paso aparte.","Hai effettuato l’accesso al tuo account. Il collegamento di questo wallet è un passaggio separato."],
   "Sign in": ["Anmelden","Se connecter","Iniciar sesión","Accedi"],
   "Create account": ["Konto erstellen","Créer un compte","Crear cuenta","Crea account"],
   "Check again": ["Erneut prüfen","Vérifier à nouveau","Comprobar de nuevo","Controlla di nuovo"],

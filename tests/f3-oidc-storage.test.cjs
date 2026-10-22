@@ -136,6 +136,7 @@ test('F3 native external login preserves the current wallet session across brows
   const originalLoad = Module._load;
   Module._load = function(name, parent, main) {
     if (parent?.filename === filename) {
+      if (name === 'react-native') return { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } };
       if (name === 'expo-web-browser') return { openAuthSessionAsync: async (_url, redirect) => { session.handleAppState('background'); assert.equal(session.isUnlocked(), true); session.handleAppState('active'); return { type: 'success', url: redirect + '?code=synthetic' }; } };
       if (name === 'expo-crypto') return { getRandomValues: bytes => bytes.fill(1) };
       if (name === '../wallet-session') return { walletSession: session };
