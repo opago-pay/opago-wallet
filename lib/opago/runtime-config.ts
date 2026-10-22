@@ -4,11 +4,32 @@ import { assertContract } from './contract';
 import { parseStrictJson, utf8 } from './encoding';
 import { PUBLIC_API_ORIGIN } from './public-account-origin';
 import { WebsiteAccountError } from './website-account';
+import { assertWalletBrokerMetadata, resolveWalletBrokerConfiguration, type WalletBrokerConfiguration } from './wallet-broker-config';
 
-/** Fresh public runtime configuration only; no identity-provider discovery. */
+/** Fresh public configuration; optional broker discovery stays on the approved Public API. */
 export class RuntimeConfigClient {
   constructor(private readonly http: HkaHttp, private readonly platform: 'ios' | 'android', private readonly build: number,
     private readonly now = Date.now) {}
+  async brokerConfiguration(signal?: AbortSignal): Promise<WalletBrokerConfiguration> {
+    const app = await this.configuration(signal);
+    const fetchedAt = this.now();
+    const check = () => { if (signal?.aborted) throw new WebsiteAccountError('cancelled'); };
+    check();
+    try {
+      // Reject legacy/internal identity providers before making a discovery request.
+      assertWalletBrokerMetadata(app);
+      const response = await this.http(PUBLIC_API_ORIGIN + '/.well-known/openid-configuration', { method: 'GET',
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-store' }, signal, maxBytes: 32768, timeoutMs: 10000 });
+      check();
+      if (response.status !== 200 || !/^application\/json(?:\s*;|$)/i.test(response.contentType) ||
+          utf8(response.body).length > 32768) throw new WebsiteAccountError();
+      return resolveWalletBrokerConfiguration(app, parseStrictJson(response.body), fetchedAt, this.now());
+    } catch (error) {
+      check();
+      if (error instanceof WebsiteAccountError) throw error;
+      throw new WebsiteAccountError();
+    }
+  }
   async configuration(signal?: AbortSignal): Promise<AppConfig> {
     const check = () => { if (signal?.aborted) throw new WebsiteAccountError('cancelled'); };
     check();

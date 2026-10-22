@@ -1,0 +1,31 @@
+{
+  "audience": "https://api.opago.com",
+  "cache_max_age": 300,
+  "contract_version": "0.2.0",
+  "issued_at": "2026-10-19T17:51:13Z",
+  "limits": {
+    "max_sendable_msat": 100000000,
+    "min_sendable_msat": 1000,
+    "photo_bytes": 10485760,
+    "photo_pixels": 24000000
+  },
+  "min_supported_build": {
+    "android": 1,
+    "ios": 1
+  },
+  "oidc": {
+    "client_id": "opago-wallet",
+    "issuer": "https://api.opago.com",
+    "redirect_uris": [
+      "com.opago.wallet:/oauth/callback"
+    ],
+    "scopes": [
+      "openid",
+      "email",
+      "profile"
+    ]
+  },
+  "revoked_kids": [],
+  "revoked_signing_key_ids": [],
+  "valid_until": "2027-04-30T00:00:00Z"
+}
