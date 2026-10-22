@@ -4,14 +4,14 @@ Diese Anleitung beschreibt einen optionalen isolierten Entwicklungs-/Regressions
 
 ## Voraussetzungen und Testkopie
 
-Mac mit Xcode 26+ und iOS/iPadOS-26-SDK, Node **22.23.1**, CocoaPods, ein isoliertes iPhone und iPad mit eigener Test-App-Kennung, kontrolliertes IPv6-only-/DNS64-/NAT64-Netz, kontrollierte DNS-/HTTPS-Ziele und Test-CA. Die vorhandene Nutzerwallet und die produktive Bundle-ID `com.opago.wallet` bleiben unberührt. Der Test-Host wird ausschließlich in eine frische Kopie installiert.
+Mac mit Xcode 26+ und iOS/iPadOS-26-SDK, Node **22.23.4**, CocoaPods, ein isoliertes iPhone und iPad mit eigener Test-App-Kennung, kontrolliertes IPv6-only-/DNS64-/NAT64-Netz, kontrollierte DNS-/HTTPS-Ziele und Test-CA. Die vorhandene Nutzerwallet und die produktive Bundle-ID `com.opago.wallet` bleiben unberührt. Der Test-Host wird ausschließlich in eine frische Kopie installiert.
 
 Die installierte Expo-Autolinking-Version setzt `includeTests` standardmäßig auf `false`; das Podspec allein erzeugt also keinen ausführbaren Testlauf. `scripts/ios-safe-http-test-gate.sh prepare` kopiert den Quellstand ohne Wallet-/Umgebungsdateien in einen **neuen Ordner außerhalb** des Checkouts, setzt eine eigene `*.safehttptest`-Bundle-ID, generiert iOS dort und fügt nur für `OpagoSafeHttp` `:testspecs => ['Tests']` vor `use_expo_modules!` ein. Der produktive Podfile wird nicht geändert. CocoaPods soll mit `requires_app_host = true` einen separaten XCTest-Host erzeugen; ob der Scheme tatsächlich verfügbar ist, muss `xcodebuild -list` auf dem Mac erst bestätigen.
 
 Die Fixture-Datei ist bei `prepare` optional, damit `pod install`, der unsigned App-Build und die Parser-/Adress-Unit-Tests schon ohne Testnetz vorbereitet werden können. **Der vollständige optionale `run`-Testlauf** verlangt dagegen alle Fixtures; `{}` fällt sofort durch.
 
 ```sh
-node --version # v22.23.1
+node --version # v22.23.4
 bash scripts/ios-safe-http-test-gate.sh prepare /tmp/opago-safe-http-test \
   com.opago.safehttptest
 cd /tmp/opago-safe-http-test
