@@ -45,4 +45,6 @@ must be integrated separately.
 
 PR #64 was merged into `codex/wallet-mvp-build-20261022` after #63 reached
 `mvp-branch`. Its account-wide logout is absent from MVP revision `d81352c` and is
-not included here, because Michael subsequently specified client-only logout.
+not included in the configuration change, because Michael subsequently specified client-only logout.
+The follow-up in `wallet-client-logout.md` reuses its local cleanup but replaces
+the global remote call with the existing client-bound RFC 7009 endpoint.
