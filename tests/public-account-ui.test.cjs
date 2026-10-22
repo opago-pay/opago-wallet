@@ -24,11 +24,13 @@ function screen(t, options = {}) {
 }
 test('production screen authenticates with the broker and offers client logout without wallet authority', async t => {
   const f = screen(t); f.render(); let tree = await f.settle();
-  assert.equal(action(tree, 'Sign in').props.disabled, false); assert.equal(action(tree, 'Create account'), undefined);
+  assert.equal(action(tree, 'Sign in or register').props.disabled, false); assert.equal(action(tree, 'Create account'), undefined);
   assert.equal(nodes(tree).some(node => node.type === 'input'), false);
-  action(tree, 'Sign in').props.onPress(); tree = await f.settle();
+  assert.match(content(tree), /After confirming your email/);
+  assert.doesNotMatch(content(tree), /Registration from the wallet is not available yet/);
+  action(tree, 'Sign in or register').props.onPress(); tree = await f.settle();
   assert.match(content(tree), /Signed in to OPAGO/); assert.match(content(tree), /Linking this wallet is a separate step/);
-  assert.equal(action(tree, 'Sign in').props.disabled, true);
+  assert.equal(action(tree, 'Sign in or register').props.disabled, true);
   assert.equal(action(tree, 'Link this wallet to my OPAGO account'), undefined);
   action(tree, 'Sign out of OPAGO').props.onPress(); tree = await f.settle();
   assert.match(content(tree), /Signed out of this wallet/); assert.equal(await f.store.read(f.slot), null);
@@ -36,7 +38,7 @@ test('production screen authenticates with the broker and offers client logout w
 });
 for (const event of ['lock', 'unlock', 'blur', 'wallet', 'spark', 'unmount', 'local', 'cancel']) test('screen ignores delayed browser results after ' + event, async t => {
   let finish; const f = screen(t, { open: () => new Promise(r => { finish = r; }) });
-  f.render(); await f.settle(); action(f.render(), 'Sign in').props.onPress(); await tick();
+  f.render(); await f.settle(); action(f.render(), 'Sign in or register').props.onPress(); await tick();
   if (event === 'lock') { f.auth.isLocked = true; f.wallet.lock(); }
   if (event === 'unlock') f.wallet.unlock();
   if (event === 'blur') f.blur();
@@ -56,11 +58,11 @@ test('background during configuration aborts and cannot open a website later', a
   let resolve; const f = screen(t, { http: () => new Promise(r => { resolve = r; }) });
   f.render(); f.change('inactive'); f.render(); resolve({ status: 503, body: '' }); await f.settle();
   assert.equal(f.opened.length, 0); f.change('active');
-  assert.equal(action(f.render(), 'Sign in').props.disabled, true);
+  assert.equal(action(f.render(), 'Sign in or register').props.disabled, true);
 });
 test('browser failure is safe, retryable and keeps local wallet navigation available', async t => {
   const f = screen(t, { open: async () => { throw new Error('private backend error'); } });
-  f.render(); await f.settle(); action(f.render(), 'Sign in').props.onPress(); const tree = await f.settle();
+  f.render(); await f.settle(); action(f.render(), 'Sign in or register').props.onPress(); const tree = await f.settle();
   assert.match(tree.props.error, /temporarily unavailable/); assert.doesNotMatch(tree.props.error, /private backend/);
   assert.equal(action(tree, 'Check again').props.disabled, false); assert.ok(action(tree, 'Continue using my wallet'));
 });
@@ -98,6 +100,6 @@ test('new browser copy is translated for every supported non-English language', 
   const { signupMessages } = require('../lib/i18n/signup-messages.ts');
   const source = fs.readFileSync(path.join(__dirname, '../components/opago/public-account-screen.tsx'), 'utf8');
   const copy = [...source.matchAll(/(?:label=|setNotice\()["']([^"']+)["']/g)].map(match => match[1]);
-  copy.push(account.websiteAccountMessage(), 'Sign in to your existing account in the OPAGO browser window.');
+  copy.push(account.websiteAccountMessage(), 'Sign in or create your account on the OPAGO website. Your browser handles your password and security checks.');
   for (const language of ['de', 'fr', 'es', 'it']) for (const key of copy) assert.ok(signupMessages(language)[key], language + ': ' + key);
 });
