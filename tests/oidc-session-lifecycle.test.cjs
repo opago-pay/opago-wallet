@@ -107,3 +107,59 @@ test('failed refresh releases its flight and preserves the previous saved sessio
   f.platform.token = async () => f.tokens('first-account');
   assert.equal((await f.login.refresh()).subject, 'first-account');
 });
+
+
+test('central logout removes credentials before transport, coalesces adapters and fences new login/refresh', async () => {
+  const f = fixture(); await f.login.login(false);
+  const started = deferred(); const release = deferred(); let calls = 0;
+  f.platform.endSession = async (config, hint) => {
+    calls++; assert.equal(config.clientId, 'synthetic-wallet'); assert.equal(hint, 'synthetic-id');
+    assert.equal(await f.store.read(f.slot), null); started.resolve(); await release.promise;
+  };
+  const one = f.login.logout(); const two = f.adapter().logout(); await started.promise;
+  await assert.rejects(f.adapter().login(false), error => error.code === 'account_logout_pending');
+  await assert.rejects(f.adapter().refresh(), error => error.code === 'account_logout_pending');
+  release.resolve(); await Promise.all([one, two]);
+  assert.equal(calls, 1); assert.equal(await f.store.read(f.slot + '.pending-logout'), null);
+  await f.adapter().login(false);
+});
+
+test('failed global logout keeps only a secure retry hint across adapters for explicit retry', async () => {
+  const f = fixture(); await f.login.login(false);
+  f.platform.endSession = async () => { throw new Error('transport secret'); };
+  await assert.rejects(f.login.logout(), error => error.code === 'account_logout_pending' && !error.message.includes('secret'));
+  assert.equal(await f.store.read(f.slot), null);
+  assert.deepEqual(await f.store.read(f.slot + '.pending-logout'), { clientId: 'synthetic-wallet', idToken: 'synthetic-id' });
+  let calls = 0; f.platform.endSession = async (_config, hint) => { calls++; assert.equal(hint, 'synthetic-id'); };
+  await f.adapter().logout(); assert.equal(calls, 1);
+  assert.equal(await f.store.read(f.slot + '.pending-logout'), null);
+  await f.adapter().logout(); assert.equal(calls, 1);
+  await f.adapter().login(true);
+});
+
+
+test('new login after unconfirmed logout requires fresh authentication and replaces the retry hint only on success', async () => {
+  const f = fixture(); await f.login.login(false);
+  f.platform.endSession = async () => { throw new Error('offline'); };
+  await assert.rejects(f.login.logout());
+  const browser = f.platform.browser;
+  f.platform.browser = async (...args) => {
+    const query = new URL(args[0]).searchParams;
+    assert.equal(query.get('prompt'), 'login'); assert.equal(query.get('max_age'), '0');
+    assert.ok(await f.store.read(f.slot + '.pending-logout'));
+    return browser(...args);
+  };
+  await f.adapter().login(false);
+  assert.equal(await f.store.read(f.slot + '.pending-logout'), null);
+  assert.ok(await f.store.read(f.slot));
+});
+
+test('logout during a credential write retains the new ID hint for central revocation', async () => {
+  const f = fixture(); const writing = deferred(); const release = deferred();
+  const write = f.store.write.bind(f.store); let first = true; let calls = 0;
+  f.store.write = async (...args) => { if (first) { first = false; writing.resolve(); await release.promise; } await write(...args); };
+  f.platform.endSession = async (_config, hint) => { calls++; assert.equal(hint, 'synthetic-id'); };
+  const rejected = assert.rejects(f.login.login(false), /cancelled/); await writing.promise;
+  const logout = f.adapter().logout(); release.resolve(); await Promise.all([rejected, logout]);
+  assert.equal(calls, 1); assert.equal(await f.store.read(f.slot), null);
+});
