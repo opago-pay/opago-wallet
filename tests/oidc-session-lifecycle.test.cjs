@@ -107,3 +107,66 @@ test('failed refresh releases its flight and preserves the previous saved sessio
   f.platform.token = async () => f.tokens('first-account');
   assert.equal((await f.login.refresh()).subject, 'first-account');
 });
+
+
+test('client logout removes credentials before transport, coalesces adapters and fences new login/refresh', async () => {
+  const f = fixture(); await f.login.login(false);
+  const started = deferred(); const release = deferred(); let calls = 0;
+  f.platform.revokeSession = async (config, hint) => {
+    calls++; assert.equal(config.clientId, 'synthetic-wallet'); assert.deepEqual(hint, { accessToken: 'first-account', refreshToken: 'synthetic-refresh-first-account' });
+    assert.equal(await f.store.read(f.slot), null); started.resolve(); await release.promise;
+  };
+  const one = f.login.logout(); const two = f.adapter().logout(); await started.promise;
+  await assert.rejects(f.adapter().login(false), error => error.code === 'account_logout_pending');
+  await assert.rejects(f.adapter().refresh(), error => error.code === 'account_logout_pending');
+  release.resolve(); await Promise.all([one, two]);
+  assert.equal(calls, 1); assert.equal(await f.store.read(f.slot + '.pending-client-logout'), null);
+  await f.adapter().login(false);
+});
+
+test('failed client logout retains secure revocation records across adapters for explicit retry', async () => {
+  const f = fixture(); await f.login.login(false);
+  f.platform.revokeSession = async () => { throw new Error('transport secret'); };
+  await assert.rejects(f.login.logout(), error => error.code === 'account_logout_pending' && !error.message.includes('secret'));
+  assert.equal(await f.store.read(f.slot), null);
+  assert.deepEqual(await f.store.read(f.slot + '.pending-client-logout'), [{ clientId: 'synthetic-wallet', tokens: { accessToken: 'first-account', refreshToken: 'synthetic-refresh-first-account' } }]);
+  const exchange = f.platform.token;
+  f.platform.token = async () => { assert.fail('pending revocation tokens must not refresh'); };
+  await assert.rejects(f.adapter().refresh(), /Sign in/); f.platform.token = exchange;
+  let calls = 0; f.platform.revokeSession = async (_config, hint) => { calls++; assert.deepEqual(hint, { accessToken: 'first-account', refreshToken: 'synthetic-refresh-first-account' }); };
+  await f.adapter().logout(); assert.equal(calls, 1);
+  assert.equal(await f.store.read(f.slot + '.pending-client-logout'), null);
+  await f.adapter().logout(); assert.equal(calls, 1);
+  await f.adapter().login(true);
+});
+
+
+test('new login after unconfirmed logout requires fresh authentication and preserves old revocation records', async () => {
+  const f = fixture(); await f.login.login(false);
+  f.platform.revokeSession = async () => { throw new Error('offline'); };
+  await assert.rejects(f.login.logout());
+  const browser = f.platform.browser;
+  f.platform.browser = async (...args) => {
+    const query = new URL(args[0]).searchParams;
+    assert.equal(query.get('prompt'), 'login'); assert.equal(query.get('max_age'), '0');
+    assert.ok(await f.store.read(f.slot + '.pending-client-logout'));
+    return browser(...args);
+  };
+  f.platform.token = async () => f.tokens('second-account');
+  await f.adapter().login(false);
+  assert.ok(await f.store.read(f.slot + '.pending-client-logout'));
+  const revoked = []; f.platform.revokeSession = async (_config, tokens) => revoked.push(tokens.accessToken);
+  await f.adapter().logout();
+  assert.deepEqual(revoked, ['first-account', 'second-account']);
+  assert.equal(await f.store.read(f.slot + '.pending-client-logout'), null);
+});
+
+test('logout during a credential write retains the new client tokens for revocation', async () => {
+  const f = fixture(); const writing = deferred(); const release = deferred();
+  const write = f.store.write.bind(f.store); let first = true; let calls = 0;
+  f.store.write = async (...args) => { if (first) { first = false; writing.resolve(); await release.promise; } await write(...args); };
+  f.platform.revokeSession = async (_config, hint) => { calls++; assert.deepEqual(hint, { accessToken: 'first-account', refreshToken: 'synthetic-refresh-first-account' }); };
+  const rejected = assert.rejects(f.login.login(false), /cancelled/); await writing.promise;
+  const logout = f.adapter().logout(); release.resolve(); await Promise.all([rejected, logout]);
+  assert.equal(calls, 1); assert.equal(await f.store.read(f.slot), null);
+});

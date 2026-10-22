@@ -3,11 +3,13 @@ import { getRandomValues } from 'expo-crypto';
 import { nativeHkaHttp } from './hka-http-native';
 import { parseStrictJson } from './encoding';
 import type { OidcPlatform } from './oidc';
+import { revokeWalletBrokerSession } from './broker-logout';
 import { walletSession } from '../wallet-session';
 
 /** Browser auth uses PKCE and secure device randomness, never a client secret. */
 export function nativeOidcPlatform(verify: OidcPlatform['verify']): OidcPlatform {
   return { start: () => walletSession.captureRuntime(), randomBytes: length => getRandomValues(new Uint8Array(length)), verify,
+    revokeSession: (config, tokens) => revokeWalletBrokerSession(nativeHkaHttp, config, tokens),
     async browser(url, redirectUri) {
       // A trusted external login may background the app; it never authorizes a payment.
       const session = walletSession.beginDeviceAuthentication(true);

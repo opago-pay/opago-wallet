@@ -2,8 +2,11 @@ import { sha256 } from '@noble/hashes/sha256';
 import { base64url as encodeBase64url } from './encoding';
 import type { AccountCredential, AccountLogin } from './account';
 import type { PrivateStore } from './store';
+import { OpagoError } from './api';
 
 export type OidcConfig = { issuer: string; clientId: string; redirectUri: string; authorizationEndpoint: string; tokenEndpoint: string };
+export type OidcRevocationTokens = { accessToken: string; refreshToken?: string };
+type PendingRevocation = { clientId: string; tokens: OidcRevocationTokens };
 type Tokens = { access_token: string; id_token: string; refresh_token?: string };
 export type VerifiedClaims = { issuer: string; audience: string; subject: string; expiresAt: number; authTime: number;
   nonce: string; emailVerified: boolean; accessAudience: string; accessExpiresAt: number };
@@ -13,11 +16,13 @@ export interface OidcPlatform {
   randomBytes(length: number): Uint8Array;
   browser(url: string, redirectUri: string): Promise<string | null>;
   token(url: string, form: URLSearchParams): Promise<Tokens>;
+  /** Native Wallet uses the broker client-revocation contract; generic test adapters may omit it. */
+  revokeSession?(config: OidcConfig, tokens: OidcRevocationTokens): Promise<void>;
   /** Must validate both tokens' signatures via trusted issuer JWKS, allowed algorithms,
    * issuer/audience/type/expiry and revocation as applicable. Never decode-only. */
   verify(tokens: Tokens, config: OidcConfig, nonce: string): Promise<VerifiedClaims>;
 }
-type SessionControl = { generation: number; writes: Promise<unknown>; loginGeneration?: number;
+type SessionControl = { generation: number; writes: Promise<unknown>; loginGeneration?: number; logout?: Promise<void>;
   refresh?: { generation: number; promise: Promise<AccountCredential> } };
 // Native runtimes can recreate adapters; coordinate all instances sharing a store/slot.
 const controls = new WeakMap<PrivateStore, Map<string, SessionControl>>();
@@ -39,9 +44,11 @@ export class OidcAccountLogin implements AccountLogin {
     }
   }
   private get slot() { return 'f3.oidc.' + this.config.issuer; }
+  private get logoutSlot() { return this.slot + '.pending-client-logout'; }
   private get control() { return sessionControl(this.store, this.slot); }
   private capture(replace = false) {
     const control = this.control;
+    if (control.logout) throw new OpagoError('account_logout_pending', true);
     if (replace) { control.generation++; control.refresh = undefined; }
     const generation = control.generation;
     const current = this.platform.start?.() || (() => {});
@@ -67,7 +74,12 @@ export class OidcAccountLogin implements AccountLogin {
       await this.store.write(this.slot, { tokens, nonce, subject: claims.subject });
       // A lock/logout/new login may arrive while secure storage is writing.
       // Cleanup stays inside the queue so it cannot erase a newer session.
-      try { active(); } catch (cause) { await this.store.remove(this.slot); throw cause; }
+      try { active(); } catch (cause) {
+        try {
+          if (this.platform.revokeSession && this.control.logout) await this.queueRevocation(tokens);
+        } finally { await this.store.remove(this.slot); }
+        throw cause;
+      }
     });
     active();
     return { accessToken: tokens.access_token, expiresAt: claims.accessExpiresAt, authTime: claims.authTime, subject: claims.subject };
@@ -76,7 +88,13 @@ export class OidcAccountLogin implements AccountLogin {
     const active = this.capture(true); active();
     const control = this.control; const generation = control.generation;
     control.loginGeneration = generation;
-    try { return await this.loginOnce(fresh, active); }
+    try {
+      await this.control.writes.catch(() => undefined); active();
+      // A failed revocation does not permanently block a new sign-in. Require
+      // fresh authentication and retain the old client-token retry record.
+      const pending = this.platform.revokeSession && await this.store.read(this.logoutSlot);
+      active(); return await this.loginOnce(fresh || !!pending, active);
+    }
     finally { if (control.loginGeneration === generation) control.loginGeneration = undefined; }
   }
   private async loginOnce(fresh: boolean, active: () => void) {
@@ -126,7 +144,40 @@ export class OidcAccountLogin implements AccountLogin {
     return this.accept(tokens, saved.nonce, false, active);
   }
   async logout() {
-    this.control.generation++; this.control.refresh = undefined;
-    await this.write(() => this.store.remove(this.slot));
+    const control = this.control;
+    if (control.logout) return control.logout;
+    control.generation++; control.refresh = undefined;
+    // Preserve generic/local-only adapters. Native always supplies revokeSession.
+    if (!this.platform.revokeSession) return this.write(() => this.store.remove(this.slot));
+    const flight = this.logoutOnce(); control.logout = flight;
+    try { await flight; } finally { if (control.logout === flight) control.logout = undefined; }
+  }
+  private async queueRevocation(tokens?: Tokens): Promise<PendingRevocation[]> {
+    const pending = await this.store.read<PendingRevocation[]>(this.logoutSlot) || [];
+    if (tokens) {
+      const record: PendingRevocation = { clientId: this.config.clientId, tokens: { accessToken: tokens.access_token,
+        ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}) } };
+      if (!pending.some(item => JSON.stringify(item) === JSON.stringify(record))) pending.push(record);
+    }
+    if (pending.length) await this.store.write(this.logoutSlot, pending);
+    return pending;
+  }
+  private async logoutOnce() {
+    // Secure retry records are separate from the active session and never used
+    // for authentication/refresh. ID tokens are not needed for client revocation.
+    const pending = await this.write(async () => {
+      const saved = await this.store.read<{ tokens: Tokens }>(this.slot);
+      try { return await this.queueRevocation(saved?.tokens); }
+      finally { await this.store.remove(this.slot); }
+    });
+    while (pending.length) {
+      const record = pending[0];
+      if (record.clientId !== this.config.clientId) throw new OpagoError('account_logout_pending', true);
+      try {
+        await this.platform.revokeSession!(this.config, record.tokens);
+        pending.shift();
+        await this.write(() => pending.length ? this.store.write(this.logoutSlot, pending) : this.store.remove(this.logoutSlot));
+      } catch { throw new OpagoError('account_logout_pending', true); }
+    }
   }
 }

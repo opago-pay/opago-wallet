@@ -407,3 +407,26 @@ test('F3: account sign-in and deletion do not require a connected Spark wallet o
   await account.deleteAccount(); assert.ok(account.state.deletion); assert.equal(account.state.session, null);
   assert.equal(backend.calls.some(c => c.path.endsWith('/auth/challenge')), false);
 });
+
+
+test('signout clears cached account authority even when both logout services fail and retries the wallet operation', async () => {
+  const { account, store, advance } = await fixture();
+  account.wait = async () => {};
+  const original = account.api.call.bind(account.api); let brokerCalls = 0; let fail = true;
+  account.api.call = async request => {
+    if (request.path === '/api/v2/wallet/auth/logout' && fail) throw new OpagoError('upstream_unavailable', true);
+    return original(request);
+  };
+  account.login.logout = async () => { brokerCalls++; if (fail) throw new OpagoError('account_logout_pending', true); };
+  await assert.rejects(account.signOut(), error => error.code === 'account_logout_pending');
+  assert.equal(brokerCalls, 1);
+  for (const field of ['credential', 'account', 'session', 'wallet']) assert.equal(account.state[field], null);
+  assert.equal(account.addressReady(), false);
+  assert.ok(await store.read(account.operationKey('logout')));
+  assert.equal(account.state.logoutPending, true);
+  advance(60000); fail = false; await account.signOut(); assert.equal(brokerCalls, 2);
+  assert.equal(account.state.logoutPending, false);
+  assert.equal(await store.read(account.operationKey('logout')), null);
+  const restored = new OpagoAccount(account.api, store, account.identity, account.login, randomUUID);
+  await restored.load(); assert.equal(restored.state.credential, null); assert.equal(restored.state.session, null);
+});

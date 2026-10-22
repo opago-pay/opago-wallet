@@ -1,3 +1,20 @@
+> **22 October update - historical checkpoint below:** AppConfig and broker
+> discovery are now publicly reachable and resolved by the Wallet runtime client
+> (#65, MVP `fad8c72`). Client-only logout uses the existing API RFC 7009 endpoint;
+> see `wallet-client-logout.md`. The earlier global-logout requirement below is
+> superseded. Neither item requires another delivery from Michael.
+>
+> API main reviewed: `738bbaf`; Compliance main reviewed:
+> `7cf4941108744c5fa2fe4d279978117d48dc4663`. The supplied
+> `docs/wallet-account-bearer.md` still describes the old realm audience
+> `opago-compliance-api`; `docs/wallet-session-store.md` describes v3 sessions for
+> an already bound wallet and explicitly has no refresh endpoint. These files
+> are not an implementation of the Wallet's v2 account/linking/renewal adapter.
+> Treat that adapter as remaining integration work: reconcile the actual v3
+> producer and service-identity routes before enabling F3. Do not translate a
+> broker credential directly into a wallet-scoped credential or declare all work
+> blocked on a missing delivery.
+
 # Wallet broker integration checkpoint — 21 October 2026
 
 Reviewed sources: Wallet `mvp-branch` `bd19d189affe0f928b79221cdbe0c44c652474da`; API
