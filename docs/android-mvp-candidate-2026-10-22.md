@@ -11,6 +11,8 @@ PR #56; it does not claim that the complete Wallet account flow is enabled.
 - Verify that development, preview, mainnet candidate and production profiles
   agree with the pinned runtime. The release APK inherits production as before.
 - Give each preview APK an incremented EAS-managed versionCode.
+- Update the public support link to `https://opago.com/portal` and the operator
+  name to `opago GmbH`. This is an informational link, not an authentication adapter.
 - Preserve preview Testnet/Regtest settings. No mainnet or account feature flag
   is enabled by this change. The preview cannot validate the mainnet-only Spark helper.
 
@@ -63,3 +65,13 @@ Record the Android export result, PR head and EAS artifact separately.
 An Android JS export is not an installable APK. A successful APK build is not
 production MVP acceptance. The EAS preview uses the existing authorized project
 and signing key; no store submission or production rollout is part of this task.
+
+## Preview snapshot
+
+EAS build `e4a0e7b6-9404-48a4-b2e5-e2cfe7524b47` uses source `2ea74c5`
+and Android versionCode 17. The source checkout was clean. EAS has no Git commit
+metadata because this upload used no-VCS mode. This preview predates the final
+support-link/operator-text correction in this PR; no account code differs.
+The build result and APK hash are recorded after completion in the PR.
+Android Hermes export passed with SHA-256
+`4b8c1690e605b543060b2a74db5c35cdf47fb95e603934f80854b44374ed93aa`.
