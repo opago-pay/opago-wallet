@@ -1,12 +1,12 @@
 # Kontakt und Rechtstexte der Wallet
 
-Stand: 3. Oktober 2026. Betreiber laut Vorgabe: **OPAGO GmbH**.
+Stand: 22. Oktober 2026. Betreiber laut Vorgabe: **opago GmbH**.
 Die URLs sind zentral in `lib/legal-links.ts` hinterlegt.
 
 | Zweck | URL |
 | --- | --- |
 | Öffentlicher Kontakt | https://www.opago.com/contact/ |
-| Supportportal | https://dashboard.opago.com/ |
+| Supportportal | https://opago.com/portal |
 | Impressum | https://www.opago.com/imprint/ |
 | Datenschutz | https://www.opago.com/wallet/privacy/ |
 | AGB | https://www.opago.com/terms/ |
@@ -17,7 +17,7 @@ Die URLs sind zentral in `lib/legal-links.ts` hinterlegt.
 - Onboarding und Wiederherstellung: Kontakt, Datenschutz, Impressum und AGB.
 - Sperrbildschirm und Wiederherstellungsfehler: Kontakt und Datenschutz, auch ohne entsperrte Wallet.
 - Externe Links öffnen über das Betriebssystem. Die App hängt keine Wallet-Daten oder Zugangsdaten an die URLs an. Die normale Sperre beim Wechsel in den Hintergrund bleibt aktiv.
-- Das Dashboard leitet aktuell auf `/login` weiter. Es wird als Supportportal mit erforderlicher Anmeldung beschriftet; der Kontakt bleibt direkt öffentlich zugänglich.
+- Das Opago Portal ist unter `/portal` erreichbar. Es wird als Supportportal mit erforderlicher Anmeldung beschriftet; der Kontakt bleibt direkt öffentlich zugänglich.
 - Linktexte und Fehlermeldungen sind auf Englisch, Deutsch, Französisch, Spanisch und Italienisch vorhanden.
 - Die angegebenen kanonischen URLs werden unabhängig von der App-Sprache verwendet. Übersetzte Linktexte bedeuten nicht, dass die Zielseite bereits in derselben Sprache vorliegt.
 - Die Links sind Informationsangebote. Die App verlangt hierdurch keine Zustimmung zu den aktuellen Händler-AGB.
