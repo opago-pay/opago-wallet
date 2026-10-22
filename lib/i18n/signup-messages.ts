@@ -1,5 +1,7 @@
 import type { AppLanguage } from './language';
 const messages: Record<string, string[]> = {
+  "Sign in or register": ["Anmelden oder registrieren", "Se connecter ou s’inscrire", "Iniciar sesión o registrarse", "Accedi o registrati"],
+  "After confirming your email, return to the browser sign-in. If the wallet locks, unlock it and start sign-in again.": ["Kehre nach der E-Mail-Bestätigung zur Anmeldung im Browser zurück. Falls sich die Wallet sperrt, entsperre sie und starte die Anmeldung erneut.", "Après avoir confirmé votre e-mail, revenez à la connexion dans le navigateur. Si le portefeuille se verrouille, déverrouillez-le et recommencez la connexion.", "Tras confirmar tu correo, vuelve al inicio de sesión del navegador. Si la cartera se bloquea, desbloquéala e inicia sesión de nuevo.", "Dopo aver confermato l’e-mail, torna all’accesso nel browser. Se il wallet si blocca, sbloccalo e riavvia l’accesso."],
   "Please sign in again.": ["Bitte melde dich erneut an.", "Veuillez vous reconnecter.", "Vuelve a iniciar sesión.", "Accedi di nuovo."],
   "Sign out of OPAGO": ["Bei OPAGO abmelden", "Se déconnecter d’OPAGO", "Cerrar sesión en OPAGO", "Esci da OPAGO"],
   "Signed in to OPAGO.": ["Bei OPAGO angemeldet.","Connecté à OPAGO.","Sesión iniciada en OPAGO.","Accesso a OPAGO effettuato."],

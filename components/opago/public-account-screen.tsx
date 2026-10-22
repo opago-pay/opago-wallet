@@ -73,10 +73,10 @@ export function PublicAccountScreen() {
     <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
     {visible && <>
       <Card title="Account sign-in">
-        <Copy>{t('Sign in to your existing account in the OPAGO browser window.')}</Copy>
+        <Copy>{t('Sign in or create your account on the OPAGO website. Your browser handles your password and security checks.')}</Copy>
         {notice && <Copy>{t(notice)}</Copy>}
-        <Action label="Sign in" disabled={busy || signedIn || expiresAt <= Date.now()} onPress={() => void execute('login')} />
-        {!signedIn && <Copy>{t('Registration from the wallet is not available yet.')}</Copy>}
+        <Action label="Sign in or register" disabled={busy || signedIn || expiresAt <= Date.now()} onPress={() => void execute('login')} />
+        {!signedIn && <Copy>{t('After confirming your email, return to the browser sign-in. If the wallet locks, unlock it and start sign-in again.')}</Copy>}
         {signedIn && <Copy>{t('Your account is signed in. Linking this wallet is a separate step.')}</Copy>}
         <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void execute('logout')} />
         <Action label="Check again" disabled={busy} onPress={() => void execute('check')} />
