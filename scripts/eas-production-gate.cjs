@@ -12,8 +12,8 @@ if (!['production', 'production-apk', 'mainnet-candidate'].includes(process.env.
   process.stdout.write(`Skipping release gate for ${process.env.EAS_BUILD_PROFILE}.\n`);
   process.exit(0);
 }
-if (process.version !== 'v22.23.1') {
-  throw new Error(`Release gate requires Node 22.23.1; found ${process.version}.`);
+if (process.version !== 'v22.23.4') {
+  throw new Error(`Release gate requires Node 22.23.4; found ${process.version}.`);
 }
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('npm CLI path is unavailable on the EAS build worker.');

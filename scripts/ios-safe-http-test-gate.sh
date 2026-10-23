@@ -43,7 +43,7 @@ app.expo.ios.bundleIdentifier = process.env.OPAGO_TEST_BUNDLE_ID;
 app.expo.name = 'Opago Safe HTTP Test';
 fs.writeFileSync(file, `${JSON.stringify(app, null, 2)}\n`);
 NODE
-  [[ "$(node --version)" == v22.23.1 ]] || { echo 'Node 22.23.1 required' >&2; exit 2; }
+  [[ "$(node --version)" == v22.23.4 ]] || { echo 'Node 22.23.4 required' >&2; exit 2; }
   npm ci
   npx expo prebuild --platform ios --no-install
   python3 - <<'PY'
@@ -74,7 +74,7 @@ if [[ "$mode" == run || "$mode" == unit ]]; then
   if [[ "$mode" == run ]]; then
     node scripts/validate-ios-safe-http-fixtures.cjs modules/opago-safe-http/ios/Tests/Fixtures.json
   fi
-  [[ "$(node --version)" == v22.23.1 ]] || { echo 'Node 22.23.1 required' >&2; exit 2; }
+  [[ "$(node --version)" == v22.23.4 ]] || { echo 'Node 22.23.4 required' >&2; exit 2; }
   scheme_json="$(xcodebuild -list -json -project ios/Pods/Pods.xcodeproj)"
   selection="$(printf '%s' "$scheme_json" | node scripts/select-ios-safe-http-test-scheme.cjs)" || {
     echo 'OpagoSafeHttp XCTest scheme/target missing or ambiguous' >&2; exit 1;
