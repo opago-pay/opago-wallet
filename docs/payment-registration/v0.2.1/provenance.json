@@ -1,0 +1,8 @@
+{
+  "version": "0.2.1",
+  "source_repository": "opago-pay/opago-compliance",
+  "source_commit": "25de377fcf73d653315fa3595f83d38e7b938137",
+  "facade_source_commit": "b5f6bbf1b6767bbb1cec8de36901c4fe70e832f7",
+  "schema_sha256_lf": "2c90e8a51434f9a96f2d1106e0213d6c7291725a0cbde47186d54b9022306c87",
+  "scope": "Only the four accepted v2 payment-registration routes; F3 0.2.0 snapshot remains immutable"
+}

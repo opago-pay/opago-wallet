@@ -1,4 +1,5 @@
 {
+  "OPAGO POS payments are not supported in this release. The required payer verification is not available yet. No payment was sent.": "Questa versione non supporta ancora i pagamenti OPAGO POS. La verifica richiesta del pagatore non è ancora disponibile. Nessun pagamento è stato inviato.",
   "System": "Sistema",
   "Dark": "Scuro",
   "Use your device setting or choose a background.": "Usa l’impostazione del dispositivo o scegli un aspetto.",

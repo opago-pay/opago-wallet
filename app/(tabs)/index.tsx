@@ -1,3 +1,4 @@
+import { sparkTransferAmount } from '@/lib/lightning/transfer-amount';
 import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -305,8 +306,8 @@ export default function HomeScreen() {
               const incoming = String(transfer.transferDirection).toUpperCase() === 'INCOMING';
               // Spark's outgoing transfer total can include the routing fee. The
               // saved payment request contains the amount sent to the recipient.
-              const amount = !incoming && hash ? journalAmounts.get(hash) ?? Math.abs(Number(transfer.totalValue) || 0)
-                : Math.abs(Number(transfer.totalValue) || 0);
+              const amount = !incoming && hash ? journalAmounts.get(hash) ?? sparkTransferAmount(transfer)
+                : sparkTransferAmount(transfer);
               if (amount <= 0) return [];
               const key = hash ? 'ln:' + hash : 'spark:' + String(transfer.id || 'unknown');
               return [{

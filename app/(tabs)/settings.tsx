@@ -29,6 +29,7 @@ import { BackupStatusNotice } from '@/components/security/backup-prompt';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { ColorModePicker } from '@/components/settings/color-mode-picker';
 import { SecurityOptions } from '@/components/settings/security-options';
+import { Action as OpagoAction } from '@/components/opago/opago-ui';
 import { KeyboardDoneAccessory } from '@/components/ui/keyboard-done-accessory';
 import { DiagnosticsConsentPanel } from '@/components/settings/diagnostics-consent';
 import { getSettingsSection, SettingsMenu, settingsSectionTitle, type SettingsSection } from '@/components/settings/settings-menu';
@@ -405,6 +406,7 @@ export default function SettingsScreen() {
       <SettingsTransition screen={activeSection}>
       {activeSection === 'overview' && <SettingsMenu backupChecked={backupChecked} backupLoading={backupStatus === 'loading'}
         disabled={busy} onSelect={navigateToSection} onLock={lockWallet} />}
+      {activeSection === 'overview' && <OpagoAction label="OPAGO account and Lightning address" disabled={busy} onPress={() => router.push('/opago-account')} />}
 
       {activeSection === 'security' && <>
       {backupStatus === 'loading' ? <View style={styles.backupCard}><BackupStatusNotice /></View> : <View style={styles.backupCard}>

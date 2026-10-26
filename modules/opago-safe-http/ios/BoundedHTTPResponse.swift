@@ -5,9 +5,11 @@ struct SafeHTTPResponse {
   let contentType: String
   let body: String
   let retryAfter: String
+  let cacheControl: String
+  let requestId: String
 
   var bridgeValue: [String: Any] {
-    ["status": status, "contentType": contentType, "body": body, "retryAfter": retryAfter]
+    ["status": status, "contentType": contentType, "body": body, "retryAfter": retryAfter, "cacheControl": cacheControl, "requestId": requestId]
   }
 }
 
@@ -21,6 +23,9 @@ final class BoundedHTTPResponse {
   private var status: Int?
   private var contentType = ""
   private var retryAfter = ""
+  private var cacheControl = ""
+  private var requestId = ""
+  private var seenRequestId = false
   private var contentLength: Int?
   private var chunked = false
   private let headerLimit = 16_384
@@ -100,6 +105,13 @@ final class BoundedHTTPResponse {
       case "retry-after":
         guard retryAfter.isEmpty else { throw SafeHTTPFailure.rejected }
         retryAfter = value
+      case "cache-control":
+        guard cacheControl.isEmpty else { throw SafeHTTPFailure.rejected }
+        cacheControl = value
+      case "x-request-id":
+        guard !seenRequestId else { throw SafeHTTPFailure.rejected }
+        seenRequestId = true
+        requestId = value
       case "content-type":
         guard !seenContentType else { throw SafeHTTPFailure.rejected }
         seenContentType = true
@@ -154,6 +166,6 @@ final class BoundedHTTPResponse {
   private func result(_ bytes: Data) throws -> SafeHTTPResponse {
     guard bytes.count <= maxBytes, let status,
           let text = String(data: bytes, encoding: .utf8) else { throw SafeHTTPFailure.rejected }
-    return SafeHTTPResponse(status: status, contentType: contentType, body: text, retryAfter: retryAfter)
+    return SafeHTTPResponse(status: status, contentType: contentType, body: text, retryAfter: retryAfter, cacheControl: cacheControl, requestId: requestId)
   }
 }

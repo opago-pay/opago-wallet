@@ -1,0 +1,14 @@
+{
+  "document": {
+    "active_kid": "prod-20260930-2c9dff0d098354f2",
+    "audience": "https://api.opago.com",
+    "issued_at": "2026-10-19T17:51:13Z",
+    "keys": [{
+      "kid": "prod-20260930-2c9dff0d098354f2",
+      "not_after": "2027-04-30T00:00:00Z",
+      "public_key": "O1j09kyNRa6_K322Xb0TdRnFkK1LbhdIwBUw1_XajGM"
+    }]
+  },
+  "signature": "4zs3nE1LHQcAKTFQYTdHlrPMF-9FsqFovGEuuXIy_O68JAaSfbg-F8k906oTDuDQ2yjhajvSVzNZyoWRZJLrCQ",
+  "signing_key_id": "opago-hpke-root-1"
+}

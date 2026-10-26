@@ -1,6 +1,6 @@
 # Wallet dependency security update — 21 October 2026
 
-Target: **main** (base 1aed902). This change is separate from Portal integration.
+Target: **mvp-branch** (base bd19d18). This change is separate from Portal integration.
 The Spark SDK version stays on the branch's existing version (main 0.7.12;
 MVP 0.14.0). No native SDK migration or production activation is included.
 

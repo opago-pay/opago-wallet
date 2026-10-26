@@ -1,10 +1,10 @@
 import { appConfig } from './config';
 import { walletSession } from './wallet-session';
 
-type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string };
+type NativeResponse = { status: number; contentType: string; body: string; retryAfter?: string; cacheControl?: string; requestId?: string };
 type NativeTransport = {
   request(options: { url: string; method: string; headers: Record<string, string>; body: string;
-    maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
+    bodyEncoding?: 'base64'; maxBytes: number; timeoutMs: number; allowPrivateDevelopment: boolean; requestId: string }): Promise<NativeResponse>;
   cancel(requestId: string): Promise<void>;
 };
 
@@ -23,12 +23,14 @@ function aborted(): Error {
 }
 
 export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_097_152,
-  trustedFixedOrigin = false): Promise<Response> {
+  trustedFixedOrigin = false, photo?: { base64: string; timeoutMs: number }): Promise<Response> {
+  if (photo && (!isNativeRuntime() || init.method !== 'POST' || init.body || !/^https:\/\/[^/?#]+\/api\/v2\/onboarding\/kyc\/[0-9a-f-]{36}\/documents\?/.test(url) ||
+      photo.base64.length > 13981056 || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo.base64))) throw new Error('Invalid encrypted photo transport.');
   if (!isNativeRuntime()) return globalThis.fetch(url, { ...init, redirect: 'error' });
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const native: NativeTransport | null = require('expo-modules-core').requireOptionalNativeModule('OpagoSafeHttp');
   if (!native) {
-    if (trustedFixedOrigin) {
+    if (trustedFixedOrigin && !photo) {
       // Compatibility only for fixed provider origins when the iOS module is absent.
       // QR/LNURL/OCP-controlled URLs never receive this exception.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -37,8 +39,9 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
     throw new Error('Secure network transport is unavailable on this device.');
   }
   const method = (init.method || 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'POST') throw new Error('Unsupported secure request method.');
+  if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method)) throw new Error('Unsupported secure request method.');
   if (init.body != null && typeof init.body !== 'string') throw new Error('Unsupported secure request body.');
+  if (['GET', 'DELETE'].includes(method) && init.body) throw new Error('Secure read/delete uses an envelope header.');
   if (init.signal?.aborted) throw aborted();
   const headers: Record<string, string> = {};
   new Headers(init.headers).forEach((value, key) => { headers[key] = value; });
@@ -53,8 +56,9 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
   const unsubscribeSession = walletSession.subscribe(onAbort);
   try {
     if (init.signal?.aborted) throw aborted();
-    const result = await native.request({ url, method, headers, body: (init.body as string) || '',
-      maxBytes, timeoutMs: 12_000, allowPrivateDevelopment: appConfig.allowInsecureHttp, requestId });
+    const result = await native.request({ url, method, headers, body: photo?.base64 || (init.body as string) || '',
+      ...(photo ? { bodyEncoding: 'base64' as const } : {}),
+      maxBytes, timeoutMs: photo ? Math.min(120_000, Math.max(1, photo.timeoutMs)) : 12_000, allowPrivateDevelopment: appConfig.allowInsecureHttp, requestId });
     if (wasAborted) throw aborted();
     if (!Number.isInteger(result.status) || result.status < 100 || result.status > 599 ||
       typeof result.body !== 'string' || typeof result.contentType !== 'string') {
@@ -64,7 +68,13 @@ export async function strictFetch(url: string, init: RequestInit, maxBytes = 2_0
     if (typeof result.retryAfter === 'string' && result.retryAfter) {
       responseHeaders['retry-after'] = result.retryAfter;
     }
-    const response = new Response(result.body, {
+    if (typeof result.cacheControl === 'string') responseHeaders['cache-control'] = result.cacheControl;
+    if (typeof result.requestId === 'string' && result.requestId) responseHeaders['x-request-id'] = result.requestId;
+    // Fetch forbids a body (even an empty string) for these HTTP statuses.
+    // In particular the public account logout returns 204, not a JSON object.
+    const bodyless = [204, 205, 304].includes(result.status);
+    if (bodyless && result.body !== '') throw new Error('Secure network transport returned an unexpected response body.');
+    const response = new Response(bodyless ? null : result.body, {
       status: result.status,
       headers: responseHeaders,
     });

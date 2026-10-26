@@ -26,6 +26,16 @@ if (apkProfile?.extends !== 'production' ||
 }
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 const app = JSON.parse(readFileSync(join(__dirname, '..', 'app.json'), 'utf8'));
+// Keep cloud and local release gates on the same patched runtime, including APK previews.
+const nodeVersion = pkg.engines?.node;
+if (nodeVersion !== '22.23.4' ||
+    ['development', 'preview', 'mainnet-candidate', 'production'].some(name => eas.build?.[name]?.node !== nodeVersion)) {
+  throw new Error('All EAS build profiles must use the pinned Node 22.23.4 runtime.');
+}
+if (eas.build.preview.autoIncrement !== true) {
+  throw new Error('Preview APKs must receive a new remote versionCode for device acceptance.');
+}
+
 if (eas.cli?.appVersionSource !== 'remote' || profile.autoIncrement !== true) {
   throw new Error('EAS production version source and autoIncrement must be configured.');
 }

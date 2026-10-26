@@ -1,0 +1,3296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.opago-internal.invalid/tx-foundation-v3/schemas.json",
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "Timestamp": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30,
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$(?!\\n)"
+    },
+    "Asset": {
+      "type": "string",
+      "enum": [
+        "BTC",
+        "HBAR"
+      ]
+    },
+    "Rail": {
+      "type": "string",
+      "enum": [
+        "lightning",
+        "spark",
+        "hedera"
+      ],
+      "description": "Settlement rail. lightning and spark carry BTC; hedera carries HBAR."
+    },
+    "Direction": {
+      "type": "string",
+      "enum": [
+        "incoming",
+        "outgoing"
+      ]
+    },
+    "WalletSource": {
+      "type": "string",
+      "enum": [
+        "lnbits",
+        "spark",
+        "hedera"
+      ]
+    },
+    "CustodyType": {
+      "type": "string",
+      "enum": [
+        "custodial",
+        "non_custodial",
+        "unknown"
+      ],
+      "description": "Set by the server from the internal wallet record. A client never supplies it."
+    },
+    "HederaNetwork": {
+      "type": "string",
+      "enum": [
+        "testnet",
+        "mainnet"
+      ]
+    },
+    "HederaAccountId": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]{0,18})\\.(0|[1-9][0-9]{0,18})\\.(0|[1-9][0-9]{0,18})$(?!\\n)",
+      "description": "Hedera account ID shard.realm.num."
+    },
+    "HederaTransactionId": {
+      "type": "string",
+      "minLength": 9,
+      "maxLength": 160,
+      "pattern": "^(0|[1-9][0-9]{0,18})\\.(0|[1-9][0-9]{0,18})\\.(0|[1-9][0-9]{0,18})@[0-9]{1,19}\\.[0-9]{1,9}$(?!\\n)",
+      "description": "Hedera transaction ID payer@seconds.nanos."
+    },
+    "HexPublicKey": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 66,
+      "pattern": "^([0-9a-f]{64}|[0-9a-f]{66})$(?!\\n)",
+      "description": "Lowercase hex public key: 32 bytes (64 hex) or a 33-byte compressed key (66 hex)."
+    },
+    "OpaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[\\x21-\\x7E]{1,255}$(?!\\n)",
+      "description": "Opaque printable ASCII identifier without spaces."
+    },
+    "PaymentHash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$(?!\\n)"
+    },
+    "Bolt11": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384,
+      "pattern": "^((lnbc|lntb|lntbs|lnbcrt)[0-9a-z]+|(LNBC|LNTB|LNTBS|LNBCRT)[0-9A-Z]+)$(?!\\n)",
+      "description": "BOLT11 payment request, entirely lowercase or entirely uppercase (BOLT 11, Bech32); mixed case is rejected."
+    },
+    "AmountMsat": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 9007199254740991,
+      "multipleOf": 1000
+    },
+    "ReportedAmountMsat": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "Absolute wallet-reported amount in msat. Always positive; the direction gives the sign of the canonical amount."
+    },
+    "ReportedAmountTinybar": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "Absolute wallet-reported amount in tinybar. Always positive."
+    },
+    "SignedAmount": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "not": {
+        "const": 0
+      },
+      "description": "Canonical signed amount: positive for incoming, negative for outgoing."
+    },
+    "FiatAmount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 15,
+      "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$(?!\\n)",
+      "description": "Fiat amount as a decimal string with at most two fraction digits; must be greater than zero.",
+      "not": {
+        "pattern": "^0(\\.0{1,2})?$(?!\\n)"
+      }
+    },
+    "FiatCurrency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3,
+      "pattern": "^[A-Z]{3}$(?!\\n)",
+      "description": "ISO 4217 fiat currency code; Bitcoin units use amount_msat.",
+      "not": {
+        "enum": [
+          "BTC",
+          "SAT",
+          "XBT"
+        ]
+      }
+    },
+    "PaymentStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "settled",
+        "failed",
+        "canceled"
+      ],
+      "description": "Normalized payment status (wallet-tme-shadow-mode.md, Path B)."
+    },
+    "VerificationStatus": {
+      "type": "string",
+      "enum": [
+        "wallet_reported",
+        "verified"
+      ],
+      "description": "OPAGO verification status, separate from the wallet's final SDK status."
+    },
+    "Resolution": {
+      "type": "string",
+      "enum": [
+        "unresolved",
+        "quarantined",
+        "linked",
+        "non_payment"
+      ],
+      "description": "Current evidence resolution (payment-registration-data-model.md, payment_evidence_resolutions)."
+    },
+    "ReportIdSource": {
+      "type": "string",
+      "enum": [
+        "SPARK_TRANSFER_ID",
+        "SPARK_LIGHTNING_REQUEST_ID",
+        "HEDERA_TRANSACTION_ID"
+      ]
+    },
+    "Empty": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "properties": {
+        "registration_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "retry_after_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "asset": {
+          "$ref": "#/$defs/Asset"
+        },
+        "rail": {
+          "$ref": "#/$defs/Rail"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "JSON pointer or header name of an invalid input."
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Closed set of detail keys. A new key is a contract change (spec.md section 4)."
+    },
+    "ErrorCode": {
+      "type": "string",
+      "enum": [
+        "invalid_request",
+        "challenge_invalid",
+        "payment_request_invalid",
+        "forbidden",
+        "custodial_not_licensed",
+        "tme_rejected",
+        "kyc_level_insufficient",
+        "travel_rule_unidentified",
+        "registration_cancelled",
+        "registration_not_found",
+        "not_found",
+        "idempotency_conflict",
+        "payment_exists",
+        "registration_paid",
+        "wallet_already_bound",
+        "wallet_inactive",
+        "custody_unknown",
+        "address_taken",
+        "asset_not_enabled",
+        "rail_not_enabled",
+        "tme_pending",
+        "tme_unavailable",
+        "upstream_unavailable",
+        "upstream_timeout"
+      ]
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "$ref": "#/$defs/ErrorCode"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "details": {
+              "$ref": "#/$defs/ErrorDetails"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "details"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "tme_pending",
+                      "tme_unavailable",
+                      "upstream_unavailable",
+                      "upstream_timeout"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "retryable": {
+                    "const": true
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "retryable": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "request_id": {
+          "$ref": "#/$defs/Uuid"
+        }
+      },
+      "required": [
+        "error",
+        "request_id"
+      ],
+      "additionalProperties": false
+    },
+    "CreateWalletChallenge": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wallet_source": {
+              "const": "spark"
+            },
+            "identity_public_key": {
+              "$ref": "#/$defs/HexPublicKey"
+            },
+            "purpose": {
+              "const": "bind"
+            }
+          },
+          "required": [
+            "wallet_source",
+            "identity_public_key",
+            "purpose"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_source": {
+              "const": "hedera"
+            },
+            "network": {
+              "$ref": "#/$defs/HederaNetwork"
+            },
+            "account_id": {
+              "$ref": "#/$defs/HederaAccountId"
+            },
+            "public_key": {
+              "$ref": "#/$defs/HexPublicKey"
+            },
+            "purpose": {
+              "const": "bind"
+            }
+          },
+          "required": [
+            "wallet_source",
+            "network",
+            "account_id",
+            "public_key",
+            "purpose"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "const": "session"
+            },
+            "wallet_id": {
+              "$ref": "#/$defs/Uuid"
+            },
+            "installation_id": {
+              "$ref": "#/$defs/Uuid"
+            }
+          },
+          "required": [
+            "purpose",
+            "wallet_id",
+            "installation_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WalletChallenge": {
+      "type": "object",
+      "properties": {
+        "challenge_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "bind",
+            "session"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^opago-tx-foundation-v3\npurpose:(bind|session)\ntenant:[\\x21-\\x7E]{1,128}\nsubject:[\\x21-\\x7E]{1,255}\nwallet_source:(spark|hedera)\nsource_wallet_id:[\\x21-\\x7E]{1,255}\nnetwork:(testnet|mainnet|-)\ninstallation_id:([0-9a-f-]{36}|-)\nchallenge_id:[0-9a-f-]{36}\nnonce:[0-9a-f]{64}\nexpires_at:\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$(?!\\n)",
+          "description": "Exact UTF-8 text to sign (spec.md 5.4). Its purpose, challenge_id and expires_at lines MUST equal the sibling fields; the server enforces this and the tests check it on the vectors."
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "challenge_id",
+        "purpose",
+        "message",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "Signature": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[\\x21-\\x7E]+$(?!\\n)",
+      "description": "Signature over the challenge message as printable ASCII without spaces. The algorithm and encoding per wallet source are an open question (spec.md, OQ-AUTH-1); the field stays opaque until then."
+    },
+    "BindWallet": {
+      "type": "object",
+      "properties": {
+        "challenge_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "signature": {
+          "$ref": "#/$defs/Signature"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "challenge_id",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "Wallet": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "wallet_source": {
+          "$ref": "#/$defs/WalletSource"
+        },
+        "source_wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Immutable source identity (payment-registration-data-model.md, wallets): the Hedera account ID or the Spark identity public key. The network is not part of the governing identity key (OQ-BIND-6)."
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HederaNetwork"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "custody_type": {
+          "$ref": "#/$defs/CustodyType"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "inactive",
+            "deleted"
+          ]
+        },
+        "ownership_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purpose": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "INBOUND",
+                "OUTBOUND",
+                "EXTERNAL",
+                "OTHER"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "wallets.type (WalletType). Only INBOUND can register incoming and only OUTBOUND can register outgoing Path A payments; EXTERNAL and OTHER cannot register. Null for Spark and Hedera wallets (OQ-BIND-3)."
+        },
+        "bound_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "deleted_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "wallet_id",
+        "wallet_source",
+        "source_wallet_id",
+        "network",
+        "custody_type",
+        "status",
+        "ownership_epoch",
+        "label",
+        "purpose",
+        "bound_at",
+        "deleted_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "deleted"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deleted_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "deleted_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wallet_source": {
+                "const": "hedera"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "network": {
+                "$ref": "#/$defs/HederaNetwork"
+              },
+              "source_wallet_id": {
+                "$ref": "#/$defs/HederaAccountId"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "network": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wallet_source": {
+                "const": "spark"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_wallet_id": {
+                "$ref": "#/$defs/HexPublicKey"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wallet_source": {
+                "const": "lnbits"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_wallet_id": {
+                "$ref": "#/$defs/OpaqueId"
+              },
+              "purpose": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "purpose": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "BoundWallet": {
+      "description": "Wallet that bindWallet creates (spec.md section 6.2): Spark or Hedera, active, custody unknown until OQ-BIND-1.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Wallet"
+        },
+        {
+          "properties": {
+            "wallet_source": {
+              "type": "string",
+              "enum": [
+                "spark",
+                "hedera"
+              ]
+            },
+            "status": {
+              "const": "active"
+            },
+            "custody_type": {
+              "const": "unknown"
+            },
+            "purpose": {
+              "type": "null"
+            },
+            "deleted_at": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "WalletList": {
+      "type": "object",
+      "properties": {
+        "wallets": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/Wallet"
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": "active"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9_-]+$(?!\\n)",
+              "description": "Opaque cursor for the next page; null on the last page."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "wallets",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "CreateWalletSession": {
+      "type": "object",
+      "properties": {
+        "challenge_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "signature": {
+          "$ref": "#/$defs/Signature"
+        }
+      },
+      "required": [
+        "challenge_id",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "WalletSession": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "installation_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "access_token": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 8192,
+          "description": "WalletBearer token. Format and lifetime: open question OQ-AUTH-2."
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "wallet_id",
+        "installation_id",
+        "access_token",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "AddressKind": {
+      "type": "string",
+      "enum": [
+        "lightning_address",
+        "spark_address",
+        "hedera_account"
+      ]
+    },
+    "CreateAddressBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "lightning_address"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 320,
+              "pattern": "^[a-z0-9._-]{1,64}@[a-z0-9.-]{1,253}$(?!\\n)"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "spark_address"
+            },
+            "value": {
+              "$ref": "#/$defs/OpaqueId"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "hedera_account"
+            },
+            "value": {
+              "$ref": "#/$defs/HederaAccountId"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AddressBinding": {
+      "type": "object",
+      "properties": {
+        "address_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "kind": {
+          "$ref": "#/$defs/AddressKind"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deactivated"
+          ]
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "deactivated_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deactivate_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "user",
+                "address_changed",
+                "wallet_closed",
+                "account_deleted"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "address_id",
+        "wallet_id",
+        "kind",
+        "value",
+        "status",
+        "created_at",
+        "deactivated_at",
+        "deactivate_reason"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "active"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deactivated_at": {
+                "type": "null"
+              },
+              "deactivate_reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "deactivated_at": {
+                "$ref": "#/$defs/Timestamp"
+              },
+              "deactivate_reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "lightning_address"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 320,
+                "pattern": "^[a-z0-9._-]{1,64}@[a-z0-9.-]{1,253}$(?!\\n)"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "spark_address"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OpaqueId"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "hedera_account"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HederaAccountId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ActiveAddressBinding": {
+      "description": "createAddressBinding result (spec.md 6.3): a new active binding.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/AddressBinding"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "active"
+            }
+          }
+        }
+      ]
+    },
+    "DeactivatedAddressBinding": {
+      "description": "deactivateAddressBinding result (spec.md 6.3): a deactivated binding with its time and reason.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/AddressBinding"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "deactivated"
+            }
+          }
+        }
+      ]
+    },
+    "AddressBindingList": {
+      "type": "object",
+      "properties": {
+        "addresses": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/AddressBinding"
+          }
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9_-]+$(?!\\n)",
+              "description": "Opaque cursor for the next page; null on the last page."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "addresses",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "CreateRegistration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "const": "incoming"
+            },
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "const": "lightning"
+            },
+            "amount_msat": {
+              "$ref": "#/$defs/AmountMsat"
+            },
+            "wallet_id": {
+              "$ref": "#/$defs/Uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "direction",
+            "asset",
+            "rail",
+            "amount_msat",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "const": "incoming"
+            },
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "const": "lightning"
+            },
+            "amount": {
+              "$ref": "#/$defs/FiatAmount"
+            },
+            "currency": {
+              "$ref": "#/$defs/FiatCurrency"
+            },
+            "wallet_id": {
+              "$ref": "#/$defs/Uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "direction",
+            "asset",
+            "rail",
+            "amount",
+            "currency",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "const": "incoming"
+            },
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "const": "lightning"
+            },
+            "amount_msat": {
+              "$ref": "#/$defs/AmountMsat"
+            },
+            "pos_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$(?!\\n)",
+              "description": "Server-issued POS device ID (the LNbits device ID registered for the device). The POS never constructs it."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required, non-null device-local payment reference: the governing model stores it as client_reference, NOT NULL for channel pos, unique per device."
+            }
+          },
+          "required": [
+            "direction",
+            "asset",
+            "rail",
+            "amount_msat",
+            "pos_id",
+            "description",
+            "external_reference"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "const": "incoming"
+            },
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "const": "lightning"
+            },
+            "amount": {
+              "$ref": "#/$defs/FiatAmount"
+            },
+            "currency": {
+              "$ref": "#/$defs/FiatCurrency"
+            },
+            "pos_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]{1,64}$(?!\\n)",
+              "description": "Server-issued POS device ID (the LNbits device ID registered for the device). The POS never constructs it."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Required, non-null device-local payment reference: the governing model stores it as client_reference, NOT NULL for channel pos, unique per device."
+            }
+          },
+          "required": [
+            "direction",
+            "asset",
+            "rail",
+            "amount",
+            "currency",
+            "pos_id",
+            "description",
+            "external_reference"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "const": "outgoing"
+            },
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "const": "lightning"
+            },
+            "payment_request": {
+              "$ref": "#/$defs/Bolt11"
+            },
+            "wallet_id": {
+              "$ref": "#/$defs/Uuid"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 1024
+            },
+            "external_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "direction",
+            "asset",
+            "rail",
+            "payment_request",
+            "wallet_id",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Invoice": {
+      "type": "object",
+      "properties": {
+        "bolt11": {
+          "$ref": "#/$defs/Bolt11"
+        },
+        "payment_hash": {
+          "$ref": "#/$defs/PaymentHash"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "paid",
+            "expired",
+            "voided",
+            "orphaned"
+          ]
+        },
+        "expires_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "bolt11",
+        "payment_hash",
+        "seq",
+        "status",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "DispatchState": {
+      "type": "string",
+      "enum": [
+        "reserved",
+        "dispatched",
+        "succeeded",
+        "failed",
+        "unknown"
+      ]
+    },
+    "PaymentCommand": {
+      "type": "object",
+      "properties": {
+        "command_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "registration_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "pre_check_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "dispatch_state": {
+          "$ref": "#/$defs/DispatchState"
+        },
+        "payment_hash": {
+          "$ref": "#/$defs/PaymentHash"
+        },
+        "amount_msat": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reserved_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "dispatched_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "command_id",
+        "registration_id",
+        "pre_check_id",
+        "dispatch_state",
+        "payment_hash",
+        "amount_msat",
+        "transaction_id",
+        "reserved_at",
+        "dispatched_at",
+        "outcome_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dispatch_state": {
+                "const": "reserved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "dispatched_at": {
+                "type": "null"
+              },
+              "outcome_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dispatch_state": {
+                "enum": [
+                  "dispatched",
+                  "unknown",
+                  "succeeded"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "dispatched_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dispatch_state": {
+                "enum": [
+                  "dispatched",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outcome_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dispatch_state": {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outcome_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dispatch_state": {
+                "const": "succeeded"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "$ref": "#/$defs/Uuid"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "transaction_id": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Registration": {
+      "type": "object",
+      "properties": {
+        "registration_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "wallet_id": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            }
+          ],
+          "description": "The registration wallet (for a POS registration, the wallet the device was bound to at registration). Path parameter of getWalletPayment."
+        },
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "asset": {
+          "const": "BTC"
+        },
+        "rail": {
+          "const": "lightning"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "invoice_issued",
+            "expired_awaiting_refresh",
+            "paid",
+            "cancelled",
+            "rejected"
+          ]
+        },
+        "custodial": {
+          "type": "boolean"
+        },
+        "amount_msat": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payable amount in msat. For a fiat registration it is fixed by each approved pre-check and is null until then. For an outgoing registration it is the amount encoded in the payment request."
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FiatAmount"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requested fiat amount; null for an msat or outgoing registration."
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FiatCurrency"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requested fiat currency; null for an msat or outgoing registration."
+        },
+        "pre_check_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "rejected",
+            "pending",
+            "unavailable"
+          ]
+        },
+        "tme_mode": {
+          "type": "string",
+          "enum": [
+            "shadow",
+            "enforcing"
+          ]
+        },
+        "tme_policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "tme_policy_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "tme_blocked": {
+          "type": "boolean"
+        },
+        "reject_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "custodial_not_licensed",
+                "travel_rule_unidentified",
+                "kyc_level_insufficient",
+                "tme_rejected"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_valid_until": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Effective eligibility deadline of the current pre-check: the earlier of the stored preliminary_valid_until and checked_at + 24 hours; when the stored deadline is absent, checked_at + 24 hours (wallet-tme-shadow-mode.md, Path A). Always set for an ok pre-check."
+        },
+        "invoice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Invoice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PaymentCommand"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First settlement of the registration (the canonical transaction that projected paid, or a late settlement after a terminal status); null while none exists. Read it with getWalletPayment."
+        },
+        "refreshed": {
+          "type": "boolean"
+        },
+        "cancel_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "user",
+                "license_disabled",
+                "address_changed",
+                "address_deactivated",
+                "wallet_closed",
+                "account_deleted"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updated_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "registration_id",
+        "wallet_id",
+        "direction",
+        "asset",
+        "rail",
+        "status",
+        "custodial",
+        "amount_msat",
+        "amount",
+        "currency",
+        "pre_check_id",
+        "pre_check_status",
+        "tme_mode",
+        "tme_policy_version",
+        "tme_policy_epoch",
+        "tme_blocked",
+        "reject_reason",
+        "pre_check_valid_until",
+        "invoice",
+        "command",
+        "transaction_id",
+        "refreshed",
+        "cancel_reason",
+        "updated_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "outgoing"
+              }
+            },
+            "required": [
+              "direction"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "open",
+                  "paid",
+                  "cancelled",
+                  "rejected"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "outgoing"
+              },
+              "status": {
+                "enum": [
+                  "cancelled",
+                  "rejected"
+                ]
+              }
+            },
+            "required": [
+              "direction",
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "type": "null"
+              },
+              "command": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "properties": {
+                      "dispatch_state": {
+                        "const": "failed"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "cancelled"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "cancel_reason": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "cancel_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "paid"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "$ref": "#/$defs/Uuid"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              },
+              "invoice": {
+                "not": {
+                  "type": "null"
+                },
+                "properties": {
+                  "status": {
+                    "const": "paid"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            },
+            "required": [
+              "direction",
+              "invoice"
+            ]
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "$ref": "#/$defs/Uuid"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              },
+              "status": {
+                "const": "paid"
+              }
+            },
+            "required": [
+              "direction",
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "invoice": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/Invoice"
+                  },
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "paid"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "open",
+                  "invoice_issued",
+                  "expired_awaiting_refresh"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "command": {
+                "not": {
+                  "type": "null"
+                },
+                "properties": {
+                  "dispatch_state": {
+                    "const": "succeeded"
+                  }
+                },
+                "required": [
+                  "dispatch_state"
+                ]
+              }
+            },
+            "required": [
+              "command"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "paid"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "outgoing"
+              },
+              "status": {
+                "const": "paid"
+              }
+            },
+            "required": [
+              "direction",
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "command": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/PaymentCommand"
+                  },
+                  {
+                    "properties": {
+                      "dispatch_state": {
+                        "const": "succeeded"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              }
+            }
+          },
+          "then": {
+            "oneOf": [
+              {
+                "properties": {
+                  "amount": {
+                    "type": "string"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "amount": {
+                    "type": "null"
+                  },
+                  "currency": {
+                    "type": "null"
+                  },
+                  "amount_msat": {
+                    "type": "integer"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tme_blocked": {
+                "const": true
+              }
+            },
+            "not": {
+              "properties": {
+                "direction": {
+                  "const": "incoming"
+                },
+                "status": {
+                  "const": "paid"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "invoice": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tme_mode": {
+                "const": "enforcing"
+              },
+              "pre_check_status": {
+                "enum": [
+                  "rejected",
+                  "pending",
+                  "unavailable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_blocked": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tme_mode": {
+                "const": "shadow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_blocked": {
+                "const": false
+              },
+              "pre_check_status": {
+                "enum": [
+                  "ok",
+                  "pending",
+                  "unavailable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pre_check_status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_blocked": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pre_check_status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "pre_check_id": {
+                "$ref": "#/$defs/Uuid"
+              },
+              "pre_check_valid_until": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "custodial": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "tme_mode": {
+                "const": "enforcing"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reject_reason": {
+                "type": "string"
+              },
+              "invoice": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reject_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "pre_check_status": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "direction",
+              "amount",
+              "pre_check_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount_msat": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reject_reason": {
+                "const": "tme_rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "rejected"
+              },
+              "tme_mode": {
+                "const": "enforcing"
+              },
+              "tme_blocked": {
+                "const": true
+              },
+              "pre_check_status": {
+                "const": "rejected"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "command": {
+                "type": "null"
+              },
+              "amount_msat": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AmountMsat"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "invoice": {
+                "type": "null"
+              },
+              "amount": {
+                "type": "null"
+              },
+              "currency": {
+                "type": "null"
+              },
+              "amount_msat": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SentRegistration": {
+      "description": "sendPayment result (spec.md 7.3): an outgoing registration with its reserved or dispatched PaymentCommand.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/Registration"
+        },
+        {
+          "properties": {
+            "direction": {
+              "const": "outgoing"
+            },
+            "command": {
+              "$ref": "#/$defs/PaymentCommand"
+            }
+          }
+        }
+      ]
+    },
+    "WalletPaymentReport": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "const": "BTC"
+            },
+            "rail": {
+              "enum": [
+                "spark",
+                "lightning"
+              ]
+            },
+            "id_source": {
+              "enum": [
+                "SPARK_TRANSFER_ID",
+                "SPARK_LIGHTNING_REQUEST_ID"
+              ]
+            },
+            "source_payment_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OpaqueId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "$ref": "#/$defs/Direction"
+            },
+            "sdk_status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PaymentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "amount_msat": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReportedAmountMsat"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "payment_hash": {
+              "$ref": "#/$defs/PaymentHash"
+            },
+            "bolt11": {
+              "$ref": "#/$defs/Bolt11"
+            },
+            "preimage": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$(?!\\n)",
+              "description": "Validated transiently against payment_hash; never persisted; never proof of settlement."
+            },
+            "observed_at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          },
+          "required": [
+            "asset",
+            "rail",
+            "id_source",
+            "source_payment_id",
+            "direction",
+            "sdk_status",
+            "status",
+            "amount_msat"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "settled"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "amount_msat": {
+                    "$ref": "#/$defs/ReportedAmountMsat"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "id_source": {
+                    "const": "SPARK_TRANSFER_ID"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "rail": {
+                    "const": "spark"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "payment_hash"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "bolt11"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "preimage"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "else": {
+                "properties": {
+                  "rail": {
+                    "const": "lightning"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "preimage"
+                ]
+              },
+              "then": {
+                "required": [
+                  "payment_hash"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "const": "HBAR"
+            },
+            "rail": {
+              "const": "hedera"
+            },
+            "id_source": {
+              "const": "HEDERA_TRANSACTION_ID"
+            },
+            "network": {
+              "$ref": "#/$defs/HederaNetwork"
+            },
+            "source_payment_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/HederaTransactionId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "direction": {
+              "$ref": "#/$defs/Direction"
+            },
+            "sdk_status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PaymentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "amount_tinybar": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReportedAmountTinybar"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "counterparty_account_id": {
+              "$ref": "#/$defs/HederaAccountId"
+            },
+            "consensus_timestamp": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 32,
+              "pattern": "^[0-9]{1,19}\\.[0-9]{1,9}$(?!\\n)"
+            },
+            "observed_at": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          },
+          "required": [
+            "asset",
+            "rail",
+            "id_source",
+            "network",
+            "source_payment_id",
+            "direction",
+            "sdk_status",
+            "status",
+            "amount_tinybar"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "settled"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "amount_tinybar": {
+                    "$ref": "#/$defs/ReportedAmountTinybar"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "PaymentAlias": {
+      "type": "object",
+      "properties": {
+        "id_source": {
+          "type": "string",
+          "enum": [
+            "SPARK_TRANSFER_ID",
+            "SPARK_LIGHTNING_REQUEST_ID",
+            "HEDERA_TRANSACTION_ID",
+            "LNBITS_CHECKING_ID",
+            "LNBITS_WALLET_PAYMENT_HASH",
+            "PAYMENT_HASH",
+            "PROVIDER_PAYMENT_ID"
+          ]
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "description": "Provider of a provider payment ID; the empty string for Spark transfer IDs, Lightning request IDs, payment hashes and Hedera transaction IDs."
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "id_source",
+        "provider_id",
+        "source_id",
+        "created_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "enum": [
+                  "PROVIDER_PAYMENT_ID",
+                  "LNBITS_CHECKING_ID"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provider_id": {
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "provider_id": {
+                "const": ""
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "enum": [
+                  "PAYMENT_HASH",
+                  "LNBITS_WALLET_PAYMENT_HASH"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_id": {
+                "$ref": "#/$defs/PaymentHash"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "const": "HEDERA_TRANSACTION_ID"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_id": {
+                "$ref": "#/$defs/HederaTransactionId"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "enum": [
+                  "SPARK_TRANSFER_ID",
+                  "SPARK_LIGHTNING_REQUEST_ID",
+                  "LNBITS_CHECKING_ID",
+                  "PROVIDER_PAYMENT_ID"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_id": {
+                "$ref": "#/$defs/OpaqueId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "WalletPaymentReceipt": {
+      "type": "object",
+      "properties": {
+        "receipt_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "received_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "id_source": {
+          "$ref": "#/$defs/ReportIdSource"
+        },
+        "source_payment_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "external_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^(spark-transfer|spark-lightning-request|hedera-tx):[\\x21-\\x7E]{1,255}$(?!\\n)"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verification_status": {
+          "$ref": "#/$defs/VerificationStatus"
+        },
+        "retry_due_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "receipt_id",
+        "received_at",
+        "wallet_id",
+        "id_source",
+        "source_payment_id",
+        "external_id",
+        "resolution",
+        "transaction_id",
+        "verification_status",
+        "retry_due_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "resolution": {
+                "const": "linked"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "$ref": "#/$defs/Uuid"
+              },
+              "retry_due_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "resolution": {
+                "enum": [
+                  "unresolved",
+                  "quarantined"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "retry_due_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "resolution": {
+                "const": "non_payment"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "type": "null"
+              },
+              "retry_due_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_payment_id": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "external_id": {
+                "type": "null"
+              },
+              "resolution": {
+                "enum": [
+                  "quarantined",
+                  "non_payment"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "external_id": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "const": "HEDERA_TRANSACTION_ID"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_payment_id": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/HederaTransactionId"
+                  }
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "source_payment_id": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/$defs/OpaqueId"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "const": "SPARK_TRANSFER_ID"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "external_id": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "pattern": "^spark-transfer:[\\x21-\\x7E]{1,255}$(?!\\n)"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "const": "SPARK_LIGHTNING_REQUEST_ID"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "external_id": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "pattern": "^spark-lightning-request:[\\x21-\\x7E]{1,255}$(?!\\n)"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id_source": {
+                "const": "HEDERA_TRANSACTION_ID"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "external_id": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "pattern": "^hedera-tx:[\\x21-\\x7E]{1,255}$(?!\\n)"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "resolution": {
+                "const": "unresolved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "transaction_id": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "WalletPayment": {
+      "type": "object",
+      "properties": {
+        "transaction_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "wallet_id": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "asset": {
+          "$ref": "#/$defs/Asset"
+        },
+        "rail": {
+          "$ref": "#/$defs/Rail"
+        },
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "amount_msat": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SignedAmount"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount_tinybar": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SignedAmount"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/PaymentStatus"
+        },
+        "verification_status": {
+          "$ref": "#/$defs/VerificationStatus"
+        },
+        "effective_time": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "effective_time_kind": {
+          "type": "string",
+          "enum": [
+            "provisional",
+            "verified"
+          ]
+        },
+        "payment_path": {
+          "type": "string",
+          "enum": [
+            "path_a",
+            "path_b",
+            "legacy"
+          ],
+          "description": "path_a: registered payment; path_b: wallet-direct report; legacy: an existing LNbits row without registration lineage (payment-registration-data-model.md, transactions)."
+        },
+        "registration_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pre_check_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/PaymentAlias"
+          },
+          "description": "Every known alias. Empty only for legacy and path_a rows created before payment_identity_aliases existed (M8 step 4 has no backfill). A path_b payment has at least one alias."
+        }
+      },
+      "required": [
+        "transaction_id",
+        "wallet_id",
+        "asset",
+        "rail",
+        "direction",
+        "amount_msat",
+        "amount_tinybar",
+        "status",
+        "verification_status",
+        "effective_time",
+        "effective_time_kind",
+        "payment_path",
+        "registration_id",
+        "pre_check_id",
+        "evidence_revision",
+        "aliases"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "asset": {
+                "const": "BTC"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "amount_msat": {
+                "$ref": "#/$defs/SignedAmount"
+              },
+              "amount_tinybar": {
+                "type": "null"
+              },
+              "rail": {
+                "enum": [
+                  "lightning",
+                  "spark"
+                ]
+              },
+              "aliases": {
+                "items": {
+                  "properties": {
+                    "id_source": {
+                      "not": {
+                        "const": "HEDERA_TRANSACTION_ID"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "amount_msat": {
+                "type": "null"
+              },
+              "amount_tinybar": {
+                "$ref": "#/$defs/SignedAmount"
+              },
+              "rail": {
+                "const": "hedera"
+              },
+              "aliases": {
+                "items": {
+                  "properties": {
+                    "id_source": {
+                      "enum": [
+                        "HEDERA_TRANSACTION_ID",
+                        "PROVIDER_PAYMENT_ID"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "direction": {
+                "const": "incoming"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "amount_msat": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                ]
+              },
+              "amount_tinybar": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "amount_msat": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "integer",
+                    "maximum": -1
+                  }
+                ]
+              },
+              "amount_tinybar": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "integer",
+                    "maximum": -1
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "payment_path": {
+                "const": "path_a"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "registration_id": {
+                "$ref": "#/$defs/Uuid"
+              },
+              "pre_check_id": {
+                "$ref": "#/$defs/Uuid"
+              },
+              "asset": {
+                "const": "BTC"
+              },
+              "rail": {
+                "const": "lightning"
+              },
+              "status": {
+                "const": "settled"
+              },
+              "verification_status": {
+                "const": "verified"
+              },
+              "effective_time_kind": {
+                "const": "verified"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "registration_id": {
+                "type": "null"
+              },
+              "pre_check_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "payment_path": {
+                "const": "legacy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "asset": {
+                "const": "BTC"
+              },
+              "rail": {
+                "const": "lightning"
+              },
+              "verification_status": {
+                "const": "verified"
+              },
+              "effective_time_kind": {
+                "const": "verified"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "payment_path": {
+                "const": "path_b"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "aliases": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verification_status": {
+                "const": "wallet_reported"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "effective_time_kind": {
+                "const": "provisional"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

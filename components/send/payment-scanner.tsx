@@ -22,7 +22,9 @@ import { scannerDarkStyles as styles, scannerStyles as sheetStyles } from './sca
 import { measurePerformance } from '@/lib/performance-trace';
 import { adaptColor } from '@/lib/theme-styles';
 
-export function PaymentScanner(props: { onDetected(value: string): void; onCancel(): void }) {
+export function PaymentScanner(props: { onDetected(value: string): void; onCancel(): void;
+  /** Read-only non-payment recognition. Returning true navigates to its own review. */
+  onOtherCode?(value: string): boolean; title?: string; trust?: string; invalidCodeMessage?: string }) {
   useLanguage();
   useColorMode();
   const insets = useSafeAreaInsets();
@@ -131,6 +133,9 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
   async function recognize(value: string, ticket: number, assertSession: () => void) {
     const current = () => mounted.current && visible.current && generation.current === ticket;
     try {
+      if (!current()) return;
+      assertSession();
+      if (props.onOtherCode?.(value.trim())) { mode.current = 'leaving'; Keyboard.dismiss(); setManual(false); return; }
       const result = await measurePerformance('scanner.recognize', () => recognizePayment(value));
       if (!current()) return;
       assertSession();
@@ -144,7 +149,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
       assertSession();
       props.onDetected(result.input);
     } catch (cause) {
-      if (current()) { setRecognized(null); showError(friendlyPaymentMessage(cause, 'Bitcoin')); }
+      if (current()) { setRecognized(null); showError(props.invalidCodeMessage || friendlyPaymentMessage(cause, 'Bitcoin')); }
     } finally {
       if (current()) { inputBusy.current = false; setChecking(false); }
     }
@@ -208,7 +213,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
     <ScrollView style={styles.screenContent} contentContainerStyle={[styles.page, { paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 20) }]}
       importantForAccessibility={modal ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={modal}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: '#f9f9fa' }]}>{t('Send Bitcoin')}</Text>
+        <Text style={[styles.title, { color: '#f9f9fa' }]}>{t(props.title || 'Send Bitcoin')}</Text>
         <TouchableOpacity style={styles.circle} accessibilityRole="button" accessibilityLabel={t('Close scanner')} onPress={close}>
           <Ionicons name="close" size={22} color="#f9f9fa" />
         </TouchableOpacity>
@@ -254,7 +259,7 @@ export function PaymentScanner(props: { onDetected(value: string): void; onCance
             <Ionicons name="create-outline" size={19} color="#eeeef1" /><Text style={[styles.dockText, { color: '#f7f7f7' }]}>{t('Type')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={[styles.trust, { color: '#b7b7c0' }]}>{t('You confirm every payment.')}</Text>
+        <Text style={[styles.trust, { color: '#b7b7c0' }]}>{t(props.trust || 'You confirm every payment.')}</Text>
       </View>
     </ScrollView>
     </>}

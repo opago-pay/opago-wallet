@@ -46,9 +46,19 @@ function fixture(reply, { session, modulePresent = true } = {}) {
   const http = load('lib/http.ts', {
     './config': config,
     './strict-http-transport': transport,
+    './opago/pos-payment': load('lib/opago/pos-payment.ts', { bech32: require('bech32') }),
   });
   return { ...transport, ...http, bridgeCalls: () => bridgeCalls, cancelCalls: () => cancelCalls };
 }
+
+test('OPAGO POS fails closed before the native bridge can dispatch discovery or callback', async () => {
+  const app = fixture(async () => { throw Error('must not reach native transport'); });
+  for (const path of ['/lnpos/api/v1/lnurl/pos-a?p=synthetic', '/lnpos/api/v1/lnurl/cb/synthetic?attempt=synthetic']) {
+    await assert.rejects(app.fetchJson('https://api.opago.com' + path, {}, { purpose: 'Payment endpoint' }),
+      error => error.code === 'opago_pos_payer_unavailable');
+  }
+  assert.equal(app.bridgeCalls(), 0);
+});
 
 test('React Native Response has no stream, yet bounded native JSON reaches fetchJson', async () => {
   assert.equal(new rnFetch.Response('{}', { status: 200 }).body, undefined);

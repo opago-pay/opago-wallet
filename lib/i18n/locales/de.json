@@ -1,4 +1,5 @@
 {
+  "OPAGO POS payments are not supported in this release. The required payer verification is not available yet. No payment was sent.": "OPAGO-POS-Zahlungen werden in dieser Version noch nicht unterstützt. Die erforderliche Zahlerprüfung ist noch nicht verfügbar. Es wurde keine Zahlung gesendet.",
   "Today’s Hedera account activations are used up. Please try again tomorrow.": "Das Tageslimit für Hedera-Kontoaktivierungen ist erreicht. Bitte versuche es morgen erneut.",
   "Hedera account setup is busy. Please try again shortly.": "Die Hedera-Kontoaktivierung ist gerade ausgelastet. Bitte versuche es in Kürze erneut.",
   "We need to review your Hedera account setup. Keep this wallet and contact Opago support with your public activation key.": "Deine Hedera-Kontoaktivierung muss geprüft werden. Behalte diese Wallet und kontaktiere den Opago-Support mit deinem öffentlichen Aktivierungsschlüssel.",

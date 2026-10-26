@@ -1,5 +1,7 @@
 # Multi-Asset-Transaktionsvertrag – Entwurf 0.3.0
 
+> Für F5 ist inzwischen der [aktuelle Backend-Vertrag 3.0.0-draft.1](../tx-foundation-v3/README.md) maßgeblich. Dieser ältere Wallet-Vorschlag bleibt als Historie erhalten; seine Observation-, Cursor-, Hedera- und Migrationsendpunkte werden nicht produktiv verwendet.
+
 Stand: 29.09.2026. Dieser Entwurf erweitert ausschließlich den **Transaktionsabgleich**. Das an Michael gelieferte LNURL-/Spark-Vertragspaket 0.2.0 bleibt unverändert und für seine bisherigen Routen maßgeblich. Eine produktive Umstellung benötigt einen gemeinsam freigegebenen API-Vertrag, Backend-Implementierung und App-/E2E-Abnahme.
 
 Für die Abstimmung mit Michael gibt es eine kurze [Gesprächsvorlage](TEAM-HANDOFF.md). Die [v3-API- und HBAR-Bindungsregeln](PROTOCOL-V3.md) sowie ihre [Klartext-Nachrichtenschemas](api-messages.schema.json) konkretisieren Fabians Vorschlag.

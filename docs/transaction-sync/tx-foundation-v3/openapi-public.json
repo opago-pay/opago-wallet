@@ -1,0 +1,3291 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "OPAGO public API transaction foundation v3 (BTC and HBAR Send/Receive)",
+    "version": "3.0.0-draft.1",
+    "description": "Specification only. NOT a deployed API. Read spec.md; x-opago-* fields are normative. Buy, Sell, Fiat and Swap are later extensions."
+  },
+  "servers": [
+    {
+      "url": "https://api.opago-public.invalid",
+      "description": "Deployment placeholder; set through trusted configuration."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "AccountBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Keycloak account access token; issuer, audience, auth_time, tenant and party are verified in api-internal. On Path A operations it authorizes only a wallet without a user-held key (LNbits) that the account's party owns (spec.md 5.3, OQ-AUTH-5)."
+      },
+      "WalletBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Wallet session token from createWalletSession, scoped to one wallet, one installation and one ownership epoch."
+      },
+      "PosBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Device credential of the registered, active POS device (pos_devices.api_key)."
+      }
+    }
+  },
+  "paths": {
+    "/api/v3/wallets/challenges": {
+      "post": {
+        "operationId": "createWalletChallenge",
+        "summary": "createWalletChallenge",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "idempotency_conflict",
+          "wallet_already_bound",
+          "wallet_inactive",
+          "rail_not_enabled"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletChallenge"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/CreateWalletChallenge"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallets": {
+      "post": {
+        "operationId": "bindWallet",
+        "summary": "bindWallet",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "challenge_invalid",
+          "idempotency_conflict",
+          "wallet_already_bound",
+          "rail_not_enabled",
+          "upstream_unavailable"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/BoundWallet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/BindWallet"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listWallets",
+        "summary": "listWallets",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9_-]+$(?!\\n)"
+            },
+            "description": "next_cursor of the previous page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    },
+    "/api/v3/wallets/{wallet_id}": {
+      "get": {
+        "operationId": "getWallet",
+        "summary": "getWallet",
+        "security": [
+          {
+            "AccountBearer": []
+          },
+          {
+            "WalletBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_or_wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Wallet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/sessions": {
+      "post": {
+        "operationId": "createWalletSession",
+        "summary": "createWalletSession",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_owns_wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "challenge_invalid",
+          "idempotency_conflict",
+          "wallet_inactive",
+          "rail_not_enabled",
+          "upstream_unavailable"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletSession"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/CreateWalletSession"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/addresses": {
+      "post": {
+        "operationId": "createAddressBinding",
+        "summary": "createAddressBinding",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_owns_wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "idempotency_conflict",
+          "address_taken",
+          "wallet_inactive",
+          "custody_unknown",
+          "rail_not_enabled"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ActiveAddressBinding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/CreateAddressBinding"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAddressBindings",
+        "summary": "listAddressBindings",
+        "security": [
+          {
+            "AccountBearer": []
+          },
+          {
+            "WalletBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_or_wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9_-]+$(?!\\n)"
+            },
+            "description": "next_cursor of the previous page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/AddressBindingList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/addresses/{address_id}/deactivate": {
+      "post": {
+        "operationId": "deactivateAddressBinding",
+        "summary": "deactivateAddressBinding",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_owns_wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "not_found",
+          "idempotency_conflict",
+          "wallet_inactive"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "address_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/DeactivatedAddressBinding"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/Empty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/payments/registrations": {
+      "post": {
+        "operationId": "createPaymentRegistration",
+        "summary": "createPaymentRegistration",
+        "security": [
+          {
+            "WalletBearer": []
+          },
+          {
+            "AccountBearer": []
+          },
+          {
+            "PosBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet_or_account_or_pos",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "custodial_not_licensed",
+          "kyc_level_insufficient",
+          "travel_rule_unidentified",
+          "tme_rejected",
+          "tme_pending",
+          "tme_unavailable",
+          "upstream_unavailable",
+          "idempotency_conflict",
+          "payment_exists",
+          "payment_request_invalid",
+          "rail_not_enabled"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Registration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/CreateRegistration"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/payments/registrations/{registration_id}": {
+      "get": {
+        "operationId": "getPaymentRegistration",
+        "summary": "getPaymentRegistration",
+        "security": [
+          {
+            "WalletBearer": []
+          },
+          {
+            "AccountBearer": []
+          },
+          {
+            "PosBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet_or_account_or_pos",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "registration_not_found",
+          "tme_unavailable"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Registration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    },
+    "/api/v3/payments/registrations/{registration_id}/invoice": {
+      "post": {
+        "operationId": "getOrRefreshInvoice",
+        "summary": "getOrRefreshInvoice",
+        "security": [
+          {
+            "WalletBearer": []
+          },
+          {
+            "AccountBearer": []
+          },
+          {
+            "PosBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet_or_account_or_pos",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "custodial_not_licensed",
+          "kyc_level_insufficient",
+          "travel_rule_unidentified",
+          "tme_rejected",
+          "tme_pending",
+          "tme_unavailable",
+          "upstream_unavailable",
+          "registration_not_found",
+          "idempotency_conflict",
+          "registration_paid",
+          "registration_cancelled",
+          "upstream_timeout",
+          "rail_not_enabled"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Registration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/Empty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/payments/registrations/{registration_id}/send": {
+      "post": {
+        "operationId": "sendPayment",
+        "summary": "sendPayment",
+        "security": [
+          {
+            "WalletBearer": []
+          },
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet_or_account",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "custodial_not_licensed",
+          "kyc_level_insufficient",
+          "travel_rule_unidentified",
+          "tme_rejected",
+          "tme_pending",
+          "tme_unavailable",
+          "upstream_unavailable",
+          "registration_not_found",
+          "idempotency_conflict",
+          "registration_paid",
+          "registration_cancelled",
+          "upstream_timeout",
+          "payment_request_invalid"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/SentRegistration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/Empty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/payments/registrations/{registration_id}/cancel": {
+      "post": {
+        "operationId": "cancelRegistration",
+        "summary": "cancelRegistration",
+        "security": [
+          {
+            "WalletBearer": []
+          },
+          {
+            "AccountBearer": []
+          },
+          {
+            "PosBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet_or_account_or_pos",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "registration_not_found",
+          "idempotency_conflict",
+          "registration_paid",
+          "registration_cancelled",
+          "tme_unavailable",
+          "upstream_unavailable",
+          "upstream_timeout"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Registration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Retryable error; Retry-After is required.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5.",
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/Empty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/payments/reports": {
+      "post": {
+        "operationId": "reportWalletPayment",
+        "summary": "reportWalletPayment",
+        "security": [
+          {
+            "WalletBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "idempotency_conflict",
+          "asset_not_enabled"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletPaymentReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/WalletPaymentReport"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/payments/reports/{receipt_id}": {
+      "get": {
+        "operationId": "getWalletPaymentReport",
+        "summary": "getWalletPaymentReport",
+        "security": [
+          {
+            "WalletBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "wallet",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "not_found"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "receipt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletPaymentReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    },
+    "/api/v3/wallets/{wallet_id}/payments/{transaction_id}": {
+      "get": {
+        "operationId": "getWalletPayment",
+        "summary": "getWalletPayment",
+        "security": [
+          {
+            "AccountBearer": []
+          },
+          {
+            "WalletBearer": []
+          },
+          {
+            "PosBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_or_wallet_or_pos",
+        "x-opago-transport": "tls-public-facade",
+        "x-opago-max-plaintext-bytes": 65536,
+        "x-opago-error-codes": [
+          "invalid_request",
+          "forbidden",
+          "not_found"
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 8200,
+              "pattern": "^Bearer [\\x21-\\x7E]+$(?!\\n)"
+            },
+            "description": "Bearer credential of the scheme the operation names. The facade copies it into X-Opago-User-Authorization for api-internal, which verifies it independently."
+          },
+          {
+            "name": "X-Opago-Contract",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "tx-foundation-v3"
+            },
+            "description": "Selects this contract. The facade rejects a v3 path without it."
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/WalletPayment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error; the HTTP status is the one the error catalog (errors.json) gives for the code.",
+            "headers": {
+              "X-Request-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME errors default to 5."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative rules: spec.md."
+      }
+    }
+  }
+}

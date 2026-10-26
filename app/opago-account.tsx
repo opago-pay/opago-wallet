@@ -1,0 +1,112 @@
+import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useOpagoAccount } from '../hooks/useOpagoAccount';
+import { Action, Card, Copy, OpagoPage, TextInput, ui } from '../components/opago/opago-ui';
+import { activeLightningAddress } from '../lib/opago/address';
+import { photoMatchReady } from '../lib/opago/account';
+import { OpagoError } from '../lib/opago/api';
+import * as Clipboard from 'expo-clipboard';
+import { themeColor } from '../lib/theme-styles';
+import { t } from '../lib/i18n';
+import QRCode from 'react-native-qrcode-svg';
+import { Share, View } from 'react-native';
+import { UpdateAccountApp } from '../components/opago/update-account-app';
+
+export default function OpagoAccountScreen() {
+  const params = useLocalSearchParams<{ test?: string }>();
+  if (__DEV__ && params.test === '1') return <ContractAccountScreen />;
+  // Keep website entry independent of legacy F3/OIDC initialization.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PublicAccountScreen } = require('../components/opago/public-account-screen') as typeof import('../components/opago/public-account-screen');
+  return <PublicAccountScreen />;
+}
+
+export function ContractAccountScreen() {
+  const params = useLocalSearchParams<{ test?: string }>();
+  const [testOnly, setTestOnly] = useState(__DEV__ && params.test === '1');
+  const { runtime, busy, error, run, updateRequired } = useOpagoAccount(testOnly);
+  const router = useRouter(); const [name, setName] = useState(''); const [deleteText, setDeleteText] = useState('');
+  const [closing, setClosing] = useState(false);
+  const account = runtime?.account; const state = account?.state; const wallet = state?.wallet;
+  const active = !busy && account ? activeLightningAddress(account, runtime!.publicAddressOrigin) : null;
+  const addressReady = account?.addressReady();
+  const shareAddress = async (copy: boolean) => {
+    if (!account || !runtime) return;
+    await account.refreshAccount(); await account.refresh();
+    const confirmed = activeLightningAddress(account, runtime.publicAddressOrigin);
+    if (!confirmed) throw new OpagoError('address_changed');
+    if (copy) await Clipboard.setStringAsync(confirmed.address);
+    else await Share.share({ message: confirmed.address });
+  };
+  useEffect(() => {
+    if (!runtime?.account.state.session || busy) return;
+    const timer = setInterval(() => { void run(async () => { await runtime.account.refreshAccount(); await runtime.account.refresh(); }); }, 30_000);
+    return () => clearInterval(timer);
+  }, [runtime, busy, run]);
+  return <OpagoPage title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
+    {updateRequired && <UpdateAccountApp />}
+    <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
+    {!state?.credential && <Action label="Create an OPAGO account" disabled={busy} onPress={() => router.push('/opago-signup')} />}
+    <Action label="POS wallet links" disabled={busy} onPress={() => router.push({ pathname: '/pos-link', params: testOnly ? { test: '1' } : {} })} />
+    <Action label="Transaction synchronization" disabled={busy} onPress={() => router.push({ pathname: '/transaction-sync', params: testOnly ? { test: '1' } : {} })} />
+    {!runtime && <Card title="Account services unavailable"><Copy>{t('OPAGO account services are not available in this build. Your local wallet remains available.')}</Copy></Card>}
+    {__DEV__ && <Action label={testOnly ? 'Leave contract test mode' : 'Start contract test mode'} disabled={busy} onPress={() => setTestOnly(!testOnly)} />}
+    {runtime && account && state && !state.deletion && <>
+      <Card title="Account sign-in">
+        <Copy>{t(state.credential ? 'Signed in to OPAGO. Wallet ownership is proved separately.' : 'Sign in to your existing account in the OPAGO browser window.')}</Copy>
+        <Action label={state.credential ? 'Sign in again' : 'Sign in to OPAGO'} disabled={busy} onPress={() => void run(() => account.signIn())} />
+        {state.credential && state.account && !state.account.email_verified && <>
+          <Copy>{t('You are signed in. Confirm your email before linking this wallet, then refresh your account details.')}</Copy>
+          <Action label="Refresh account details" disabled={busy} onPress={() => void run(() => account.refreshAccount())} />
+        </>}
+        {(state.credential || state.logoutPending) && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
+      </Card>
+      <Card title="Wallet ownership and binding">
+        <Copy>{t(wallet?.party_id ? 'This wallet is explicitly linked to your OPAGO account.' : state.session ? 'Wallet ownership proved. The wallet is not linked to an account yet.' : 'Prove ownership of this local wallet to OPAGO.')}</Copy>
+        {!account.walletAvailable && <Copy>{t('Connect Lightning to prove or restore wallet ownership. Account sign-in and deletion remain available.')}</Copy>}
+        <Action label="Prove wallet ownership" disabled={busy || !account.walletAvailable} onPress={() => void run(() => account.proveOwnership())} />
+        {!wallet?.party_id && <Action label="Link this wallet to my OPAGO account" disabled={busy || !state.credential || !state.session || !state.account?.email_verified} onPress={() => void run(() => account.bind())} />}
+        {state.credential && <><Copy>{t('After restoring your 12 words, restore the OPAGO link with the owning account. Address reactivation is a separate step.')}</Copy>
+          <Action label="Restore my OPAGO wallet link" disabled={busy || !account.walletAvailable} onPress={() => void run(() => account.restore())} /></>}
+        {state.session && <Action label="Refresh account status" disabled={busy} onPress={() => void run(() => account.refresh())} />}
+      </Card>
+      <Card title="Personal Lightning address">
+        {!addressReady && <Copy>{t('Sign in and connect this Spark wallet to manage your personal address. The server must confirm activation before you can share it.')}</Copy>}
+        {account.hasPendingAddressOperation && <Action label="Recover unfinished address operation" disabled={busy}
+          onPress={() => void run(() => account.resumeAddress())} />}
+        {active ? <>
+          <Copy>{testOnly ? t('Synthetic test address — do not send funds.') : active.address}</Copy>
+          {!testOnly && <View style={{ alignSelf: 'center', padding: 14, backgroundColor: '#fff' }} accessibilityLabel={active.address}>
+            <QRCode value={active.qr_payload} size={210} color="#000" backgroundColor="#fff" />
+          </View>}
+          {!testOnly && <><Action label="Copy Lightning address" disabled={busy} onPress={() => void run(() => shareAddress(true))} />
+            <Action label="Share Lightning address" disabled={busy} onPress={() => void run(() => shareAddress(false))} /></>}
+        </> : <Copy>{t(wallet?.address?.status === 'deactivated' ? 'Your address is deactivated.' : 'Your address is not active. It becomes usable only after the backend confirms activation.')}</Copy>}
+        <TextInput value={name} onChangeText={setName} editable={!busy} autoCapitalize="none" autoCorrect={false} maxLength={32}
+          accessibilityLabel={t('Lightning address name')} placeholder={t('Lightning address name')}
+          placeholderTextColor={themeColor('muted')} style={[ui.input, { color: themeColor('text'), borderColor: themeColor('border') }]} />
+        <Action label={wallet?.address ? 'Change address name' : 'Activate my Lightning address'} disabled={busy || !addressReady || !name}
+          onPress={() => void run(() => account.address(wallet?.address ? 'rename' : 'set', name))} />
+        {wallet?.address && <Action label={wallet.address.status === 'active' ? 'Deactivate my address' : 'Reactivate my address'} disabled={busy || !addressReady}
+          onPress={() => void run(() => account.address(wallet.address!.status === 'active' ? 'deactivate' : 'reactivate'))} />}
+        <Action label="Send with UMA" disabled={busy || !active || !photoMatchReady(wallet || null)} onPress={() => router.push({ pathname: '/uma-send', params: testOnly ? { test: '1' } : {} })} />
+      </Card>
+      {state.credential && <Card title="OPAGO service management">
+        <Copy>{t('Closing the OPAGO wallet link deactivates its address. It can be restored with the owning account and wallet proof. Your local funds and keys stay on this device.')}</Copy>
+        {!closing ? <Action label="Close OPAGO wallet link" disabled={busy || !state.session} onPress={() => setClosing(true)} /> :
+          <><Action label="Confirm closing OPAGO wallet link" destructive disabled={busy} onPress={() => void run(async () => { await account.close(); setClosing(false); })} />
+            <Action label="Cancel" disabled={busy} onPress={() => setClosing(false)} /></>}
+        <Copy warning>{t('Deleting your OPAGO account revokes sessions and disables its addresses. Retained records follow the backend retention policy. This does not delete your local wallet or erase all retained data. Type DELETE to confirm.')}</Copy>
+        <TextInput value={deleteText} onChangeText={setDeleteText} editable={!busy} accessibilityLabel={t('Type DELETE to confirm account deletion')}
+          autoCorrect={false} autoCapitalize="characters" style={[ui.input, { color: themeColor('text'), borderColor: themeColor('border') }]} />
+        <Action label="Delete OPAGO account" destructive disabled={busy || deleteText !== 'DELETE'} onPress={() => void run(() => account.deleteAccount())} />
+      </Card>}
+    </>}
+    {state?.deletion && account && <Card title="Account deletion receipt">
+      <Copy>{t(state.deletionStatus?.status === 'deleted' ? 'OPAGO account deleted. Retained records may remain under the approved retention policy.' : 'Account deletion is pending. OPAGO access is revoked.')}</Copy>
+      <Action label="Check deletion status" disabled={busy} onPress={() => void run(() => account.deletionStatus())} />
+      <Copy>{t('After deletion is complete, new onboarding starts a new service relationship. Old approval and address names are not restored.')}</Copy>
+      <Action label="Start new OPAGO onboarding" disabled={busy || state.deletionStatus?.status !== 'deleted'} onPress={() => void run(() => account.restartOnboarding())} />
+    </Card>}
+  </OpagoPage>;
+}

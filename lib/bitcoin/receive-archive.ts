@@ -53,6 +53,8 @@ export function archiveBitcoinRequest(scope: string, request: StoredLightningRec
   });
 }
 const offsets = new Map<string, number>();
+/** Read-only F5 migration/source view; preserves the existing receive journal. */
+export function listArchivedBitcoinRequests(scope: string) { return exclusive(async () => (await read()).filter(row => row.scope === scope)); }
 export async function reconcileArchivedBitcoinRequests(wallet: SparkReceiveWalletLike, scope: string, assertCurrent: () => void) {
   const epoch = generation;
   const waiting = (await exclusive(read)).filter(row => row.scope === scope && row.state === 'waiting' &&

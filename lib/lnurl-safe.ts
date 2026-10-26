@@ -5,6 +5,7 @@ import { decodeLightningInvoice } from './lightning';
 import { fetchJson } from './http';
 import { assertSafeRemoteUrl } from './config';
 import { requireIdentityPayments } from './product-capabilities';
+import { assertNotOpagoPosPaymentUrl } from './opago/pos-payment';
 
 export interface LNURLPResponse {
   callback: string;
@@ -19,6 +20,7 @@ export interface LNURLPResponse {
 
 export function validateLNURLResponse(data: LNURLPResponse): LNURLPResponse {
   if (!data || typeof data !== 'object') throw new Error('LNURL endpoint returned invalid payment limits.');
+  assertNotOpagoPosPaymentUrl(data.callback);
   if (data.compliance?.isSubjectToTravelRule || Object.values(data.payerData || {}).some(field => field?.mandatory)) {
     requireIdentityPayments();
   }
@@ -84,6 +86,7 @@ export async function fetchInvoiceFromLNURLP(
   amountSat: number,
   payerData?: Record<string, unknown>,
 ): Promise<string> {
+  assertNotOpagoPosPaymentUrl(request.callback);
   if (payerData) requireIdentityPayments();
   if (!Number.isSafeInteger(amountSat) || amountSat <= 0 || !Number.isSafeInteger(amountSat * 1000)) {
     throw new Error('LNURL amount must be a positive whole number of satoshis.');

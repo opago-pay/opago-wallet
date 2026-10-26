@@ -277,7 +277,7 @@ test('pending receive polls use only the direct request, while a failed lookup f
     getLightningReceiveRequest: async () => ({ id: saved.requestId, status: 'INVOICE_CREATED', invoice: { paymentHash } }),
     getTransfers: async () => assert.fail('Waiting must not load history every poll'),
   }, saved), 'waiting');
-  const transfer = { id: 'transfer', transferDirection: 'INCOMING', status: 'COMPLETED', totalValue: 20,
+  const transfer = { id: 'transfer', transferDirection: 'INCOMING', status: 'COMPLETED', valueReceivedByWallet: 20,
     userRequest: { invoice: { paymentHash }, paymentPreimage: preimage } };
   assert.equal(await resolveLightningReceive({
     getLightningReceiveRequest: async () => { throw new Error('offline'); },

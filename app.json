@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "opagowallet",
+    "scheme": [
+      "opagowallet",
+      "com.opago.wallet"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -79,9 +82,17 @@
       ],
       "expo-sqlite",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Opago to photograph your identity document for the photo and data comparison.",
+          "photosPermission": "Allow Opago to select an identity document image for the photo and data comparison.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
-          "cameraPermission": "Opago uses the camera to scan payment QR codes.",
+          "cameraPermission": "Opago uses the camera to scan payment QR codes and photograph your identity document for the photo and data comparison.",
           "recordAudioAndroid": false,
           "microphonePermission": false
         }

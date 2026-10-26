@@ -44,6 +44,7 @@ import { lightningPaymentLifecycle, reconcileLightningPayments } from '@/lib/lig
 import { lightningPaymentJournalFor } from '@/lib/lightning/payment-journal-native';
 import { PaymentForm } from '@/components/send/payment-form';
 import { PaymentScanner } from '@/components/send/payment-scanner';
+import { isPosLinkQr } from '@/lib/opago/pos-qr-native';
 import {
   HederaReviewView,
   HederaSuccessView,
@@ -219,6 +220,10 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
   ) => {
     if (preparationInFlight.current) return;
     const raw = (scannedValue ?? destination).trim();
+    if (/^\$[^\s]+@[^\s]+$/.test(raw)) {
+      router.push({ pathname: '/uma-send', params: { receiver: raw } });
+      return;
+    }
     const activeSource = sourceOverride || inferPaymentSourceFromRequest(raw, 'spark');
     // A newly detected asset must never reinterpret a previous SAT/EUR amount
     // as HBAR (or the reverse). Ask for that asset's amount instead.
@@ -356,7 +361,7 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
         setReviewPreparation(null);
       }
     }
-  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet]);
+  }, [amountInput, currency, destination, hederaAccount, prepareLightningInvoice, rates.btcToEur, rates.updatedAt, refreshHederaAccount, source, bitcoinDestination, sparkWallet, router]);
 
   async function executeBitcoinPayment() {
     if (!pendingBitcoin || !sparkWallet || paymentInFlight.current) return;
@@ -672,6 +677,10 @@ export default function SendScreen({ modal = false }: { modal?: boolean } = {}) 
     label={reviewPreparation.label} onCancel={cancelPayment} />;
 
   if (entryMode === 'scan') return <PaymentScanner
+    onOtherCode={value => {
+      if (!isPosLinkQr(value)) return false;
+      router.push({ pathname: '/pos-link', params: { scanResultKey: paymentScanInbox.save(value) } }); return true;
+    }}
     onCancel={closeToHome}
     onDetected={value => {
       const key = paymentScanInbox.save(value);
