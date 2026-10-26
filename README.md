@@ -37,7 +37,7 @@ Download OPAGO Wallet and start using Bitcoin in everyday life.
 <h3 align="center">See it in action</h3>
 
 <p align="center">
-  <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="Bitcoin for everyday life — OPAGO Wallet home screen" width="600" />
+  <img src="docs/app-store-assets/OPAGO_01_Bitcoin_for_Everyday_Life_6_5.png" alt="Bitcoin for everyday life — current OPAGO Wallet home screen" width="600" />
 </p>
 
 <p align="center">
@@ -61,15 +61,11 @@ Download OPAGO Wallet and start using Bitcoin in everyday life.
 </p>
 
 <p align="center">
-  <img src="docs/app-store-assets/OPAGO_07_Bitcoin_and_HBAR_6_5.png" alt="Bitcoin and HBAR balances together in OPAGO Wallet" width="600" />
-</p>
-
-<p align="center">
   <img src="docs/app-store-assets/OPAGO_08_Receive_HBAR_6_5.png" alt="Receive HBAR by sharing your QR code" width="600" />
 </p>
 
 <p align="center">
-  <img src="docs/app-store-assets/OPAGO_09_Self_Custodial_Your_Money_6_5.png" alt="Self-custodial. Your money. — OPAGO Wallet in dark mode" width="600" />
+  <img src="docs/app-store-assets/OPAGO_09_Self_Custodial_Your_Money_6_5.png" alt="Self-custodial. Your money. — current OPAGO Wallet in dark mode" width="600" />
 </p>
 
 ---

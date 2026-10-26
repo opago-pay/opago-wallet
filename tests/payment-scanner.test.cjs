@@ -6,14 +6,14 @@ const { hookFixture } = require('./react-hooks-fixture.cjs');
 function nodes(tree) { return !tree || typeof tree !== 'object' ? [] : [tree, ...React.Children.toArray(tree.props?.children).flatMap(nodes)]; }
 function button(tree, label) { return nodes(tree).find(n => n.type === 'button' && (n.props.accessibilityLabel === label || nodes(n).some(c => c.type === 'text' && c.props.children === label))); }
 function fixture(options = {}) {
-  const calls = []; const state = { focused: true, locked: false, granted: true, torch: true, ...options };
+  const calls = []; const state = { focused: true, locked: false, granted: true, canAskAgain: true, torch: true, ...options };
   let appState; let back;
   const app = hookFixture('components/send/payment-scanner.tsx', () => ({
     'react-native': { View: 'view', Text: 'text', ScrollView: 'scroll', ActivityIndicator: 'spinner', StyleSheet: { create: v => v },
       Platform: { OS: options.os || 'android' }, useWindowDimensions: () => ({ width: 360, height: 720, fontScale: 1 }),
       Keyboard: { dismiss() {} }, AccessibilityInfo: { announceForAccessibility: v => calls.push(['announce',v]) },
       BackHandler: { addEventListener: (_,fn) => { back=fn; return {remove(){}}; } },
-      AppState: { currentState: 'active', addEventListener: (_,fn) => {appState=fn;return {remove(){}};} }, Linking: { openSettings: async()=>{} } },
+      AppState: { currentState: 'active', addEventListener: (_,fn) => {appState=fn;return {remove(){}};} }, Linking: { openSettings: async()=>{calls.push('settings');} } },
     '@react-navigation/native': { useIsFocused: () => state.focused },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top:24,bottom:0 }) },
     '@/components/ui/wallet-interaction': { TouchableOpacity:'button',TextInput:'input' },
@@ -24,7 +24,7 @@ function fixture(options = {}) {
     './scanner-styles': options.scannerStyles || { scannerStyles:{}, scannerDarkStyles:{} }, './scanner-sheet': { ScannerSheet:'sheet' },
     './scanner-success-background': { ScannerShade:'shade', ScannerSuccessBackground:'scan-background' },
     '@/lib/camera-capabilities': { hasBackCameraTorch:async()=>state.torch },
-    '@/lib/scanner-permission': { scannerPermission:async(_,request)=>{calls.push(request?'permission-request':'permission-read');return {granted:state.granted,canAskAgain:true};} },
+    '@/lib/scanner-permission': { scannerPermission:async(_,request)=>{calls.push(request?'permission-request':'permission-read');return {granted:state.granted,canAskAgain:state.canAskAgain};} },
     'expo-clipboard': { getStringAsync:async()=>{calls.push('clipboard');return state.clipboard?state.clipboard():'';} },
     'expo-haptics': { ImpactFeedbackStyle:{Light:'light'},impactAsync:async()=>{calls.push('haptic');if(state.hapticFails)throw Error('haptics');} },
     '@/lib/payment-recognition': { recognizePayment:async value=>{ calls.push(['validate',value]);return state.validate?state.validate(value):{input:value,kind:'lightning',recipient:'synthetic-hash',amount:'20',unit:'SAT'};} },
@@ -66,6 +66,28 @@ test('POS recognition keeps ordinary payment recognition and rejects a locked wa
  nodes(tree).find(n=>n.type==='camera').props.onBarcodeScanned({data:'invoice'});await app.settle();assert.equal(detected(app).length,1);
  const locked=fixture({onOtherCode:()=>{throw Error('must not run');}});t.after(locked.unmount);const lockedTree=await locked.settle();locked.state.locked=true;
  nodes(lockedTree).find(n=>n.type==='camera').props.onBarcodeScanned({data:'pos-code'});await locked.settle();assert.equal(validations(locked).length,0);
+});
+
+test('iOS camera pre-prompt requests permission only after Continue', async t => {
+ const app = fixture({os:'ios',granted:false}); t.after(app.unmount);
+ let tree = await app.settle();
+ assert.deepEqual(app.calls, ['permission-read']);
+ assert.equal(button(tree, 'Allow camera'), undefined);
+ assert.ok(nodes(tree).some(n => n.props.children === 'Camera access is used to scan payment QR codes.'));
+ button(tree, 'Continue').props.onPress(); tree = await app.settle();
+ assert.equal(app.calls.filter(c => c === 'permission-request').length, 1);
+ assert.ok(button(tree, 'Paste from clipboard'));
+ assert.ok(button(tree, 'Enter address'));
+ assert.ok(button(tree, 'Close scanner'));
+});
+
+test('iOS denied camera access opens settings without requesting permission again', async t => {
+ const app = fixture({os:'ios',granted:false,canAskAgain:false}); t.after(app.unmount);
+ const tree = await app.settle();
+ button(tree, 'Open device settings').props.onPress(); await app.settle();
+ assert.deepEqual(app.calls, ['permission-read', 'settings']);
+ assert.ok(button(tree, 'Paste from clipboard'));
+ assert.ok(button(tree, 'Enter address'));
 });
 
 test('valid QR codes with or without an amount advance once without an intermediate button', async t=>{
