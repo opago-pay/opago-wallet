@@ -31,7 +31,9 @@ const flow = new BrokerAccountFlow({
       async browser(url, redirect) { browsing(true); try { return await platform.browser(url, redirect); } finally { browsing(false); } },
     }, f3PrivateStore);
   },
-  logout: () => logoutOnly.logout(),
+  logout: nativeBrokerClientLogout,
 });
 walletSession.subscribe(() => flow.cancel());
 export function nativeBrokerAccount() { return flow; }
+/** Shared OIDC storage/generation controls keep both account entry points client-scoped. */
+export function nativeBrokerClientLogout() { return logoutOnly.logout(); }
