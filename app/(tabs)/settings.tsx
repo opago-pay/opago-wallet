@@ -49,6 +49,7 @@ import { categorizeAuthFailure, recordAuthDiagnostic } from '@/lib/auth-diagnost
 import { bindHederaWalletAccount } from '@/lib/hedera/account-binding-native';
 import { listHederaAccountsForKey, type HederaAccountSnapshot } from '@/lib/hedera/account';
 import { nativeCrashTestEnabled, triggerNativeCrashTest } from '@/lib/crash-reporting';
+import { accountDeletionEnabled, requestAccountDeletion } from '@/lib/account-deletion';
 
 function SensitiveInputScreenCaptureGuard() {
   usePreventScreenCapture('opago-recovery-verification');
@@ -85,6 +86,7 @@ export default function SettingsScreen() {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRequestingAccountDeletion, setIsRequestingAccountDeletion] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [deletionVerified, setDeletionVerified] = useState(false);
   const [verificationPurpose, setVerificationPurpose] = useState<'backup' | 'removal'>('backup');
@@ -370,7 +372,30 @@ export default function SettingsScreen() {
     );
   }
 
-  const busy = isUnlocking || isVerifyingBackup || isSavingBackup || isDeleting;
+  const busy = isUnlocking || isVerifyingBackup || isSavingBackup || isDeleting || isRequestingAccountDeletion;
+
+  function confirmAccountDeletion() {
+    Alert.alert(t('Delete OPAGO account?'), t('This request concerns your OPAGO service account, not just this device. Your self-custody wallet and funds are not deleted by this request. Keep your recovery phrase safe. Certain compliance records may be retained where the law requires it.'), [
+      { text: t('Cancel'), style: 'cancel' },
+      { text: t('Continue'), style: 'destructive', onPress: () => void submitAccountDeletion() },
+    ]);
+  }
+
+  async function submitAccountDeletion() {
+    if (isRequestingAccountDeletion) return;
+    setIsRequestingAccountDeletion(true);
+    try {
+      // The endpoint/auth adapter remains gated until the API contract is accepted.
+      await requestAccountDeletion();
+      Alert.alert(t('Request submitted'), t('Your account deletion request was submitted. Follow any instructions sent by OPAGO.'));
+    } catch (cause) {
+      Alert.alert(t('Account deletion unavailable'), accountDeletionEnabled
+        ? t('Account deletion needs a fresh authenticated session. Please contact OPAGO support until this feature is available.')
+        : t('Account deletion requests are not enabled in this build. Please contact OPAGO support.'));
+    } finally {
+      setIsRequestingAccountDeletion(false);
+    }
+  }
   const navigateToSection = useCallback((section: SettingsSection) => {
     if (busy) return;
     Keyboard.dismiss();
@@ -555,6 +580,19 @@ export default function SettingsScreen() {
       {activeSection === 'language' && <LanguagePicker embedded />}
       {activeSection === 'help' && <LegalLinks embedded disabled={busy} />}
       {activeSection === 'diagnostics' && <DiagnosticsConsentPanel />}
+      {activeSection === 'account-deletion' && <View style={styles.walletCard}>
+        <Text style={styles.sectionTitle}>{t('Delete OPAGO account')}</Text>
+        <Text style={styles.body}>{t('You can request deletion of your OPAGO service account here. This is separate from removing the wallet from this device.')}</Text>
+        <Text style={styles.caption}>{t('Self-custody warning: deleting an OPAGO account does not recover, transfer or delete on-chain assets. Keep your complete recovery phrase; OPAGO cannot recover a lost phrase.')}</Text>
+        <Text style={styles.caption}>{t('Legal retention: certain account and wallet-binding evidence may be retained for five years where required for compliance. Other eligible personal data is handled according to the privacy policy.')}</Text>
+        {!accountDeletionEnabled && <Text style={styles.caption}>{t('Account deletion requests are not enabled in this build. Please contact OPAGO support.')}</Text>}
+        <TouchableOpacity style={[styles.dangerButton, (!accountDeletionEnabled || busy) && styles.disabledButton]}
+          accessibilityRole="button" disabled={!accountDeletionEnabled || busy}
+          accessibilityState={{ disabled: !accountDeletionEnabled || busy, busy: isRequestingAccountDeletion }}
+          onPress={confirmAccountDeletion}>
+          {isRequestingAccountDeletion ? <ActivityIndicator color={adaptColor('#ffab97', 'color')} /> : <Text style={styles.dangerText}>{t('Request account deletion')}</Text>}
+        </TouchableOpacity>
+      </View>}
       {activeSection === 'wallet' && <View style={styles.walletCard}>
         <Text style={styles.body}>{t("Remove the keys and saved payment data from this device. Keep your complete recovery phrase to access the wallet again.")}</Text>
         <Text style={styles.caption}>{t("Backup verification and a separate confirmation protect against accidental removal.")}</Text>
