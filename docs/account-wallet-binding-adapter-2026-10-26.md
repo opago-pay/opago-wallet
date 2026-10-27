@@ -41,7 +41,7 @@ issuer `https://api.opago.com`, audience `opago-account`, client `opago-wallet`.
 API `services/wallet_broker_auth.py` deliberately accepts it only on its enumerated
 merchant-data routes; that contract does not authorize the F3 account routes.
 Compliance `wallet_account_bearer.py` instead verifies a private Keycloak realm
-token with audience `opago-compliance-api`. The backend owners must publish and
+token with audience `opago-compliance-api`. The separate OPAGO API project chat must publish and
 implement the broker-to-F3 authorization boundary without a direct app/Keycloak
 connection or a client-side token substitution.
 
@@ -61,7 +61,7 @@ These were source reads; no authenticated production probe was performed.
 
 ## Acceptance and native build
 
-Keep this PR draft and F3 off until API/Compliance owners deliver the boundary
+Keep this PR draft and F3 off until the separate OPAGO API implementation and Compliance deliver the boundary
 and run the real facade-to-backend flow. Verify first binding, same-wallet replay,
 foreign account/tenant/key, expired challenge/proof/session, concurrent binding,
 lost-response recovery and client-only logout. Existing credentials must not
@@ -81,3 +81,16 @@ Tests use fixed public configuration/key-document fixtures and explicit syntheti
 OIDC/network ports. They verify trust rejection, lifecycle invalidation, client
 logout during metadata outages and absence of fabricated binding/signatures when
 the business backend is unavailable. They are not a production success test.
+
+## Ownership correction — 27 October 2026
+
+The separate **OPAGO API project chat** implements Challenge/Verify for `login`
+and `wallet_bind`, internal handlers `/api/account` and `/api/account/wallets`,
+and broker-token acceptance matching the Keycloak **AccountBearer F3** profile.
+Those are not tasks for Michael's team and are not implemented again here.
+The source inventory above records missing compatibility at inspection time,
+not a claim about the other chat's current implementation or deployment.
+
+Michael's team owns only the Keycloak/broker client, any required public values
+in `OPAGOkubernetes`, binding evidence in Compliance (five years), and pin/deploy.
+See [the binding decisions and API handoff](contracts/payout-binding-decisions-2026-10-27.md).

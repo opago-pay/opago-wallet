@@ -9,6 +9,7 @@ import { nativeBrokerAccount } from '../../lib/opago/broker-account-native';
 import type { BrokerAccountAction } from '../../lib/opago/broker-account';
 import { WebsiteAccountError, websiteAccountMessage } from '../../lib/opago/website-account';
 import { t } from '../../lib/i18n';
+import { payoutBindingPolicy } from '../../lib/opago/payout-binding-policy';
 import { Action, Card, Copy, OpagoPage } from './opago-ui';
 
 export function PublicAccountScreen() {
@@ -82,6 +83,11 @@ export function PublicAccountScreen() {
         <Action label="Check again" disabled={busy} onPress={() => void execute('check')} />
         {busy && <Action label="Cancel sign-in" onPress={clear} />}
       </Card>
+      {signedIn && <Card title={payoutBindingPolicy.title}>
+        <Copy>{t(payoutBindingPolicy.unlink)}</Copy>
+        <Copy warning>{t(payoutBindingPolicy.loss)}</Copy>
+        <Copy>{t(payoutBindingPolicy.evidence)}</Copy>
+      </Card>}
       <Action label="Continue using my wallet" onPress={() => { clear(); context.current.focused = false; router.replace('/'); }} />
     </>}
   </OpagoPage>;
