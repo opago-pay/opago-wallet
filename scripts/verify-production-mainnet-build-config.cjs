@@ -6,29 +6,25 @@ require('../tests/register-typescript.cjs');
 
 const { appConfig } = require('../lib/config.ts');
 
-assert.equal(appConfig.isMainnet, true, 'Lightning Mainnet must be explicitly enabled.');
-assert.equal(process.env.EXPO_PUBLIC_ENABLE_MAINNET, 'false', 'Legacy global Mainnet flag must stay disabled.');
-assert.equal(process.env.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET, 'true');
-assert.equal(process.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'true');
-assert.equal(appConfig.sparkNetwork, 'MAINNET');
-assert.equal(appConfig.lightningBuildProfile, 'mainnet');
-assert.equal(appConfig.maxLightningFeeSats, 100);
+// Store builds stay on Regtest/Testnet until a separate, reviewed activation change.
+// A production EAS profile is not by itself authorization to activate Mainnet.
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_MAINNET, 'false');
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET, 'false');
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'false');
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_F3, 'false');
+assert.equal(appConfig.isMainnet, false);
+assert.equal(appConfig.sparkNetwork, 'REGTEST');
+assert.equal(appConfig.lightningBuildProfile, 'regtest');
 assert.equal(appConfig.isDevelopment, false);
-assert.equal(appConfig.isHederaMainnet, true, 'Hedera Mainnet must be explicitly enabled.');
-assert.equal(appConfig.hederaNetwork, 'mainnet');
-assert.equal(appConfig.hederaBuildProfile, 'mainnet');
-assert.equal(appConfig.hederaMirrorNodeUrl, 'https://mainnet.mirrornode.hedera.com');
-assert.equal(appConfig.hederaMaxTransferHbar, 'balance');
-assert.equal(
-  process.env.EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL,
-  'https://hedera-activation.opago.com',
-  'Production must include the verified Mainnet activation service.',
-);
-assert.equal(appConfig.hederaCheckoutContractId, '0.0.10850063');
+assert.equal(appConfig.isHederaMainnet, false);
+assert.equal(appConfig.hederaNetwork, 'testnet');
+assert.equal(appConfig.hederaBuildProfile, 'testnet');
+assert.equal(appConfig.hederaMirrorNodeUrl, 'https://testnet.mirrornode.hedera.com');
+assert.equal(appConfig.allowInsecureHttp, false);
+assert.equal(appConfig.hederaCheckoutContractId, '0.0.9972670');
 assert.equal(
   appConfig.hederaCheckoutRuntimeSha256,
   '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
 );
-assert.equal(appConfig.allowInsecureHttp, false);
 
-process.stdout.write('Verified: Hedera and Lightning Mainnet production profile.\n');
+process.stdout.write('Verified: production build keeps Mainnet and F3 disabled on Regtest/Testnet.\n');
