@@ -773,5 +773,19 @@
   "Address setup is temporarily unavailable. Please try again later.": "La creación de direcciones no está disponible temporalmente. Vuelve a intentarlo más tarde.",
   "Technical details": "Detalles técnicos",
   "Checking your address…": "Comprobando tu dirección…",
-  "Your address is ready. Show this code to receive HBAR.": "Tu dirección está lista. Muestra este código para recibir HBAR."
+  "Your address is ready. Show this code to receive HBAR.": "Tu dirección está lista. Muestra este código para recibir HBAR.",
+  "Delete OPAGO account": "Eliminar cuenta de OPAGO",
+  "Delete your OPAGO account and associated server data": "Eliminar tu cuenta de OPAGO y los datos asociados del servidor",
+  "Account": "Cuenta",
+  "Delete OPAGO account?": "¿Eliminar la cuenta de OPAGO?",
+  "This request concerns your OPAGO service account, not just this device. Your self-custody wallet and funds are not deleted by this request. Keep your recovery phrase safe. Certain compliance records may be retained where the law requires it.": "Esta solicitud afecta a tu cuenta de servicio de OPAGO, no solo a este dispositivo. No elimina tu monedero autocustodiado ni tus fondos. Guarda tu frase de recuperación de forma segura. Algunos registros de cumplimiento pueden conservarse cuando la ley lo exija.",
+  "Request submitted": "Solicitud enviada",
+  "Your account deletion request was submitted. Follow any instructions sent by OPAGO.": "Se ha enviado la solicitud de eliminación de tu cuenta. Sigue las instrucciones que te envíe OPAGO.",
+  "Account deletion unavailable": "Eliminación de cuenta no disponible",
+  "Account deletion needs a fresh authenticated session. Please contact OPAGO support until this feature is available.": "La eliminación de la cuenta requiere una sesión autenticada reciente. Contacta con el soporte de OPAGO hasta que esta función esté disponible.",
+  "Account deletion requests are not enabled in this build. Please contact OPAGO support.": "Las solicitudes de eliminación de cuenta no están habilitadas en esta compilación. Contacta con el soporte de OPAGO.",
+  "You can request deletion of your OPAGO service account here. This is separate from removing the wallet from this device.": "Aquí puedes solicitar la eliminación de tu cuenta de servicio de OPAGO. Esto es distinto de eliminar el monedero de este dispositivo.",
+  "Self-custody warning: deleting an OPAGO account does not recover, transfer or delete on-chain assets. Keep your complete recovery phrase; OPAGO cannot recover a lost phrase.": "Aviso de autocustodia: eliminar la cuenta de OPAGO no recupera, transfiere ni elimina activos en cadena. Guarda tu frase de recuperación completa; OPAGO no puede recuperar una frase perdida.",
+  "Legal retention: certain account and wallet-binding evidence may be retained for five years where required for compliance. Other eligible personal data is handled according to the privacy policy.": "Conservación legal: determinadas pruebas de cuenta y vinculación de monedero pueden conservarse durante cinco años cuando lo exijan las normas de cumplimiento. Los demás datos personales que puedan eliminarse se gestionan según la política de privacidad.",
+  "Request account deletion": "Solicitar eliminación de cuenta"
 }
