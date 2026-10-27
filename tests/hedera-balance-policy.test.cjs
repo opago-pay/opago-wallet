@@ -6,14 +6,20 @@ const test = require('node:test');
 require('./register-typescript.cjs');
 const { resolveHederaBuildPolicy } = require('../lib/config.ts');
 
-test('Mainnet explicitly opts into balance-based transfers and rejects invalid limit settings', () => {
+test('Mainnet policy supports balance-based transfers while the production EAS profile stays gated', () => {
   const policy = {
     network: 'mainnet', buildProfile: 'mainnet', mainnetEnabled: true,
     maxTransferHbar: 'balance', checkoutContractId: '0.0.123456',
     checkoutRuntimeSha256: 'a'.repeat(64),
   };
   assert.equal(resolveHederaBuildPolicy(policy).maxTransferHbar, 'balance');
-  assert.equal(require('../eas.json').build.production.env.EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR, 'balance');
+  const production = require('../eas.json').build.production.env;
+  assert.equal(production.EXPO_PUBLIC_ENABLE_MAINNET, 'false');
+  assert.equal(production.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET, 'false');
+  assert.equal(production.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'false');
+  assert.equal(production.EXPO_PUBLIC_ENABLE_F3, 'false');
+  assert.equal(production.EXPO_PUBLIC_HEDERA_NETWORK, 'testnet');
+  assert.equal(production.EXPO_PUBLIC_HEDERA_BUILD_PROFILE, 'testnet');
   for (const invalid of [undefined, '', '0', '-1', 'unlimited', 'Balance', '1.000000001', 'Infinity']) {
     assert.throws(() => resolveHederaBuildPolicy({ ...policy, maxTransferHbar: invalid }), /MAX_TRANSFER_HBAR/);
   }
