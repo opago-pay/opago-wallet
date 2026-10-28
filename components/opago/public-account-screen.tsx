@@ -18,12 +18,13 @@ export function PublicAccountScreen() {
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [expiresAt, setExpiresAt] = useState(0), [signedIn, setSignedIn] = useState(false);
+  const [walletBackendStatus, setWalletBackendStatus] = useState('');
   const generation = useRef(0), pending = useRef(false);
   const context = useRef({ focused, isLocked, sparkWallet, hederaPublicKey });
   context.current = { focused, isLocked, sparkWallet, hederaPublicKey };
   const clear = useCallback(() => {
     generation.current++; pending.current = false; nativeBrokerAccount().cancel();
-    setBusy(false); setSignedIn(false); setExpiresAt(0); setError(''); setNotice('');
+    setBusy(false); setSignedIn(false); setExpiresAt(0); setError(''); setNotice(''); setWalletBackendStatus('');
   }, []);
   const execute = useCallback(async (action: BrokerAccountAction) => {
     const start = context.current;
@@ -47,6 +48,36 @@ export function PublicAccountScreen() {
       else setError(websiteAccountMessage());
     } catch (cause) {
       try { check(); setError(action === 'logout' ? 'Wallet sign-out could not be confirmed. Please retry.' : websiteAccountMessage(cause)); } catch { /* Old screen/wallet. */ }
+    } finally {
+      if (epoch === generation.current) { pending.current = false; setBusy(false); }
+    }
+  }, []);
+  const checkWalletBackend = useCallback(async () => {
+    const start = context.current;
+    if (pending.current || !start.focused || start.isLocked || AppState.currentState !== 'active') return;
+    let current: () => void;
+    try { current = walletSession.captureRuntime(); current(); } catch { return; }
+    const epoch = generation.current;
+    pending.current = true; setBusy(true); setWalletBackendStatus('');
+    try {
+      // Never pass a public browser account token as WalletBearer or AccountBearer.
+      // The live F3 bootstrap must furnish an approved, authenticated integration.
+      const { getF3Runtime } = await import('../../lib/opago/runtime-native');
+      const runtime = await getF3Runtime(start.sparkWallet, start.hederaPublicKey);
+      if (epoch !== generation.current) return;
+      current();
+      setWalletBackendStatus(runtime.account.state.wallet?.party_id
+        ? 'OPAGO wallet binding returned an account-linked wallet.'
+        : 'The account backend returned no confirmed wallet binding.');
+    } catch (cause) {
+      if (epoch !== generation.current) return;
+      try { current(); } catch { return; }
+      // Only show a fixed, non-sensitive diagnostic code; never a server exception,
+      // token, descriptor, subject, error body, or raw response.
+      const { OpagoError } = await import('../../lib/opago/api');
+      const code = cause instanceof OpagoError && cause.code === 'wallet_session_contract_pending'
+        ? 'wallet_session_contract_pending' : 'wallet_backend_unavailable';
+      setWalletBackendStatus('OPAGO wallet backend: ' + code + '. Account/wallet binding and synchronization are not confirmed.');
     } finally {
       if (epoch === generation.current) { pending.current = false; setBusy(false); }
     }
@@ -81,6 +112,12 @@ export function PublicAccountScreen() {
         <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void execute('logout')} />
         <Action label="Check again" disabled={busy} onPress={() => void execute('check')} />
         {busy && <Action label="Cancel sign-in" onPress={clear} />}
+      </Card>
+      <Card title="OPAGO wallet backend">
+        <Copy>{t('Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.')}</Copy>
+        {walletBackendStatus && <Copy>{walletBackendStatus}</Copy>}
+        <Action label="Check wallet backend" disabled={busy} onPress={() => void checkWalletBackend()} />
+        <Action label="Transaction synchronization" disabled={busy} onPress={() => router.push('/transaction-sync')} />
       </Card>
       <Action label="Continue using my wallet" onPress={() => { clear(); context.current.focused = false; router.replace('/'); }} />
     </>}
