@@ -16,6 +16,13 @@ const directory = () => {
 function destroy(value: unknown) {
   (value as { uniffiDestroy?: () => void } | null)?.uniffiDestroy?.();
 }
+function isUninitializedWalletError(cause: unknown): boolean {
+  // Only a known BDK "wallet not initialized" signal permits destructive recovery.
+  // Generic SQLite, schema, descriptor, network and I/O errors must preserve disk state.
+  if (!(cause instanceof Error)) return false;
+  if (cause.name === 'WalletNotInitialized') return true;
+  return /^(?:wallet (?:is )?not initialized|uninitialized wallet|walletnotinitialized)(?:[.!])?$/i.test(cause.message.trim());
+}
 export async function initializeOnchainWallet(seed: Uint8Array, assertCurrent: () => void, signal?: AbortSignal): Promise<OnchainWallet> {
   const policy = onchainProvider();
   const bdk = await import('bdk-rn'); assertCurrent();
@@ -70,7 +77,8 @@ export async function initializeOnchainWallet(seed: Uint8Array, assertCurrent: (
     if (exists) {
       try {
         wallet = bdk.Wallet.load(descriptors[0],descriptors[1],persister,100);
-      } catch {
+      } catch (cause) {
+        if (!isUninitializedWalletError(cause)) throw cause;
         // First startup can be interrupted after newSqlite creates the file but
         // before the wallet is persisted. Rebuild from the deterministic public
         // descriptors and let the initial full scan recover chain state.
