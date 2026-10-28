@@ -234,7 +234,7 @@ function nativeFixture(options={}){
  class Descriptor{constructor(value){this.value=value;descriptors.push(this);}uniffiDestroy(){this.destroyed=true;}}
  class Wallet{
   constructor(a,b){assert.doesNotMatch(a.value+b.value,/tprv|xprv/);calls.push('public wallet');}
-  static load(){calls.push('wallet load');if(options.failLoad)throw new Error('uninitialized sqlite');return new Wallet({value:'public'}, {value:'public'});}
+  static load(){calls.push('wallet load');if(options.failLoad)throw (options.loadError ?? new Error('Wallet not initialized'));return new Wallet({value:'public'}, {value:'public'});}
   persist(){if(failPersist)throw new Error('disk full');calls.push('persist');}
   balance(){return {confirmed:amount(1000),total:amount(1000),trustedPending:amount(0),untrustedPending:amount(0)};}
   listUnspent(){return [];}
@@ -267,6 +267,33 @@ test('an interrupted first initialization recovers a broken SQLite wallet by reb
  assert.equal(f.calls.includes('apply update'),true);
  await wallet.cleanupConnections();
  assert.ok(f.descriptors.filter(d=>/tprv/.test(d.value)).every(d=>d.destroyed));
+});
+test('transient, corrupt, mismatched or unknown BDK load failures preserve the SQLite database',async()=>{
+ const errors=[
+  new Error('database is locked'),
+  new Error('SQLITE_CORRUPT: malformed database'),
+  new Error('unsupported schema version'),
+  new Error('descriptor mismatch'),
+  new Error('wrong network'),
+  new Error('not initialized while decoding network'),
+  new Error('Wallet not initialized: invalid database version'),
+ ];
+ for(const cause of errors){
+  const f=nativeFixture({exists:true,failLoad:true,loadError:cause});
+  await assert.rejects(f.start(),error=>error===cause);
+  assert.ok(f.calls.includes('wallet load'));
+  assert.equal(f.calls.includes('delete storage'),false,cause.message);
+  assert.equal(f.calls.includes('public wallet'),false,cause.message);
+  assert.ok(f.calls.includes('dispose storage'));
+ }
+});
+test('known uninitialized BDK error name allows the first-start recovery path',async()=>{
+ const cause=new Error('SDK error');
+ cause.name='WalletNotInitialized';
+ const f=nativeFixture({exists:true,failLoad:true,loadError:cause});
+ const wallet=await f.start();
+ assert.ok(f.calls.includes('delete storage'));
+ await wallet.cleanupConnections();
 });
 test('a healthy persisted native wallet loads without deleting its database',async()=>{
  const f=nativeFixture({exists:true});
