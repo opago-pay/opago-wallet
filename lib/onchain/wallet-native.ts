@@ -17,11 +17,10 @@ function destroy(value: unknown) {
   (value as { uniffiDestroy?: () => void } | null)?.uniffiDestroy?.();
 }
 function isUninitializedWalletError(cause: unknown): boolean {
-  // Only a known BDK "wallet not initialized" signal permits destructive recovery.
-  // Generic SQLite, schema, descriptor, network and I/O errors must preserve disk state.
-  if (!(cause instanceof Error)) return false;
-  if (cause.name === 'WalletNotInitialized') return true;
-  return /^(?:wallet (?:is )?not initialized|uninitialized wallet|walletnotinitialized)(?:[.!])?$/i.test(cause.message.trim());
+  // bdk-rn 1.1.0 maps BDK FFI LoadWithPersistError::CouldNotLoad
+  // (empty/uninitialized changeset) to the exact message "could not load".
+  // Persistence failures and invalid changesets must never erase existing data.
+  return cause instanceof Error && cause.message === 'could not load';
 }
 export async function initializeOnchainWallet(seed: Uint8Array, assertCurrent: () => void, signal?: AbortSignal): Promise<OnchainWallet> {
   const policy = onchainProvider();
