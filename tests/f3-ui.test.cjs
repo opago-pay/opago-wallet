@@ -111,6 +111,30 @@ test('F3 hook discards an old wallet and its pending action feedback on a wallet
   state = app.render(); assert.equal(state.runtime, b); assert.equal(state.error, ''); assert.equal(state.busy, false);
 });
 
+test('native binding entry revalidates the browser session before exposing a cached runtime', async t => {
+  let finish, inspections = 0, focused = true;
+  const auth = { sparkWallet: {}, hederaPublicKey: 'key' };
+  const runtime = { account: { state: {} }, perform: async action => action() };
+  const app = hookFixture('hooks/useOpagoAccount.ts', () => ({
+    './useWalletAuth': { useWalletAuth: () => auth },
+    '../lib/opago/runtime-native': { getF3Runtime: async () => runtime },
+    '../lib/opago/backend-status': { inspectWalletBackend: () => {
+      inspections++; return new Promise(resolve => { finish = resolve; });
+    } },
+    '../lib/opago/errors': { opagoUserError: () => 'failure' },
+    '../lib/opago/api': require('../lib/opago/api.ts'),
+  }), exports => exports.useOpagoAccount(false, focused)); t.after(app.unmount);
+  assert.equal(app.render().runtime, null); await Promise.resolve();
+  assert.equal(inspections, 1); assert.equal(app.render().runtime, null);
+  finish('Please sign in again.'); await app.settle();
+  assert.equal(app.render().runtime, runtime);
+  focused = false; await app.settle();
+  focused = true; assert.equal(app.render().runtime, null); await Promise.resolve();
+  assert.equal(inspections, 2); assert.equal(app.render().runtime, null);
+  finish('Please sign in again.'); await app.settle();
+  assert.equal(app.render().runtime, runtime);
+});
+
 test('F3 runtime rebuilds for the same Spark object after lock/unlock', async t => {
   let changeSession; let generation = 1, bootstraps = 0;
   class Account {

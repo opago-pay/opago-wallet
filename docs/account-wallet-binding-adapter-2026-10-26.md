@@ -32,8 +32,10 @@ account refresh, ownership proof, binding and wallet status actions. Existing
 identity signing, durable operation IDs, response validation and session renewal
 after binding. Each ownership/binding action refreshes the account first. A
 browser login alone never becomes a WalletBearer or a confirmed binding.
-The screen ignores test-mode query parameters and hides account details while
-locked or unfocused. Lock/unlock rebuilds native adapters; delayed bootstrap
+The screen revalidates the browser session and backend status whenever it gains
+focus, before exposing cached state, including after logout through the public
+account screen. It ignores test-mode query parameters and hides account details
+while locked or unfocused. Lock/unlock rebuilds native adapters; delayed bootstrap
 results cannot replace the new wallet lifecycle.
 
 UMA, POS/QR pairing and transaction sync adapters remain separate integrations.
@@ -79,7 +81,7 @@ Automated tests use explicit synthetic OIDC/network/backend ports. They cover
 trust rejection, restoration of the shared login, account lookup without invented
 wallet authority, fresh status, API failure, foreign subjects, logout/lock races,
 native adapter recreation, and separate ownership/binding approvals in the UI.
-`npm run phase5:verify` passed on pinned Node 22.23.4: 1,172 application tests
+`npm run phase5:verify` passed on pinned Node 22.23.4: 1,173 application tests
 passed, one existing test skipped, and all nine contract tests passed, along with
 typecheck, lint and configuration/patch/syntax gates. The existing iOS plist test
 used a local `python3.exe` alias to installed Python 3.14 on Windows. Android

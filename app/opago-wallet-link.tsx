@@ -13,7 +13,7 @@ export default function WalletLinkScreen() {
   const focused = useIsFocused();
   const { isLocked } = useWalletAuth();
   const router = useRouter();
-  const { runtime, busy, error, run, updateRequired } = useOpagoAccount(false);
+  const { runtime, busy, error, run, updateRequired } = useOpagoAccount(false, focused && !isLocked);
   const account = runtime?.account;
   const state = account?.state;
   const visible = focused && !isLocked;
