@@ -75,6 +75,7 @@ export function SettingsMenu(props: {
   disabled?: boolean;
   onSelect(section: SettingsSection): void;
   onLock(): void;
+  onOpenOpagoAccount(): void;
 }) {
   const { selection } = useColorMode();
   const { language } = useLanguage();
@@ -86,6 +87,12 @@ export function SettingsMenu(props: {
           icon={props.backupChecked ? 'checkmark-circle' : 'shield-outline'} accent={!props.backupChecked}
           success={props.backupChecked}
           disabled={props.disabled} onPress={() => props.onSelect('security')} />}
+    </MenuGroup>
+    <MenuGroup title={t('Wallet')}>
+      <MenuRow title={t('OPAGO account')} detail={t('Account services')}
+        icon="person-circle-outline" divider disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
+      <MenuRow title={t('Lightning address')} detail={t('Manage your Lightning address')}
+        icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
     </MenuGroup>
     <MenuGroup title={t('Preferences')}>
       <MenuRow title={t('Appearance')} detail={t(selection === 'system' ? 'System' : selection === 'light' ? 'Day' : 'Dark')}
