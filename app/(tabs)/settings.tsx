@@ -42,7 +42,7 @@ import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { appConfig } from '@/lib/config';
 import { operationalHealth } from '@/lib/operational-health-native';
 import type { ServiceHealthRecord } from '@/lib/operational-health';
-import { getPerformanceReport, markNavigationReady, performanceTracingEnabled } from '@/lib/performance-trace';
+import { getPerformanceReport, markNavigationReady, markNavigationStart, performanceTracingEnabled } from '@/lib/performance-trace';
 import { categorizeAuthFailure, recordAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { bindHederaWalletAccount } from '@/lib/hedera/account-binding-native';
 import { listHederaAccountsForKey, type HederaAccountSnapshot } from '@/lib/hedera/account';
@@ -394,7 +394,7 @@ export default function SettingsScreen() {
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">{settingsSectionTitle(activeSection)}</Text>
         </View>
         <TouchableOpacity style={styles.headerBackButton}
-          onPress={() => activeSection === 'overview' ? router.replace('/(tabs)') : navigateToSection('overview')}
+          onPress={() => { if (activeSection === 'overview') { markNavigationStart('home'); router.replace('/(tabs)'); } else navigateToSection('overview'); }}
           accessibilityRole="button" accessibilityLabel={t('Back')} accessibilityState={{ disabled: busy }} disabled={busy}>
           <Ionicons name="arrow-back" size={26} color={themeColor('text')} accessible={false} />
         </TouchableOpacity>
