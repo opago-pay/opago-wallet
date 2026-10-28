@@ -66,9 +66,15 @@ export function PublicAccountScreen() {
       const runtime = await getF3Runtime(start.sparkWallet, start.hederaPublicKey);
       if (epoch !== generation.current) return;
       current();
-      setWalletBackendStatus(t(runtime.account.state.wallet?.party_id
-        ? 'OPAGO wallet binding returned an account-linked wallet.'
-        : 'The account backend returned no confirmed wallet binding.'));
+      if (runtime.startupError) {
+        setWalletBackendStatus(t('Wallet session refresh failed. The backend binding status is unknown.'));
+      } else if (!runtime.account.state.session) {
+        setWalletBackendStatus(t('No verified wallet session is available. Sign in and link your wallet before checking backend binding.'));
+      } else {
+        setWalletBackendStatus(t(runtime.account.state.wallet?.party_id
+          ? 'OPAGO wallet binding returned an account-linked wallet.'
+          : 'The account backend returned no confirmed wallet binding.'));
+      }
     } catch (cause) {
       if (epoch !== generation.current) return;
       try { current(); } catch { return; }
