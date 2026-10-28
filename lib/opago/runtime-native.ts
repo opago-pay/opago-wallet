@@ -33,15 +33,19 @@ export type F3Integration = { hka: HkaTransport; accountLogin: AccountLogin; dis
   transactionSync?: { revision: '3.0.0-draft.1'; resolution: string; authorize(account: OpagoAccount, owner: SyncOwner): Promise<TxAuthorization> } };
 let integration: F3Integration | null = null;
 let initializing: Promise<void> | null = null;
+let integrationGeneration = 0;
 async function ensureIntegration() {
   if (integration) return;
-  if (!nativeF3Enabled()) throw new Error('OPAGO backend integration is not configured.');
-  initializing ||= (async () => {
+  if (!nativeF3Enabled()) throw new OpagoError('wallet_integration_disabled');
+  const generation = integrationGeneration;
+  const flight = initializing ||= (async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createNativeF3Integration } = require('./bootstrap-native') as typeof import('./bootstrap-native');
-    installF3Integration(await createNativeF3Integration());
+    const configured = await createNativeF3Integration();
+    if (generation !== integrationGeneration) throw new OpagoError('operation_cancelled');
+    installF3Integration(configured);
   })();
-  try { await initializing; } catch (error) { initializing = null; throw error; }
+  try { await flight; } catch (error) { if (initializing === flight) initializing = null; throw error; }
 }
 /** Wire the existing HKA/OIDC integration here. No unknown root/key or old login format is accepted. */
 export function installF3Integration(value: F3Integration) {
@@ -68,7 +72,10 @@ export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinkin
 let live = new WeakMap<BitcoinSparkWallet, Promise<F3Runtime>>();
 let test: Promise<F3Runtime> | null = null;
 let accountOnly: Promise<F3Runtime> | null = null;
-walletSession.subscribe(() => { live = new WeakMap(); test = null; accountOnly = null; });
+walletSession.subscribe(() => {
+  live = new WeakMap(); test = null; accountOnly = null;
+  integrationGeneration++; integration = null; initializing = null;
+});
 async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string | null, testOnly: boolean): Promise<F3Runtime> {
   const assertCurrent = walletSession.captureRuntime();
   let account: OpagoAccount; let uma: UmaSending; let testKya: F3Runtime['setTestKya'];
@@ -150,11 +157,14 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
 export function getF3Runtime(wallet: BitcoinSparkWallet | null, publicKey: string | null, testOnly = false): Promise<F3Runtime> {
   if (testOnly) { test ||= buildRuntime(null, null, true); return test; }
   if (!wallet) {
-    accountOnly ||= buildRuntime(null, publicKey, false);
-    accountOnly.catch(() => { accountOnly = null; });
-    return accountOnly;
+    const runtime = accountOnly ||= buildRuntime(null, publicKey, false);
+    runtime.catch(() => { if (accountOnly === runtime) accountOnly = null; });
+    return runtime;
   }
   let runtime = live.get(wallet);
-  if (!runtime) { runtime = buildRuntime(wallet, publicKey, false); live.set(wallet, runtime); runtime.catch(() => live.delete(wallet)); }
+  if (!runtime) {
+    runtime = buildRuntime(wallet, publicKey, false); live.set(wallet, runtime);
+    runtime.catch(() => { if (live.get(wallet) === runtime) live.delete(wallet); });
+  }
   return runtime;
 }

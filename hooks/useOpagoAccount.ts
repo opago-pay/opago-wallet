@@ -19,7 +19,7 @@ export function useOpagoAccount(testOnly: boolean) {
       if (active) { setLoaded({ runtime: value, sparkWallet, hederaPublicKey, testOnly }); if (value.startupError) setError(opagoUserError(value.startupError)); update(v => v + 1); }
     }, cause => { if (active) {
       const update = cause instanceof OpagoError && cause.code === 'app_update_required'; setUpdateRequired(update);
-      setError(update ? opagoUserError(cause) : 'OPAGO account services are not available in this build. Your local wallet remains available.');
+      setError(opagoUserError(cause));
     } });
     return () => { active = false; current.current = null; };
   }, [sparkWallet, hederaPublicKey, testOnly]);

@@ -9,6 +9,7 @@ import { nativeBrokerAccount } from '../../lib/opago/broker-account-native';
 import type { BrokerAccountAction } from '../../lib/opago/broker-account';
 import { WebsiteAccountError, websiteAccountMessage } from '../../lib/opago/website-account';
 import { t } from '../../lib/i18n';
+import { payoutBindingPolicy } from '../../lib/opago/payout-binding-policy';
 import { Action, Card, Copy, OpagoPage } from './opago-ui';
 
 export function PublicAccountScreen() {
@@ -60,29 +61,24 @@ export function PublicAccountScreen() {
     const epoch = generation.current;
     pending.current = true; setBusy(true); setWalletBackendStatus('');
     try {
-      // Never pass a public browser account token as WalletBearer or AccountBearer.
-      // The live F3 bootstrap must furnish an approved, authenticated integration.
+      // Restore the verified broker session and revalidate account authority at the API.
       const { getF3Runtime } = await import('../../lib/opago/runtime-native');
       const runtime = await getF3Runtime(start.sparkWallet, start.hederaPublicKey);
       if (epoch !== generation.current) return;
       current();
-      if (runtime.startupError) {
-        setWalletBackendStatus(t('Wallet session refresh failed. The backend binding status is unknown.'));
-      } else if (!runtime.account.state.session) {
-        setWalletBackendStatus(t('No verified wallet session is available. Sign in and link your wallet before checking backend binding.'));
-      } else {
-        setWalletBackendStatus(t(runtime.account.state.wallet?.party_id
-          ? 'OPAGO wallet binding returned an account-linked wallet.'
-          : 'The account backend returned no confirmed wallet binding.'));
-      }
+      const { inspectWalletBackend } = await import('../../lib/opago/backend-status');
+      let status = '';
+      await runtime.perform(async () => { status = await inspectWalletBackend(runtime.account); });
+      if (epoch !== generation.current) return;
+      current(); setWalletBackendStatus(t(status));
     } catch (cause) {
       if (epoch !== generation.current) return;
       try { current(); } catch { return; }
       // Only show a fixed, non-sensitive diagnostic code; never a server exception,
       // token, descriptor, subject, error body, or raw response.
       const { OpagoError } = await import('../../lib/opago/api');
-      const code = cause instanceof OpagoError && cause.code === 'wallet_session_contract_pending'
-        ? 'wallet_session_contract_pending' : 'wallet_backend_unavailable';
+      const code = cause instanceof OpagoError && ['wallet_integration_disabled', 'app_update_required', 'session_expired', 'upstream_unavailable'].includes(cause.code)
+        ? cause.code : 'wallet_backend_unavailable';
       setWalletBackendStatus(t('OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.', { code }));
     } finally {
       if (epoch === generation.current) { pending.current = false; setBusy(false); }
@@ -123,8 +119,14 @@ export function PublicAccountScreen() {
         <Copy>{t('Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.')}</Copy>
         {walletBackendStatus && <Copy>{walletBackendStatus}</Copy>}
         <Action label={t('Check wallet backend')} disabled={busy} onPress={() => void checkWalletBackend()} />
+        <Action label="Wallet ownership and binding" disabled={busy} onPress={() => router.push('/opago-wallet-link')} />
         <Action label={t('Transaction synchronization')} disabled={busy} onPress={() => router.push('/transaction-sync')} />
       </Card>
+      {signedIn && <Card title={payoutBindingPolicy.title}>
+        <Copy>{t(payoutBindingPolicy.unlink)}</Copy>
+        <Copy warning>{t(payoutBindingPolicy.loss)}</Copy>
+        <Copy>{t(payoutBindingPolicy.evidence)}</Copy>
+      </Card>}
       <Action label="Continue using my wallet" onPress={() => { clear(); context.current.focused = false; router.replace('/'); }} />
     </>}
   </OpagoPage>;

@@ -64,6 +64,7 @@ function AppStack() {
           <Stack.Screen name="exchange-flow" options={{ headerShown: false }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-wallet-link" options={{ headerShown: false }} />
           <Stack.Screen name="opago-signup" options={{ headerShown: false }} />
           <Stack.Screen name="identity" options={{ headerShown: false }} />
           <Stack.Screen name="pos-link" options={{ headerShown: false }} />
