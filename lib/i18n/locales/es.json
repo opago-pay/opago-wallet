@@ -784,5 +784,7 @@
   "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "Servicio de cartera OPAGO no disponible ({code}). La vinculación entre cuenta y cartera y la sincronización no están confirmadas.",
   "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "La prueba de propiedad de la cartera, la dirección Lightning personal y los informes de transacciones requieren una cuenta verificada y una sesión de cartera independientes.",
   "Check wallet backend": "Comprobar servicio de cartera",
-  "Transaction synchronization": "Sincronización de transacciones"
+  "Transaction synchronization": "Sincronización de transacciones",
+  "Wallet session refresh failed. The backend binding status is unknown.": "No se pudo actualizar la sesión de la cartera. Se desconoce el estado de vinculación del servidor.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "No hay una sesión de cartera verificada. Inicia sesión y vincula tu cartera antes de comprobar la vinculación en el servidor."
 }
