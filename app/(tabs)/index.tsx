@@ -782,6 +782,9 @@ export default function HomeScreen() {
       </View>
 
       {walletReady && <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
+      <View style={styles.homeBackupReminder}>
+        <BackupReminder />
+      </View>
       <View style={styles.quickActions}>
         <QuickAction
           icon="qr-code-outline"
@@ -795,7 +798,6 @@ export default function HomeScreen() {
         <Text style={styles.balanceLabel}>{row.kind==='to_lightning'?'Bitcoin → Lightning':'Lightning → Bitcoin'}</Text>
         <Text style={styles.balanceSubtitle}>{t(row.transferStage==='claim_required'?'Lightning fee approval required':'Checking transfer')}</Text>
       </TouchableOpacity>)}
-      <BackupReminder />
       {(latestTransaction || historyLoadedRef.current) && <>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t('Latest activity')}</Text>
@@ -1125,6 +1127,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   portfolioBalanceLabel: { color: '#d5d5da', fontSize: 19, fontWeight: '600', marginTop: 8 },
   balanceCaveat: { color: '#a59a84', fontSize: 11, textAlign: 'center', marginTop: 5 },
   total: { color: '#fff', fontSize: 52, fontWeight: '600', textAlign: 'center', flexShrink: 1, fontVariant: ['tabular-nums'] },
+  homeBackupReminder: { width: '100%', marginTop: 8, marginBottom: 4 },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
