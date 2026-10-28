@@ -109,7 +109,38 @@ Gradle completed all 1,103 tasks successfully. APK evidence:
   clearing. Installed version 22 was confirmed; launch returned `Status: ok` and
   the app displayed its wallet unlock screen.
 
-The authenticated device check is pending user unlock. Installation/startup alone
-does not establish login, proof or binding success or verify stored balances.
+The device was subsequently unlocked and the native backend inspection completed
+with “Please sign in again.” Configuration and HPKE discovery reached the real
+API and returned 200. The user attempted browser authentication, but the return
+to the wallet failed before OAuth token exchange/account or binding acceptance.
+
+Public API access logs on 28 October (UTC; local Europe/Berlin was UTC+1):
+
+| Time | Request | Status |
+| --- | --- | --- |
+| 22:49:29 | `POST /api/v2/auth/token` | 200 |
+| 22:49:29 | `POST /api/v2/auth/handover-ticket` | 503 |
+| 22:49:43 | `POST /api/v2/auth/token` | 200 |
+| 22:49:43 | `POST /api/v2/auth/handover-ticket` | 503 |
+| 22:50:13 | `POST /api/v2/auth/token` | 200 |
+| 22:50:13 | `POST /api/v2/auth/handover-ticket` | 503 |
+| 22:50:31 | `POST /api/v2/auth/token` | 200 |
+| 22:50:31 | `POST /api/v2/auth/handover-ticket` | 503 |
+
+The failing handover requests were seen across all three public API replicas.
+The public handler checks the website session through the internal
+`POST /api/auth/verify-website-session` operation and uses Redis for revocation,
+quotas and one-time tickets. Its source maps several configuration, internal
+authenticator and Redis exceptions to the same 503. Access logs did not expose
+which exception occurred; no matching internal session-verification access entries
+were available in the inspected container logs. The developer readonly role was
+denied access to the internal gateway ConfigMap. Therefore the exact dependency
+failure remains unconfirmed and must not be labelled a proven Redis failure or
+a proven missing internal handler. Backend operators can correlate the above
+times and inspect that handover/session-verification path.
+
+This is a real device failure at browser-to-app handover, not a successful binding
+test. No ownership proof or binding was submitted, and stored balances were not
+verified. The app remained usable and returned to its wallet home screen.
 The running API deployment had the broker enabled and no explicit `WALLET_F3_*`
 environment settings (no `envFrom`); its internal-service acceptance remains open.
