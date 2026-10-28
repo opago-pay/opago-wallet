@@ -43,6 +43,7 @@ function settingsFixture(t, initialSection = 'overview') {
   global.requestAnimationFrame = callback => { callback(); return 1; };
   global.cancelAnimationFrame = () => {};
   const navigation = [];
+  const performanceMarks = [];
   const router = { setParams: value => { section = value.section; }, replace: route => navigation.push(['replace', route]), push: route => navigation.push(['push', route]) };
   const auth = {
     backupStatus: 'verified', hederaPublicKey: 'test-public-key',
@@ -65,6 +66,7 @@ function settingsFixture(t, initialSection = 'overview') {
     '@/lib/auth-diagnostics': { recordAuthDiagnostic() {}, categorizeAuthFailure: () => 'unknown' },
     '@/lib/storage': { getSecureItem: async () => 'test recovery words never from a real wallet', MNEMONIC_STORE_KEY: 'test' },
     '@/lib/config': { appConfig: {} },
+    '@/lib/performance-trace': { markNavigationStart: route => { performanceMarks.push(route); navigation.push(['markNavigationStart', route]); }, markNavigationReady() {}, getPerformanceReport: () => [], performanceTracingEnabled: () => false },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'Button', TextInput: 'Input', WalletActivityBoundary: 'Boundary' },
     '@/components/navigation/close-wallet-screen': { CloseWalletScreen: 'Close' },
     '@/components/settings/settings-menu': { ...menuExports, SettingsMenu: 'Menu' },
@@ -89,7 +91,7 @@ function settingsFixture(t, initialSection = 'overview') {
     global.cancelAnimationFrame = oldCancel;
   });
   return {
-    ...fixture, getSection: () => section, back: () => back(), alerts, navigation,
+    ...fixture, getSection: () => section, back: () => back(), alerts, navigation, performanceMarks,
     setSection: value => { section = value; }, setFocused: value => { focused = value; },
     setAuthorization: value => { authorize = value; }, authCalls: () => authCalls,
   };
@@ -159,13 +161,14 @@ test('header has one accessible back arrow with context-aware navigation', t => 
   let screen = ui.render();
   assert.equal(find(screen, node => node.props?.accessibilityLabel === 'Back')?.type, 'Button');
   find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
-  assert.deepEqual(ui.navigation, [['replace', '/(tabs)']]);
+  assert.deepEqual(ui.navigation, [['markNavigationStart', 'home'], ['replace', '/(tabs)']]);
   find(screen, node => node.type === 'Menu').props.onSelect('appearance');
   screen = ui.render();
   assert.equal(find(screen, node => node.props?.accessibilityLabel === 'Back to settings'), null);
   find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
   assert.equal(ui.getSection(), 'overview');
-  assert.deepEqual(ui.navigation, [['replace', '/(tabs)']]);
+  assert.deepEqual(ui.performanceMarks, ['home']);
+  assert.deepEqual(ui.navigation, [['markNavigationStart', 'home'], ['replace', '/(tabs)']]);
 });
 
 test('OPAGO account and Lightning address use matching menu entries and the existing destination', () => {
