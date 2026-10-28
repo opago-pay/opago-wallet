@@ -19,7 +19,7 @@ function publicKeyBytes(value: unknown): Uint8Array {
 }
 
 /**
- * SDK 0.7.12 exposes these Rust operations on Android, but DefaultSparkSigner
+ * SDK 0.14.0 exposes these Rust operations on Android, but DefaultSparkSigner
  * still uses JavaScript curve multiplication for keys and nonce commitments.
  * Keep SDK derivation, secure randomness, nonce ownership and FROST signing;
  * only delegate the same compressed secp256k1 public-key operation to Rust.
@@ -92,7 +92,7 @@ class AndroidSparkSigner extends PaymentScopedSparkSigner {
 }
 
 export function createSparkSigner(): DefaultSparkSigner {
-  // Deliberately Android-only. In pinned SDK 0.7.12 the iOS versions of these
+  // Deliberately Android-only. In pinned SDK 0.14.0 the iOS versions of these
   // particular bridge methods print their input parameters. Do not call them.
   if (Platform.OS !== 'android') return new DefaultSparkSigner();
   const bridge = NativeModules.SparkFrostModule as PublicKeyBridge | undefined;

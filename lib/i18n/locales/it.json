@@ -372,10 +372,9 @@
   "Could not read this payment code.": "Impossibile leggere questo codice di pagamento.",
   "Scan payment code": "Scansiona il codice di pagamento",
   "Opening camera…": "Apertura della fotocamera…",
-  "Allow camera access to scan a payment QR code.": "Consenti l'accesso alla fotocamera per scansionare un codice QR di pagamento.",
+  "Camera access is used to scan payment QR codes.": "L'accesso alla fotocamera serve a scansionare i codici QR di pagamento.",
   "Open your device settings to allow camera access for Opago.": "Apri le impostazioni del dispositivo per consentire a Opago di usare la fotocamera.",
   "Open device settings": "Apri impostazioni del dispositivo",
-  "Allow camera": "Consenti fotocamera",
   "Hold the QR code inside the frame": "Tieni il codice QR all'interno della cornice",
   "Close scanner": "Chiudi scanner",
   "It is complete and saved in your activity.": "È completo e registrato nell'attività.",
@@ -774,5 +773,9 @@
   "Address setup is temporarily unavailable. Please try again later.": "La creazione di indirizzi è temporaneamente non disponibile. Riprova più tardi.",
   "Technical details": "Dettagli tecnici",
   "Checking your address…": "Verifica del tuo indirizzo…",
-  "Your address is ready. Show this code to receive HBAR.": "Il tuo indirizzo è pronto. Mostra questo codice per ricevere HBAR."
+  "Your address is ready. Show this code to receive HBAR.": "Il tuo indirizzo è pronto. Mostra questo codice per ricevere HBAR.",
+  "OPAGO account": "Account OPAGO",
+  "Account services": "Servizi account",
+  "Lightning address": "Indirizzo Lightning",
+  "Manage your Lightning address": "Gestisci il tuo indirizzo Lightning"
 }

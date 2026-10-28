@@ -49,7 +49,7 @@ test('F3 refuses changed action, account, identity, network, lifetime, and insta
   assert.equal(signCalls, 0);
 });
 
-test('Spark SDK 0.7.12 signs the exact F3 digest and produces a verify payload', async () => {
+test('Spark SDK 0.14.0 signs the exact F3 digest and produces a verify payload', async () => {
   const signer = new DefaultSparkSigner();
   const seed = Buffer.alloc(64, 0x37); // Public synthetic test seed only.
   await signer.createSparkWalletFromSeed(seed, 1);

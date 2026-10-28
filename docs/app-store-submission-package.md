@@ -1,6 +1,6 @@
 # OPAGO Wallet – Apple-Einreichungspaket
 
-**Stand: 4. Oktober 2026.** Dieses Dokument beschreibt den aktuellen Quellstand. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
+**Stand: 20. Oktober 2026.** Dieses Dokument beschreibt den aktuellen Quellstand. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
 
 ## Produktumfang
 
@@ -35,11 +35,13 @@
 
 ## Screenshots
 
-Sieben historische Grafiken liegen in [app-store-assets](app-store-assets/README.md). Bilder 01 und 07 zeigen den entfernten Buy-Einstieg und dürfen so nicht eingereicht werden. Die restlichen Bilder sind ebenfalls gegen den finalen signierten Build zu prüfen. Neue Aufnahmen mit kontrollierten Testdaten erstellen; keine privaten Wiederherstellungswörter oder fremden Zahlungsdaten zeigen. Die README blendet die zwei offensichtlich veralteten Home-Bilder aus.
+Acht Grafiken liegen in [app-store-assets](app-store-assets/README.md), dort mit Upload-Reihenfolge. Bilder 01 und 09 enthalten jetzt die am 20. Oktober von Fabian gelieferten aktuellen iPhone-Aufnahmen in Hell und Dunkel, eingesetzt in das bisherige Design. Sie zeigen die deutsche Oberfläche mit Empfangen und Senden ohne Buy; die englischen Werbetexte bleiben erhalten. Bild 07 bleibt mangels aktueller Aufnahme mit aufgeklappter Coin-Liste ausgeschlossen. In App Store Connect die alten Bilder 01 und 09 ersetzen und Bild 07 entfernen. Alle Bilder gegen den finalen signierten Build und die ausgewählte Store-Sprache prüfen.
 
 Die benötigten Gerätefamilien und Abmessungen anhand des tatsächlich hochgeladenen iPhone-Builds und der [aktuellen Screenshot-Spezifikation](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications) auswählen. Aus der früheren supportsTablet-Konfiguration folgt keine aktuelle iPad-Screenshotpflicht.
 
 ## Review Notes – vor Einreichung an den finalen Build anpassen
+
+Die Ablehnung vom 18. Oktober 2026 betrifft Version 1.0.0 (46), Submission-ID `2af73989-d45a-4a68-8636-6678e3dbea67`. Der Kamera-Vordialog verwendet im Quellstand jetzt „Continue“ bzw. „Weiter“ sowie eine sachliche Zweckbeschreibung in allen fünf Sprachen. Die eigentliche Berechtigung wird weiterhin im Systemdialog erteilt oder abgelehnt. Ein neuer iOS-Build und die Aktualisierung der Store-Screenshots stehen separat aus.
 
 1. Neue Wallet erstellen oder eine separat und sicher bereitgestellte Review-Wallet wiederherstellen. Geräteauthentifizierung und Backup gemäß Oberfläche durchlaufen. Keine echten Nutzerseeds im Repository oder in öffentlichen Review Notes hinterlegen.
 2. Startseite zeigt Empfangen und Senden. Empfangen öffnet Lightning; über die Zahlungsweg-Auswahl Bitcoin-Onchain und gegebenenfalls HBAR auswählen.

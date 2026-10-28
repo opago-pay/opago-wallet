@@ -20,12 +20,12 @@ assert.equal(appConfig.isDevelopment, false);
 assert.equal(appConfig.allowInsecureHttp, false, 'Insecure HTTP must be disabled.');
 assert.equal(
   packageJson.dependencies['@buildonspark/spark-sdk'],
-  '0.7.12',
+  '0.14.0',
   'Spark SDK must be pinned exactly.',
 );
 assert.equal(
   lock.packages['node_modules/@buildonspark/spark-sdk'].version,
-  '0.7.12',
+  '0.14.0',
   'Lockfile Spark SDK must match the reviewed version.',
 );
 

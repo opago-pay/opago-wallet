@@ -116,6 +116,7 @@ function fixture(data = {}) {
       list: query('hedera journal'), reconcile: async () => { throw new Error('Recovery must not block history'); },
     }) },
     '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: query('lightning journal') }) },
+    '@/lib/lightning/transfer-amount': require('../lib/lightning/transfer-amount.ts'),
     '@/lib/lightning/spark-history': { loadSparkTransferPage: async (_wallet, limit, offset) => {
       const transfers = await query('lightning history')(limit, offset);
       return { transfers, next: transfers.length === limit ? offset + limit : null };
@@ -287,7 +288,7 @@ test('a Lightning payment keeps the recipient amount when Spark reports an amoun
   const app = fixture({
     local: [{ ...record(1, createdAt), txId: key, type: 'outgoing', amount: 1 }],
     'lightning journal': [{ paymentHash: hash, amountSats: 1, state: 'confirmed', createdAt }],
-    'lightning history': [{ id: 'transfer-1', status: 'COMPLETED', totalValue: 3,
+    'lightning history': [{ id: 'transfer-1', status: 'COMPLETED', valueReceivedByWallet: 3,
       transferDirection: 'OUTGOING', createdTime: createdAt, userRequest: { invoice: { paymentHash: hash } } }],
   });
   app.render(); app.refocus(); await settle();
@@ -329,7 +330,7 @@ test('Home starts wallet initialization immediately while remote history remains
 
 test('History loads other assets while waiting for Bitcoin, then pages twenty payments at a time', async () => {
   const transfers = Array.from({ length: 45 }, (_, i) => ({
-    id: 'transfer-' + i, status: 'COMPLETED', totalValue: 10, transferDirection: 'INCOMING',
+    id: 'transfer-' + i, status: 'COMPLETED', valueReceivedByWallet: 10, transferDirection: 'INCOMING',
     createdTime: new Date(1800000000000 - i * 1000).toISOString(),
   }));
   const data = { primaryReady: false, 'lightning history': (limit, offset) => transfers.slice(offset, offset + limit) };

@@ -14,6 +14,15 @@ import { UpdateAccountApp } from '../components/opago/update-account-app';
 
 export default function OpagoAccountScreen() {
   const params = useLocalSearchParams<{ test?: string }>();
+  if (__DEV__ && params.test === '1') return <ContractAccountScreen />;
+  // Keep website entry independent of legacy F3/OIDC initialization.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PublicAccountScreen } = require('../components/opago/public-account-screen') as typeof import('../components/opago/public-account-screen');
+  return <PublicAccountScreen />;
+}
+
+export function ContractAccountScreen() {
+  const params = useLocalSearchParams<{ test?: string }>();
   const [testOnly, setTestOnly] = useState(__DEV__ && params.test === '1');
   const { runtime, busy, error, run, updateRequired } = useOpagoAccount(testOnly);
   const router = useRouter(); const [name, setName] = useState(''); const [deleteText, setDeleteText] = useState('');
@@ -50,7 +59,7 @@ export default function OpagoAccountScreen() {
           <Copy>{t('You are signed in. Confirm your email before linking this wallet, then refresh your account details.')}</Copy>
           <Action label="Refresh account details" disabled={busy} onPress={() => void run(() => account.refreshAccount())} />
         </>}
-        {state.credential && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
+        {(state.credential || state.logoutPending) && <Action label="Sign out of OPAGO" disabled={busy} onPress={() => void run(() => account.signOut())} />}
       </Card>
       <Card title="Wallet ownership and binding">
         <Copy>{t(wallet?.party_id ? 'This wallet is explicitly linked to your OPAGO account.' : state.session ? 'Wallet ownership proved. The wallet is not linked to an account yet.' : 'Prove ownership of this local wallet to OPAGO.')}</Copy>

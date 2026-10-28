@@ -11,7 +11,7 @@ function fixture(query) {
   let queries = 0;
   class SparkWallet {
     async getLeaves(balanceCheck) {
-      assert.equal(balanceCheck, true);
+      assert.equal(balanceCheck, undefined);
       queries++;
       return query();
     }
@@ -36,7 +36,6 @@ function fixture(query) {
     if (name === './spark-leaf-selection') return require('../lib/spark-leaf-selection.ts');
     if (name === './spark-signer-cache') return require('../lib/spark-signer-cache.ts');
     if (name === './spark-htlc-preparation') return require('../lib/spark-htlc-preparation.ts');
-    if (name === './spark-lightning-pipeline') return require('../lib/spark-lightning-pipeline.ts');
     throw Error('Unexpected dependency: ' + name);
   }, exports);
   return { wallet: new exports.BitcoinSparkWallet(), cache, queries: () => queries };

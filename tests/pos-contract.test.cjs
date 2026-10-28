@@ -61,7 +61,7 @@ test('invoice checks bind signature, network, amount, metadata plus exact payerd
   for (const pr of [invoice(21, undefined, { descriptionHash }), invoice(20),
     invoice(20, undefined, { network: 'bc', descriptionHash }), invoice(20, 1, { descriptionHash }),
     invoice(20, undefined, { descriptionHash: digest(metadata + JSON.stringify(JSON.parse(raw))) }),
-    good.pr.slice(0, -1) + 'x']) assert.throws(() => attempt.inspectInvoice({ pr }), /invalid_invoice/);
+    good.pr.slice(0, -1) + (good.pr.endsWith('x') ? 'q' : 'x')]) assert.throws(() => attempt.inspectInvoice({ pr }), /invalid_invoice/);
   assert.throws(() => attempt.inspectInvoice({ pr: invoice(20, undefined, { descriptionHash, paymentHash: '08'.repeat(32) }) }), /invoice_changed/);
   attempt.close(); assert.throws(() => attempt.inspectInvoice(good), /attempt_closed/);
 });

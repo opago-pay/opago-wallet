@@ -47,7 +47,7 @@ function screenFixture(t, file, runtime, params = { test: '1' }) {
     'react-native-qrcode-svg': { default: 'qr', __esModule: true }, 'react-native': { View: 'view', Share: { share: async value => { runtime.shared = value.message; } } },
     'expo-clipboard': { setStringAsync: async value => { runtime.copied = value; } },
     '../lib/opago/api': require('../lib/opago/api.ts'),
-  }), exports => exports.default()); t.after(app.unmount); return { ...app, afterAction: async () => { await pending; return app.render(); } };
+  }), exports => file === 'app/opago-account.tsx' ? exports.ContractAccountScreen() : exports.default()); t.after(app.unmount); return { ...app, afterAction: async () => { await pending; return app.render(); } };
 }
 
 test('F3 update action opens only the configured distribution URL after an explicit tap', async t => {

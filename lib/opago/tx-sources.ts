@@ -1,3 +1,4 @@
+import { sparkTransferAmount } from '../lightning/transfer-amount';
 import type { SparkTransferLike, SparkUserRequestLike } from '../lightning/spark-history';
 import type { LightningPaymentJournalRecord } from '../lightning/payment-journal';
 import type { HederaPaymentJournalRecord } from '../hedera/payment-journal';
@@ -31,7 +32,7 @@ export function sparkTransferCandidate(transfer: SparkTransferLike): Candidate {
   if (typeof transfer.id !== 'string' || !transfer.id || !['INCOMING','OUTGOING'].includes(String(transfer.transferDirection))) throw new Error('sync_invalid_contract');
   return candidate('spark-transfer:' + transfer.id, { asset: 'BTC', rail: 'spark', id_source: 'SPARK_TRANSFER_ID', source_payment_id: transfer.id,
     direction: transfer.transferDirection === 'INCOMING' ? 'incoming' : 'outgoing', sdk_status: status(transfer.status), status: null,
-    amount_msat: exactAmount(transfer.totalValue, 1000n) });
+    amount_msat: exactAmount(sparkTransferAmount(transfer), 1000n) });
 }
 export function sparkRequestCandidate(request: SparkUserRequestLike, paymentHash?: string | null): Candidate | null {
   if (!['LightningSendRequest','LightningReceiveRequest'].includes(String(request.typename))) return null; // On-chain/Buy/Sell have no report shape in this revision.

@@ -84,11 +84,11 @@ test('matches incoming Spark transfers by direction, state, hash, and exact amou
     id: 'transfer-1',
     transferDirection: 'INCOMING',
     status: 'COMPLETED',
-    totalValue: 50,
+    valueReceivedByWallet: 50,
     userRequest: { invoice: { paymentHash }, paymentPreimage: preimage },
   };
   assert.equal(sparkTransferMatchesInvoice(transfer, paymentHash, 50), true);
-  assert.equal(sparkTransferMatchesInvoice({ ...transfer, totalValue: 51 }, paymentHash, 50), false);
+  assert.equal(sparkTransferMatchesInvoice({ ...transfer, valueReceivedByWallet: 51 }, paymentHash, 50), false);
   assert.equal(sparkTransferMatchesInvoice({ ...transfer, transferDirection: 'OUTGOING' }, paymentHash, 50), false);
   assert.equal(sparkTransferMatchesInvoice({
     ...transfer,
@@ -159,7 +159,7 @@ test('records a Spark payment only after a matching proof and propagates failure
     invoice: details.invoice,
     maxFeeSats: 1,
     amountSatsToSend: undefined,
-    idempotencyKey: 'opago-' + paymentHash,
+    transferId: require('../lib/lightning/transfer-id.ts').lightningTransferId(paymentHash),
   });
 
   await assert.rejects(

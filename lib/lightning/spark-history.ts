@@ -23,7 +23,9 @@ export interface SparkUserRequestLike {
 export interface SparkTransferLike {
   id?: unknown;
   status?: unknown;
-  totalValue?: unknown;
+  totalValue?: unknown; // Legacy metadata only; never use as this wallet's amount.
+  valueReceivedByWallet?: unknown;
+  valueSentByWallet?: unknown;
   transferDirection?: unknown;
   createdTime?: string | number | Date;
   userRequest?: SparkUserRequestLike;

@@ -9,7 +9,7 @@ import { OPAGO_LINKS, OPAGO_OPERATOR } from '@/lib/legal-links';
 import { themeColor } from '@/lib/theme-styles';
 
 type LinkId = keyof typeof OPAGO_LINKS;
-type Props = { variant?: 'section' | 'footer' | 'help'; disabled?: boolean; embedded?: boolean };
+type Props = { variant?: 'section' | 'footer' | 'help' | 'welcome'; disabled?: boolean; embedded?: boolean };
 
 export function LegalLinks({ variant = 'section', disabled = false, embedded = false }: Props) {
   const { mode } = useColorMode();
@@ -25,7 +25,9 @@ export function LegalLinks({ variant = 'section', disabled = false, embedded = f
     { id: 'terms', label: t('Terms and conditions') },
   ];
   const visibleLinks = links.filter(link => variant === 'section'
-    || (variant === 'help' ? link.id === 'contact' || link.id === 'privacy' : link.id !== 'support'));
+    || (variant === 'help' || variant === 'welcome'
+      ? link.id === 'contact' || link.id === 'privacy'
+      : link.id !== 'support'));
 
   async function openLink(id: LinkId) {
     if (unavailable) return;

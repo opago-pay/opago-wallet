@@ -31,7 +31,7 @@ export function ColorModePicker({ embedded = false }: { embedded?: boolean }) {
         disabled={saving !== null} onPress={() => void select(item)}
       >
           <Ionicons name={item === 'system' ? 'phone-portrait-outline' : item === 'light' ? 'sunny-outline' : 'moon-outline'} size={21} color={item === selection ? themeColor('accentText') : adaptColor('#96969d', 'color')} />
-        <Text style={[styles.choiceText, item === selection && styles.selectedText]}>{t(item === 'system' ? 'System' : item === 'light' ? 'Day' : 'Dark')}</Text>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.choiceText, item === selection && styles.selectedText]}>{t(item === 'system' ? 'System' : item === 'light' ? 'Day' : 'Dark')}</Text>
         {saving === item ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> :
           <Ionicons name={item === selection ? 'checkmark-circle' : 'ellipse-outline'} size={21} color={item === selection ? themeColor('accentText') : adaptColor('#96969d', 'color')} />}
       </TouchableOpacity>)}
@@ -44,9 +44,9 @@ const styles = adaptiveStyles(StyleSheet.create({
   embedded: { marginTop: 0, paddingTop: 0, borderTopWidth: 0 },
   title: { color: '#fff', fontSize: 20, fontWeight: '600' },
   subtitle: { color: '#b8b8c0', fontSize: 15, lineHeight: 23, marginTop: 8, marginBottom: 16 },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  choice: { flexGrow: 1, flexBasis: 140, minHeight: 56, borderRadius: 14, borderWidth: 1, borderColor: '#39393e', backgroundColor: '#151518', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 12 },
+  choices: { gap: 10 },
+  choice: { width: '100%', minHeight: 56, borderRadius: 14, borderWidth: 1, borderColor: '#39393e', backgroundColor: '#151518', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   selected: { borderColor: '#96701c', backgroundColor: '#211c11' },
-  choiceText: { color: '#eeeef0', fontSize: 16, fontWeight: '600', flexShrink: 1 },
+  choiceText: { color: '#eeeef0', fontSize: 16, fontWeight: '600', flex: 1, minWidth: 0 },
   selectedText: { color: '#ffb000' },
 }));
