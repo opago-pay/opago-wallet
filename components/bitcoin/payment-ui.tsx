@@ -63,7 +63,7 @@ export function BitcoinReview(props: {
       <Cost label={t('Maximum total')} amount={props.amountSats + props.feeSats} />
     </View>
     {props.route === 'onchain' && <><Text style={bitcoinStyles.value}>{t('From Lightning balance')}</Text><Text style={[bitcoinStyles.note, { marginBottom: 16 }]}>{t('Bitcoin network confirmation required.')}</Text></>}
-    {props.feeSats > props.amountSats / 10 && <Text style={[bitcoinStyles.note, { color: adaptColor('#ffce6b', 'color'), marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
+    {props.feeSats > props.amountSats / 10 && <Text accessibilityRole="alert" style={[bitcoinStyles.note, { color: adaptColor('#ffce6b', 'color'), marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
   </BitcoinSendScreen>;
 }
 

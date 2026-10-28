@@ -1,5 +1,6 @@
 // English key, German, French, Spanish, Italian. Dynamic F3 labels share the normal catalog.
 const rows = [
+  ['Maximum fee in SAT', 'Maximale Gebühr in SAT', 'Frais maximum en SAT', 'Comisión máxima en SAT', 'Commissione massima in SAT'],
   ['Copy Lightning address', 'Lightning-Adresse kopieren', 'Copier l’adresse Lightning', 'Copiar dirección Lightning', 'Copia indirizzo Lightning'],
   ['Share Lightning address', 'Lightning-Adresse teilen', 'Partager l’adresse Lightning', 'Compartir dirección Lightning', 'Condividi indirizzo Lightning'],
   ['Sign in and connect this Spark wallet to manage your personal address. The server must confirm activation before you can share it.', 'Melde dich an und verbinde diese Spark-Wallet, um deine persönliche Adresse zu verwalten. Erst nach der Aktivierungsbestätigung vom Server kannst du sie teilen.', 'Connectez-vous et liez ce portefeuille Spark pour gérer votre adresse personnelle. Le serveur doit confirmer son activation avant le partage.', 'Inicia sesión y vincula esta cartera Spark para gestionar tu dirección personal. El servidor debe confirmar la activación antes de compartirla.', 'Accedi e collega questo portafoglio Spark per gestire il tuo indirizzo personale. Il server deve confermare l’attivazione prima della condivisione.'],

@@ -124,16 +124,17 @@ test('LNURL limits, fractional amounts and incorrect callback amounts fail befor
   }
 });
 
-test('quotes over the build fee cap fail clearly without submitting a payment', async () => {
+test('fees above 100 SAT reach review while unaffordable or unavailable fees never submit', async () => {
   const wallet = {
     getBalance: async () => ({ balance: 1000 }),
     getLightningSendFeeEstimate: async () => 101,
     payLightningInvoice: async () => assert.fail('An unaffordable quote must not submit a payment'),
   };
-  await assert.rejects(prepareSparkPayment(wallet, invoice(20)), cause => {
-    assert.equal(friendlyPaymentMessage(cause), t('The estimated network fee is {fee} SAT. This payment allows at most {max} SAT. Nothing was sent. Try again later or use a different payment request.', { fee: 101, max: 100 }));
-    return true;
-  });
+  const reviewed = await prepareSparkPayment(wallet, invoice(20));
+  assert.equal(reviewed.maxFeeSats, 101);
+  assert.equal(reviewed.amountSats + reviewed.maxFeeSats, 121);
+  wallet.getLightningSendFeeEstimate = async () => 981;
+  await assert.rejects(prepareSparkPayment(wallet, invoice(20)), /Insufficient balance/);
   wallet.getLightningSendFeeEstimate = async () => { throw new Error('Private invoice in SDK response'); };
   await assert.rejects(prepareSparkPayment(wallet, invoice(20)), cause => {
     assert.equal(friendlyPaymentMessage(cause), t('The Lightning network could not provide a fee estimate. Nothing was sent. Please try again in a moment.'));
