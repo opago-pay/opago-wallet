@@ -31,3 +31,18 @@ test('live backend inspection is exposed without replacing account or wallet aut
   assert.match(runtime, /transactionSyncPort/);
   assert.match(runtime, /onchainSyncPort/);
 });
+
+test('wallet backend diagnostics distinguish missing sessions and startup failures from verified binding', () => {
+  const screen = read('components/opago/public-account-screen.tsx');
+  const startup = screen.indexOf('if (runtime.startupError)');
+  const session = screen.indexOf('else if (!runtime.account.state.session)');
+  const binding = screen.indexOf("runtime.account.state.wallet?.party_id");
+  assert.ok(startup > 0 && startup < session && session < binding,
+    'startup and missing-session states must be checked before wallet binding results');
+  assert.match(screen, /Wallet session refresh failed\. The backend binding status is unknown\./);
+  assert.match(screen, /No verified wallet session is available\./);
+  assert.match(screen, /OPAGO wallet binding returned an account-linked wallet/);
+  const runtime = read('lib/opago/runtime-native.ts');
+  assert.match(runtime, /startupError = testOnly \? undefined : await account\.refreshAfterLoad\(\)/);
+  assert.match(runtime, /return \{ account, uma, pos, testOnly, transactionSyncPort, onchainSyncPort:.*startupError/);
+});
