@@ -65,9 +65,24 @@ export async function initializeOnchainWallet(seed: Uint8Array, assertCurrent: (
     await FileSystem.makeDirectoryAsync(directory(),{intermediates:true}); assertCurrent();
     const path = directory() + scope.split(':').at(-1) + '.sqlite';
     const exists = (await FileSystem.getInfoAsync(path)).exists; assertCurrent();
-    persister = bdk.Persister.newSqlite(decodeURIComponent(path.replace(/^file:\/\//,'')));
-    wallet = exists ? bdk.Wallet.load(descriptors[0],descriptors[1],persister,100) :
-      new bdk.Wallet(descriptors[0],descriptors[1],network,persister,100);
+    const sqlitePath = decodeURIComponent(path.replace(/^file:\/\//,''));
+    persister = bdk.Persister.newSqlite(sqlitePath);
+    if (exists) {
+      try {
+        wallet = bdk.Wallet.load(descriptors[0],descriptors[1],persister,100);
+      } catch {
+        // First startup can be interrupted after newSqlite creates the file but
+        // before the wallet is persisted. Rebuild from the deterministic public
+        // descriptors and let the initial full scan recover chain state.
+        assertCurrent();
+        destroy(persister); persister = null;
+        await FileSystem.deleteAsync(path,{idempotent:true}); assertCurrent();
+        persister = bdk.Persister.newSqlite(sqlitePath);
+        wallet = new bdk.Wallet(descriptors[0],descriptors[1],network,persister,100);
+      }
+    } else {
+      wallet = new bdk.Wallet(descriptors[0],descriptors[1],network,persister,100);
+    }
     persist();
 
     const balance = async (): Promise<OnchainBalance> => {
