@@ -236,3 +236,19 @@ test('detecting a different asset never reuses an amount from the previous payme
   tree = await app.settle(); assert.equal(tree.type, 'form'); assert.equal(tree.props.source, 'hedera');
   assert.equal(tree.props.amountInput, ''); assert.deepEqual(app.calls, []);
 });
+
+test('a changed fee clears approval and a fresh quote requires another explicit confirmation', async t => {
+ let fee=250, reject=true;
+ const app=fixture({wallet:{},prepare:async()=>({invoice:{},amountSats:1000,maxFeeSats:fee}),
+  submit:async()=>{if(reject)throw new FeeError('fee changed');return {amountSats:1000,reference:'proof'};}});
+ t.after(app.unmount);
+ let tree=await app.settle();assert.equal(tree.props.payment.maxFeeSats,250);
+ tree.props.onConfirm();tree=await app.settle();assert.notEqual(tree.type,'review');
+ assert.equal(app.calls.filter(c=>c==='submit').length,1);
+ app.params.scanResultKey='scan-2';fee=300;reject=false;tree=await app.settle();
+ assert.equal(tree.type,'review');assert.equal(tree.props.payment.maxFeeSats,300);
+ assert.equal(app.calls.filter(c=>c==='submit').length,1);
+ tree.props.onConfirm();tree=await app.settle();assert.equal(tree.type,'success');
+ assert.equal(app.calls.filter(c=>c==='authorize').length,2);
+ assert.equal(app.calls.filter(c=>c==='submit').length,2);
+});

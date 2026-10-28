@@ -191,3 +191,19 @@ test('modal keyboard layout handles overlay, native resize and hide without doub
  assert.equal(nodes(tree).find(n=>n.type==='activity').props.style[1].paddingBottom,0);
  assert.equal(nodes(tree).find(n=>n.props.accessibilityViewIsModal).props.style[1].maxHeight,704);
 });
+
+test('high Lightning fees are warned about without blocking an explicit reviewed payment', async t => {
+ const calls=[];
+ const props={amountSats:1000,feeSats:250,route:'lightning',recipient:'synthetic-invoice',loading:false,
+  onConfirm:()=>calls.push('send'),onCancel:()=>calls.push('cancel')};
+ const app=hookFixture('components/bitcoin/payment-ui.tsx',()=>base,e=>e.BitcoinReview(props));t.after(app.unmount);
+ let tree=expand(await app.settle());
+ assert.match(text(tree),/Fee, at most 250 SAT/);assert.match(text(tree),/Maximum total 1,250 SAT/);
+ const warning=nodes(tree).find(n=>n.props.accessibilityRole==='alert');
+ assert.equal(text(warning),'Fee is high relative to the amount.');
+ const send=nodes(tree).find(n=>n.type==='button'&&text(n)==='Send');
+ assert.equal(!!send.props.disabled,false);assert.deepEqual(calls,[]);
+ send.props.onPress();assert.deepEqual(calls,['send']);
+ props.amountSats=10000;tree=expand(app.render());
+ assert.equal(nodes(tree).some(n=>n.props.accessibilityRole==='alert'),false);
+});
