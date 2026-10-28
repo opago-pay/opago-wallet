@@ -1,3 +1,4 @@
+import { OnchainSyncStatus } from '../components/onchain/sync-status';
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -16,7 +17,7 @@ export default function TransactionSyncScreen() {
   const params = useLocalSearchParams<{ test?: string }>(); const router = useRouter();
   const [testOnly, setTestOnly] = useState(__DEV__ && params.test === '1');
   const { runtime } = useOpagoAccount(false);
-  const { sparkWallet, hederaPublicKey, hederaAccount } = useWalletAuth();
+  const { onchainWallet, sparkWallet, hederaPublicKey, hederaAccount } = useWalletAuth();
   const focused = useIsFocused(); const [active, setActive] = useState(AppState.currentState === 'active');
   const [items, setItems] = useState<Item[]>([]); const [snapshots, setSnapshots] = useState<Partial<Record<'BTC' | 'HBAR', Snapshot>>>({});
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
@@ -54,6 +55,7 @@ export default function TransactionSyncScreen() {
     <Copy>{t('Your balances and payment history come from your wallet. Synchronization reports activity to OPAGO and never sends a payment again.')}</Copy>
     <Action label="Open OPAGO account" disabled={busy} onPress={() => router.push('/opago-account')} />
     {!items.length && <Card title="Synchronization not connected"><Copy>{t('Sign in and link your wallet to OPAGO to prepare activity reports. Your local wallet works without an OPAGO account.')}</Copy></Card>}
+    {!testOnly&&runtime&&onchainWallet&&<OnchainSyncStatus runtime={runtime} wallet={onchainWallet} active={focused&&active}/>}
     {items.map(item => {
       const status = snapshots[item.asset];
       return <Card key={item.asset} title={item.asset === 'BTC' ? 'BTC activity reports' : 'HBAR activity reports'}>

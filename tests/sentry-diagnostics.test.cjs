@@ -144,11 +144,11 @@ test('builds without credentials skip uploads; EAS upload outages are non-blocki
   try {
     delete process.env.SENTRY_AUTH_TOKEN;
     const result=config({config:{name:'wallet',plugins:['expo-router']}});
-    assert.equal(result.plugins[1][1].disableAutoUpload,true);
+    assert.equal(result.plugins.find(plugin=>Array.isArray(plugin)&&plugin[0]==='@sentry/react-native/expo')[1].disableAutoUpload,true);
     assert.equal(result.name,'wallet');
     process.env.SENTRY_AUTH_TOKEN='synthetic-build-only-token';
     const configured=config({config:{plugins:[]}});
-    assert.equal(configured.plugins[0][1].disableAutoUpload,false);
+    assert.equal(configured.plugins.find(plugin=>Array.isArray(plugin)&&plugin[0]==='@sentry/react-native/expo')[1].disableAutoUpload,false);
     assert.doesNotMatch(JSON.stringify(configured),/synthetic-build-only-token/);
   } finally {if(token===undefined)delete process.env.SENTRY_AUTH_TOKEN;else process.env.SENTRY_AUTH_TOKEN=token;}
   const eas=JSON.parse(fs.readFileSync(path.join(__dirname,'../eas.json'),'utf8'));

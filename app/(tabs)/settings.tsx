@@ -1,3 +1,4 @@
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
 import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -71,6 +72,7 @@ function selectBackupChallengePositions(wordCount: number): number[] {
 export default function SettingsScreen() {
   useLanguage();
   useColorMode();
+  const { bitcoinOnly } = useBitcoinOnly();
   const router = useRouter();
   const params = useLocalSearchParams<{ section?: string | string[] }>();
   const activeSection = getSettingsSection(params.section);
@@ -589,6 +591,7 @@ export default function SettingsScreen() {
                 ? t('Needs attention · {category} connection issue', { category: lightningHealth.lastErrorCategory || 'unknown' })
                 : t('Available · last wallet refresh succeeded')}
           </Text>
+          {!bitcoinOnly && <>
           <Text style={styles.stepLabel}>{t('Hedera {network} public key', { network: appConfig.hederaNetwork })}</Text>
           <Text style={styles.caption}>{t("Identifies your account. It cannot authorize a payment.")}</Text>
           <Text style={styles.publicKey}>{hederaPublicKey || t('Wallet key is not ready.')}</Text>
@@ -621,6 +624,7 @@ export default function SettingsScreen() {
             disabled={!hederaPublicKey || bindingAccount || busy} onPress={() => void importHederaAccount()}>
             {bindingAccount ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : <Text style={styles.actionText}>{t('Link account ID')}</Text>}
           </TouchableOpacity>
+          </>}
         </View>
         {performanceTracingEnabled() && <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t('Performance diagnostics')}</Text>

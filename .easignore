@@ -65,3 +65,7 @@ app-example
 
 # Private release review files never belong in the EAS source archive
 /Opago_Pilot_Test_Feedback.docx
+
+# Local native module build output must not enter cloud builds
+/modules/*/android/build/
+/modules/*/android/.cxx/

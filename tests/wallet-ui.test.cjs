@@ -126,7 +126,7 @@ test('shows a clearly labelled estimate for development-network balances', () =>
 
   const portfolio = readSource('app', '(tabs)', 'index.tsx');
   assert.doesNotMatch(portfolio, /Not valued/);
-  assert.match(portfolio, /<NetworkBadge label=\{presentation\.networkBadge\}/);
+  assert.match(portfolio, /<NetworkBadge label=\{props\.networkBadge\s*\?\?\s*presentation\.networkBadge\}/);
   assert.match(portfolio, /if \(!label\.trim\(\) \|\| label === 'MAINNET'\) return null/);
   assert.doesNotMatch(portfolio, /Demo balance based on current market prices|Based on current market prices/);
 });

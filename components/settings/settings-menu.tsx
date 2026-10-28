@@ -1,3 +1,4 @@
+import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -95,6 +96,7 @@ export function SettingsMenu(props: {
         icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
     </MenuGroup>
     <MenuGroup title={t('Preferences')}>
+      <BitcoinOnlyToggle disabled={props.disabled} />
       <MenuRow title={t('Appearance')} detail={t(selection === 'system' ? 'System' : selection === 'light' ? 'Day' : 'Dark')}
         icon="color-palette-outline" divider disabled={props.disabled} onPress={() => props.onSelect('appearance')} />
       <MenuRow title={t('Language')} detail={LANGUAGE_NAMES[language]}

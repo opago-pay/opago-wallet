@@ -9,6 +9,7 @@ module.exports = ({ config }) => ({
   ...config,
   plugins: [
     ...(config.plugins || []),
+    './plugins/with-bitcoin-bdk',
     ['@sentry/react-native/expo', {
       organization: 'opago-gmbh',
       project: 'react-native',

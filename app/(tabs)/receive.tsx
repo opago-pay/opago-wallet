@@ -1,4 +1,6 @@
+import { onchainErrorMessage, isOnchainUnavailable } from '@/lib/onchain/errors';
 import { adaptColor, themeColor } from '@/lib/theme-styles';
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
 import { appLocale, t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColorMode } from '@/hooks/useColorMode';
@@ -62,9 +64,7 @@ import { walletSession } from '@/lib/wallet-session';
 import { parsePaymentAmount } from '@/lib/payment-input';
 import { friendlyPaymentMessage } from '@/lib/payment-errors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { validateBitcoinAddress } from '@/lib/bitcoin/destination';
 import { satsToBtc } from '@/lib/bitcoin/amount';
-import { bitcoinDepositWatch, bitcoinStaticAddressCache } from '@/lib/bitcoin/store-native';
 import { beginPerformanceSpan, markNavigationReady, measurePerformance, recordPerformanceDuration } from '@/lib/performance-trace';
 import { PaymentSuccessIcon, PaymentSuccessMotionScrollView } from '@/components/ui/payment-success-motion';
 
@@ -84,9 +84,10 @@ function receiveAmountError(cause: unknown, rateLoading: boolean): string {
     : message);
 }
 
-export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {}) {
+export default function ReceiveScreen({ modal = false, initialNetwork = 'lightning' }: { modal?: boolean; initialNetwork?: ReceiveNetwork } = {}) {
   useLanguage();
   const { mode } = useColorMode();
+  const { bitcoinOnly } = useBitcoinOnly();
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
@@ -97,6 +98,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const {
+    onchainWallet,
+    onchainError: walletOnchainError,
+    retryOnchainConnection,
     sparkWallet,
     sparkStatus,
     sparkError,
@@ -109,7 +113,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     backupStatus,
     beginBackup,
   } = useWalletAuth();
-  const [network, setNetwork] = useState<ReceiveNetwork>('lightning');
+  const [selectedNetwork, setNetwork] = useState<ReceiveNetwork>(initialNetwork);
+  const network = bitcoinOnly && selectedNetwork === 'hedera' ? 'lightning' : selectedNetwork;
+  const onchainUnavailable = network === 'onchain' && isOnchainUnavailable(walletOnchainError);
   const [networkPickerOpen, setNetworkPickerOpen] = useState(false);
   const [amountEditorOpen, setAmountEditorOpen] = useState(false);
   const receiveScrollRef = useRef<ScrollView>(null);
@@ -157,6 +163,11 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
   }, [backupStatus]);
   const ownerKey = walletReady && hederaPublicKey ? `${appConfig.sparkNetwork}:${hederaPublicKey}` : null;
   const restoreComplete = !!ownerKey && restoredOwnerKey === ownerKey;
+  useEffect(() => {
+    setOnchainAddress(null);
+    setOnchainError(null);
+    setOnchainLoading(false);
+  }, [ownerKey, onchainWallet]);
   const activeOwnerKey = useRef(ownerKey);
   activeOwnerKey.current = ownerKey;
   const restoredLightningRequest = useRef<string | null>(null);
@@ -197,8 +208,6 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     setInvoicePaymentHash(null);
     setInvoiceExpiresAt(null);
     setInvoiceExpired(false);
-    setOnchainAddress(null);
-    setOnchainError(null);
     setLoading(false);
     lastInvoiceAttempt.current = null;
     const generation = receiveGeneration.current;
@@ -621,43 +630,18 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     amountInput, isEur, rates.updatedAt, rates.isLoading, invoice, invoiceOwnerKey, invoiceExpiresAt, invoiceExpired, invoiceAmountSats, receiveStatus,
     retryVersion, parseInvoiceAmount, generateInvoice]);
 
-  const shouldPrefetchOnchain = network === 'onchain' ||
-    (restoreComplete && !!invoice && invoiceOwnerKey === ownerKey);
-
   useEffect(() => {
-    // Warm the wallet-bound static address while Lightning is displayed. A
-    // later tab switch should only change which already prepared QR is shown.
-    if (!sparkWallet || !walletReady || !ownerKey || onchainAddress?.ownerKey === ownerKey || onchainError || !pollingEnabled ||
-        !shouldPrefetchOnchain) return;
+    if (!onchainWallet || !walletReady || !ownerKey || !pollingEnabled || network !== 'onchain') return;
     let cancelled = false;
-    const assertWallet = walletSession.captureRuntime();
-    const assertCurrent = () => {
-      assertWallet();
-      if (cancelled || activeOwnerKey.current !== ownerKey) throw new Error('Wallet changed.');
-    };
+    const guard = walletSession.captureRuntime();
     setOnchainLoading(true);
-    void measurePerformance('receive.onchain_address', async () => {
-      const scope = await bitcoinScope(sparkWallet, appConfig.sparkNetwork);
-      assertCurrent();
-      const cachedAddress = await bitcoinStaticAddressCache.load(scope, appConfig.sparkNetwork, assertCurrent);
-      let address = cachedAddress;
-      if (!address) {
-        address = validateBitcoinAddress(
-          await withTimeout(sparkWallet.getStaticDepositAddress(), 20_000, 'Bitcoin address unavailable.'),
-          appConfig.sparkNetwork,
-        );
-      }
-      assertCurrent();
-      await bitcoinDepositWatch.enable(scope, assertCurrent);
-      if (!cachedAddress) await bitcoinStaticAddressCache.save(scope, address, appConfig.sparkNetwork, assertCurrent);
-      assertCurrent();
-      setOnchainAddress({ ownerKey, address });
-      setOnchainError(null);
-    }).catch(cause => {
-      if (!cancelled && activeOwnerKey.current === ownerKey) setOnchainError(t(friendlyPaymentMessage(cause, 'Bitcoin')));
-    }).finally(() => { if (!cancelled && activeOwnerKey.current === ownerKey) setOnchainLoading(false); });
-    return () => { cancelled = true; };
-  }, [sparkWallet, walletReady, ownerKey, onchainAddress?.ownerKey, onchainError, pollingEnabled, shouldPrefetchOnchain]);
+    void onchainWallet.receiveAddress().then(address => {
+      guard(); if(cancelled) return;
+      setOnchainAddress({ownerKey,address});setOnchainError(null);
+    }).catch(cause => { if(!cancelled)setOnchainError(onchainErrorMessage(cause)); })
+      .finally(() => {if(!cancelled)setOnchainLoading(false);});
+    return () => {cancelled=true;};
+  }, [onchainWallet,walletReady,ownerKey,pollingEnabled,network,retryVersion]);
 
   const successHeading = useAccessibleHeading('receive-success', isPaid);
   useAccessibleStatus(isPaid ? null : requestError, isFocused);
@@ -773,7 +757,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     !!invoice && invoiceOwnerKey === ownerKey && !invoiceExpired &&
     (!invoiceExpiresAt || invoiceExpiresAt > Date.now()) &&
     receiveStatus !== 'failed' && draftSats !== null && draftSats === invoiceAmountSats;
-  const onchainReady = network === 'onchain' && !!sparkWallet && !!ownerKey &&
+  const onchainReady = network === 'onchain' && !!onchainWallet && !!ownerKey &&
     onchainAddress?.ownerKey === ownerKey && draftSats !== null;
   const hederaReadyForQr = network === 'hedera' && !!ownerKey && !!hederaAccount &&
     hederaReady && hederaReadyOwnerKey === ownerKey;
@@ -788,7 +772,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     { id: 'lightning', label: 'Lightning', description: 'Receive from a Lightning wallet' },
     { id: 'onchain', label: 'Bitcoin network', description: 'Receive from a Bitcoin wallet' },
   ];
-  if (showAllCoins || network === 'hedera') receiveRoutes.push({
+  if (!bitcoinOnly && (showAllCoins || network === 'hedera')) receiveRoutes.push({
     id: 'hedera', label: 'HBAR', description: 'Receive from a Hedera account',
   });
 
@@ -806,7 +790,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     {network === 'lightning' && <TouchableOpacity accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }}
       onPress={() => router.push('/opago-account')}><Text style={{ color: adaptColor('#ffb000', 'color'), fontSize: 16 }}>
       {t('OPAGO account and Lightning address')}</Text></TouchableOpacity>}
-    {walletReady && network !== 'hedera' &&
+    {walletReady && network === 'lightning' &&
       <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
 
     <TouchableOpacity
@@ -837,7 +821,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
         </View>
         {network === item.id && <Ionicons name="checkmark" size={19} color={themeColor('accentText')} />}
       </TouchableOpacity>)}
-      {!showAllCoins && network !== 'hedera' && <TouchableOpacity
+      {!bitcoinOnly && !showAllCoins && network !== 'hedera' && <TouchableOpacity
         onPress={() => setShowAllCoins(true)}
         accessibilityRole="button"
         accessibilityLabel={t('Show all coins')}
@@ -850,7 +834,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
     </View>}
 
     {network === 'lightning' && <PersonalLightningAddressReceive focused={pollingEnabled} size={qrSize} />}
-    {network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
+    {!onchainUnavailable && network !== 'hedera' && amountEditorOpen && <View style={{ backgroundColor: adaptColor('#1b1b20', 'backgroundColor'), borderRadius: 20, padding: 16, marginBottom: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
         <Text style={{ color: adaptColor('#fff', 'color'), fontSize: 16, fontWeight: '700', flexShrink: 1 }}>{t('Amount (optional)')}</Text>
         <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -871,7 +855,7 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
         <TextInput
           value={amountInput}
           onChangeText={changeAmount}
-          editable={restoreComplete}
+          editable={network === 'onchain' ? !!onchainWallet : restoreComplete}
           keyboardType="decimal-pad" inputAccessoryViewID="receive-amount-done"
           placeholder="0"
           placeholderTextColor={themeColor('muted')}
@@ -885,7 +869,12 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       }}>{network === 'lightning' ? requestError : draftAmountError}</Text>}
     </View>}
 
-    {(network !== 'hedera' || hederaReadyForQr) && <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
+    {onchainUnavailable && <View style={[bitcoinStyles.box,{gap:14}]} accessibilityLiveRegion="polite">
+      <Text accessibilityRole="header" style={bitcoinStyles.value}>{t('Onchain receiving is not available yet')}</Text>
+      <Text style={bitcoinStyles.note}>{t('Onchain receiving is not enabled in this build. Use Lightning to receive Bitcoin.')}</Text>
+      <BitcoinButton label={t('Receive with Lightning')} onPress={() => switchNetwork('lightning')} />
+    </View>}
+    {!onchainUnavailable && (network !== 'hedera' || hederaReadyForQr) && <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: qrSize + 44, marginBottom: 6 }} accessibilityLiveRegion="polite">
       {qrValue ? <View style={mode === 'light'
         ? { backgroundColor: '#fff', borderRadius: 20, padding: 12, overflow: 'hidden' }
         : { backgroundColor: '#fff', borderRadius: 24, padding: 20, overflow: 'hidden' }}>
@@ -901,12 +890,12 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
           ? <ActivityIndicator color={themeColor('accentText')} size="large" />
           : <Ionicons name="qr-code-outline" size={40} color={themeColor('muted')} />}
         <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', marginTop: 12 }}>
-          {(network === 'lightning' ? requestError : network === 'onchain' ? draftAmountError || onchainError : hederaLookupError) || t('Preparing payment code…')}
+          {(network === 'lightning' ? requestError : network === 'onchain' ? draftAmountError || onchainError || walletOnchainError : hederaLookupError) || t('Preparing payment code…')}
         </Text>
       </View>}
     </View>}
 
-    {network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
+    {!onchainUnavailable && network !== 'hedera' && !amountEditorOpen && <TouchableOpacity
       onPress={() => {
         setNetworkPickerOpen(false);
         setAmountEditorOpen(true);
@@ -927,8 +916,9 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
       {t(receiveStatus === 'offline' ? 'Connection interrupted. Your request is saved; checking again automatically.' :
         receiveStatus === 'processing' ? 'Payment is processing. Waiting for confirmation.' : 'Show this code to receive Bitcoin.')}
     </Text>}
-    {network === 'onchain' && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
-      {t('Bitcoin deposits require network confirmation and a claim fee before the balance is available.')}
+    {network==='onchain'&&onchainWallet&&onchainWallet.network!=='mainnet'&&<Text style={bitcoinStyles.warning}>{onchainWallet.network.toUpperCase()} · {t('TEST MODE')}</Text>}
+    {network === 'onchain' && !onchainUnavailable && <Text style={{ color: adaptColor('#aaaab4', 'color'), textAlign: 'center', fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+      {t('Bitcoin stays in your onchain balance. You choose when to send it or move it to Lightning.')}
     </Text>}
     {network === 'hedera' && !hederaReadyForQr && (hederaMissing && hederaPublicKey
       ? <HederaActivation publicKey={hederaPublicKey} network={HEDERA_NETWORK_BADGE} />
@@ -963,13 +953,15 @@ export default function ReceiveScreen({ modal = false }: { modal?: boolean } = {
         void rates.refresh();
       }
     }} />}
-    {(onchainError || (eurRateMissing && !rates.isLoading)) && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
+    {!onchainUnavailable && (onchainError || walletOnchainError || (eurRateMissing && !rates.isLoading)) && network === 'onchain' && <BitcoinButton label={t('Try again')} secondary onPress={() => {
       setOnchainError(null);
+      setRetryVersion(value => value + 1);
+      if (!onchainWallet) void retryOnchainConnection().catch(() => undefined);
       if (eurRateMissing) {
         void rates.refresh();
       }
     }} />}
-    {network === 'onchain' && <BitcoinButton label={t('Incoming Bitcoin')} secondary onPress={() => setShowDepositDetails(true)} />}
+    {network === 'onchain' && <BitcoinButton label={t('Previous Lightning deposits')} secondary onPress={() => setShowDepositDetails(true)} />}
 
     <KeyboardDoneAccessory nativeID="receive-amount-done" />
   </ScrollView>;

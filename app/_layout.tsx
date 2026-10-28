@@ -6,11 +6,13 @@ import { AppState } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { TransferAgent } from '../components/onchain/transfer-agent';
 import { TransactionSyncAgent } from '../components/opago/transaction-sync-agent';
 import * as Notifications from 'expo-notifications';
 import { WalletProvider } from '@/hooks/useWalletAuth';
 import { WalletGate } from '@/components/security/wallet-gate';
 import { BackupPrompt } from '@/components/security/backup-prompt';
+import { BitcoinOnlyProvider } from '@/hooks/useBitcoinOnly';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
 import { SecurityPreferencesProvider } from '@/hooks/useSecurityPreferences';
@@ -57,6 +59,9 @@ function AppStack() {
           <Stack.Screen name="send-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="onchain-send" options={{ headerShown: false }} />
+          <Stack.Screen name="onchain-activity" options={{ headerShown: false }} />
+          <Stack.Screen name="exchange-flow" options={{ headerShown: false }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
           <Stack.Screen name="opago-signup" options={{ headerShown: false }} />
@@ -67,6 +72,7 @@ function AppStack() {
         </Stack>
         <BackupPrompt />
         <TransactionSyncAgent />
+        <TransferAgent />
         </WalletGate>
         <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
@@ -75,5 +81,5 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><AppStack /></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
+  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><BitcoinOnlyProvider><AppStack /></BitcoinOnlyProvider></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
 }

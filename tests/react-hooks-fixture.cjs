@@ -33,9 +33,13 @@ function hookFixture(file, makeDependencies, invoke) {
   };
   const dependencies = {
     react: hooks,
+    '../lib/onchain/errors': require('../lib/onchain/errors.ts'),
+    '@/lib/onchain/errors': require('../lib/onchain/errors.ts'),
     'react/jsx-runtime': require('react/jsx-runtime'),
     '@/hooks/useAccessibleStatus': { useAccessibleStatus() {} },
     '@/hooks/useAccessibleHeading': { useAccessibleHeading: () => hooks.useRef(null) },
+    '@/hooks/useBitcoinOnly': { useBitcoinOnly: () => ({ bitcoinOnly: false, ready: true }) },
+    '@/lib/bitcoin-only': { ...require('../lib/bitcoin-only.ts'), bitcoinOnlyPreference: { getSnapshot: () => ({ bitcoinOnly: false, ready: true }) } },
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),
@@ -43,6 +47,7 @@ function hookFixture(file, makeDependencies, invoke) {
     ...makeDependencies(hooks),
   };
   const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
+    fileName: file,
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
   const exports = {};

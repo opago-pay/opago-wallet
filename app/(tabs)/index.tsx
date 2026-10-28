@@ -1,3 +1,10 @@
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { isOnchainUnavailable } from '@/lib/onchain/errors';
+import * as Clipboard from 'expo-clipboard';
+import { useOnchainBalance } from '@/hooks/useOnchainBalance';
+import { AccountDetails, AccountIcon } from '@/components/onchain/account-details';
+import { mergeOnchainHistory } from '@/lib/onchain/history';
+import type { WalletAccount } from '@/lib/onchain/types';
 import { sparkTransferAmount } from '@/lib/lightning/transfer-amount';
 import { adaptColor, adaptiveStyles } from '@/lib/theme-styles';
 import { appLocale, t } from '@/lib/i18n';
@@ -23,7 +30,7 @@ import {
 import { Pressable, TouchableOpacity } from '@/components/ui/wallet-interaction';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AdvancedOptions } from '@/components/ui/advanced-options';
@@ -108,16 +115,20 @@ export default function HomeScreen() {
   useEffect(() => { recordWalletStartupStage('home_mounted'); }, []);
   const { mode } = useColorMode();
   const router = useRouter();
+  const { bitcoinOnly } = useBitcoinOnly();
+  const { activity } = useLocalSearchParams<{activity?:string}>();
   const insets = useSafeAreaInsets();
   const {
     walletReady,
     sparkWallet,
     sparkStatus,
     sparkError,
+    onchainError: walletOnchainError,
     retrySparkConnection,
     hederaPublicKey,
     loadOrGenerateWallet,
     refreshHederaAccount,
+    hederaAccount,
     error: walletError,
   } = useWalletAuth();
   const hederaPaymentJournal = hederaPublicKey ? hederaPaymentJournalFor(appConfig.hederaNetwork, hederaPublicKey) : null;
@@ -125,13 +136,16 @@ export default function HomeScreen() {
   const lightningScope = useMemo(() => hederaPublicKey ?
     { network: appConfig.sparkNetwork, publicKey: hederaPublicKey } : null, [hederaPublicKey]);
   const rates = useExchangeRates();
+  const onchain=useOnchainBalance();
+  const onchainUnavailable=isOnchainUnavailable(walletOnchainError);
+  const [selectedAccount,setSelectedAccount]=useState<WalletAccount|null>(null);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [startupComplete, setStartupComplete] = useState(false);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const { balances, balanceStates, bitcoinIncoming, secondaryDataReady, sparkPriorityTimedOut, refreshBalances } = useWalletBalances({
-    walletReady, walletIdentity: hederaPublicKey, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: true,
+    walletReady, walletIdentity: hederaPublicKey, sparkWallet, refreshHederaAccount, initializationError: walletError, enableHedera: !bitcoinOnly,
     prioritizeSpark: true, allowHederaBeforeSpark: true,
   });
   const preview = useHomeBalancePreview({
@@ -156,7 +170,13 @@ export default function HomeScreen() {
   const transactionsRef = useRef(transactions);
   transactionsRef.current = transactions;
   const hiddenHistoryKeys = useRef<string[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(activity === 'all');
+  useEffect(() => {
+    if (activity !== 'all') return;
+    setHistoryOpen(true);
+    router.setParams({ activity: undefined });
+  }, [activity, router]);
+  useEffect(() => { if (bitcoinOnly) setSelectedAccount(current => current === 'hedera' ? null : current); }, [bitcoinOnly]);
   const [localSnapshot, setLocalSnapshot] = useState<{ identity: string | null; item: DisplayTransaction | null }>({ identity: hederaPublicKey, item: null });
   const recentLocal = localSnapshot.identity === hederaPublicKey ? localSnapshot.item : null;
   const setRecentLocal = useCallback((item: DisplayTransaction | null) => setLocalSnapshot({ identity: hederaPublicKey, item }), [hederaPublicKey]);
@@ -536,7 +556,7 @@ export default function HomeScreen() {
       await refreshBalances();
       const latest = await loadLatestLocal();
       setRecentLocal(latest);
-      await Promise.all([refresh(true), rates.refresh()]);
+      await Promise.all([refresh(true), rates.refresh(),onchain.refresh()]);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Wallet data could not be loaded.');
     } finally {
@@ -560,17 +580,24 @@ export default function HomeScreen() {
   }, [lightningPaymentJournal]);
 
   const openTransaction = useCallback((transaction: DisplayTransaction) => {
+    if(transaction.account==='bitcoin_onchain'){
+      if(transaction.internalTransfer||transaction.legacyDeposit)router.push({pathname:'/exchange-flow',params:{id:transaction.onchainOperationId}});
+      else if(transaction.onchainOperationId)router.push({pathname:'/onchain-send',params:{id:transaction.onchainOperationId}});
+      else setSelectedTransaction(transaction);
+      return;
+    }
     setSelectedTransaction(transaction);
-  }, []);
+  }, [router]);
 
-  const visibleTransactions = useMemo(() => transactions.filter(
+  const visibleTransactions = useMemo(() => mergeOnchainHistory(transactions,onchain.transactions??[],onchain.operations,appLocale(),onchain.network).filter(
     item => item.status !== 'pending' || !hiddenPaymentKeys.includes(item.key),
-  ), [transactions, hiddenPaymentKeys]);
+  ), [transactions, hiddenPaymentKeys,onchain.transactions,onchain.operations,onchain.network]);
 
+  const onchainEur=calculateBitcoinEur(onchain.state.value?.totalSats??null,displayRates.btcToEur);
   const bitcoinEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
   const hederaEur = calculateHederaEur(displayBalances.hbarTinybars, displayRates.hbarToEur);
   const balanceError = balanceStates.spark.error;
-  const assetBalanceError = balanceError || balanceStates.hedera.error;
+  const assetBalanceError = balanceError || (!bitcoinOnly && balanceStates.hedera.error);
   const hederaPriceText = Number.isFinite(displayRates.hbarToEur) && displayRates.hbarToEur > 0
     ? t(!(rates.hbarToEur > 0) || !(rates.hbarUpdatedAt > 0) || Date.now() - rates.hbarUpdatedAt > 300_000
       ? '1 HBAR = {price} · last known' : '1 HBAR = {price}', { price: formatCoinUnitPrice(displayRates.hbarToEur, 'hedera') })
@@ -590,12 +617,20 @@ export default function HomeScreen() {
 
   // Each visible coin card contributes exactly once to the headline. Adding a
   // new coin card to this list also adds its EUR value to the portfolio total.
-  const assetCards: { eurValue: number | null; props: React.ComponentProps<typeof BalanceCard> }[] = [
+  const allAssetCards: { account:WalletAccount; eurValue: number | null; props: React.ComponentProps<typeof BalanceCard> }[] = [
     {
-      eurValue: bitcoinEur,
+      account:'bitcoin_onchain',eurValue:onchainEur,
+      props:{asset:'bitcoin',account:'bitcoin_onchain',networkBadge:onchain.network?(onchain.network==='mainnet'?'BITCOIN':onchain.network.toUpperCase()):undefined,subtitle:t('Onchain'),description:bitcoinPriceText,
+        value:onchain.state.value?formatBtcBalance(onchain.state.value.totalSats,appLocale())+' BTC':'— BTC',
+        fiatValue:onchainEur===null?t('EUR estimate unavailable'):'≈ '+formatEurValue(onchainEur),
+        loading:onchain.state.status==='loading'&&!onchain.state.value,
+        statusText:onchainUnavailable?t('Not available in this build'):onchain.state.status==='error'?t(onchain.state.value?'Last known balance':'Balance unavailable'):undefined},
+    },
+    {
+      account:'bitcoin_spark',eurValue: bitcoinEur,
       props: {
-        asset: 'bitcoin', subtitle: bitcoinPriceText, notes: bitcoinNotes,
-        value: displayBalances.spark === null ? '— BTC' : formatBtcBalance(displayBalances.spark, appLocale()) + ' BTC',
+        asset: 'lightning',account:'bitcoin_spark',subtitle:'Bitcoin',notes:bitcoinNotes,
+        value: displayBalances.spark === null ? '— SAT' : displayBalances.spark.toLocaleString(appLocale()) + ' SAT',
         fiatValue: bitcoinEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(bitcoinEur),
         loading: balanceStates.spark.status === 'loading' && displayBalances.spark === null,
         statusText: balanceStates.spark.status === 'error'
@@ -605,9 +640,9 @@ export default function HomeScreen() {
       },
     },
     {
-      eurValue: hederaEur,
+      account:'hedera',eurValue: hederaEur,
       props: {
-        asset: 'hedera', subtitle: hederaPriceText,
+        asset: 'hedera',account:'hedera',subtitle:'Hedera',description:hederaPriceText,
         value: displayBalances.hbarTinybars === null ? '—' : formatTinybars(displayBalances.hbarTinybars) + ' HBAR',
         fiatValue: hederaEur === null ? t('EUR estimate unavailable') : '≈ ' + formatEurValue(hederaEur),
         loading: balanceStates.hedera.status === 'loading' && displayBalances.hbarTinybars === null,
@@ -618,7 +653,16 @@ export default function HomeScreen() {
       },
     },
   ];
-  const totalEur = sumAssetValuesEur(assetCards.map(card => card.eurValue));
+  const assetCards=allAssetCards.filter(card=>!bitcoinOnly||card.account!=='hedera');
+  const moves=onchain.operations.filter(row=>row.kind!=='refund'&&row.transferStage&&row.state!=='aborted');
+  const transferPending=moves.some(row=>row.state!=='confirmed'||row.transferStage!=='completed'&&row.transferStage!=='refunded');
+  const lastTransfer=Math.max(0,...moves.map(row=>Date.parse(row.updatedAt)));
+  const transferBalancesStale=lastTransfer>0&&(onchain.state.updatedAt<=lastTransfer||balanceStates.spark.updatedAt<=lastTransfer);
+  const totalEur = transferPending||transferBalancesStale?null:sumAssetValuesEur(assetCards.map(card => card.eurValue));
+  const selectedCard=assetCards.find(card=>card.account===selectedAccount);
+  const accountAction=(path:'/receive-flow'|'/send-flow'|'/exchange-flow')=>{
+    const account=selectedAccount;setSelectedAccount(null);if(account)router.push({pathname:path,params:{account}});
+  };
   const totalEurLabel = totalEur === null ? '—'
     : formatEurValue(totalEur).replace('€', '').trim() + '€';
   const initialBalanceReady = walletReady && displayBalances.spark !== null
@@ -642,7 +686,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (balanceStates.spark.status === 'ready' && balances.spark !== null) recordWalletStartupStage('home_live_balance_rendered');
   }, [balanceStates.spark.status, balances.spark]);
-  const balanceCaveat = assetBalanceError
+  const balanceCaveat = onchainUnavailable?t('Onchain receiving is not enabled in this build. Use Lightning to receive Bitcoin.'):transferPending||transferBalancesStale?t('Transfer in progress · balances updating'):onchain.state.status==='error'?t('Some balances could not be refreshed. Pull down to try again.'):assetBalanceError
     ? (totalEur === null ? t('Balance unavailable') : t('Last known balance · refresh unavailable'))
     : sparkPriorityTimedOut && displayBalances.spark === null ? t('Bitcoin balance unavailable')
       : totalEur === null && (rates.isLoading || assetCards.some(card => card.props.loading)) ? t('Loading balances…')
@@ -662,7 +706,7 @@ export default function HomeScreen() {
 
   if (selectedTransaction) {
     const hash = lightningHashFromPayment(selectedTransaction);
-    const updatedPayment = transactions.find(item => item.key === selectedTransaction.key) ?? selectedTransaction;
+    const updatedPayment = visibleTransactions.find(item => item.key === selectedTransaction.key) ?? selectedTransaction;
     return <PaymentDetailsScreen payment={updatedPayment} rates={displayRates}
       onClose={() => setSelectedTransaction(null)}
       onHide={hash && selectedTransaction.type === 'outgoing' && selectedTransaction.status === 'pending'
@@ -692,7 +736,7 @@ export default function HomeScreen() {
     openTransaction={openTransaction}
   />;
 
-  return (
+  return (<>
     <ScrollView
       style={styles.container}
       keyboardShouldPersistTaps="handled"
@@ -747,6 +791,10 @@ export default function HomeScreen() {
         <QuickAction icon="scan-outline" label={t('Send')} onPress={() => { markNavigationStart('send'); router.push('/send-flow' as Href); }} />
       </View>
 
+      {moves.filter(row=>row.transferStage!=='completed'&&row.transferStage!=='refunded').map(row=><TouchableOpacity key={row.id} style={styles.paymentNotice} accessibilityRole="button" onPress={()=>router.push({pathname:'/exchange-flow',params:{id:row.id}})}>
+        <Text style={styles.balanceLabel}>{row.kind==='to_lightning'?'Bitcoin → Lightning':'Lightning → Bitcoin'}</Text>
+        <Text style={styles.balanceSubtitle}>{t(row.transferStage==='claim_required'?'Lightning fee approval required':'Checking transfer')}</Text>
+      </TouchableOpacity>)}
       <BackupReminder />
       {(latestTransaction || historyLoadedRef.current) && <>
         <View style={styles.sectionHeader}>
@@ -801,7 +849,7 @@ export default function HomeScreen() {
 
       <AdvancedOptions expanded={advancedExpanded} onChange={setAdvancedExpanded} label={t('All coins')}>
         {!secondaryDataReady && <Text style={styles.waitingText} accessibilityLiveRegion="polite">{t('Loading Bitcoin balance…')}</Text>}
-        {assetCards.map(card => <BalanceCard key={card.props.asset} {...card.props} />)}
+        {assetCards.map(card => <BalanceCard key={card.account} {...card.props} onOpen={()=>setSelectedAccount(card.account)} />)}
       </AdvancedOptions>
       {!!assetBalanceError && (
         <View style={styles.errorNotice}>
@@ -810,7 +858,13 @@ export default function HomeScreen() {
         </View>
       )}
     </ScrollView>
-  );
+    <AccountDetails onchainUnavailable={onchainUnavailable} account={selectedAccount} title={selectedAccount==='bitcoin_spark'?'Lightning':selectedAccount==='hedera'?'HBAR':'Bitcoin'}
+      balance={selectedCard?.props.value??'—'} fiat={selectedCard?.props.fiatValue??''} status={selectedCard?.props.statusText}
+      available={selectedAccount==='bitcoin_onchain'&&onchain.state.value?t('Available: {amount} SAT',{amount:onchain.state.value.availableSats.toLocaleString(appLocale())}):undefined}
+      identifier={selectedAccount==='hedera'?hederaAccount?.accountId:undefined}
+      onCopy={()=>{if(hederaAccount?.accountId)void Clipboard.setStringAsync(hederaAccount.accountId);}}
+      onClose={()=>setSelectedAccount(null)} onReceive={()=>accountAction('/receive-flow')} onSend={()=>accountAction('/send-flow')} onTransfer={()=>accountAction('/exchange-flow')}/>
+  </>);
 }
 
 function StartupLoadingScreen() {
@@ -857,7 +911,7 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
   const eurAccessibilityLabel = eurQuote ? eurLabel
     : t(transaction.transactionRatePending ? 'Historical rate is being retrieved' : 'Historical EUR value unavailable');
   const friendlyStatus = paymentHistoryStatus(transaction.type, transaction.asset, transaction.status, transaction.route);
-  const title = friendlyStatus === 'Completed'
+  const title = transaction.legacyDeposit?t('Previous Lightning deposits'):transaction.internalTransfer?t('Internal transfer')+' · '+(transaction.internalTransfer==='to_lightning'?'Bitcoin → Lightning':'Lightning → Bitcoin'):friendlyStatus === 'Completed'
     ? transaction.asset === 'SAT'
       ? t(transaction.type === 'incoming' ? 'Bitcoin received' : 'Bitcoin sent')
       : transaction.asset === 'HBAR'
@@ -887,7 +941,7 @@ function TransactionRow({ transaction, hbarToEur, openTransaction }: {
     </View>
     <View style={styles.transactionTrailing}>
       <Text style={[styles.transactionAmount, transaction.type === 'incoming' && styles.incoming]}>
-        {transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
+        {transaction.internalTransfer?'':transaction.type === 'incoming' ? '+' : '-'}{transaction.amountDisplay} {transaction.asset}
       </Text>
       <Text style={styles.transactionEurValue} numberOfLines={1} accessibilityLabel={eurAccessibilityLabel}>{eurLabel}</Text>
     </View>
@@ -951,6 +1005,9 @@ function HistoryPage({ insets, transactions, loading, waitingForSpark, loadError
 }
 
 function BalanceCard(props: {
+  account:WalletAccount;
+  networkBadge?:string;
+  onOpen?:()=>void;
   asset: WalletAssetKey;
   value: string;
   loading?: boolean;
@@ -972,18 +1029,17 @@ function BalanceCard(props: {
   return (
     <TouchableOpacity
       style={styles.balanceCard}
-      onPress={props.onCopy}
-      disabled={!props.onCopy}
-      activeOpacity={props.onCopy ? 0.72 : 1}
-      accessibilityRole={props.onCopy ? 'button' : 'summary'}
-      accessibilityLabel={`${presentation.name}, ${props.value}, ${props.fiatValue || ''}, ${props.statusText || ''}, ${props.subtitle ?? (props.identifier ? compactWalletIdentifier(props.identifier) : t(presentation.description))}, ${props.notes?.join(', ') || ''}${props.onCopy ? ', ' + t('Tap to copy address') : ''}`}
+      onPress={props.onOpen}
+      activeOpacity={0.72}
+      accessibilityRole="button"
+      accessibilityLabel={`${props.account==='bitcoin_spark'?'Lightning':presentation.name}, ${props.value}, ${props.fiatValue || ''}, ${props.statusText || ''}, ${props.subtitle ?? (props.identifier ? compactWalletIdentifier(props.identifier) : t(presentation.description))}, ${props.notes?.join(', ') || ''}${props.onCopy ? ', ' + t('Tap to copy address') : ''}`}
     >
       <View style={styles.balanceCardMain}>
-        <AssetIcon asset={props.asset} size={44} />
+        <AccountIcon account={props.account} size={44} />
         <View style={styles.balanceDetails}>
           <View style={styles.balanceTitleRow}>
-            <Text style={styles.balanceLabel}>{presentation.name}</Text>
-            <NetworkBadge label={presentation.networkBadge} />
+            <Text style={styles.balanceLabel}>{props.account==='bitcoin_spark'?'Lightning':props.account==='hedera'?'HBAR':'Bitcoin'}</Text>
+            <NetworkBadge label={props.networkBadge??presentation.networkBadge} />
           </View>
           <Text style={styles.balanceSubtitle} numberOfLines={props.subtitle ? undefined : 1}>
             {props.subtitle || (props.identifier
@@ -997,7 +1053,7 @@ function BalanceCard(props: {
           {props.loading && <ActivityIndicator color={adaptColor('#ffb000', 'color')} size="small" />}
           <Text style={styles.balanceValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{props.value}</Text>
           {props.fiatValue && <Text style={styles.balanceSubtitle}>{props.fiatValue}</Text>}
-          {props.onCopy && <Ionicons name="copy-outline" size={16} color={adaptColor('#8f8f9d', 'color')} />}
+          {props.onOpen && <Ionicons name="chevron-forward" size={16} color={adaptColor('#8f8f9d', 'color')} />}
         </View>
       </View>
       {props.notes?.map(note => <Text key={note} style={styles.balanceSubtitle}>{note}</Text>)}

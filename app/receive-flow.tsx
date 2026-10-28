@@ -1,5 +1,7 @@
+import { useLocalSearchParams } from 'expo-router';
 import ReceiveScreen from './(tabs)/receive';
 
 export default function ReceiveFlow() {
-  return <ReceiveScreen modal />;
+  const { account } = useLocalSearchParams<{account?:string}>();
+  return <ReceiveScreen modal initialNetwork={account === 'bitcoin_onchain' ? 'onchain' : account === 'hedera' ? 'hedera' : 'lightning'} />;
 }
