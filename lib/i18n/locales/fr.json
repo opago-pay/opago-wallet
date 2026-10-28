@@ -777,5 +777,12 @@
   "OPAGO account": "Compte OPAGO",
   "Account services": "Services de compte",
   "Lightning address": "Adresse Lightning",
-  "Manage your Lightning address": "Gérer votre adresse Lightning"
+  "Manage your Lightning address": "Gérer votre adresse Lightning",
+  "OPAGO wallet backend": "Service du portefeuille OPAGO",
+  "OPAGO wallet binding returned an account-linked wallet.": "Le service de liaison OPAGO a confirmé un portefeuille associé au compte.",
+  "The account backend returned no confirmed wallet binding.": "Le service de compte n'a renvoyé aucune liaison de portefeuille confirmée.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "Service du portefeuille OPAGO indisponible ({code}). La liaison compte-portefeuille et la synchronisation ne sont pas confirmées.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "La preuve de propriété du portefeuille, l'adresse Lightning personnelle et les rapports de transactions nécessitent un compte vérifié et une session de portefeuille distincts.",
+  "Check wallet backend": "Vérifier le service du portefeuille",
+  "Transaction synchronization": "Synchronisation des transactions"
 }
