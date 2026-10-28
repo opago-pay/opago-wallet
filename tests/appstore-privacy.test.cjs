@@ -38,3 +38,28 @@ test('App Store additions preserve bdk native plugin, store permissions and prod
  assert.equal(eas.build.production.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET,'true');
  assert.equal(eas.build.production.env.EXPO_PUBLIC_OPAGO_F3_ENABLED,'true');
 });
+
+test('privacy manifest Xcode resource registration is idempotent across two prebuild passes', () => {
+ const { addPrivacyResourceIfMissing } = require('../plugins/with-privacy-manifest.js');
+ const references = {};
+ const buildFiles = [];
+ const project = {
+  pbxFileReferenceSection: () => references,
+  getFirstTarget: () => ({uuid:'APP_TARGET'}),
+  addResourceFile: (relativePath, options) => {
+   assert.equal(options.target, 'APP_TARGET');
+   buildFiles.push({fileRef:'PRIVACY_REF',comment:'PrivacyInfo.xcprivacy in Resources'});
+   references.PRIVACY_REF={isa:'PBXFileReference',name:'"PrivacyInfo.xcprivacy"',
+     path:'"opago-wallet/PrivacyInfo.xcprivacy"'};
+  },
+ };
+ // Mimic Xcode: PBXBuildFile entries have fileRef/comment, not a path.
+ addPrivacyResourceIfMissing(project,'opago-wallet/PrivacyInfo.xcprivacy');
+ addPrivacyResourceIfMissing(project,'opago-wallet/PrivacyInfo.xcprivacy');
+ assert.equal(buildFiles.length,1);
+ assert.equal(Object.hasOwn(buildFiles[0],'path'),false);
+ // Also recognize a file reference that exposes only a (quoted) path.
+ const pathOnly={...project,pbxFileReferenceSection:()=>({OTHER:{path:'"Other/PrivacyInfo.xcprivacy"'}}),
+  addResourceFile:()=>{throw new Error('duplicate privacy resource');}};
+ addPrivacyResourceIfMissing(pathOnly,'opago-wallet/PrivacyInfo.xcprivacy');
+});
