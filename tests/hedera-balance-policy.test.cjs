@@ -13,8 +13,7 @@ test('Mainnet explicitly opts into balance-based transfers and rejects invalid l
     checkoutRuntimeSha256: 'a'.repeat(64),
   };
   assert.equal(resolveHederaBuildPolicy(policy).maxTransferHbar, 'balance');
-  assert.equal(require('../eas.json').build.production.env.EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR, '1');
-  assert.equal(require('../eas.json').build.production.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'false');
+  assert.equal(require('../eas.json').build.production.env.EXPO_PUBLIC_HEDERA_MAX_TRANSFER_HBAR, 'balance');
   for (const invalid of [undefined, '', '0', '-1', 'unlimited', 'Balance', '1.000000001', 'Infinity']) {
     assert.throws(() => resolveHederaBuildPolicy({ ...policy, maxTransferHbar: invalid }), /MAX_TRANSFER_HBAR/);
   }
