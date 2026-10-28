@@ -234,7 +234,7 @@ function nativeFixture(options={}){
  class Descriptor{constructor(value){this.value=value;descriptors.push(this);}uniffiDestroy(){this.destroyed=true;}}
  class Wallet{
   constructor(a,b){assert.doesNotMatch(a.value+b.value,/tprv|xprv/);calls.push('public wallet');}
-  static load(){calls.push('wallet load');if(options.failLoad)throw (options.loadError ?? new Error('Wallet not initialized'));return new Wallet({value:'public'}, {value:'public'});}
+  static load(){calls.push('wallet load');if(options.failLoad)throw (options.loadError ?? new Error('could not load'));return new Wallet({value:'public'}, {value:'public'});}
   persist(){if(failPersist)throw new Error('disk full');calls.push('persist');}
   balance(){return {confirmed:amount(1000),total:amount(1000),trustedPending:amount(0),untrustedPending:amount(0)};}
   listUnspent(){return [];}
@@ -277,6 +277,9 @@ test('transient, corrupt, mismatched or unknown BDK load failures preserve the S
   new Error('wrong network'),
   new Error('not initialized while decoding network'),
   new Error('Wallet not initialized: invalid database version'),
+  new Error('could not load: persistence failed'),
+  new Error('Could not load'),
+  new Error('could not load '),
  ];
  for(const cause of errors){
   const f=nativeFixture({exists:true,failLoad:true,loadError:cause});
@@ -287,13 +290,14 @@ test('transient, corrupt, mismatched or unknown BDK load failures preserve the S
   assert.ok(f.calls.includes('dispose storage'));
  }
 });
-test('known uninitialized BDK error name allows the first-start recovery path',async()=>{
- const cause=new Error('SDK error');
- cause.name='WalletNotInitialized';
- const f=nativeFixture({exists:true,failLoad:true,loadError:cause});
+test('only exact bdk-rn 1.1.0 CouldNotLoad message permits interrupted-first-start recovery',async()=>{
+ const f=nativeFixture({exists:true,failLoad:true,loadError:new Error('could not load')});
  const wallet=await f.start();
  assert.ok(f.calls.includes('delete storage'));
  await wallet.cleanupConnections();
+ const legacy=nativeFixture({exists:true,failLoad:true,loadError:Object.assign(new Error('Wallet not initialized'),{name:'WalletNotInitialized'})});
+ await assert.rejects(legacy.start(),/Wallet not initialized/);
+ assert.equal(legacy.calls.includes('delete storage'),false);
 });
 test('a healthy persisted native wallet loads without deleting its database',async()=>{
  const f=nativeFixture({exists:true});
