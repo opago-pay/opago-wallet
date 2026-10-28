@@ -23,7 +23,7 @@ function RecoveryInputScreenCaptureGuard() {
 }
 
 export default function LoginScreen() {
-  const { mode } = useColorMode();
+  useColorMode();
   useLanguage();
   const router = useRouter();
   const { restore } = useLocalSearchParams<{ restore?: string }>();
@@ -90,12 +90,10 @@ export default function LoginScreen() {
               <>
                 <View style={styles.header}>
                   <Image
-                    source={mode === 'light'
-                      ? require('@/assets/images/opago-wordmark-light.svg')
-                      : require('@/assets/images/opago-wordmark.svg')}
-                    style={styles.wordmark}
+                    source={require('@/assets/images/logo_new.svg')}
+                    style={styles.logo}
                     contentFit="contain"
-                    accessibilityLabel="Opago"
+                    accessibilityLabel="OPAGO"
                     accessibilityRole="image"
                   />
                 </View>
@@ -150,7 +148,7 @@ export default function LoginScreen() {
               </Text>
             )}
             {error && !loading && <Text style={styles.errorText} accessibilityRole="alert">{t(error || '')}</Text>}
-            <LegalLinks variant="footer" disabled={loading} />
+            <LegalLinks variant="welcome" disabled={loading} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -164,7 +162,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 26 },
   content: { flexGrow: 1, width: '100%', maxWidth: 460, alignSelf: 'center' },
   header: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  wordmark: { width: 104, height: 30 },
+  logo: { width: 44, height: 44 },
   hero: { flexGrow: 1, justifyContent: 'center', paddingTop: 32, paddingBottom: 34 },
   heroCompact: { paddingTop: 24, paddingBottom: 24 },
   title: { color: '#f3f4eb', fontSize: 50, lineHeight: 54, letterSpacing: -2.2, fontWeight: '600' },

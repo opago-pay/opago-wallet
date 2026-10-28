@@ -773,5 +773,9 @@
   "Address setup is temporarily unavailable. Please try again later.": "Das Anlegen der Adresse ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
   "Technical details": "Technische Details",
   "Checking your address…": "Deine Adresse wird geprüft…",
-  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen."
+  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen.",
+  "OPAGO account": "OPAGO Konto",
+  "Account services": "Kontodienste",
+  "Lightning address": "Lightning Adresse",
+  "Manage your Lightning address": "Lightning Adresse verwalten"
 }
