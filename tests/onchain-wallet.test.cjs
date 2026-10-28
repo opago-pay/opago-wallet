@@ -234,6 +234,7 @@ function nativeFixture(options={}){
  class Descriptor{constructor(value){this.value=value;descriptors.push(this);}uniffiDestroy(){this.destroyed=true;}}
  class Wallet{
   constructor(a,b){assert.doesNotMatch(a.value+b.value,/tprv|xprv/);calls.push('public wallet');}
+  static load(){calls.push('wallet load');if(options.failLoad)throw new Error('uninitialized sqlite');return new Wallet({value:'public'}, {value:'public'});}
   persist(){if(failPersist)throw new Error('disk full');calls.push('persist');}
   balance(){return {confirmed:amount(1000),total:amount(1000),trustedPending:amount(0),untrustedPending:amount(0)};}
   listUnspent(){return [];}
@@ -242,9 +243,9 @@ function nativeFixture(options={}){
   applyUpdate(){calls.push('apply update');}uniffiDestroy(){calls.push('dispose wallet');}
  }
  class EsploraClient{async fullScan(){calls.push('scan');if(releaseScan)await new Promise(resolve=>{releaseScan.resolve=resolve;});return {};}sync(){return this.fullScan();}uniffiDestroy(){}}
- const bdk={Descriptor,Wallet,EsploraClient,Network:{Regtest:'regtest'},NetworkKind:{Test:'test'},KeychainKind:{External:'external'},ChainPosition_Tags:{Confirmed:'confirmed'},Persister:{newSqlite:()=>({uniffiDestroy(){calls.push('dispose storage');}})}};
+ const bdk={Descriptor,Wallet,EsploraClient,Network:{Regtest:'regtest'},NetworkKind:{Test:'test'},KeychainKind:{External:'external'},ChainPosition_Tags:{Confirmed:'confirmed'},Persister:{newSqlite:()=>{calls.push('open storage');return {uniffiDestroy(){calls.push('dispose storage');}};}}};
  const {initializeOnchainWallet}=hookFixture('lib/onchain/wallet-native.ts',()=>({
-  'bdk-rn':bdk,'expo-file-system/legacy':{documentDirectory:'file:///test/',makeDirectoryAsync:options.mkdir|| (async()=>{}),getInfoAsync:async()=>({exists:false}),deleteAsync:async()=>{}},
+  'bdk-rn':bdk,'expo-file-system/legacy':{documentDirectory:'file:///test/',makeDirectoryAsync:options.mkdir|| (async()=>{}),getInfoAsync:async()=>({exists:!!options.exists}),deleteAsync:async()=>{calls.push('delete storage');}},
   './provider':{onchainProvider:()=>({network:'regtest',esploraUrl:'http://test'})},'./keys':{deriveOnchainAccount},'./policy':policy,
   './journal-native':{onchainJournal:()=>({list:async()=>[]})},
  }),exports=>exports).render();
@@ -255,6 +256,25 @@ test('native wallet persists public descriptors and returns a receive address wi
  assert.equal(address,'synthetic-address');assert.equal(f.calls.includes('scan'),false);
  assert.equal(f.calls.at(-1),'persist');await wallet.cleanupConnections();
  assert.ok(f.descriptors.filter(d=>/tprv/.test(d.value)).every(d=>d.destroyed));
+});
+test('an interrupted first initialization recovers a broken SQLite wallet by rebuilding and full scanning',async()=>{
+ const f=nativeFixture({exists:true,failLoad:true});
+ const wallet=await f.start();
+ assert.deepEqual(f.calls.slice(0,6),['open storage','wallet load','dispose storage','delete storage','open storage','public wallet']);
+ assert.equal(f.calls[6],'persist');
+ await wallet.sync();
+ assert.ok(f.calls.includes('scan'));
+ assert.equal(f.calls.includes('apply update'),true);
+ await wallet.cleanupConnections();
+ assert.ok(f.descriptors.filter(d=>/tprv/.test(d.value)).every(d=>d.destroyed));
+});
+test('a healthy persisted native wallet loads without deleting its database',async()=>{
+ const f=nativeFixture({exists:true});
+ const wallet=await f.start();
+ assert.ok(f.calls.includes('wallet load'));
+ assert.equal(f.calls.includes('delete storage'),false);
+ assert.equal(f.calls.includes('persist'),true);
+ await wallet.cleanupConnections();
 });
 test('a failed native persistence never returns an unrecorded receive address',async()=>{
  const f=nativeFixture();const wallet=await f.start();await wallet.sync();f.fail();
