@@ -101,6 +101,7 @@ export function PaymentDetailsScreen({ payment, rates, onClose, onHide, onReview
       </>}
       {!!recipient && <Field label={t('Recipient')} value={recipient} selectable />}
       {!!receivingAddress && <Field label={t('Receiving address')} value={receivingAddress} selectable />}
+      {payment.onchainFeeSats !== undefined && <Field label={t('Network fee')} value={`${payment.onchainFeeSats.toLocaleString(appLocale())} SAT`} />}
       {operation?.state === 'confirmed' && operation.actualFeeSats !== undefined &&
         <Field label={t('Fee paid')} value={`${operation.actualFeeSats.toLocaleString(appLocale())} SAT`} />}
       {operation?.feeSats !== null && operation?.feeSats !== undefined &&

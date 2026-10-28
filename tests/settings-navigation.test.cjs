@@ -2,6 +2,8 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
 const { hookFixture } = require('./react-hooks-fixture.cjs');
 
 function find(tree, predicate) {
@@ -40,7 +42,9 @@ function settingsFixture(t, initialSection = 'overview') {
   const oldCancel = global.cancelAnimationFrame;
   global.requestAnimationFrame = callback => { callback(); return 1; };
   global.cancelAnimationFrame = () => {};
-  const router = { setParams: value => { section = value.section; }, replace() {} };
+  const navigation = [];
+  const performanceMarks = [];
+  const router = { setParams: value => { section = value.section; }, replace: route => navigation.push(['replace', route]), push: route => navigation.push(['push', route]) };
   const auth = {
     backupStatus: 'verified', hederaPublicKey: 'test-public-key',
     wipeWallet: async () => {}, refreshHederaAccount: async () => {}, markBackupVerified: async () => {}, lockWallet() {},
@@ -62,6 +66,7 @@ function settingsFixture(t, initialSection = 'overview') {
     '@/lib/auth-diagnostics': { recordAuthDiagnostic() {}, categorizeAuthFailure: () => 'unknown' },
     '@/lib/storage': { getSecureItem: async () => 'test recovery words never from a real wallet', MNEMONIC_STORE_KEY: 'test' },
     '@/lib/config': { appConfig: {} },
+    '@/lib/performance-trace': { markNavigationStart: route => { performanceMarks.push(route); navigation.push(['markNavigationStart', route]); }, markNavigationReady() {}, getPerformanceReport: () => [], performanceTracingEnabled: () => false },
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'Button', TextInput: 'Input', WalletActivityBoundary: 'Boundary' },
     '@/components/navigation/close-wallet-screen': { CloseWalletScreen: 'Close' },
     '@/components/settings/settings-menu': { ...menuExports, SettingsMenu: 'Menu' },
@@ -86,7 +91,7 @@ function settingsFixture(t, initialSection = 'overview') {
     global.cancelAnimationFrame = oldCancel;
   });
   return {
-    ...fixture, getSection: () => section, back: () => back(), alerts,
+    ...fixture, getSection: () => section, back: () => back(), alerts, navigation, performanceMarks,
     setSection: value => { section = value; }, setFocused: value => { focused = value; },
     setAuthorization: value => { authorize = value; }, authCalls: () => authCalls,
   };
@@ -125,7 +130,7 @@ test('backup deep link requires explicit authorization and leaving clears reveal
   screen = await ui.settle();
   assert.equal(ui.authCalls(), 1);
   assert.ok(find(screen, node => node.type === 'Recovery'));
-  find(screen, node => node.props?.accessibilityLabel === 'Back to settings').props.onPress();
+  find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
   ui.render();
   ui.setSection('security');
   screen = ui.render();
@@ -149,4 +154,38 @@ test('late recovery authorization cannot reveal words after the settings tab los
   assert.equal(find(screen, node => node.type === 'Recovery'), null);
   assert.equal(find(screen, node => node.type === 'Modal').props.visible, false);
   assert.equal(ui.alerts.length, 0);
+});
+
+test('header has one accessible back arrow with context-aware navigation', t => {
+  const ui = settingsFixture(t);
+  let screen = ui.render();
+  assert.equal(find(screen, node => node.props?.accessibilityLabel === 'Back')?.type, 'Button');
+  find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
+  assert.deepEqual(ui.navigation, [['markNavigationStart', 'home'], ['replace', '/(tabs)']]);
+  find(screen, node => node.type === 'Menu').props.onSelect('appearance');
+  screen = ui.render();
+  assert.equal(find(screen, node => node.props?.accessibilityLabel === 'Back to settings'), null);
+  find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
+  assert.equal(ui.getSection(), 'overview');
+  assert.deepEqual(ui.performanceMarks, ['home']);
+  assert.deepEqual(ui.navigation, [['markNavigationStart', 'home'], ['replace', '/(tabs)']]);
+});
+
+test('OPAGO account and Lightning address use matching menu entries and the existing destination', () => {
+  const root = path.join(__dirname, '..');
+  const screen = fs.readFileSync(path.join(root, 'app/(tabs)/settings.tsx'), 'utf8');
+  const menu = fs.readFileSync(path.join(root, 'components/settings/settings-menu.tsx'), 'utf8');
+  assert.match(screen, /onOpenOpagoAccount=\{\(\) => router\.push\('\/opago-account'\)\}/);
+  assert.doesNotMatch(screen, /OpagoAction|OPAGO account and Lightning address/);
+  assert.match(menu, /<MenuRow title=\{t\('OPAGO account'\)\}/);
+  assert.match(menu, /<MenuRow title=\{t\('Lightning address'\)\}/);
+  assert.equal((menu.match(/onPress=\{props\.onOpenOpagoAccount\}/g) || []).length, 2);
+});
+
+test('appearance options are full-width and labels remain on one line', () => {
+  const root = path.join(__dirname, '..');
+  const source = fs.readFileSync(path.join(root, 'components/settings/color-mode-picker.tsx'), 'utf8');
+  assert.match(source, /<Text numberOfLines=\{1\} ellipsizeMode="tail"/);
+  assert.match(source, /choice: \{ width: '100%'/);
+  assert.doesNotMatch(source, /flexBasis: 140/);
 });

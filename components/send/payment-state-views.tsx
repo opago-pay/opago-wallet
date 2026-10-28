@@ -1,3 +1,5 @@
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { isBitcoinAsset } from '@/lib/bitcoin-only';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -16,14 +18,18 @@ export function OcpQuoteView(props: {
   onCancel(): void;
 }) {
   useLanguage();
+  const { bitcoinOnly } = useBitcoinOnly();
+  const options = props.state.quote.transferAmounts.filter(option => !bitcoinOnly || isBitcoinAsset(option.asset));
+  const selected = props.selected && options.includes(props.selected) ? props.selected : null;
   return (
     <View style={styles.container}>
       <Text style={styles.quoteTitle}>{props.state.quote.merchantName}</Text>
       <Text style={styles.subtitle}>
         {t("Total:")} {props.state.quote.fiatAmount} {props.state.quote.fiatCurrency}
       </Text>
+      {!options.length && <Text style={styles.subtitle}>{t('Turn off Bitcoin Only in Settings to use other coins.')}</Text>}
       <View style={{ marginTop: 24 }}>
-        {props.state.quote.transferAmounts.map(option => (
+        {options.map(option => (
           <TouchableOpacity
             key={option.method + ':' + option.asset}
             style={[styles.option, props.selected === option && styles.optionActive]}
@@ -41,9 +47,9 @@ export function OcpQuoteView(props: {
         ))}
       </View>
       <TouchableOpacity
-        style={[styles.button, !props.selected && { opacity: 0.5 }]}
+        style={[styles.button, !selected && { opacity: 0.5 }]}
         onPress={props.onExecute}
-        disabled={props.loading || !props.selected}
+        disabled={props.loading || !selected}
       >
         {props.loading ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t("Review and pay")}</Text>}
       </TouchableOpacity>

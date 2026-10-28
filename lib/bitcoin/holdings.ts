@@ -8,7 +8,7 @@ export function pendingOnchainDepositSats(operations: readonly BitcoinOperation[
     for (const item of operations) if (item.kind === 'deposit') deposits.set(item.id, item);
     let total = 0n;
     for (const item of deposits.values()) {
-      if (!['confirmed', 'failed', 'aborted'].includes(item.state)) total += BigInt(sats(item.amountSats));
+      if (!['confirmed', 'refunded', 'failed', 'aborted'].includes(item.state)) total += BigInt(sats(item.amountSats));
     }
     return sats(total);
   } catch {

@@ -48,7 +48,7 @@ function fixture(options = {}) {
     getStaticDepositAddress: async () => { calls.push('fetch address'); return 'test-bitcoin-address'; },
   };
   const hederaAccount = { accountId: '0.0.123456' };
-  const auth = { walletReady: true, backupStatus: 'verified', sparkWallet: client, hederaPublicKey: 'fixture-owner',
+  const auth = { walletReady: true, backupStatus: 'verified', sparkWallet: client, onchainWallet:{network:'regtest',scope:'bitcoin_onchain:regtest:test',receiveAddress:async()=>{calls.push('derive onchain address');return 'own-bitcoin-address';}}, hederaPublicKey: 'fixture-owner',
     hederaAccount: options.hederaMissing ? null : hederaAccount,
     refreshHederaAccount: async () => {
       if (options.hederaLookupError) throw new Error('network unavailable');
@@ -59,6 +59,7 @@ function fixture(options = {}) {
     '@/lib/i18n': { t: (key, vars = {}) => key.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`), appLocale: () => 'en' },
     '@/components/bitcoin/payment-ui': { bitcoinStyles: {}, BitcoinButton: 'bitcoin-button', BitcoinInfo: 'bitcoin-info', BitcoinMoney: 'bitcoin-money' },
     '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
+    '@/hooks/useBitcoinOnly': { useBitcoinOnly: () => ({ bitcoinOnly: options.bitcoinOnly ?? false, ready: true }) },
     '@/hooks/useLanguage': { useLanguage() {} },
     'expo-router': { useRouter: () => ({ replace: route => calls.push(['replace', route]) }) }, '@react-navigation/native': { useIsFocused: () => true },
     '@/hooks/useWalletAuth': { useWalletAuth: () => auth }, '@/hooks/useExchangeRates': { useExchangeRates: () => rates },
@@ -111,7 +112,7 @@ function fixture(options = {}) {
     '@/lib/transaction-rates-native': { observeTransactionRate: () => calls.push('rate queued') },
     'expo-haptics': { NotificationFeedbackType: { Success: 'success' } },
     'expo-notifications': { getPermissionsAsync: async () => ({ granted: false }) },
-  }), exports => exports.default());
+  }), exports => exports.default({initialNetwork:options.initialNetwork ?? 'lightning'}));
   return { ...app, calls, auth, cache, rates };
 }
 const request = expiresAt => ({ scope: 'REGTEST:fixture-scope', requestId: 'synthetic', paymentHash: 'a'.repeat(64), amountSats: 20, invoice: 'lightning:' + invoice(20, Math.floor(expiresAt / 1000) - 3600, { paymentHash: 'a'.repeat(64), expiry: false }), expiresAt, createdAt: new Date().toISOString() });
@@ -186,7 +187,7 @@ test('switching between Lightning and Bitcoin keeps the same unpaid request and 
   const lightningCode = nodes(screen).find(isQr).props.value;
   selectRoute(app, 'Bitcoin network');
   screen = await app.settle();
-  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address');
+  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:own-bitcoin-address');
   assert.equal(nodes(screen).find(isQr).props.logo, 'bitcoin');
   selectRoute(app, 'Lightning');
   screen = await app.settle();
@@ -220,23 +221,25 @@ test('a wallet change hides the previous QR before asynchronous restoration fini
   assert.equal(nodes(screen).some(isQr), false);
 });
 
-test('a cached on-chain address is reused after the Receive screen is reopened', async t => {
-  const cache = { address: null };
+test('onchain receive reopens the own wallet address without using the legacy Spark cache', async t => {
+  const cache = { address: 'legacy-spark-address' };
   const first = fixture({ cache });
   first.render(); await first.settle();
   await new Promise(done => setTimeout(done, 10));
   let screen = await first.settle();
   selectRoute(first, 'Bitcoin network');
   screen = await first.settle();
-  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address');
-  assert.equal(first.calls.filter(call => call === 'fetch address').length, 1);
+  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:own-bitcoin-address');
+  assert.equal(first.calls.filter(call => call === 'derive onchain address').length, 1);
   first.unmount();
   const second = fixture({ cache }); t.after(second.unmount);
   second.render(); screen = await second.settle();
   selectRoute(second, 'Bitcoin network');
   screen = await second.settle();
-  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address');
+  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:own-bitcoin-address');
   assert.equal(second.calls.includes('fetch address'), false);
+  assert.equal(second.calls.filter(call=>call==='derive onchain address').length,1);
+  assert.equal(cache.address,'legacy-spark-address');
 });
 
 test('an expired restored request is replaced by an open Lightning QR without tapping a button', async t => {
@@ -311,16 +314,16 @@ test('Bitcoin network selection exposes the on-chain QR immediately and encodes 
   app.render(); let screen = await app.settle();
   selectRoute(app, 'Bitcoin network');
   screen = await app.settle();
-  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address');
+  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:own-bitcoin-address');
   screen = openAmount(app);
   nodes(screen).find(node => node.type === 'button' && node.props.accessibilityRole === 'radio' && text(node).includes('SAT')).props.onPress();
   screen = app.render();
   nodes(screen).find(node => node.type === 'input').props.onChangeText('200');
   screen = app.render();
-  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:test-bitcoin-address?amount=0.00000200');
+  assert.equal(nodes(screen).find(isQr).props.value, 'bitcoin:own-bitcoin-address?amount=0.00000200');
   nodes(screen).find(node => node.type === 'button' && text(node) === 'Copy').props.onPress();
   await app.settle();
-  assert.deepEqual(app.calls.find(call => Array.isArray(call) && call[0] === 'copied'), ['copied', 'bitcoin:test-bitcoin-address?amount=0.00000200']);
+  assert.deepEqual(app.calls.find(call => Array.isArray(call) && call[0] === 'copied'), ['copied', 'bitcoin:own-bitcoin-address?amount=0.00000200']);
 });
 
 test('Show all coins reveals HBAR in the network picker and opens its account QR', async t => {
@@ -373,4 +376,29 @@ test('Hedera lookup failure offers a working retry without a QR or loading spinn
   nodes(screen).find(node => node.type === 'bitcoin-button' && node.props.label === 'Try again').props.onPress();
   screen = await app.settle();
   assert.equal(nodes(screen).find(isQr).props.value, '0.0.123456');
+});
+
+test('Bitcoin Only never reveals an HBAR receive option and applies to preselected routes',async t=>{
+  const options={bitcoinOnly:true,initialNetwork:'hedera'};const app=fixture(options);t.after(app.unmount);
+  app.render();let screen=await app.settle();assert.match(text(screen),/Receive Bitcoin/);
+  nodes(screen).find(node=>node.props.accessibilityLabel==='Via Lightning').props.onPress();screen=app.render();
+  assert.doesNotMatch(text(screen),/HBAR|Receive from a Hedera account/);
+  assert.equal(nodes(screen).some(node=>node.props.accessibilityLabel==='Show all coins'),false);
+});
+test('disabled mainnet receive explains availability and offers Lightning instead of a permanent QR placeholder',async t=>{
+  const app=fixture({initialNetwork:'onchain'});t.after(app.unmount);
+  app.auth.onchainWallet=null;app.auth.onchainError='Bitcoin onchain mainnet has not been enabled for this build.';
+  app.render();let screen=await app.settle();assert.match(text(screen),/Onchain receiving is not available yet/);
+  assert.equal(nodes(screen).some(node=>isQr(node)||node.props.name==='qr-code-outline'||node.props.accessibilityLabel==='Add amount'),false);
+  assert.equal(nodes(screen).some(node=>node.props.label==='Try again'),false);
+  nodes(screen).find(node=>node.props.label==='Receive with Lightning').props.onPress();await app.settle();
+  await new Promise(resolve=>setTimeout(resolve,550));screen=await app.settle();
+  assert.ok(nodes(screen).some(isQr));
+});
+test('a later Spark startup cannot erase an already derived onchain receive address',async t=>{
+  const app=fixture({initialNetwork:'onchain'});t.after(app.unmount);
+  const spark=app.auth.sparkWallet;app.auth.sparkWallet=null;
+  app.render();let screen=await app.settle();assert.equal(nodes(screen).find(isQr).props.value,'bitcoin:own-bitcoin-address');
+  app.auth.sparkWallet=spark;screen=await app.settle();assert.equal(nodes(screen).find(isQr).props.value,'bitcoin:own-bitcoin-address');
+  assert.equal(app.calls.filter(call=>call==='derive onchain address').length,1);
 });

@@ -37,6 +37,8 @@ function fixture(file, overrides = {}) {
     '@/components/bitcoin/payment-ui': { bitcoinStyles: {}, BitcoinButton: 'bitcoin-button', BitcoinInfo: 'bitcoin-info', BitcoinMoney: 'bitcoin-money' },
     '@/lib/bitcoin/amount': require('../lib/bitcoin/amount.ts'),
     '@/hooks/useLanguage': { useLanguage: () => {} },
+    '@/hooks/useBitcoinOnly': { useBitcoinOnly: () => ({ bitcoinOnly: false, ready: true }) },
+    '@/lib/onchain/errors': require('../lib/onchain/errors.ts'),
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
     '@/lib/performance-trace': require('./performance-trace-stub.cjs'),

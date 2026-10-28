@@ -15,7 +15,8 @@ assert.equal(process.env.EXPO_PUBLIC_ENABLE_MAINNET, 'false', 'Legacy global Mai
 assert.equal(process.env.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET, 'true');
 assert.equal(appConfig.sparkNetwork, 'MAINNET');
 assert.equal(appConfig.lightningBuildProfile, 'mainnet');
-assert.equal(appConfig.maxLightningFeeSats, 100);
+const { calculateMaxLightningFee } = require('../lib/lightning.ts');
+assert.equal(calculateMaxLightningFee(1000, 1250, 250), 250, 'Production must retain the reviewed fee without a fixed SAT cap.');
 assert.equal(appConfig.isDevelopment, false);
 assert.equal(appConfig.allowInsecureHttp, false, 'Insecure HTTP must be disabled.');
 assert.equal(

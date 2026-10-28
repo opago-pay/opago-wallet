@@ -62,7 +62,7 @@ export class LightningFeeChangedError extends Error {
 }
 
 function feeRejectedBeforeSubmission(cause: unknown, maxFeeSats: number): boolean {
-  // Pinned Spark SDK 0.7.12 throws this local validation error before selecting
+  // The pinned Spark SDK throws this local validation error before selecting
   // leaves or contacting the swap/send service. Do not classify generic errors
   // (including similarly worded transport failures) as safe to resend.
   if (!(cause instanceof Error) || !/^maxFeeSats does not cover fee estimate(?: \[|$)/.test(cause.message)) return false;

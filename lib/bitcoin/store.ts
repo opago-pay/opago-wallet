@@ -2,7 +2,7 @@ import { sats } from './amount';
 import type { BitcoinNetwork } from './destination';
 
 export const BITCOIN_STORE_KEY = 'opago.bitcoin.operations.v1';
-export type BitcoinOperationState = 'prepared' | 'checking' | 'pending' | 'broadcast' | 'confirmed' | 'failed' | 'aborted' | 'action_required';
+export type BitcoinOperationState = 'prepared' | 'checking' | 'pending' | 'broadcast' | 'confirmed' | 'refunded' | 'failed' | 'aborted' | 'action_required';
 export interface BitcoinOperation {
   id: string;
   scope: string;
@@ -22,6 +22,8 @@ export interface BitcoinOperation {
   txid?: string;
   vout?: number;
   transferId?: string;
+  /** Durable exclusive ownership of an unclaimed outpoint by a refund. */
+  refundIntent?: { operationId: string; txid: string };
   /** Provider history after a seed restore may not expose the original
    * recipient and amount. Such records block duplicate sends without
    * inventing payment details. */
@@ -53,7 +55,7 @@ export function assertBitcoinOperation(record: BitcoinOperation): void {
       typeof record.scope !== 'string' || !record.scope ||
       !['MAINNET', 'REGTEST'].includes(record.network) ||
       !record.scope.startsWith(`${record.network}:`) || !['withdrawal', 'deposit'].includes(record.kind) ||
-      !['prepared', 'checking', 'pending', 'broadcast', 'confirmed', 'failed', 'aborted', 'action_required'].includes(record.state) ||
+      !['prepared', 'checking', 'pending', 'broadcast', 'confirmed', 'refunded', 'failed', 'aborted', 'action_required'].includes(record.state) ||
       typeof record.address !== 'string' || !Number.isFinite(Date.parse(record.createdAt))) {
     throw new Error('Bitcoin payment storage is unavailable.');
   }
@@ -64,6 +66,7 @@ export function assertBitcoinOperation(record: BitcoinOperation): void {
       record.btcEurRate > 1e12 || !record.btcEurRateAt || !Number.isFinite(Date.parse(record.btcEurRateAt)))) {
     throw new Error('Bitcoin payment storage is unavailable.');
   }
+  if (record.refundIntent && (record.kind !== 'deposit' || !record.refundIntent.operationId || !/^[0-9a-f]{64}$/.test(record.refundIntent.txid))) throw new Error('Invalid Bitcoin refund intent.');
   sats(record.amountSats);
   if (record.feeSats !== null) sats(record.feeSats);
   if (record.actualFeeSats !== undefined) {
@@ -92,7 +95,7 @@ export function createBitcoinStore(storage: Storage) {
   return {
     list(scope: string) { return exclusive(async () => (await read()).filter(row => row.scope === scope)); },
     listActive(scope: string) { return exclusive(async () => (await read()).filter(row =>
-      row.scope === scope && !['confirmed', 'failed', 'aborted'].includes(row.state))); },
+      row.scope === scope && !['confirmed', 'refunded', 'failed', 'aborted'].includes(row.state))); },
     listWithdrawalRequestIds(scope: string) { return exclusive(async () => (await read()).filter(row =>
       row.scope === scope && row.kind === 'withdrawal' && row.requestId).map(row => row.requestId!)); },
     existingIds(scope: string, ids: string[]) { return exclusive(async () => {
@@ -160,7 +163,7 @@ export function createBitcoinStore(storage: Storage) {
         assertCurrent();
         if (records.some(row => row.scope === operation.scope && (row.id === operation.id ||
             (operation.kind === 'withdrawal' && row.kind === 'withdrawal' &&
-              !['confirmed', 'failed', 'aborted'].includes(row.state))))) {
+              !['confirmed', 'refunded', 'failed', 'aborted'].includes(row.state))))) {
           throw new Error('A Bitcoin payment is still being checked. Do not send it again.');
         }
         await write([...records, operation]);

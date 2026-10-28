@@ -18,7 +18,9 @@ test('small payments use the reviewed quote instead of a percentage that rejects
   assert.equal(calculateMaxLightningFee(20, 120, 100), 100);
   assert.equal(calculateMaxLightningFee(1000, 1001, 1), 1);
   assert.throws(() => calculateMaxLightningFee(20, 21, 2), /Insufficient balance/);
-  assert.throws(() => calculateMaxLightningFee(20, 1000, 101), /exceeds.*100 SAT/);
+  assert.equal(calculateMaxLightningFee(20, 1000, 101), 101);
+  assert.equal(calculateMaxLightningFee(20, 200020, 200000), 200000);
+  assert.throws(() => calculateMaxLightningFee(1, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER), /Insufficient balance/);
   for (const invalid of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(() => calculateMaxLightningFee(20, 120, invalid), /invalid Lightning fee estimate/);
   }
@@ -65,7 +67,7 @@ test('zero-fee and amountless invoices retain their exact reviewed amount and fe
 });
 
 test('insufficient total balance and malformed quotes never reach payment submission', async () => {
-  for (const [balance, quote, expected] of [[21, 2, /Insufficient balance/], [120, 101, /exceeds/], [120, -1, /invalid/], [120, 1.5, /invalid/], [120, undefined, /invalid/]]) {
+  for (const [balance, quote, expected] of [[21, 2, /Insufficient balance/], [120, 101, /Insufficient balance/], [120, -1, /invalid/], [120, 1.5, /invalid/], [120, undefined, /invalid/]]) {
     await assert.rejects(prepareDecodedSparkPayment({
       getBalance: async () => ({ balance }),
       getLightningSendFeeEstimate: async () => quote,
@@ -118,4 +120,46 @@ test('cancelling authorization still blocks the newly prepared fee budget before
   };
   const prepared = await prepareDecodedSparkPayment(wallet, details());
   await assert.rejects(payPreparedSparkPayment(wallet, prepared, undefined, () => { throw new Error('Wallet locked'); }), /Wallet locked/);
+});
+
+test('reviewed fees above the former cap stay exact and a higher quote needs a new review', async () => {
+  const { LightningFeeChangedError } = require('../lib/payments.ts');
+  let currentFee = 250;
+  const submitted = [];
+  const wallet = {
+    getBalance: async () => ({ balance: 1000 }),
+    getLightningSendFeeEstimate: async () => currentFee,
+    payLightningInvoice: async input => {
+      submitted.push(input.maxFeeSats);
+      if (input.maxFeeSats < currentFee) {
+        const error = new Error('maxFeeSats does not cover fee estimate');
+        error.getContext = () => ({ field: 'maxFeeSats', value: input.maxFeeSats, expected: `${currentFee} sats` });
+        throw error;
+      }
+      return { preimage };
+    },
+  };
+  const first = await prepareDecodedSparkPayment(wallet, details());
+  assert.equal(first.maxFeeSats, 250); assert.deepEqual(submitted, []);
+  currentFee = 300;
+  const results = [];
+  await assert.rejects(payPreparedSparkPayment(wallet, first, {
+    onResolved: async (_hash, state, result) => results.push([state, result]),
+  }), LightningFeeChangedError);
+  assert.deepEqual(submitted, [250]);
+  assert.deepEqual(results, [['failed', 'FEE_CHANGED_BEFORE_SUBMISSION']]);
+  const second = await prepareDecodedSparkPayment(wallet, details());
+  assert.equal(second.maxFeeSats, 300); assert.deepEqual(submitted, [250]);
+  await payPreparedSparkPayment(wallet, second);
+  assert.deepEqual(submitted, [250, 300]);
+});
+
+test('legacy build fee settings cannot reinstate a hidden payment cap', () => {
+  const { execFileSync } = require('node:child_process');
+  const output = execFileSync(process.execPath, ['-r', './tests/register-typescript.cjs', '-e',
+    "const {calculateMaxLightningFee}=require('./lib/lightning.ts'); console.log(calculateMaxLightningFee(20,1000,250));"], {
+    cwd: require('node:path').join(__dirname, '..'),
+    env: { ...process.env, EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS: '1' }, encoding: 'utf8',
+  });
+  assert.equal(output.trim(), '250');
 });

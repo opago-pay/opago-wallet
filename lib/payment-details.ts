@@ -3,6 +3,12 @@ import type { TransactionRate } from './transaction-rates';
 
 export interface PaymentHistoryItem {
   key: string;
+  account?: 'bitcoin_onchain';
+  onchainNetwork?: 'mainnet' | 'testnet' | 'signet' | 'regtest';
+  onchainFeeSats?: number;
+  onchainOperationId?: string;
+  legacyDeposit?: boolean;
+  internalTransfer?: 'to_lightning'|'from_lightning';
   type: 'incoming' | 'outgoing';
   amountDisplay: string;
   /** Numeric amount in the displayed asset unit (SAT or HBAR). */
@@ -98,6 +104,7 @@ export function paymentMethodLabel(item: PaymentHistoryItem): string {
 }
 
 export function paymentDetailStatus(item: PaymentHistoryItem): string {
+  if (item.status === 'refunded') return 'Returned to on-chain';
   if (item.status === 'action_required') return item.operation?.kind === 'deposit' ? 'Claim required' : 'Needs attention';
   if (item.status === 'broadcast' && item.asset === 'SAT' && item.route === 'onchain') {
     return 'Broadcast to the Bitcoin network';
@@ -109,6 +116,10 @@ export function paymentDetailStatus(item: PaymentHistoryItem): string {
 
 export function bitcoinExplorerUrl(item: PaymentHistoryItem): string | null {
   const operation = item.operation;
+  if (item.account === 'bitcoin_onchain' && /^[a-f0-9]{64}$/i.test(item.txId ?? '')) {
+    const path = item.onchainNetwork === 'mainnet' ? '' : item.onchainNetwork === 'testnet' ? '/testnet' : item.onchainNetwork === 'signet' ? '/signet' : null;
+    return path === null ? null : `https://mempool.space${path}/tx/${item.txId!.toLowerCase()}`;
+  }
   return operation?.network === 'MAINNET' && /^[a-f0-9]{64}$/i.test(operation.txid ?? '')
     ? `https://mempool.space/tx/${operation.txid!.toLowerCase()}` : null;
 }
@@ -118,7 +129,9 @@ export function paymentDetailReferences(item: PaymentHistoryItem): { label: stri
   const add = (label: string, value: string | null | undefined) => {
     if (value && !references.some(item => item.value === value)) references.push({ label, value });
   };
-  if (item.operation) {
+  if (item.account === 'bitcoin_onchain') {
+    add('Transaction ID', item.txId);
+  } else if (item.operation) {
     add('Transaction ID', item.operation.txid);
     add('Request ID', item.operation.requestId);
     add('Quote ID', item.operation.quoteId);

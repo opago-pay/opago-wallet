@@ -1,3 +1,4 @@
+import { clearOnchainWalletData } from './onchain/wallet-native';
 import { BACKUP_STATUS_KEY } from './wallet-backup';
 import { deleteSecureItem, getSecureItem, MNEMONIC_STORE_KEY, WALLET_IDENTITY_KEY, WALLET_WIPE_PENDING_KEY } from './storage';
 import { wipeTransactions } from './database';
@@ -18,6 +19,7 @@ const wiper = createWalletWiper({
   get: () => getSecureItem(WALLET_WIPE_PENDING_KEY),
   remove: () => deleteSecureItem(WALLET_WIPE_PENDING_KEY),
 }, [
+  () => clearOnchainWalletData(),
   () => homeBalancePreviewStore.clear(),
   () => wipeTransactions(),
   () => transactionRateStore.clear(),

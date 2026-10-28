@@ -1,3 +1,4 @@
+import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,6 +76,7 @@ export function SettingsMenu(props: {
   disabled?: boolean;
   onSelect(section: SettingsSection): void;
   onLock(): void;
+  onOpenOpagoAccount(): void;
 }) {
   const { selection } = useColorMode();
   const { language } = useLanguage();
@@ -87,7 +89,14 @@ export function SettingsMenu(props: {
           success={props.backupChecked}
           disabled={props.disabled} onPress={() => props.onSelect('security')} />}
     </MenuGroup>
+    <MenuGroup title={t('Wallet')}>
+      <MenuRow title={t('OPAGO account')} detail={t('Account services')}
+        icon="person-circle-outline" divider disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
+      <MenuRow title={t('Lightning address')} detail={t('Manage your Lightning address')}
+        icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
+    </MenuGroup>
     <MenuGroup title={t('Preferences')}>
+      <BitcoinOnlyToggle disabled={props.disabled} />
       <MenuRow title={t('Appearance')} detail={t(selection === 'system' ? 'System' : selection === 'light' ? 'Day' : 'Dark')}
         icon="color-palette-outline" divider disabled={props.disabled} onPress={() => props.onSelect('appearance')} />
       <MenuRow title={t('Language')} detail={LANGUAGE_NAMES[language]}

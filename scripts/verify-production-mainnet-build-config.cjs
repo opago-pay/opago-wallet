@@ -12,7 +12,8 @@ assert.equal(process.env.EXPO_PUBLIC_ENABLE_LIGHTNING_MAINNET, 'true');
 assert.equal(process.env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'true');
 assert.equal(appConfig.sparkNetwork, 'MAINNET');
 assert.equal(appConfig.lightningBuildProfile, 'mainnet');
-assert.equal(appConfig.maxLightningFeeSats, 100);
+const { calculateMaxLightningFee } = require('../lib/lightning.ts');
+assert.equal(calculateMaxLightningFee(1000, 1250, 250), 250, 'Production must retain the reviewed fee without a fixed SAT cap.');
 assert.equal(appConfig.isDevelopment, false);
 assert.equal(appConfig.isHederaMainnet, true, 'Hedera Mainnet must be explicitly enabled.');
 assert.equal(appConfig.hederaNetwork, 'mainnet');
@@ -30,5 +31,11 @@ assert.equal(
   '18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8',
 );
 assert.equal(appConfig.allowInsecureHttp, false);
+assert.equal(process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET, 'true');
+const { resolveOnchainPolicy } = require('../lib/onchain/policy.ts');
+assert.deepEqual(resolveOnchainPolicy({network:process.env.EXPO_PUBLIC_BITCOIN_NETWORK,
+  esploraUrl:process.env.EXPO_PUBLIC_BITCOIN_ESPLORA_URL,
+  mainnetEnabled:process.env.EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET === 'true',allowLocal:appConfig.allowInsecureHttp}),
+  {network:'mainnet',esploraUrl:'https://mempool.space/api'});
 
-process.stdout.write('Verified: Hedera and Lightning Mainnet production profile.\n');
+process.stdout.write('Verified: Bitcoin onchain, Lightning and Hedera Mainnet production profile.\n');

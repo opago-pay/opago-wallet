@@ -33,8 +33,6 @@ export function friendlyPaymentMessage(cause: unknown, asset = 'payment'): strin
   }
   const range = message.match(/^Amount must be between (\d+) and (\d+) SAT\.$/);
   if (range) return t('Enter an amount between {min} and {max} SAT.', { min: range[1], max: range[2] });
-  const fee = message.match(/^The Lightning fee estimate of (\d+) SAT exceeds your maximum fee of (\d+) SAT\.$/);
-  if (fee) return t('The estimated network fee is {fee} SAT. This payment allows at most {max} SAT. Nothing was sent. Try again later or use a different payment request.', { fee: fee[1], max: fee[2] });
   if (/insufficient|not enough/.test(normalized)) {
     return t('There is not enough {asset} to cover this payment and its network fee.', { asset });
   }

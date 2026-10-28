@@ -773,5 +773,18 @@
   "Address setup is temporarily unavailable. Please try again later.": "Das Anlegen der Adresse ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
   "Technical details": "Technische Details",
   "Checking your address…": "Deine Adresse wird geprüft…",
-  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen."
+  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen.",
+  "OPAGO account": "OPAGO Konto",
+  "Account services": "Kontodienste",
+  "Lightning address": "Lightning Adresse",
+  "Manage your Lightning address": "Lightning Adresse verwalten",
+  "OPAGO wallet backend": "OPAGO-Wallet-Backend",
+  "OPAGO wallet binding returned an account-linked wallet.": "Die OPAGO-Wallet-Bindung hat eine mit dem Konto verknüpfte Wallet zurückgegeben.",
+  "The account backend returned no confirmed wallet binding.": "Das Konto-Backend hat keine bestätigte Wallet-Bindung zurückgegeben.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "OPAGO-Wallet-Backend nicht verfügbar ({code}). Konto-/Wallet-Bindung und Synchronisierung sind nicht bestätigt.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "Wallet-Eigentumsnachweis, persönliche Lightning-Adresse und Transaktionsmeldungen erfordern ein gesondert verifiziertes Konto und eine Wallet-Sitzung.",
+  "Check wallet backend": "Wallet-Backend prüfen",
+  "Transaction synchronization": "Transaktionssynchronisierung",
+  "Wallet session refresh failed. The backend binding status is unknown.": "Aktualisierung der Wallet-Sitzung fehlgeschlagen. Der Backend-Bindungsstatus ist unbekannt.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "Keine verifizierte Wallet-Sitzung verfügbar. Melde dich an und verknüpfe deine Wallet, bevor du die Backend-Bindung prüfst."
 }

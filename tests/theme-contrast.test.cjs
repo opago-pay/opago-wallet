@@ -65,15 +65,19 @@ test('known light colors resolve by role, unknown colors are never guessed', asy
   await colorModePreference.setMode('dark');
 });
 
-test('welcome wordmark has an explicit visible light variant', () => {
+test('welcome uses the existing OPAGO logo and retains privacy without legal clutter', () => {
   const root = path.join(__dirname, '..');
   const welcome = fs.readFileSync(path.join(root, 'app/(auth)/login.tsx'), 'utf8');
-  const darkMark = fs.readFileSync(path.join(root, 'assets/images/opago-wordmark.svg'), 'utf8');
-  const lightMark = fs.readFileSync(path.join(root, 'assets/images/opago-wordmark-light.svg'), 'utf8');
-  assert.match(welcome, /mode === 'light'[\s\S]*?opago-wordmark-light\.svg/);
-  assert.match(darkMark, /fill="#ffffff"/);
-  assert.match(lightMark, /fill="#18181d"/);
-  assert.doesNotMatch(lightMark, /fill="#ffffff"/);
+  const legal = fs.readFileSync(path.join(root, 'components/legal/legal-links.tsx'), 'utf8');
+  const logo = fs.readFileSync(path.join(root, 'assets/images/logo_new.svg'), 'utf8');
+  assert.match(welcome, /source=\{require\('@\/assets\/images\/logo_new\.svg'\)\}/);
+  assert.match(welcome, /accessibilityLabel="OPAGO"/);
+  assert.match(welcome, /<LegalLinks variant="welcome"/);
+  assert.match(legal, /variant === 'help' \|\| variant === 'welcome'/);
+  assert.match(legal, /link\.id === 'contact' \|\| link\.id === 'privacy'/);
+  assert.match(legal, /\{ id: 'imprint', label: t\('Imprint'\) \}/);
+  assert.match(legal, /\{ id: 'terms', label: t\('Terms and conditions'\) \}/);
+  assert.match(logo, /fill: #ffb000/);
 });
 
 test('shared placeholder role meets contrast on actual dark input surfaces', () => {

@@ -1,3 +1,4 @@
+import { appConfig, assertSafeRemoteUrl } from '../config';
 import { Transaction } from '@scure/btc-signer';
 import { hex } from '@scure/base';
 import { sats } from './amount';
@@ -11,11 +12,14 @@ export async function depositAmount(network: BitcoinNetwork, txid: string, vout:
   if (!/^[a-f\d]{64}$/i.test(txid) || !Number.isSafeInteger(vout) || vout < 0) throw new Error('Invalid Bitcoin deposit.');
   // A regtest Electrs provider must be explicitly integrated; never query a
   // mainnet explorer for a test transaction or embed provider credentials.
-  if (network !== 'MAINNET') throw new Error('Bitcoin deposit verification is unavailable on this test network.');
+  const provider = process.env.EXPO_PUBLIC_BITCOIN_ESPLORA_URL || (network === 'MAINNET' ? 'https://mempool.space/api' : '');
+  const configuredNetwork = process.env.EXPO_PUBLIC_BITCOIN_NETWORK || (appConfig.isMainnet ? 'mainnet' : 'regtest');
+  if (!provider || configuredNetwork !== (network === 'MAINNET' ? 'mainnet' : 'regtest')) throw new Error('Bitcoin deposit verification is unavailable on this network.');
+  const base = assertSafeRemoteUrl(provider, 'Bitcoin provider').toString().replace(/\/$/, '');
   const controller = new AbortController();
   try {
     const raw = await withTimeout((async () => {
-      const response = await strictFetch(`https://mempool.space/api/tx/${txid}/hex`, { signal: controller.signal }, 8_000_000, true);
+      const response = await strictFetch(`${base}/tx/${txid}/hex`, { signal: controller.signal }, 8_000_000, true);
       if (!response.ok || response.redirected) throw new Error('Bitcoin transaction verification is unavailable.');
       const body = await readBoundedText(response, 'Bitcoin transaction verification',
         8_000_000, controller, 8_000_000);

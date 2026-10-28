@@ -773,5 +773,18 @@
   "Address setup is temporarily unavailable. Please try again later.": "La creazione di indirizzi è temporaneamente non disponibile. Riprova più tardi.",
   "Technical details": "Dettagli tecnici",
   "Checking your address…": "Verifica del tuo indirizzo…",
-  "Your address is ready. Show this code to receive HBAR.": "Il tuo indirizzo è pronto. Mostra questo codice per ricevere HBAR."
+  "Your address is ready. Show this code to receive HBAR.": "Il tuo indirizzo è pronto. Mostra questo codice per ricevere HBAR.",
+  "OPAGO account": "Account OPAGO",
+  "Account services": "Servizi account",
+  "Lightning address": "Indirizzo Lightning",
+  "Manage your Lightning address": "Gestisci il tuo indirizzo Lightning",
+  "OPAGO wallet backend": "Servizio wallet OPAGO",
+  "OPAGO wallet binding returned an account-linked wallet.": "Il servizio di collegamento OPAGO ha restituito un wallet associato all'account.",
+  "The account backend returned no confirmed wallet binding.": "Il servizio account non ha restituito alcun collegamento wallet confermato.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "Servizio wallet OPAGO non disponibile ({code}). Il collegamento account-wallet e la sincronizzazione non sono confermati.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "La prova di proprietà del wallet, l'indirizzo Lightning personale e i report delle transazioni richiedono un account verificato e una sessione wallet separati.",
+  "Check wallet backend": "Verifica servizio wallet",
+  "Transaction synchronization": "Sincronizzazione transazioni",
+  "Wallet session refresh failed. The backend binding status is unknown.": "L'aggiornamento della sessione wallet non è riuscito. Lo stato del collegamento sul server è sconosciuto.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "Non è disponibile una sessione wallet verificata. Accedi e collega il wallet prima di verificare il collegamento sul server."
 }
