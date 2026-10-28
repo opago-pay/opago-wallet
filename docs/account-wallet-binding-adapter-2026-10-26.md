@@ -86,12 +86,30 @@ passed, one existing test skipped, and all nine contract tests passed, along wit
 typecheck, lint and configuration/patch/syntax gates. The existing iOS plist test
 used a local `python3.exe` alias to installed Python 3.14 on Windows. Android
 Expo export with the existing EAS production environment also succeeded.
-These checks are not production acceptance or a signed native APK build.
+These checks are not production backend acceptance.
 
-Keep the PR draft until real authenticated acceptance is recorded: approved test
-account, matching backend network, first binding, replay/lost-response recovery,
-foreign account/key rejection, expiry, logout and lock/cancellation. Build and
-install a new signed APK with source SHA, build ID, version code and APK hash.
-Confirm login/return, proof, binding, restart and status on the physical device,
-preserving existing local keys/funds. The installed versionCode-21 APK predates
-this change and does not validate it. No replacement APK was installed here.
+An APK can be built and tested before backend acceptance; the PR review status
+does not gate that test. Production acceptance still requires an approved test
+account and matching backend network, first binding, replay/lost-response recovery,
+foreign account/key rejection, expiry, logout and lock/cancellation.
+
+On 28 October, EAS refused the requested build because the account's monthly
+Android build quota was exhausted. A local standalone release APK was then built
+from exact source `514c23d47ea9311822cbbc10cabf6be5f9e96ab7`, using the existing
+production profile, Node 22.23.4 and a generated-native-only versionCode override.
+Gradle completed all 1,103 tasks successfully. APK evidence:
+
+- Package `com.opago.wallet`, versionName `1.0.0`, versionCode **22**, arm64-v8a.
+- Production networks and F3 enabled; embedded Hermes bundle; not debuggable.
+- APK SHA-256: `04302e672dae14cba2e764b01bc6385b156284a1578547a21fa95a06925a09e9`.
+- Signing certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
+  This is the same local Android test certificate as installed version 21,
+  not the EAS/store release certificate.
+- `adb install -r` succeeded on the attached G7 device, with no uninstall or data
+  clearing. Installed version 22 was confirmed; launch returned `Status: ok` and
+  the app displayed its wallet unlock screen.
+
+The authenticated device check is pending user unlock. Installation/startup alone
+does not establish login, proof or binding success or verify stored balances.
+The running API deployment had the broker enabled and no explicit `WALLET_F3_*`
+environment settings (no `envFrom`); its internal-service acceptance remains open.
