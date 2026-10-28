@@ -73,7 +73,8 @@ export class UmaSending {
   async reviewDisclosure(receiver: string, amountSats: number, maxFeeSats: number) {
     if (this.payment && !['cancelled', 'confirmed'].includes(this.payment.phase)) throw new OpagoError('payment_already_open');
     if (!Number.isSafeInteger(amountSats) || amountSats <= 0 || !Number.isSafeInteger(amountSats * 1000) ||
-        !Number.isSafeInteger(maxFeeSats) || maxFeeSats < 0) throw new Error('Invalid UMA amount or fee limit.');
+        !Number.isSafeInteger(maxFeeSats) || maxFeeSats < 0 ||
+        !Number.isSafeInteger(amountSats + maxFeeSats)) throw new Error('Invalid UMA amount or fee limit.');
     await this.ready();
     await this.account.finish('uma.discovery', 'uma.verify', 'uma.request', 'uma.response');
     const normalized = normalizeUmaAddress(receiver);

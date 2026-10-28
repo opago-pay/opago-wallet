@@ -21,7 +21,7 @@ function nodes(tree) {
 }
 function content(tree) {
   if (Array.isArray(tree)) return tree.map(content).join(' ');
-  return tree && typeof tree === 'object' ? content(tree.props?.children) : typeof tree === 'string' ? tree : '';
+  return tree && typeof tree === 'object' ? content(tree.props?.children) : typeof tree === 'string' || typeof tree === 'number' ? String(tree) : '';
 }
 function action(tree, label) { return nodes(tree).find(n => n.type === 'action' && n.props.label === label); }
 async function runtimeFixture(ready = false) {
@@ -136,7 +136,10 @@ test('F3 runtime rebuilds for the same Spark object after lock/unlock', async t 
 test('F3 UMA UI shows receiver, amount, fees and provider data before consent and a separate payment confirmation', async t => {
   const runtime = await runtimeFixture(true); const app = screenFixture(t, 'app/uma-send.tsx', runtime);
   let tree = app.render(); nodes(tree).find(n => n.type === 'input' && n.props.accessibilityLabel === 'Amount in SAT').props.onChangeText('100');
+  tree = app.render(); assert.equal(action(tree, 'Review identity disclosure').props.disabled, true);
+  nodes(tree).find(n => n.type === 'input' && n.props.accessibilityLabel === 'Maximum fee in SAT').props.onChangeText('250');
   tree = app.render(); action(tree, 'Review identity disclosure').props.onPress(); tree = await app.afterAction();
+  assert.equal(runtime.uma.payment.disclosure.maxFeeSats, 250);
   assert.match(content(tree), /\$alice@receiver.example/); assert.match(content(tree), /100 SAT/); assert.match(content(tree), /Maximum fee/);
   assert.match(content(tree), /receiver.example/); assert.match(content(tree), /Given name/); assert.match(content(tree), /Document number/);
   assert.equal(runtime.backend.peerCalls, 0); assert.equal(action(tree, 'Simulate confirmed payment'), undefined);
@@ -172,4 +175,22 @@ test('F3 Receive shows the confirmed personal QR first and never loads account s
   assert.match(content(tree), /One-time Lightning invoice/);
   runtime.account.verifiedAt = 0; tree = app.render(); assert.equal(nodes(tree).some(n => n.type === 'qr'), false);
   assert.match(content(tree), /confirmed by the backend/);
+});
+
+test('UMA disclosure requires an explicit valid fee budget and keeps it separate from payment approval', async t => {
+ const runtime=await runtimeFixture(true);const app=screenFixture(t,'app/uma-send.tsx',runtime);
+ let tree=app.render();nodes(tree).find(n=>n.props.accessibilityLabel==='Amount in SAT').props.onChangeText('1000');
+ for(const invalid of ['', '-1', '1.5', '1e3', '9007199254740992']){
+  tree=app.render();nodes(tree).find(n=>n.props.accessibilityLabel==='Maximum fee in SAT').props.onChangeText(invalid);
+  tree=app.render();assert.equal(action(tree,'Review identity disclosure').props.disabled,true);
+ }
+ nodes(tree).find(n=>n.props.accessibilityLabel==='Maximum fee in SAT').props.onChangeText('500');
+ tree=app.render();assert.equal(action(tree,'Review identity disclosure').props.disabled,false);
+ action(tree,'Review identity disclosure').props.onPress();tree=await app.afterAction();
+ assert.equal(runtime.uma.payment.disclosure.maxFeeSats,500);assert.equal(runtime.payments(),0);
+ runtime.prepare=()=>runtime.uma.consentAndPrepare(runtime.uma.payment.disclosure.id,async()=>250);
+ action(tree,'I consent to this data transfer').props.onPress();tree=await app.afterAction();
+ assert.match(content(tree),/Payment fee limit: 250 SAT/);assert.match(content(tree),/Maximum total.*1250/);
+ assert.match(content(tree),/Fee is high relative/);assert.equal(runtime.payments(),0);
+ action(tree,'Simulate confirmed payment').props.onPress();await app.afterAction();assert.equal(runtime.payments(),1);
 });

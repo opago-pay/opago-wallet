@@ -6,7 +6,6 @@ const test = require('node:test');
 process.env.NODE_ENV = 'test';
 process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP = 'true';
 delete process.env.EXPO_PUBLIC_ENABLE_MAINNET;
-delete process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS;
 
 require('./register-typescript.cjs');
 
@@ -18,7 +17,7 @@ const {
   normalizeLightningInput,
   resolveInvoiceAmount,
 } = require('../lib/lightning.ts');
-const { assertSafeRemoteUrl, isPrivateDevelopmentHost, resolveMaxLightningFeeSats } = require('../lib/config.ts');
+const { assertSafeRemoteUrl, isPrivateDevelopmentHost } = require('../lib/config.ts');
 const {
   payDecodedSparkInvoice,
   sparkTransferMatchesInvoice,
@@ -65,16 +64,12 @@ test('binds selected amounts to fixed and amountless invoices', () => {
   assert.throws(() => resolveInvoiceAmount(invoice(null), 1.5), /whole number/i);
 });
 
-test('caps Lightning fees and fails closed on insufficient balance', () => {
+test('unquoted Lightning budgets remain proportional and fail closed on insufficient balance', () => {
   assert.equal(calculateMaxLightningFee(1_000, 1_005), 5);
-  assert.equal(calculateMaxLightningFee(100_000, 100_100), 100);
+  assert.equal(calculateMaxLightningFee(100_000, 100_500), 500);
   assert.throws(() => calculateMaxLightningFee(1_000, 1_004), /maximum fee/i);
   assert.throws(() => calculateMaxLightningFee(-1, 100), /invalid payment amount/i);
   assert.throws(() => calculateMaxLightningFee(1, 1.5), /insufficient Lightning balance/i);
-  assert.equal(resolveMaxLightningFeeSats(undefined), 100);
-  assert.equal(resolveMaxLightningFeeSats('250'), 250);
-  assert.throws(() => resolveMaxLightningFeeSats('1.5'), /positive whole number/i);
-  assert.throws(() => resolveMaxLightningFeeSats('100001'), /must not exceed/i);
 });
 
 test('matches incoming Spark transfers by direction, state, hash, and exact amount', () => {
