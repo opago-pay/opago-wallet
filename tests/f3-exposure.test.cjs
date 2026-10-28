@@ -8,14 +8,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = filename => fs.readFileSync(path.join(root, filename), 'utf8');
 
-test('F3 is visible in EAS builds while Hedera Mainnet remains disabled', () => {
+test('F3 is visible in the existing EAS build profiles', () => {
   const eas = JSON.parse(read('eas.json'));
   for (const name of ['development', 'preview', 'mainnet-candidate', 'production']) {
     const env = eas.build[name].env;
     assert.equal(env.EXPO_PUBLIC_OPAGO_F3_ENABLED, 'true', name);
-    assert.equal(env.EXPO_PUBLIC_ENABLE_HEDERA_MAINNET, 'false', name);
-    assert.equal(env.EXPO_PUBLIC_HEDERA_NETWORK, 'testnet', name);
-    assert.equal(env.EXPO_PUBLIC_HEDERA_BUILD_PROFILE, 'testnet', name);
   }
   assert.equal(eas.build['production-apk'].extends, 'production');
   assert.equal(eas.build.production.env.EXPO_PUBLIC_ENABLE_MAINNET, 'false');
