@@ -10,6 +10,7 @@ module.exports = ({ config }) => ({
   plugins: [
     ...(config.plugins || []),
     './plugins/with-bitcoin-bdk',
+    './plugins/with-privacy-manifest',
     ['@sentry/react-native/expo', {
       organization: 'opago-gmbh',
       project: 'react-native',
