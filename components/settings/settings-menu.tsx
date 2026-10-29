@@ -1,5 +1,5 @@
 import { ACCOUNT_LINK_PREVIEW_ENABLED } from '@/lib/opago/account-link-preview';
-import { ACCOUNT_DELETION_PREVIEW_ENABLED } from '@/lib/opago/account-deletion-preview';
+import { ACCOUNT_DELETION_PREVIEW_ENABLED, WALLET_DETACH_PREVIEW_ENABLED } from '@/lib/opago/account-wallet-lifecycle-preview';
 import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -81,6 +81,7 @@ export function SettingsMenu(props: {
   onOpenOpagoAccount(): void;
   onOpenAccountDeletionPreview?(): void;
   onOpenAccountLinkPreview?(): void;
+  onOpenWalletDetachPreview?(): void;
 }) {
   const { selection } = useColorMode();
   const { language } = useLanguage();
@@ -98,6 +99,7 @@ export function SettingsMenu(props: {
         icon="person-circle-outline" divider disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
       {ACCOUNT_DELETION_PREVIEW_ENABLED && props.onOpenAccountDeletionPreview && <MenuRow title={t('Delete OPAGO account')} detail={t('Account services')} icon="trash-outline" disabled={props.disabled} onPress={props.onOpenAccountDeletionPreview} />}
       {ACCOUNT_LINK_PREVIEW_ENABLED && props.onOpenAccountLinkPreview && <MenuRow title={t('OPAGO account and wallet linking')} detail={t('Mock preview only. No real account or wallet changes are made.')} icon="link-outline" disabled={props.disabled} onPress={props.onOpenAccountLinkPreview} />}
+      {WALLET_DETACH_PREVIEW_ENABLED && props.onOpenWalletDetachPreview && <MenuRow title={t('Unlink wallet')} detail={t('Mock only: no live wallet request is made.')} icon="link-outline" disabled={props.disabled} onPress={props.onOpenWalletDetachPreview} />}
       <MenuRow title={t('Lightning address')} detail={t('Manage your Lightning address')}
         icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
     </MenuGroup>

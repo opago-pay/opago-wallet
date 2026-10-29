@@ -1,6 +1,6 @@
 import type { PrivateStore } from './store';
-/** Disabled until a real authenticated account deletion contract is approved. */
-export const ACCOUNT_DELETION_PREVIEW_ENABLED = false;
+/** Backward-compatible export of the single shared lifecycle preview flag. */
+export { ACCOUNT_DELETION_PREVIEW_ENABLED } from './account-wallet-lifecycle-preview';
 export type DeletionResult = { status: 'deleted' | 'pending'; receiptId: string };
 export interface AccountDeletionAdapter {
   login(): Promise<{ accountId: string } | null>;
