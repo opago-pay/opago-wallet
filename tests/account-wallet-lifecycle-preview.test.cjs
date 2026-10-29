@@ -207,3 +207,26 @@ test('detach challenge issuance is limited to five outstanding challenges per wa
   for (let i = 0; i < 5; i++) await adapter.challenge(uuid(200 + i));
   await assert.rejects(adapter.challenge(uuid(206)), e => e.code === 'rate_limited' && e.status === 429);
 });
+
+test('detach challenge matches protocol message fields and binds installation', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const installationId = uuid(220);
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(221), uuid(222), 5, () => now, (() => { let n = 223; return () => uuid(n++); })(), 'regtest');
+  const challenge = await adapter.challenge(installationId);
+  assert.equal(challenge.installation_id, installationId);
+  assert.equal(challenge.network, 'regtest');
+  assert.match(challenge.wallet_pubkey, /^(02|03)[0-9a-f]{64}$/);
+  assert.match(challenge.nonce, /^[0-9a-f]{64}$/);
+  assert.deepEqual(challenge.message.split('\n').map(line => line.split(':')[0]), [
+    'opago-wallet-auth', 'domain', 'network', 'wallet_pubkey', 'nonce', 'issued_at', 'expires_at', 'action', 'action_params_sha256',
+  ]);
+  assert.equal(challenge.message.split('\n')[7], 'action: wallet_detach');
+});
+test('verify idempotency key conflicts if reused for a different challenge', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(230), uuid(231), 1, () => now, (() => { let n = 232; return () => uuid(n++); })());
+  const first = await adapter.challenge(uuid(233));
+  const second = await adapter.challenge(uuid(234));
+  await adapter.verify(first, true, uuid(235));
+  await assert.rejects(adapter.verify(second, true, uuid(235)), e => e.code === 'idempotency_conflict' && e.status === 409);
+});
