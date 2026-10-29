@@ -25,6 +25,16 @@ const fromHex = (hex: string): Uint8Array => Uint8Array.from(hex.match(/../g)?.m
 const time = (ms: number) => new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z');
 const text = (value: string) => new TextEncoder().encode(value);
 const PARTY_ID = '10000000-0000-4000-8000-000000000001';
+const cloneChallenge = (value: LinkChallenge): LinkChallenge => JSON.parse(JSON.stringify(value)) as LinkChallenge;
+
+/** Keep the same stateful mock throughout sign-out / sign-in for one wallet. */
+export function accountLinkAdapterForWallet(
+  current: { walletKey: string; adapter: MockAccountLinkAdapter } | null,
+  walletKey: string,
+  create: () => MockAccountLinkAdapter,
+): { walletKey: string; adapter: MockAccountLinkAdapter } {
+  return current?.walletKey === walletKey ? current : { walletKey, adapter: create() };
+}
 
 /** Mock mimics the existing F3 wallet_bind challenge/verify contract. */
 export class MockAccountLinkAdapter implements AccountLinkPreviewAdapter {
@@ -48,22 +58,34 @@ export class MockAccountLinkAdapter implements AccountLinkPreviewAdapter {
       'issued_at: ' + issued, 'expires_at: ' + expires, 'action: wallet_bind',
       'action_params_sha256: ' + toHex(sha256(text(params)))].join('\n');
     this.pending = { accountId, walletId, intent, challenge: { challenge_id: id, message, expires_at: expires } };
-    return this.pending;
+    return cloneChallenge(this.pending);
   }
   async verify(binding: LinkChallenge, proof: WalletAuthVerifyRequest): Promise<LinkStatus> {
-    if (!this.pending || this.pending.challenge.challenge_id !== binding.challenge.challenge_id ||
-        this.now() >= Date.parse(binding.challenge.expires_at)) throw new LinkPreviewError('challenge_expired');
-    if (binding.accountId !== this.pending.accountId || binding.walletId !== this.walletId ||
-        binding.challenge.message !== this.pending.challenge.message || binding.intent.action !== 'wallet_bind') throw new LinkPreviewError('cancelled');
-    if (proof.challenge_id !== binding.challenge.challenge_id ||
+    const pending = this.pending;
+    if (!pending) throw new LinkPreviewError('challenge_expired');
+    // The server-side pending record is authoritative; caller fields cannot
+    // extend expiry or change the principal, nonce, message or action.
+    if (this.now() >= Date.parse(pending.challenge.expires_at)) throw new LinkPreviewError('challenge_expired');
+    if (binding.challenge.challenge_id !== pending.challenge.challenge_id ||
+        binding.challenge.expires_at !== pending.challenge.expires_at ||
+        binding.challenge.message !== pending.challenge.message ||
+        binding.accountId !== pending.accountId ||
+        binding.walletId !== pending.walletId ||
+        pending.walletId !== this.walletId ||
+        JSON.stringify(binding.intent) !== JSON.stringify(pending.intent) ||
+        binding.intent.action !== 'wallet_bind') throw new LinkPreviewError('cancelled');
+    const pendingNonce = pending.challenge.message.split('\n')[4];
+    const submittedNonce = binding.challenge.message.split('\n')[4];
+    if (!pendingNonce?.startsWith('nonce: ') || submittedNonce !== pendingNonce) throw new LinkPreviewError('cancelled');
+    if (proof.challenge_id !== pending.challenge.challenge_id ||
         !/^[0-9a-f]{128}$/i.test(proof.signature) ||
-        !schnorr.verify(fromHex(proof.signature), sha256(text(binding.challenge.message)), fromHex(this.walletId.slice(2)))) {
+        !schnorr.verify(fromHex(proof.signature), sha256(text(pending.challenge.message)), fromHex(this.walletId.slice(2)))) {
       throw new LinkPreviewError('cancelled');
     }
-    if (this.owner && this.owner !== binding.accountId) throw new LinkPreviewError('conflict');
-    this.owner = binding.accountId;
+    if (this.owner && this.owner !== pending.accountId) throw new LinkPreviewError('conflict');
+    this.owner = pending.accountId;
     this.pending = null;
-    return this.status(binding.accountId);
+    return this.status(pending.accountId);
   }
   async unlink(accountId: string) {
     if (this.owner === accountId) this.owner = null;
