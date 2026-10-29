@@ -38,7 +38,8 @@ export type LifecycleRequest = {
 export type LifecycleFailureCode =
   | 'unauthorized' | 'account_not_fresh' | 'deletion_in_progress' | 'idempotency_conflict'
   | 'receipt_expired' | 'deletion_not_cancellable' | 'rate_limited' | 'compliance_unavailable'
-  | 'proof_invalid' | 'wallet_not_found' | 'account_mismatch' | 'proof_replayed' | 'proof_expired';
+  | 'proof_invalid' | 'wallet_not_found' | 'account_mismatch' | 'proof_replayed' | 'proof_expired'
+  | 'invalid_request' | 'challenge_invalid' | 'signature_invalid';
 export class LifecyclePreviewError extends Error {
   constructor(readonly code: LifecycleFailureCode, readonly status: number) { super(code); }
 }
@@ -155,7 +156,7 @@ export class MockWalletDetachAdapter {
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid,
     private readonly network: 'mainnet' | 'regtest' = 'mainnet', private readonly walletPubkey = '02' + '11'.repeat(32)) {}
   async challenge(installationId: string): Promise<DetachChallenge> {
-    if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('proof_invalid', 403);
+    if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('invalid_request', 400);
     for (const [id, challenge] of this.pendingChallenges) {
       if (this.now() >= Date.parse(challenge.expires_at)) this.pendingChallenges.delete(id);
     }
@@ -183,7 +184,7 @@ export class MockWalletDetachAdapter {
     return clone(challenge);
   }
   async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
-    if (!uuidPattern.test(idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
+    if (!uuidPattern.test(idempotencyKey)) throw new LifecyclePreviewError('invalid_request', 400);
     const fingerprint = 'POST:/api/v2/wallet/auth/verify:' + JSON.stringify({ challenge, signatureValid });
     const prior = this.verifyResults.get(idempotencyKey);
     if (prior) {
@@ -197,11 +198,11 @@ export class MockWalletDetachAdapter {
         challenge.issued_at !== pending.issued_at ||
         challenge.expires_at !== pending.expires_at ||
         JSON.stringify(challenge.action_params) !== JSON.stringify(pending.action_params)) {
-      throw new LifecyclePreviewError('proof_invalid', 403);
+      throw new LifecyclePreviewError('challenge_invalid', 401);
     }
     if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('proof_replayed', 409);
     if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
-    if (!signatureValid) throw new LifecyclePreviewError('proof_invalid', 403);
+    if (!signatureValid) throw new LifecyclePreviewError('signature_invalid', 401);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
       idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
     const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
