@@ -1,6 +1,7 @@
 export interface Celebration { kind: string; id: number }
 export function enqueueCelebration<T extends Celebration>(queue: T[], event: T): T[];
 export function finishCelebration<T extends Celebration>(queue: T[], id: number): T[];
+export function celebrationDisposition(active: boolean, reduced: boolean | null): 'play' | 'pause' | 'discard';
 export function createReviewScheduler(options: {
   isActive(): boolean;
   requestReview(wallet: string): Promise<boolean>;
