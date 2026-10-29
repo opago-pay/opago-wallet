@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "node": "22.23.4",
       "developmentClient": true,
       "distribution": "internal",
       "env": {
@@ -16,13 +17,16 @@
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com",
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
-        "SENTRY_HTTP_MAX_RETRIES": "1"
+        "SENTRY_HTTP_MAX_RETRIES": "1",
+        "EXPO_PUBLIC_OPAGO_F3_ENABLED": "true"
       },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
+      "node": "22.23.4",
+      "autoIncrement": true,
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_ENABLE_MAINNET": "false",
@@ -33,7 +37,8 @@
         "EXPO_PUBLIC_HEDERA_MIRROR_NODE_URL": "https://testnet.mirrornode.hedera.com",
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
-        "SENTRY_HTTP_MAX_RETRIES": "1"
+        "SENTRY_HTTP_MAX_RETRIES": "1",
+        "EXPO_PUBLIC_OPAGO_F3_ENABLED": "true"
       },
       "android": {
         "buildType": "apk"
@@ -57,7 +62,8 @@
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
         "SENTRY_HTTP_MAX_RETRIES": "1",
-        "EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL": "https://hedera-activation.opago.com"
+        "EXPO_PUBLIC_HEDERA_ACTIVATION_API_URL": "https://hedera-activation.opago.com",
+        "EXPO_PUBLIC_OPAGO_F3_ENABLED": "true"
       },
       "android": {
         "buildType": "apk"
@@ -82,7 +88,11 @@
         "EXPO_PUBLIC_HEDERA_CHECKOUT_RUNTIME_SHA256": "18dfd309cde03d2291101f3b77f8c5810664a5c52bbed3b63ccce4752d7943c8",
         "SENTRY_ALLOW_FAILURE": "true",
         "SENTRY_HTTP_TIMEOUT": "10",
-        "SENTRY_HTTP_MAX_RETRIES": "1"
+        "SENTRY_HTTP_MAX_RETRIES": "1",
+        "EXPO_PUBLIC_ENABLE_BITCOIN_MAINNET": "true",
+        "EXPO_PUBLIC_BITCOIN_NETWORK": "mainnet",
+        "EXPO_PUBLIC_BITCOIN_ESPLORA_URL": "https://mempool.space/api",
+        "EXPO_PUBLIC_OPAGO_F3_ENABLED": "true"
       }
     },
     "production-apk": {

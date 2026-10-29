@@ -14,18 +14,20 @@ struct SafeRequest {
   let requestId: String
 
   init(_ raw: [String: Any]) throws {
+    let binary = raw["bodyEncoding"] as? String == "base64"
+    guard raw["bodyEncoding"] == nil || binary else { throw SafeHTTPFailure.rejected }
     guard let urlString = raw["url"] as? String, urlString.utf8.count <= 8192,
           let components = URLComponents(string: urlString),
           let scheme = components.scheme?.lowercased(),
           let rawHost = components.host, !rawHost.isEmpty,
           components.user == nil, components.password == nil, components.fragment == nil,
-          let method = raw["method"] as? String, method == "GET" || method == "POST",
+          let method = raw["method"] as? String, ["GET", "POST", "PUT", "DELETE"].contains(method),
           let body = raw["body"] as? String,
           let headers = raw["headers"] as? [String: String],
           let requestId = raw["requestId"] as? String,
           !requestId.isEmpty, requestId.utf8.count <= 128,
           let maxBytes = Self.integer(raw["maxBytes"], min: 1, max: 8_000_000),
-          let timeoutMs = Self.integer(raw["timeoutMs"], min: 1, max: 30_000) else {
+          let timeoutMs = Self.integer(raw["timeoutMs"], min: 1, max: binary ? 120_000 : 30_000) else {
       throw SafeHTTPFailure.rejected
     }
     let host = rawHost.hasPrefix("[") && rawHost.hasSuffix("]")
@@ -39,11 +41,24 @@ struct SafeRequest {
     let development = false
     #endif
     guard scheme == "https" || (development && scheme == "http"),
-          !(method == "GET" && !body.isEmpty) else { throw SafeHTTPFailure.rejected }
+          !(["GET", "DELETE"].contains(method) && !body.isEmpty) else { throw SafeHTTPFailure.rejected }
     let portNumber = components.port ?? (scheme == "https" ? 443 : 80)
     guard (1...65535).contains(portNumber) else { throw SafeHTTPFailure.rejected }
-    let payload = Data(body.utf8)
-    guard payload.count <= 1_048_576 else { throw SafeHTTPFailure.rejected }
+    let payload: Data
+    if binary {
+      guard scheme == "https", method == "POST",
+            components.path.range(of: "^/api/v2/onboarding/kyc/[0-9a-f-]{36}/documents$", options: .regularExpression) != nil,
+            headers.first(where: { $0.key.lowercased() == "content-type" })?.value == "application/octet-stream",
+            headers.contains(where: { $0.key.lowercased() == "x-opago-envelope" }),
+            body.utf8.count <= 13_981_056, let decoded = Data(base64Encoded: body),
+            decoded.count >= 29, decoded.count <= 10_485_788, decoded.base64EncodedString() == body else {
+        throw SafeHTTPFailure.rejected
+      }
+      payload = decoded
+    } else {
+      payload = Data(body.utf8)
+      guard payload.count <= 1_048_576 else { throw SafeHTTPFailure.rejected }
+    }
     let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
     let target = path + (components.percentEncodedQuery.map { "?" + $0 } ?? "")
     guard target.utf8.count <= 8192, !target.contains("\r"), !target.contains("\n") else {
@@ -57,7 +72,7 @@ struct SafeRequest {
     for (name, value) in headers {
       guard !name.isEmpty, name.utf8.allSatisfy({
         (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45
-      }), value.utf8.count <= 8192, !value.contains("\r"), !value.contains("\n") else {
+      }), value.utf8.count <= 16_384, !value.contains("\r"), !value.contains("\n") else {
         throw SafeHTTPFailure.rejected
       }
       headerBytes += name.utf8.count + value.utf8.count + 4
@@ -65,7 +80,7 @@ struct SafeRequest {
       if ["host", "accept-encoding", "connection", "content-length", "transfer-encoding"].contains(name.lowercased()) { continue }
       lines.append("\(name): \(value)")
     }
-    if method == "POST" { lines.append("Content-Length: \(payload.count)") }
+    if method == "POST" || method == "PUT" { lines.append("Content-Length: \(payload.count)") }
     guard let prefix = (lines.joined(separator: "\r\n") + "\r\n\r\n").data(using: .utf8) else {
       throw SafeHTTPFailure.rejected
     }
@@ -231,6 +246,10 @@ public class OpagoSafeHttpModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("OpagoSafeHttp")
+
+    AsyncFunction("verifyRs256") { (n: String, e: String, message: String, signature: String) -> Bool in
+      return verifyOidcRs256(n: n, e: e, message: message, signature: signature)
+    }
 
     AsyncFunction("cancel") { (requestId: String) in
       self.lock.lock()

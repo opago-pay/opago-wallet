@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { adaptColor } from '@/lib/theme-styles';
 import React, { useRef, useState } from 'react';
 import { Alert, ScrollView, Share, Text, View, useWindowDimensions } from 'react-native';
@@ -22,6 +23,7 @@ const StableQRCode = WalletQrCode;
 
 export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet | null; onBack(): void }) {
   useLanguage();
+  const router=useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [knownAddress, setKnownAddress] = useState<{ wallet: OnchainWallet; value: string } | null>(null);
@@ -93,6 +95,7 @@ export function BitcoinDepositScreen({ wallet, onBack }: { wallet: OnchainWallet
         <Text style={bitcoinStyles.value}>{t(item.state === 'confirmed' ? 'Completed' : item.state === 'action_required' ? 'Claim required' : 'Payment is being checked')}</Text>
         {item.amountSats > 0 && <BitcoinMoney amount={item.amountSats} historicalBtcEurRate={item.btcEurRate} />}
         <Text selectable style={bitcoinStyles.address}>{item.txid}:{item.vout}</Text>
+        {(item.state==='action_required'||item.refundIntent)&&<BitcoinButton label={t('Return to on-chain')} secondary disabled={busy} onPress={()=>router.push({pathname:'/exchange-flow',params:{deposit:item.id}})}/>}
         {item.state !== 'confirmed' && <Text style={bitcoinStyles.note}>{t('Not included in your available balance yet.')}</Text>}
         {item.state === 'action_required' && <BitcoinButton label={t('Review claim fee')} disabled={!wallet} loading={busy} onPress={() => void run(async () => {
           const current = walletSession.captureRuntime();

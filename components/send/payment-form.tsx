@@ -40,6 +40,7 @@ export function PaymentForm(props: {
   amountInput: string;
   amountRequirement?: LightningAmountRequirement | null;
   currency: PaymentCurrency;
+  bitcoinOnly?: boolean;
   source: PaymentSource;
   sourceSelected: boolean;
   advancedExpanded: boolean;
@@ -150,9 +151,9 @@ export function PaymentForm(props: {
     {props.balanceError && <Text style={bitcoinStyles.warning}>{t('Some balances may be out of date. Please try again.')}</Text>}
     <BitcoinButton label={t(props.bitcoinRoute === 'onchain' ? 'Prepare fee offer' : 'Continue')} onPress={props.onReview}
       disabled={!props.destination.trim() || !props.walletReady || (amountMissing && props.fixedAmountSats == null)} loading={props.loading} />
-    <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+    {!props.bitcoinOnly && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
       <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
-    </AdvancedOptions>
+    </AdvancedOptions>}
     <KeyboardDoneAccessory nativeID="send-amount-done" />
   </ScrollView>;
 
@@ -231,9 +232,9 @@ export function PaymentForm(props: {
             <View style={styles.assetGrid}>
               {sources.filter(item => item.source === 'spark').map(renderSource)}
             </View>
-            <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+            {!props.bitcoinOnly && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
               <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
-            </AdvancedOptions>
+            </AdvancedOptions>}
           </>
         ) : (
           <>
@@ -337,7 +338,7 @@ export function PaymentForm(props: {
           </>
         )}
       </View>
-      {props.sourceSelected && !isHedera && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
+      {props.sourceSelected && !isHedera && !props.bitcoinOnly && <AdvancedOptions expanded={props.advancedExpanded} onChange={props.onAdvancedChange} disabled={props.loading}>
         <View style={styles.assetGrid}>{sources.filter(item => item.source !== 'spark').map(renderSource)}</View>
       </AdvancedOptions>}
       <KeyboardDoneAccessory nativeID="send-amount-done" />

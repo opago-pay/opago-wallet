@@ -1,6 +1,7 @@
 import { decodeLightningInvoice, normalizeLightningInput, resolveInvoiceAmount } from './lightning';
 import { fetchInvoiceFromLNURLP, lnurlDescription, resolveLightningAddress, resolveLNURL, type LNURLPResponse } from './lnurl-safe';
 import { resolveLnurlAmount } from './payment-input';
+import { assertNotOpagoPosPayment } from './opago/pos-payment';
 
 export interface LightningAmountRequirement {
   minSats: number;
@@ -20,6 +21,7 @@ export async function resolveLightningDestination(
   requestedAmountSats = 0,
   preloadedLnurl?: LNURLPResponse,
 ): Promise<LightningDestinationResult> {
+  assertNotOpagoPosPayment(input);
   const normalized = normalizeLightningInput(input);
   const isAddress = normalized.includes('@');
   if (isAddress || /^lnurl1/i.test(normalized)) {

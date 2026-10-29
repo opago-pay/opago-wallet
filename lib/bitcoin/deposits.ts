@@ -108,7 +108,7 @@ export async function discoverBitcoinDeposits(wallet: OnchainWallet, store: Bitc
 
 export async function prepareBitcoinDeposit(wallet: OnchainWallet, operation: BitcoinOperation,
   assertCurrent: () => void, readAmount = depositAmount): Promise<BitcoinDepositQuote> {
-  if (operation.kind !== 'deposit' || !operation.txid || operation.vout === undefined || operation.state !== 'action_required') {
+  if (operation.kind !== 'deposit' || !operation.txid || operation.vout === undefined || operation.state !== 'action_required' || operation.refundIntent) {
     throw new Error('This Bitcoin deposit is still being checked.');
   }
   if (operation.scope !== await bitcoinScope(wallet, operation.network)) throw new Error('Wallet changed.');
@@ -132,7 +132,7 @@ export async function claimBitcoinDeposit(wallet: OnchainWallet, store: BitcoinS
   if (operation.scope !== await bitcoinScope(wallet, operation.network)) throw new Error('Wallet changed.');
   assertAuthorized();
   await store.update(operation.scope, operation.id, previous => {
-    if (!previous || previous.state !== 'action_required') throw new Error('This Bitcoin deposit is still being checked.');
+    if (!previous || previous.state !== 'action_required' || previous.refundIntent) throw new Error('This Bitcoin deposit is still being checked.');
     return { ...previous, state: 'checking', feeSats, amountSats: creditSats };
   }, assertAuthorized);
   try {

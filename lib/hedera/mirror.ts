@@ -29,6 +29,10 @@ export interface MirrorTransfer {
 }
 
 export interface MirrorTransactionRecord {
+  node?: string | null;
+  staking_reward_transfers?: MirrorTransfer[] | null;
+  token_transfers?: unknown[] | null;
+  nft_transfers?: unknown[] | null;
   charged_tx_fee?: string | null;
   consensus_timestamp?: string | null;
   memo_base64?: string | null;
@@ -47,6 +51,26 @@ interface MirrorAccountsResponse {
 
 interface MirrorTransactionsResponse {
   transactions?: MirrorTransactionRecord[];
+  links?: { next?: string | null };
+}
+
+/** F5 reads the provider continuation, including same-timestamp/child/duplicate
+ * records. Display history's timestamp cursor must not become a sync checkpoint. */
+export async function listMirrorTransactionsForSync(rawAccountId: string, continuation: string | null) {
+  const accountId = parseHederaAccountId(rawAccountId);
+  const initial = mirrorUrl('/api/v1/transactions');
+  initial.searchParams.set('account.id', accountId); initial.searchParams.set('limit', '50'); initial.searchParams.set('order', 'desc');
+  const url = continuation ? new URL(continuation, initial) : initial;
+  const valid = (value: URL) => value.origin === initial.origin && value.pathname === initial.pathname && !value.username && !value.password && !value.hash &&
+    value.searchParams.get('account.id') === accountId && value.searchParams.get('limit') === '50' && value.searchParams.get('order') === 'desc' &&
+    [...value.searchParams.keys()].every(k => ['account.id','limit','order','timestamp'].includes(k) && value.searchParams.getAll(k).length === 1) &&
+    (!value.searchParams.has('timestamp') || /^lt:[0-9]{1,19}\.[0-9]{1,9}$/.test(value.searchParams.get('timestamp')!));
+  if (!valid(url)) throw new Error('sync_invalid_contract');
+  const response = await fetchMirrorJson<MirrorTransactionsResponse>(url, 'Hedera synchronization history');
+  if (!Array.isArray(response?.transactions) || response.transactions.length > 50 || !response.links || response.links.next === undefined) throw new Error('sync_invalid_contract');
+  const next = response.links.next ? new URL(response.links.next, initial) : null;
+  if (next && (!valid(next) || next.toString() === url.toString())) throw new Error('sync_invalid_contract');
+  return { transactions: response.transactions, next: next?.toString() || null };
 }
 
 const HEDERA_HISTORY_TRANSACTION_TYPES = [

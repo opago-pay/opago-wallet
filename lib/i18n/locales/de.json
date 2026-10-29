@@ -1,4 +1,5 @@
 {
+  "OPAGO POS payments are not supported in this release. The required payer verification is not available yet. No payment was sent.": "OPAGO-POS-Zahlungen werden in dieser Version noch nicht unterstützt. Die erforderliche Zahlerprüfung ist noch nicht verfügbar. Es wurde keine Zahlung gesendet.",
   "Today’s Hedera account activations are used up. Please try again tomorrow.": "Das Tageslimit für Hedera-Kontoaktivierungen ist erreicht. Bitte versuche es morgen erneut.",
   "Hedera account setup is busy. Please try again shortly.": "Die Hedera-Kontoaktivierung ist gerade ausgelastet. Bitte versuche es in Kürze erneut.",
   "We need to review your Hedera account setup. Keep this wallet and contact Opago support with your public activation key.": "Deine Hedera-Kontoaktivierung muss geprüft werden. Behalte diese Wallet und kontaktiere den Opago-Support mit deinem öffentlichen Aktivierungsschlüssel.",
@@ -772,5 +773,18 @@
   "Address setup is temporarily unavailable. Please try again later.": "Das Anlegen der Adresse ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
   "Technical details": "Technische Details",
   "Checking your address…": "Deine Adresse wird geprüft…",
-  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen."
+  "Your address is ready. Show this code to receive HBAR.": "Deine Adresse ist bereit. Zeige diesen Code, um HBAR zu empfangen.",
+  "OPAGO account": "OPAGO Konto",
+  "Account services": "Kontodienste",
+  "Lightning address": "Lightning Adresse",
+  "Manage your Lightning address": "Lightning Adresse verwalten",
+  "OPAGO wallet backend": "OPAGO-Wallet-Backend",
+  "OPAGO wallet binding returned an account-linked wallet.": "Die OPAGO-Wallet-Bindung hat eine mit dem Konto verknüpfte Wallet zurückgegeben.",
+  "The account backend returned no confirmed wallet binding.": "Das Konto-Backend hat keine bestätigte Wallet-Bindung zurückgegeben.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "OPAGO-Wallet-Backend nicht verfügbar ({code}). Konto-/Wallet-Bindung und Synchronisierung sind nicht bestätigt.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "Wallet-Eigentumsnachweis, persönliche Lightning-Adresse und Transaktionsmeldungen erfordern ein gesondert verifiziertes Konto und eine Wallet-Sitzung.",
+  "Check wallet backend": "Wallet-Backend prüfen",
+  "Transaction synchronization": "Transaktionssynchronisierung",
+  "Wallet session refresh failed. The backend binding status is unknown.": "Aktualisierung der Wallet-Sitzung fehlgeschlagen. Der Backend-Bindungsstatus ist unbekannt.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "Keine verifizierte Wallet-Sitzung verfügbar. Melde dich an und verknüpfe deine Wallet, bevor du die Backend-Bindung prüfst."
 }

@@ -58,9 +58,11 @@ function fixture(data = {}) {
     '@/components/ui/wallet-interaction': { TouchableOpacity: 'button', Pressable: 'pressable' },
     '@/lib/i18n': { t: (value, values = {}) => value.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match), appLocale: () => 'en' },
     '@/hooks/useLanguage': { useLanguage: () => {} },
+    '@/hooks/useBitcoinOnly': { useBitcoinOnly: () => ({ bitcoinOnly: data.bitcoinOnly ?? false, ready: true }) },
+    '@/lib/onchain/errors': require('../lib/onchain/errors.ts'),
     '@/hooks/useColorMode': { useColorMode: () => ({ mode: 'dark' }) },
     '@/lib/theme-styles': { adaptiveStyles: styles => styles, adaptColor: value => value, themeColor: role => role === 'accentText' ? '#ffb000' : '#fff' },
-    'expo-router': { useRouter: () => ({ push: path => pushes.push(path) }), useFocusEffect: callback => { focusEffects.push(callback); } },
+    'expo-router': { useLocalSearchParams: () => data.params ?? {}, useRouter: () => ({ push: path => pushes.push(path) }), useFocusEffect: callback => { focusEffects.push(callback); } },
     '@expo/vector-icons': { Ionicons: 'icon' },
     'expo-image': { Image: 'image' },
     'expo-haptics': { impactAsync: async () => {}, ImpactFeedbackStyle: { Light: 'light' } },
@@ -76,6 +78,12 @@ function fixture(data = {}) {
       bitcoinIncoming: data.bitcoinIncoming ?? null,
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }); } },
+    '@/lib/onchain/history': require('../lib/onchain/history.ts'),
+    '@/lib/first-payment-feedback': { observeFirstConfirmedHistory: async (wallet, items) => {
+      (data.observedMilestones ??= []).push({ wallet, items });
+    } },
+    '@/hooks/useOnchainBalance': { useOnchainBalance: () => ({ network:data.onchainNetwork, state: { value: data.onchain === null ? null : {totalSats:data.onchain??0,availableSats:data.onchain??0},status:data.onchain===null?'loading':'ready',updatedAt:1 }, operations:data.onchainOperations??[],transactions:data.onchainTransactions??[],refresh:async()=>{} }) },
+    '@/components/onchain/account-details': { AccountDetails:'account-details', AccountIcon:'account-icon' },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
     '@/hooks/useBitcoinOperations': { useBitcoinOperations: () => ({ operations: data.bitcoinOperations || [] }) },
     '@/lib/bitcoin/onchain': { bitcoinScope: async () => 'fixture' },
@@ -111,6 +119,7 @@ function fixture(data = {}) {
       list: query('hedera journal'), reconcile: async () => { throw new Error('Recovery must not block history'); },
     }) },
     '@/lib/lightning/payment-journal-native': { lightningPaymentJournalFor: () => ({ list: query('lightning journal') }) },
+    '@/lib/lightning/transfer-amount': require('../lib/lightning/transfer-amount.ts'),
     '@/lib/lightning/spark-history': { loadSparkTransferPage: async (_wallet, limit, offset) => {
       const transfers = await query('lightning history')(limit, offset);
       return { transfers, next: transfers.length === limit ? offset + limit : null };
@@ -142,7 +151,7 @@ function fixture(data = {}) {
     name => deps[name] || {}, exports, callback => setImmediate(callback), clearImmediate,
     (callback, ms) => { const id={};intervals.set(id,{callback,ms});return id; }, id=>intervals.delete(id),
   );
-  const render = () => { cursor = 0; focusEffects.length = 0; return exports.default(); };
+  const render = () => { cursor = 0; focusEffects.length = 0; const result=exports.default();return result.type===React.Fragment?React.Children.toArray(result.props.children)[0]:result; };
   const blur = () => { cleanups.forEach(cleanup => cleanup?.()); cleanups = []; };
   const refocus = () => { blur(); cleanups = focusEffects.map(focus => focus()); };
   return { reads, requests, pushes, render, refocus, blur,
@@ -188,7 +197,7 @@ test('Home keeps its primary balance and reads HBAR activity without waiting for
   assert.ok(texts.includes('Balance'));
   assert.equal(texts.some(text => text.includes('Bitcoin balance:') || text.includes('Your money')), false);
   assert.ok(texts.includes('Latest activity'));
-  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'), null);
+  assert.ok(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning'));
   assert.equal(advanced(screen).props.label, 'All coins');
 });
 
@@ -199,7 +208,7 @@ test('Home headline adds every displayed coin and waits for missing holdings', (
   assert.equal(data.balanceParams.enableHedera, true);
   const headline = find(screen, node => node.type === 'text' && node.props.accessibilityLabel?.startsWith('Total estimated balance:'));
   assert.equal(headline.props.accessibilityLabel, 'Total estimated balance: 75002€');
-  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'bitcoin').props.fiatValue, '≈ 75000');
+  assert.equal(find(screen, node => node.type?.name === 'BalanceCard' && node.props.asset === 'lightning').props.fiatValue, '≈ 75000');
 
   data.hbarTinybars = null;
   screen = app.render();
@@ -282,7 +291,7 @@ test('a Lightning payment keeps the recipient amount when Spark reports an amoun
   const app = fixture({
     local: [{ ...record(1, createdAt), txId: key, type: 'outgoing', amount: 1 }],
     'lightning journal': [{ paymentHash: hash, amountSats: 1, state: 'confirmed', createdAt }],
-    'lightning history': [{ id: 'transfer-1', status: 'COMPLETED', totalValue: 3,
+    'lightning history': [{ id: 'transfer-1', status: 'COMPLETED', valueReceivedByWallet: 3,
       transferDirection: 'OUTGOING', createdTime: createdAt, userRequest: { invoice: { paymentHash: hash } } }],
   });
   app.render(); app.refocus(); await settle();
@@ -324,7 +333,7 @@ test('Home starts wallet initialization immediately while remote history remains
 
 test('History loads other assets while waiting for Bitcoin, then pages twenty payments at a time', async () => {
   const transfers = Array.from({ length: 45 }, (_, i) => ({
-    id: 'transfer-' + i, status: 'COMPLETED', totalValue: 10, transferDirection: 'INCOMING',
+    id: 'transfer-' + i, status: 'COMPLETED', valueReceivedByWallet: 10, transferDirection: 'INCOMING',
     createdTime: new Date(1800000000000 - i * 1000).toISOString(),
   }));
   const data = { primaryReady: false, 'lightning history': (limit, offset) => transfers.slice(offset, offset + limit) };
@@ -489,9 +498,9 @@ test('Home and incoming Bitcoin amounts render without Intl.formatToParts on iOS
         {id:'pending-deposit',kind:'deposit',state:'pending',amountSats:200},
       ]:[]});
       const screen=app.render();
-      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+      const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
       assert.ok(btc);
-      assert.equal(btc.props.value,'0.00000107 BTC');
+      assert.equal(btc.props.value,'107 SAT');
       assert.deepEqual(btc.props.notes,incoming?['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']:[]);
     }
   } finally { Object.defineProperty(Intl.NumberFormat.prototype,'formatToParts',descriptor); }
@@ -503,22 +512,22 @@ test('All coins shows available BTC and HBAR holdings, EUR values, unit prices a
   });
   let screen=app.render();
   assert.equal(advanced(screen).props.label,'All coins');
-  const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
+  const btc=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
   const hbar=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera');
-  assert.equal(btc.props.value,'1.5 BTC');assert.equal(btc.props.fiatValue,'≈ 75000');
-  assert.equal(btc.props.subtitle,'1 BTC = 50000');
+  assert.equal(btc.props.value,'150,000,000 SAT');assert.equal(btc.props.fiatValue,'≈ 75000');
+  assert.equal(btc.props.subtitle,'Bitcoin');
   assert.equal(btc.props.description,undefined);
   assert.deepEqual(btc.props.notes,['Incoming Bitcoin: 0.000001 BTC','Onchain deposits awaiting credit: 0.000002 BTC']);
   assert.equal(hbar.props.value,'20 HBAR');assert.equal(hbar.props.fiatValue,'≈ 2');
-  assert.equal(hbar.props.subtitle,'1 HBAR = 0.1');
+  assert.equal(hbar.props.subtitle,'Hedera');assert.equal(hbar.props.description,'1 HBAR = 0.1');
   const unavailable=fixture({spark:null,btcRate:0,hbarRate:0,sparkStatus:'error',sparkError:'unavailable'});screen=unavailable.render();
-  const unknown=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin');
-  assert.equal(unknown.props.value,'— BTC');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
+  const unknown=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='lightning');
+  assert.equal(unknown.props.value,'— SAT');assert.equal(unknown.props.fiatValue,'EUR estimate unavailable');
 });
 
 test('known coin holdings keep their values and layout during background balance refresh',()=>{
   const app=fixture({sparkStatus:'loading',hederaStatus:'loading'});const screen=app.render();
-  for(const asset of ['bitcoin','hedera']) {
+  for(const asset of ['bitcoin','lightning','hedera']) {
     const card=find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset===asset);
     assert.equal(card.props.loading,false);
     assert.equal(card.props.statusText,undefined);
@@ -564,8 +573,8 @@ test('coin unit prices use their own timestamps when only the other asset was re
   const now=Date.now();
   const app=fixture({btcRatesAt:now-301_000,hbarRatesAt:now});
   const screen=app.render();
-  assert.match(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin').props.subtitle,/last known/);
-  assert.doesNotMatch(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera').props.subtitle,/last known/);
+  assert.match(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='bitcoin').props.description,/last known/);
+  assert.doesNotMatch(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset==='hedera').props.description,/last known/);
 });
 
 test('a known HBAR receipt stays visible while a slower fresh page is still loading',async()=>{
@@ -622,4 +631,35 @@ test('a historical HBAR quote arriving later updates an already opened detail vi
   assert.equal(require('../lib/payment-details.ts').paymentEurQuote(details.props.payment,details.props.rates).eurValue,1);
   assert.equal(details.props.payment.transactionRatePending,false);
   app.blur();
+});
+
+test('home counts onchain and Lightning once each and keeps All coins collapsed initially',()=>{
+ const app=fixture({onchain:100000000,spark:150000000,hbarTinybars:2000000000n});const screen=app.render();
+ assert.equal(advanced(screen).props.expanded,false);
+ assert.equal(find(screen,node=>node.type==='text'&&node.props.accessibilityLabel?.startsWith('Total estimated balance:')).props.accessibilityLabel,'Total estimated balance: 125002€');
+ const cards=['bitcoin','lightning','hedera'].map(asset=>find(screen,node=>node.type?.name==='BalanceCard'&&node.props.asset===asset));
+ assert.deepEqual(cards.map(card=>card.props.account),['bitcoin_onchain','bitcoin_spark','hedera']);
+ cards[0].props.onOpen();app.render();assert.equal(advanced(app.render()).props.expanded,false);
+});
+
+test('the onchain holding displays its own test network instead of inheriting the Spark network',()=>{
+ const app=fixture({onchainNetwork:'signet'});const card=find(app.render(),node=>node.type?.name==='BalanceCard'&&node.props.account==='bitcoin_onchain');
+ assert.equal(card.props.networkBadge,'SIGNET');
+});
+
+test('Bitcoin Only hides HBAR holdings and excludes them from the headline while keeping its activity',async()=>{
+  const data={bitcoinOnly:true,onchain:100000000,spark:150000000,hbarTinybars:2000000000n,local:[record(1,'2026-09-23T10:00:00Z','HBAR')]};
+  const app=fixture(data);let screen=app.render();
+  assert.equal(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.account==='hedera'),null);
+  assert.equal(find(screen,node=>node.type==='text'&&node.props.accessibilityLabel?.startsWith('Total estimated balance:')).props.accessibilityLabel,'Total estimated balance: 125000€');
+  assert.equal(data.balanceParams.enableHedera,false);
+  app.refocus();await settle();screen=app.render();assert.equal(latestRow(screen).props.transaction.asset,'HBAR');
+  data.bitcoinOnly=false;screen=app.render();assert.ok(find(screen,node=>node.type?.name==='BalanceCard'&&node.props.account==='hedera'));app.blur();
+});
+test('onchain receipts appear in All activity and open their own payment details without a separate history',()=>{
+  const txid='a'.repeat(64);const app=fixture({onchainNetwork:'signet',onchainTransactions:[{txid,receivedSats:1000,sentSats:0,feeSats:null,confirmed:true,observedAt:Date.now()}]});
+  const home=app.render();assert.equal(find(home,node=>node.type==='text'&&node.props.children==='Bitcoin activity'),null);
+  const page=openHistory(app);assert.equal(page.type.name,'HistoryPage');
+  const row=latestRow(home);row.props.openTransaction(row.props.transaction);
+  const details=app.render();assert.equal(details.type,'payment-details');assert.equal(details.props.payment.txId,txid);assert.deepEqual(app.pushes,[]);
 });

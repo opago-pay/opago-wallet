@@ -1,4 +1,5 @@
 {
+  "OPAGO POS payments are not supported in this release. The required payer verification is not available yet. No payment was sent.": "Esta versión aún no admite pagos OPAGO POS. La verificación requerida del pagador todavía no está disponible. No se ha enviado ningún pago.",
   "System": "Sistema",
   "Dark": "Oscuro",
   "Use your device setting or choose a background.": "Usa la configuración del dispositivo o elige una apariencia.",
@@ -772,5 +773,18 @@
   "Address setup is temporarily unavailable. Please try again later.": "La creación de direcciones no está disponible temporalmente. Vuelve a intentarlo más tarde.",
   "Technical details": "Detalles técnicos",
   "Checking your address…": "Comprobando tu dirección…",
-  "Your address is ready. Show this code to receive HBAR.": "Tu dirección está lista. Muestra este código para recibir HBAR."
+  "Your address is ready. Show this code to receive HBAR.": "Tu dirección está lista. Muestra este código para recibir HBAR.",
+  "OPAGO account": "Cuenta OPAGO",
+  "Account services": "Servicios de cuenta",
+  "Lightning address": "Dirección Lightning",
+  "Manage your Lightning address": "Gestionar tu dirección Lightning",
+  "OPAGO wallet backend": "Servicio de cartera OPAGO",
+  "OPAGO wallet binding returned an account-linked wallet.": "El servicio de vinculación OPAGO devolvió una cartera asociada a la cuenta.",
+  "The account backend returned no confirmed wallet binding.": "El servicio de cuenta no devolvió ninguna vinculación de cartera confirmada.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "Servicio de cartera OPAGO no disponible ({code}). La vinculación entre cuenta y cartera y la sincronización no están confirmadas.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "La prueba de propiedad de la cartera, la dirección Lightning personal y los informes de transacciones requieren una cuenta verificada y una sesión de cartera independientes.",
+  "Check wallet backend": "Comprobar servicio de cartera",
+  "Transaction synchronization": "Sincronización de transacciones",
+  "Wallet session refresh failed. The backend binding status is unknown.": "No se pudo actualizar la sesión de la cartera. Se desconoce el estado de vinculación del servidor.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "No hay una sesión de cartera verificada. Inicia sesión y vincula tu cartera antes de comprobar la vinculación en el servidor."
 }

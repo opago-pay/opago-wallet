@@ -1,6 +1,7 @@
 import { fetchJson } from './http';
 import { validateLNURLResponse, type LNURLPResponse } from './lnurl-safe';
 import { validateOcpOptions, type OcpResponse } from './ocp-safe';
+import { assertNotOpagoPosPaymentUrl } from './opago/pos-payment';
 
 export type PaymentEndpoint =
   | { kind: 'lnurl'; info: LNURLPResponse }
@@ -12,6 +13,7 @@ const recent = new Map<string, { at: number; info: LNURLPResponse }>();
 /** A bech32 LNURL can encode either protocol. Classify one bounded response
  * instead of requesting the same remote URL as OCP, then LNURL. */
 export async function loadPaymentEndpoint(url: string): Promise<PaymentEndpoint> {
+  assertNotOpagoPosPaymentUrl(url);
   const cached = recent.get(url);
   if (cached && Date.now() - cached.at < RECENT_LNURL_MS) {
     return { kind: 'lnurl', info: cached.info };

@@ -1,4 +1,5 @@
 {
+  "OPAGO POS payments are not supported in this release. The required payer verification is not available yet. No payment was sent.": "Les paiements OPAGO POS ne sont pas encore pris en charge dans cette version. La vérification requise du payeur n’est pas encore disponible. Aucun paiement n’a été envoyé.",
   "System": "Système",
   "Dark": "Sombre",
   "Use your device setting or choose a background.": "Utilisez le réglage de votre appareil ou choisissez une apparence.",
@@ -772,5 +773,18 @@
   "Address setup is temporarily unavailable. Please try again later.": "La création d’adresses est temporairement indisponible. Veuillez réessayer plus tard.",
   "Technical details": "Détails techniques",
   "Checking your address…": "Vérification de votre adresse…",
-  "Your address is ready. Show this code to receive HBAR.": "Votre adresse est prête. Montrez ce code pour recevoir des HBAR."
+  "Your address is ready. Show this code to receive HBAR.": "Votre adresse est prête. Montrez ce code pour recevoir des HBAR.",
+  "OPAGO account": "Compte OPAGO",
+  "Account services": "Services de compte",
+  "Lightning address": "Adresse Lightning",
+  "Manage your Lightning address": "Gérer votre adresse Lightning",
+  "OPAGO wallet backend": "Service du portefeuille OPAGO",
+  "OPAGO wallet binding returned an account-linked wallet.": "Le service de liaison OPAGO a confirmé un portefeuille associé au compte.",
+  "The account backend returned no confirmed wallet binding.": "Le service de compte n'a renvoyé aucune liaison de portefeuille confirmée.",
+  "OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.": "Service du portefeuille OPAGO indisponible ({code}). La liaison compte-portefeuille et la synchronisation ne sont pas confirmées.",
+  "Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.": "La preuve de propriété du portefeuille, l'adresse Lightning personnelle et les rapports de transactions nécessitent un compte vérifié et une session de portefeuille distincts.",
+  "Check wallet backend": "Vérifier le service du portefeuille",
+  "Transaction synchronization": "Synchronisation des transactions",
+  "Wallet session refresh failed. The backend binding status is unknown.": "L'actualisation de la session du portefeuille a échoué. L'état de liaison côté serveur est inconnu.",
+  "No verified wallet session is available. Sign in and link your wallet before checking backend binding.": "Aucune session de portefeuille vérifiée disponible. Connectez-vous et associez votre portefeuille avant de vérifier la liaison côté serveur."
 }

@@ -1,6 +1,7 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "Opago utiliza la cámara para escanear códigos QR de pago.",
+    "NSCameraUsageDescription": "Opago utiliza la cámara para escanear códigos QR de pago y fotografiar tu documento de identidad para comparar la foto y los datos.",
+    "NSPhotoLibraryUsageDescription": "Permite que Opago seleccione una imagen del documento de identidad para comparar la foto y los datos.",
     "NSFaceIDUsageDescription": "Usa Face ID para desbloquear tu cartera, confirmar pagos y acceder a tu frase de recuperación."
   }
 }

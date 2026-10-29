@@ -42,6 +42,27 @@ test('native JSON requests use the bounded native transport and never fall back 
   assert.equal(called, true);
 });
 
+test('native bodyless HTTP responses preserve logout status and reject unexpected data', async () => {
+  for (const status of [204, 205, 304]) {
+    const transport = body => nativeTransport({ request: async () => ({ status, contentType: '', body, cacheControl: 'no-store' }), cancel: async () => {} });
+    const response = await transport('')('https://api.opago.com/api/v2/auth/logout', { method: 'POST' });
+    assert.equal(response.status, status); assert.equal(await response.text(), '');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    await assert.rejects(transport('{}')('https://api.opago.com/api/v2/auth/logout', { method: 'POST' }), /unexpected response body/);
+  }
+});
+
+test('P3 binary native requests carry encrypted bytes only on the contracted photo endpoint and never fall back', async () => {
+  const payload = Buffer.alloc(29,7).toString('base64'); let captured;
+  const transport = nativeTransport({ request: async options => { captured=options; return {status:201,contentType:'application/json',body:'{}'};},cancel:async()=>{} });
+  const url='https://example.org/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents?revision=1&side=front';
+  const options={method:'POST',headers:{'Content-Type':'application/octet-stream','X-Opago-Envelope':'synthetic-encrypted-descriptor'}};
+  await transport(url,options,91500,false,{base64:payload,timeoutMs:120000});
+  assert.equal(captured.bodyEncoding,'base64');assert.equal(captured.body,payload);assert.equal(captured.timeoutMs,120000);assert.equal(captured.maxBytes,91500);
+  await assert.rejects(transport('https://example.org/arbitrary',options,91500,false,{base64:payload,timeoutMs:120000}));
+  await assert.rejects(nativeTransport(null)(url,options,91500,true,{base64:payload,timeoutMs:120000}),/Secure network transport is unavailable/);
+});
+
 test('untrusted native requests fail closed when the peer-bound module is absent', async () => {
   await assert.rejects(nativeTransport(null)('https://example.org/api', {}),
     /Secure network transport is unavailable/);
@@ -94,4 +115,24 @@ test('native Retry-After reaches the activation backoff even for proxy errors', 
   const response = await request('https://hedera-activation.opago.com/v1/challenges', {method:'POST',body:'{}'});
   assert.equal(response.status,429);
   assert.equal(response.headers.get('retry-after'),'120');
+});
+
+test('native HKA PUT/DELETE preserve envelopes and fresh-config Cache-Control; read/delete reject bodies', async () => {
+  const calls = [];
+  const request = nativeTransport({ request: async options => { calls.push(options); return { status: 200, contentType: 'application/json', body: '{}', cacheControl: 'no-store' }; }, cancel: async () => {} });
+  const response = await request('https://api.opago.com/api/v2/wallet/address', { method: 'PUT', body: '{"encryption":"hpke-v1"}' });
+  assert.equal(response.headers.get('cache-control'), 'no-store'); assert.equal(calls[0].method, 'PUT'); assert.ok(calls[0].body);
+  await request('https://api.opago.com/api/v2/account', { method: 'DELETE', headers: { 'X-Opago-Envelope': 'synthetic-envelope' } });
+  assert.equal(calls[1].method, 'DELETE'); assert.equal(calls[1].body, ''); assert.equal(calls[1].headers['x-opago-envelope'], 'synthetic-envelope');
+  await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'DELETE', body: '{}' }));
+  await assert.rejects(request('https://api.opago.com/api/v2/account', { method: 'GET', body: '{}' }));
+});
+
+
+test('native response request ID survives the platform bridge for authenticated v3 validation', async () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const request = nativeTransport({ request: async () => ({ status: 201, contentType: 'application/json', body: '{}', requestId: id, cacheControl: 'no-store' }), cancel: async () => {} });
+  const response = await request('https://example.org/api/v3/report', { method: 'POST', body: '{}' });
+  assert.equal(response.headers.get('x-request-id'), id);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
 });

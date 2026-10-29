@@ -1,15 +1,15 @@
 {
   "date": "2026-10-21",
-  "base": "1aed902",
-  "branch": "main",
+  "base": "bd19d18",
+  "branch": "mvp-branch",
   "scope": "npm audit including dev dependencies; not the external App-Dependencies report",
   "before": {
     "info": 0,
     "low": 2,
     "moderate": 5,
     "high": 38,
-    "critical": 0,
-    "total": 45
+    "critical": 1,
+    "total": 46
   },
   "after": {
     "info": 0,
@@ -23,7 +23,7 @@
     "shell-quote": [
       {
         "path": "node_modules/shell-quote",
-        "version": "1.12.0"
+        "version": "1.11.0"
       }
     ],
     "follow-redirects": [

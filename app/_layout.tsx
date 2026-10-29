@@ -2,14 +2,18 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
+import { FirstPaymentConfetti } from '@/components/ui/first-payment-confetti';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { TransferAgent } from '../components/onchain/transfer-agent';
+import { TransactionSyncAgent } from '../components/opago/transaction-sync-agent';
 import * as Notifications from 'expo-notifications';
 import { WalletProvider } from '@/hooks/useWalletAuth';
 import { WalletGate } from '@/components/security/wallet-gate';
 import { BackupPrompt } from '@/components/security/backup-prompt';
+import { BitcoinOnlyProvider } from '@/hooks/useBitcoinOnly';
 import { LanguageProvider } from '@/hooks/useLanguage';
 import { ColorModeProvider, useColorMode } from '@/hooks/useColorMode';
 import { SecurityPreferencesProvider } from '@/hooks/useSecurityPreferences';
@@ -37,6 +41,11 @@ function AppStack() {
   useEffect(() => { recordDiagnosticScreen(segments); }, [segments]);
   useEffect(() => { void diagnosticsConsent.initialize(); }, []);
   useEffect(() => {
+    // Remove private media copies left by an interrupted previous process.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    void (require('../lib/opago/identity-media-native') as typeof import('../lib/opago/identity-media-native')).cleanupIdentityPhotos().catch(() => {});
+  }, []);
+  useEffect(() => {
     const stop = startEventLoopMonitor(() => AppState.currentState === 'active');
     return stop;
   }, []);
@@ -44,6 +53,7 @@ function AppStack() {
     <WalletProvider>
       <ThemeProvider value={mode === 'light' ? DefaultTheme : DarkTheme}>
         <WalletGate>
+        <View style={styles.navigationHost}>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -51,9 +61,24 @@ function AppStack() {
           <Stack.Screen name="send-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="receive-flow" options={{ headerShown: false, animation: 'slide_from_bottom', animationDuration: 180 }} />
           <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="onchain-send" options={{ headerShown: false }} />
+          <Stack.Screen name="onchain-activity" options={{ headerShown: false }} />
+          <Stack.Screen name="exchange-flow" options={{ headerShown: false }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-wallet-link" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-signup" options={{ headerShown: false }} />
+          <Stack.Screen name="identity" options={{ headerShown: false }} />
+          <Stack.Screen name="pos-link" options={{ headerShown: false }} />
+          <Stack.Screen name="transaction-sync" options={{ headerShown: false }} />
+          <Stack.Screen name="uma-send" options={{ headerShown: false }} />
         </Stack>
+        {/* Root navigator sibling: visible over send-flow, onchain-send and other stack screens. */}
+        <FirstPaymentConfetti />
+        </View>
         <BackupPrompt />
+        <TransactionSyncAgent />
+        <TransferAgent />
         </WalletGate>
         <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
@@ -62,5 +87,7 @@ function AppStack() {
 }
 
 export default function RootLayout() {
-  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><AppStack /></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
+  return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><BitcoinOnlyProvider><AppStack /></BitcoinOnlyProvider></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
 }
+
+const styles = StyleSheet.create({ navigationHost: { flex: 1 } });

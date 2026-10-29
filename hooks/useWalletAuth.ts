@@ -1,3 +1,4 @@
+import { onchainErrorMessage } from '../lib/onchain/errors';
 import React, {
   createContext,
   ReactNode,
@@ -13,6 +14,7 @@ import { generateMnemonic } from 'bip39';
 import type { PrivateKey } from '@hiero-ledger/sdk';
 import * as Crypto from 'expo-crypto';
 import { initializeSparkWallet } from '../lib/spark';
+import type { OnchainWallet } from '../lib/onchain/types';
 import {
   deleteSecureItem,
   getBiometricallyProtectedMnemonic,
@@ -80,6 +82,10 @@ interface WalletContextValue {
   isInitializing: boolean;
   initStatus: string;
   walletReady: boolean;
+  onchainWallet: OnchainWallet | null;
+  onchainStatus: 'idle' | 'connecting' | 'ready' | 'error';
+  onchainError: string | null;
+  retryOnchainConnection(): Promise<void>;
   sparkWallet: SparkWalletInstance | null;
   sparkStatus: 'idle' | 'connecting' | 'ready' | 'error';
   sparkError: string | null;
@@ -112,10 +118,18 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const [backupStatus, setBackupStatus] = useState<WalletContextValue['backupStatus']>('loading');
   const initializationRef = useRef<Promise<void> | null>(null);
   const initializationGenerationRef = useRef(0);
+  const removalGenerationRef = useRef(0);
+  const activeRemovalsRef = useRef(0);
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const startupSeedRef = useRef<Uint8Array | null>(null);
   const hederaLookupRef = useRef<Promise<HederaAccountSnapshot | null> | null>(null);
   const hederaActivationRef = useRef<Promise<void> | null>(null);
+  const onchainResource = useRef(new SessionResource<OnchainWallet>());
+  const onchainSeedRef=useRef<Uint8Array|null>(null);
+  const onchainRetryRef = useRef<Promise<void> | null>(null);
+  const [onchainWallet, setOnchainWallet] = useState<OnchainWallet | null>(null);
+  const [onchainStatus, setOnchainStatus] = useState<WalletContextValue['onchainStatus']>('idle');
+  const [onchainError, setOnchainError] = useState<string | null>(null);
   const sparkResource = useRef(new SessionResource<SparkWalletInstance>());
   const sparkRetryRef = useRef<Promise<void> | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -136,6 +150,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
     initializationGenerationRef.current += 1;
     startupSeedRef.current?.fill(0);
     startupSeedRef.current = null;
+    onchainSeedRef.current?.fill(0);onchainSeedRef.current=null;
+    onchainResource.current.reset();
+    setOnchainWallet(null); setOnchainStatus('idle'); setOnchainError(null);
     sparkResource.current.reset();
     setSparkWallet(null);
     setSparkStatus('idle');
@@ -155,6 +172,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
 
   useEffect(() => {
     const runtime = sparkResource.current;
+    const onchainRuntime = onchainResource.current;
     const unsubscribe = walletSession.subscribe(() => {
       const unlocked = walletSession.isUnlocked();
       setIsLocked(!unlocked);
@@ -194,6 +212,8 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       startupSeedRef.current = null;
       hederaPrivateKeyRef.current = null;
       runtime.reset();
+      onchainSeedRef.current?.fill(0);onchainSeedRef.current=null;
+      onchainRuntime.reset();
     };
   }, [clearRuntimeState]);
 
@@ -241,6 +261,46 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       if (startupSeedRef.current === seed) startupSeedRef.current = null;
     }
   }, []);
+
+  const connectOnchain = useCallback(async (seed: Uint8Array, generation: number) => {
+    onchainSeedRef.current=seed;
+    try {
+      const assertRuntime = walletSession.captureRuntime();
+      setOnchainStatus('connecting'); setOnchainError(null);
+      const wallet = await onchainResource.current.initialize(async signal => {
+        const { initializeOnchainWallet } = await import('../lib/onchain/wallet-native');
+        const current = () => {
+          assertRuntime();
+          if (signal.aborted || initializationGenerationRef.current !== generation) throw new Error('Wallet changed.');
+        };
+        current(); return initializeOnchainWallet(seed, current,signal);
+      });
+      if (!wallet || initializationGenerationRef.current !== generation) return;
+      assertRuntime(); setOnchainWallet(wallet); setOnchainStatus('ready');
+    } catch (cause) {
+      if (initializationGenerationRef.current !== generation) return;
+      setOnchainStatus('error'); setOnchainError(onchainErrorMessage(cause));
+    } finally { seed.fill(0);if(onchainSeedRef.current===seed)onchainSeedRef.current=null; }
+  }, []);
+
+  const retryOnchainConnection = useCallback(async () => {
+    if (onchainWallet || !walletReady || !hederaPublicKey) return;
+    if (onchainRetryRef.current) return onchainRetryRef.current;
+    if (onchainResource.current.hasUnsettledStartup()) throw new Error('Bitcoin startup is still running.');
+    const retry = (async () => {
+      const guard = walletSession.captureRuntime();
+      const generation = initializationGenerationRef.current;
+      let seed: Uint8Array | null = null;
+      try {
+        const mnemonic = await withProtectedWalletAccess(() => getSecureItem(MNEMONIC_STORE_KEY));
+        guard(); if (!mnemonic) throw new Error('Wallet recovery words are unavailable.');
+        seed = await deriveAuthenticatedWalletSeed(mnemonic); guard();
+        if (deriveHederaPrivateKeyFromSeed(seed).publicKey.toStringRaw().toLowerCase() !== hederaPublicKey) throw new Error('Wallet changed.');
+        await connectOnchain(seed,generation);
+      } finally { seed?.fill(0); }
+    })().finally(() => { onchainRetryRef.current = null; });
+    onchainRetryRef.current = retry; return retry;
+  }, [connectOnchain,hederaPublicKey,onchainWallet,walletReady]);
 
   const initializeMnemonic = useCallback(
     async (mnemonic: string) => {
@@ -303,13 +363,14 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
 
         // Show the wallet shell immediately while Bitcoin connects in the
         // background. Keys and network readiness are separate states.
+        void connectOnchain(Uint8Array.from(seed), generation);
         void connectSpark(seed, generation);
         handedToSpark = true;
       } finally {
         if (!handedToSpark) eraseSeed();
       }
     },
-    [connectSpark],
+    [connectSpark, connectOnchain],
   );
 
   const retrySparkConnection = useCallback(async () => {
@@ -398,11 +459,39 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const unlockWallet = useCallback(async () => {
     recordAuthDiagnostic('unlock.begin');
     try {
+      const assertNoRemoval = () => {
+        if (activeRemovalsRef.current) throw new Error('Wallet removal must finish before continuing.');
+      };
+      const resumeRemoval = async () => {
+        assertNoRemoval();
+        const pending = await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true';
+        assertNoRemoval();
+        if (!pending) return false;
+        // A previous removal was already authorized. Complete it before reading
+        // keys; a cached pre-wipe phrase must never reopen the removed wallet.
+        walletSession.lock();
+        removalGenerationRef.current += 1;
+        activeRemovalsRef.current += 1;
+        try {
+          const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+          await resumePendingWalletWipe();
+        } finally {
+          activeRemovalsRef.current -= 1;
+          removalGenerationRef.current += 1;
+        }
+        setHasStoredWallet(await hasStoredMnemonic());
+        setRecoveryRequired(false);
+        setError(null);
+        return true;
+      };
+      await resumeRemoval();
+      assertNoRemoval();
+      const removalGeneration = removalGenerationRef.current;
       // A protected iOS keychain read is itself the Face ID challenge. Reuse
       // its result to open the wallet instead of prompting and reading twice.
       // Legacy unprotected entries still require explicit device authorization.
       const lockOnOpen = securityPreferences.getSnapshot().lockOnOpen;
-      const protectedMnemonic = lockOnOpen && Platform.OS === 'ios'
+      let protectedMnemonic = lockOnOpen && Platform.OS === 'ios'
         ? await measurePerformance('wallet.device_unlock', () =>
           readProtectedKeyForUnlock(getBiometricallyProtectedMnemonic))
         : null;
@@ -411,10 +500,10 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
           authenticateDevice('Unlock Opago', { allowDeviceCredential: true }));
       }
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
-      if (await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true') {
-        const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
-        await resumePendingWalletWipe();
-      }
+      // Removal may have started or finished while the native authentication
+      // sheet was open. Its marker can already be gone; reject the old key too.
+      if (await resumeRemoval() || removalGeneration !== removalGenerationRef.current) protectedMnemonic = null;
+      assertNoRemoval();
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
       beginWalletStartupTiming();
       walletSession.unlock();
@@ -659,21 +748,32 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const wipeWallet = useCallback(async () => {
     const assertUnlocked = walletSession.capture();
     assertUnlocked();
-    await setSecureItem(WALLET_WIPE_PENDING_KEY, 'true');
-    // Invalidate running payment/claim/reconciliation callbacks before erasing
-    // storage, so they cannot repopulate the removed wallet's activity.
-    walletSession.lock();
-    if (initializationRef.current) {
-      await withTimeout(initializationRef.current.catch(() => undefined), 30_000,
-        'Wallet startup is still running. Restart Opago to finish removing this wallet.');
+    // Invalidate protected reads even when the durable marker is still being
+    // written or has already been cleared before their native result arrives.
+    removalGenerationRef.current += 1;
+    activeRemovalsRef.current += 1;
+    try {
+      await setSecureItem(WALLET_WIPE_PENDING_KEY, 'true');
+      // Invalidate running payment/claim/reconciliation callbacks before erasing
+      // storage, so they cannot repopulate the removed wallet's activity.
+      walletSession.lock();
+      if (initializationRef.current) {
+        await withTimeout(initializationRef.current.catch(() => undefined), 30_000,
+          'Wallet startup is still running. Restart Opago to finish removing this wallet.');
+      }
+      const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+      await resumePendingWalletWipe();
+      clearRuntimeState();
+      setRecoveryRequired(false);
+      setHasStoredWallet(false);
+      setBackupStatus('loading');
+      if (AppState.currentState === 'active') walletSession.unlock();
+    } finally {
+      // A read can begin after removal starts. A second generation change
+      // rejects that read too, including partial-removal failures.
+      activeRemovalsRef.current -= 1;
+      removalGenerationRef.current += 1;
     }
-    const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
-    await resumePendingWalletWipe();
-    clearRuntimeState();
-    setRecoveryRequired(false);
-    setHasStoredWallet(false);
-    setBackupStatus('loading');
-    if (AppState.currentState === 'active') walletSession.unlock();
   }, [clearRuntimeState]);
 
   const value = useMemo<WalletContextValue>(
@@ -683,6 +783,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       isInitializing,
       initStatus,
       walletReady,
+      onchainWallet, onchainStatus, onchainError, retryOnchainConnection,
       sparkWallet,
       sparkStatus,
       sparkError,
@@ -721,6 +822,7 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
       sendHederaPayment,
       sparkError,
       sparkStatus,
+      onchainWallet, onchainStatus, onchainError, retryOnchainConnection,
       sparkWallet,
       walletReady,
       wipeWallet,

@@ -67,7 +67,7 @@ function commitments(count) {
 }
 
 test('installed SDK oracle matches every transaction, sighash, output order and commitment association', async () => {
-  for (const amount of [1, 954, 955, 956, 10000]) {
+  for (const amount of [1, 954, 955, 956, 1023, 1024, 1025, 10000]) {
     for (const sequence of [200, 1870, (1 << 30) | 1800]) {
       const leaves = [leaf(1, { amount, sequence }), leaf(8, { amount, sequence, direct: false })];
       const args = [leaves, ...commitments(leaves.length), new Uint8Array(32).fill(amount % 255)];

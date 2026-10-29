@@ -1,0 +1,196 @@
+{
+  "sdk": "0.7.12",
+  "synthetic": true,
+  "vectors": [
+    {
+      "entropyBytes": 16,
+      "entropyByte": 66,
+      "account": 0,
+      "network": "REGTEST",
+      "identity": "02327ee88277d8fa0b757126428dbbd70ab52312f5c86c773b4521fa2a0eb454f3",
+      "keys": {
+        "identityKey": "02327ee88277d8fa0b757126428dbbd70ab52312f5c86c773b4521fa2a0eb454f3",
+        "signingKey": "028cd2ac2bcf281698140b820b70dc45b1a207ac335cda8406f2cb47dae4630af2",
+        "depositKey": "022d233dc4c97742cc4278d3948ce9babef0394bb15698b6e64f21e368e1c9ad2e",
+        "staticDepositKey": "0316e2891b8965cc01af54c586c276266c40a56b53d6513ebfd5b87ba1e99f215a",
+        "htlcPreimageKey": "03db89a90029dead5f71caab597e927bc62e6ee58f616f19ad3d670a480e885215"
+      },
+      "derived": [
+        "03eafafdb4495447bfbfe5d62b0e9873336f863ee1176c783de5a17f0e0ce329c5",
+        "03cf2866edfc4eea068c37bb8a9346c1cbe70d96f51a946d7147fa2d810c8a5d9e"
+      ],
+      "address": "sparkrt1pgssyvn7azp80k86pd6hzfjz3kaawz44yvf0tjrvwua52g069g8tg48nmaw3g0"
+    },
+    {
+      "entropyBytes": 16,
+      "entropyByte": 66,
+      "account": 1,
+      "network": "MAINNET",
+      "identity": "02a169b6a5d7271c7d0753f0a9f3266ee6e32830c4ca6fdf4105b28200f297a9dc",
+      "keys": {
+        "identityKey": "02a169b6a5d7271c7d0753f0a9f3266ee6e32830c4ca6fdf4105b28200f297a9dc",
+        "signingKey": "02649831c3f5c4d5b486cc250c22c5eaf131a4cc46963926d9ae48977f97439d8b",
+        "depositKey": "02e053989ea44e5b0b9a73e23775ce07ce046fa9e8056f5c47bf3ccc7f266849a5",
+        "staticDepositKey": "03d9780f9a1105c7a7f56a1e48828fe83b4c8c56906e12db45e37fe9cd10f9133a",
+        "htlcPreimageKey": "032d8908179e43a3889343a524c18b75a48e20e003ab57f2e002b4fea76a6b90a8"
+      },
+      "derived": [
+        "03b3d1f669014911350effd27c9a7b106cf80f2f642bc6481173288ceec0f5b6f8",
+        "02ba84c499ba46bc50a01297f2267e3a213cbed3cd5f5ad5673435f849b7285f50"
+      ],
+      "address": "spark1pgss9gtfk6jawfcu05r48u9f7vnxaehr9qcvfjn0maqstv5zqref02wuxpqxnq"
+    },
+    {
+      "entropyBytes": 20,
+      "entropyByte": 66,
+      "account": 0,
+      "network": "REGTEST",
+      "identity": "02880f8df98a64bebc570e6443e7584790a014a2fb76e88d5a8d17dbd9d610ca34",
+      "keys": {
+        "identityKey": "02880f8df98a64bebc570e6443e7584790a014a2fb76e88d5a8d17dbd9d610ca34",
+        "signingKey": "02eaa7bb4baa35e3c87ea18c00958c280c78f0cb515b88589d9da8036878e897de",
+        "depositKey": "0330213250b7e0d1b052edb4f176969bf8aaa4e15af3f55ca0b9acabe8449a73ea",
+        "staticDepositKey": "02bbdd30e620e7edcf086c1aba29ea252107ee602630baf1e2cfae338c22812b7f",
+        "htlcPreimageKey": "025b69d3180a06440d0a2036967544a85baa7b58dbce6eb110845065d5698a7e17"
+      },
+      "derived": [
+        "03c9d1085ee99067c788d8802e054e0829e43d88e01e0b460270b062651c84cc39",
+        "02b60fb9d80c0e54e4e318c6d0c8ea4cec1a67f5dee6680de817f72e9db18456ec"
+      ],
+      "address": "sparkrt1pgss9zq03huc5e97h3tsuezruavy0y9qzj30kahg34dg697mm8tppj35fsgurc"
+    },
+    {
+      "entropyBytes": 20,
+      "entropyByte": 66,
+      "account": 1,
+      "network": "MAINNET",
+      "identity": "024815f31e5235885a654e6baa29d4c31b1aef21c3f3b2e5c80e38b69f96511b6e",
+      "keys": {
+        "identityKey": "024815f31e5235885a654e6baa29d4c31b1aef21c3f3b2e5c80e38b69f96511b6e",
+        "signingKey": "03fc9212efdc875e5535ab4e252a81b9d8ed42923101707202c8172238a59e9ae9",
+        "depositKey": "02b135f692f7facbe105d959f72437ea9a618d02facc9d7fd978264998e2111bcb",
+        "staticDepositKey": "02c5e0f89b23382ef10c319f0290c3bec59d5200bf37d62e4a79ec0ea9bb4f8e4f",
+        "htlcPreimageKey": "021b3d3cab601035cca5cbc08463e931acc5d06ed024e61f0d7355fa93f81189cd"
+      },
+      "derived": [
+        "0208fd81a3d19308b3269ab2bb9e17a5be77a9ef165e0369b19aa52e710119ac72",
+        "03dbc6d532e5cded111234748c5f1bc53560c41efeb5641a9a5c481b477d127ec9"
+      ],
+      "address": "spark1pgssyjq47v09ydvgtfj5u6a2982vxxc6ausu8uajuhyquw9kn7t9zxmw02qgzd"
+    },
+    {
+      "entropyBytes": 24,
+      "entropyByte": 66,
+      "account": 0,
+      "network": "REGTEST",
+      "identity": "02e2de72caf2e0d7a1d9ad8d5c2bf57ef5e14ef3b9697fae0ac0469f3c2f2be2c9",
+      "keys": {
+        "identityKey": "02e2de72caf2e0d7a1d9ad8d5c2bf57ef5e14ef3b9697fae0ac0469f3c2f2be2c9",
+        "signingKey": "028e826deaaf93d0a7db126f63cc14c1719cd5292e7cee6eecc7e9da5a9fe3221d",
+        "depositKey": "02c3124a4e3f78052465ace79a41301e40851291ab46bcec4ca272d4d83cb70831",
+        "staticDepositKey": "0329c10451d214df6066ef05ea4b46c1f3ac00a073191dfb0d0f2a195981d24819",
+        "htlcPreimageKey": "03b19224271d2b2e04d0fe26052a5169d81aabbeff09a4ac941338a74e8821d93d"
+      },
+      "derived": [
+        "024feaf456bbe075ab8f4cd141fbe9a8a3d0eb08dea4115d4f3185e41dc31e0d00",
+        "0230cf49348fd059a1399e25aea80577a8b1eaa45a5803211ce55af9d07f642062"
+      ],
+      "address": "sparkrt1pgss9ck7wt909cxh58v6mr2u906haa0pfmemj6tl4c9vq35l8shjhckfhukf2a"
+    },
+    {
+      "entropyBytes": 24,
+      "entropyByte": 66,
+      "account": 1,
+      "network": "MAINNET",
+      "identity": "0295f9cae7e17d222be5574c3e3f07b8429dd40cf84fe49244a024b00bf80ba06d",
+      "keys": {
+        "identityKey": "0295f9cae7e17d222be5574c3e3f07b8429dd40cf84fe49244a024b00bf80ba06d",
+        "signingKey": "03924493a443cea1531b5facd5dae494299b7949ed27d9fe9ebb85d032dd0e10b7",
+        "depositKey": "03bc0d08d702acbff13ddcbabf6bd78f92e5beb8a3a6098f7066fa05b9dec109b2",
+        "staticDepositKey": "03dc137f4c8f1e31547385d7327c546160fd17381382cbfc00de4ae149c2cf3878",
+        "htlcPreimageKey": "036f2dd915459c4604c989c3ace4b8e0c3d469559b799218e1a8d439362eead815"
+      },
+      "derived": [
+        "02a2b997691979119f1b2863e2d0c8d10c2ddadb5ca59bc70c378ea3510066870b",
+        "0241ca1e2e921f7d2859eb827d546fb6e0cf44ae00c512d50d529cf8497db5f341"
+      ],
+      "address": "spark1pgss990eetn7zlfz90j4wnp78urmss5a6sx0snlyjfz2qf9sp0uqhgrdpskw5d"
+    },
+    {
+      "entropyBytes": 28,
+      "entropyByte": 66,
+      "account": 0,
+      "network": "REGTEST",
+      "identity": "035bde2ffbb5078f99eeef8c53d26069129f4e122bd09a6d84d2bc908d955cc83b",
+      "keys": {
+        "identityKey": "035bde2ffbb5078f99eeef8c53d26069129f4e122bd09a6d84d2bc908d955cc83b",
+        "signingKey": "03946bb412dc63666112fa509cea0343cf478d13f437a8ff4fd08b8d7d56552d19",
+        "depositKey": "03b63ef3fce968292d9a571149939f7ad2066cb30381fbb12a697fcd2ada786f1d",
+        "staticDepositKey": "0256a47377d4c6fb438a8275dba9506194ea08e9ea21f20976cb4d51502eff98f7",
+        "htlcPreimageKey": "02c9a2690d832ab869993b8e0983878a9193b1242b89049dc89971a9bf95e7462d"
+      },
+      "derived": [
+        "037efd948cf553058bd14b31a9f0a8aa53da52cb0cb8cc5e2008d8e5b2ec00a0bb",
+        "03b369d37f8f552e421e8c57a1b35f46b5d101dbbc86ec9049ca66707baf1259bb"
+      ],
+      "address": "sparkrt1pgssxk779lam2pu0n8hwlrzn6fsxjy5lfcfzh5y6dkzd90ys3k24ejpmftq2vw"
+    },
+    {
+      "entropyBytes": 28,
+      "entropyByte": 66,
+      "account": 1,
+      "network": "MAINNET",
+      "identity": "03b2af04d82cbf81fab70827e423fb6828cbe0977ecbf5eb9c014bfcc836549ea5",
+      "keys": {
+        "identityKey": "03b2af04d82cbf81fab70827e423fb6828cbe0977ecbf5eb9c014bfcc836549ea5",
+        "signingKey": "022f5cf3387629ca4af7fbbba43a123a98ffb026aad078b350b2847c98213f43a4",
+        "depositKey": "0343723ad6c8aa3b4fae2ff16b60d5978cfadcf9eced495717203acc9a1d6acd13",
+        "staticDepositKey": "032049cf4c6301a9f016b9ef3185cf736b6e8f54498ad229970e9ab40bea06a428",
+        "htlcPreimageKey": "0360fb97a9eb99b6dbd6fa5b03704e89e969d927a5f5eeb534e0711632d67e22db"
+      },
+      "derived": [
+        "03d8d265bd1caac8071c30d5d6924ca17903cc289501feb59d28a9e1d833321735",
+        "020400d291febef33dc9be3f4b9bffae8f23690d6f76c37e8eb282f5be4eb19e4d"
+      ],
+      "address": "spark1pgss8v40qnvze0upl2mssflyy0aks2xtuzthajl4awwqzjlueqm9f8490w6gh0"
+    },
+    {
+      "entropyBytes": 32,
+      "entropyByte": 66,
+      "account": 0,
+      "network": "REGTEST",
+      "identity": "034bf4eefed35a7dd995e4f732ef0375d350af6a37b363733254121103b805b0b8",
+      "keys": {
+        "identityKey": "034bf4eefed35a7dd995e4f732ef0375d350af6a37b363733254121103b805b0b8",
+        "signingKey": "0327048f0de75b5b1bd1cda45470be48137ff7fc0f2721920144d8bbc792ebf266",
+        "depositKey": "02e9c2bb0cee94ebf8803f937523bf52e40d7c817faac91cce86a210e102386235",
+        "staticDepositKey": "03c057374192f03ca479056c42fd50c7b444a3637ce4581cfdd6f19758885463ba",
+        "htlcPreimageKey": "03ca76a9c0efe7f053f3a59fd317015b842b63384a1458fb8611f09fa82fa0b7ea"
+      },
+      "derived": [
+        "029204ee64d7df897c4aec96e0ebbb4410a2fb579e06491f685ce7200051313ef4",
+        "03b6fef44f4d10f98ca6921bde2d7c06b03f0da310160fc313fd086626c84c09db"
+      ],
+      "address": "sparkrt1pgssxjl5amldxknamx27faejaupht56s4a4r0vmrwve9gys3qwuqtv9cshv60h"
+    },
+    {
+      "entropyBytes": 32,
+      "entropyByte": 66,
+      "account": 1,
+      "network": "MAINNET",
+      "identity": "03d42db9de46614bfbc69be80d6c1f471e02508e80b922d37eabc351f520a00964",
+      "keys": {
+        "identityKey": "03d42db9de46614bfbc69be80d6c1f471e02508e80b922d37eabc351f520a00964",
+        "signingKey": "03c7758894af4ff67e8f544bc3e0f3d1ddad9cc844162f35bc5dc4bc9b6238afe5",
+        "depositKey": "03aa82f471f3c0e178c45503884fa6365fb7662882e15c9ede3aa6ace679816065",
+        "staticDepositKey": "02a0ab43b3c9b3eccf30e18d8a2226789c9e5d44e48bd911326a0092cff3244279",
+        "htlcPreimageKey": "024f24b144ddf67a05b857ffbeb2cd3daee8e4ae733c4c2dba1ef077598909379b"
+      },
+      "derived": [
+        "020e12e288f5f7d996dc1e02fe3e681d1c9ce72c5cfaf970275a530ecbffc0ba09",
+        "0279304966723f347d9780d533b72366d6b91fdceec5308e90c1b252b19b109317"
+      ],
+      "address": "spark1pgss84pdh80yvc2tl0rfh6qdds05w8sz2z8gpwfz6dl2hs6375s2qzty8vfhva"
+    }
+  ]
+}

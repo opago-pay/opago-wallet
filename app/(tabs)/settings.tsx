@@ -1,3 +1,4 @@
+import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
 import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -22,7 +23,6 @@ import {
   View,
 } from 'react-native';
 import { TextInput, TouchableOpacity, WalletActivityBoundary } from '@/components/ui/wallet-interaction';
-import { CloseWalletScreen } from '@/components/navigation/close-wallet-screen';
 import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRecoveryPhrase } from '@/components/security/recovery-phrase';
 import { BackupStatusNotice } from '@/components/security/backup-prompt';
@@ -43,7 +43,7 @@ import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { appConfig } from '@/lib/config';
 import { operationalHealth } from '@/lib/operational-health-native';
 import type { ServiceHealthRecord } from '@/lib/operational-health';
-import { getPerformanceReport, markNavigationReady, performanceTracingEnabled } from '@/lib/performance-trace';
+import { getPerformanceReport, markNavigationReady, markNavigationStart, performanceTracingEnabled } from '@/lib/performance-trace';
 import { categorizeAuthFailure, recordAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { bindHederaWalletAccount } from '@/lib/hedera/account-binding-native';
 import { listHederaAccountsForKey, type HederaAccountSnapshot } from '@/lib/hedera/account';
@@ -72,6 +72,7 @@ function selectBackupChallengePositions(wordCount: number): number[] {
 export default function SettingsScreen() {
   useLanguage();
   useColorMode();
+  const { bitcoinOnly } = useBitcoinOnly();
   const router = useRouter();
   const params = useLocalSearchParams<{ section?: string | string[] }>();
   const activeSection = getSettingsSection(params.section);
@@ -390,21 +391,24 @@ export default function SettingsScreen() {
   return (
     <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" ref={scrollRef} style={styles.container} keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 28 }]}>
-      {activeSection !== 'overview' && <TouchableOpacity style={styles.backButton} onPress={() => navigateToSection('overview')}
-        accessibilityRole="button" accessibilityLabel={t('Back to settings')} accessibilityState={{ disabled: busy }} disabled={busy}>
-        <Ionicons name="chevron-back" size={20} color={themeColor('secondary')} accessible={false} />
-        <Text style={styles.backText}>{t('Settings')}</Text>
-      </TouchableOpacity>}
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text ref={titleRef} style={styles.title} accessibilityRole="header">{settingsSectionTitle(activeSection)}</Text>
         </View>
-        <CloseWalletScreen disabled={busy} />
+        <TouchableOpacity style={styles.headerBackButton}
+          onPress={() => { if (activeSection === 'overview') { markNavigationStart('home'); router.replace('/(tabs)'); } else navigateToSection('overview'); }}
+          accessibilityRole="button" accessibilityLabel={t('Back')} accessibilityState={{ disabled: busy }} disabled={busy}>
+          <Ionicons name="arrow-back" size={26} color={themeColor('text')} accessible={false} />
+        </TouchableOpacity>
       </View>
 
       <SettingsTransition screen={activeSection}>
       {activeSection === 'overview' && <SettingsMenu backupChecked={backupChecked} backupLoading={backupStatus === 'loading'}
-        disabled={busy} onSelect={navigateToSection} onLock={lockWallet} />}
+        disabled={busy} onSelect={navigateToSection} onLock={lockWallet}
+        onOpenOpagoAccount={() => router.push('/opago-account')}
+        onOpenAccountDeletionPreview={() => router.push('/account-deletion-preview')}
+        onOpenAccountLinkPreview={() => router.push('/account-link-preview')}
+        onOpenWalletDetachPreview={() => router.push('/wallet-detach-preview')} />}
 
       {activeSection === 'security' && <>
       {backupStatus === 'loading' ? <View style={styles.backupCard}><BackupStatusNotice /></View> : <View style={styles.backupCard}>
@@ -590,6 +594,7 @@ export default function SettingsScreen() {
                 ? t('Needs attention · {category} connection issue', { category: lightningHealth.lastErrorCategory || 'unknown' })
                 : t('Available · last wallet refresh succeeded')}
           </Text>
+          {!bitcoinOnly && <>
           <Text style={styles.stepLabel}>{t('Hedera {network} public key', { network: appConfig.hederaNetwork })}</Text>
           <Text style={styles.caption}>{t("Identifies your account. It cannot authorize a payment.")}</Text>
           <Text style={styles.publicKey}>{hederaPublicKey || t('Wallet key is not ready.')}</Text>
@@ -622,6 +627,7 @@ export default function SettingsScreen() {
             disabled={!hederaPublicKey || bindingAccount || busy} onPress={() => void importHederaAccount()}>
             {bindingAccount ? <ActivityIndicator color={adaptColor('#ffb000', 'color')} /> : <Text style={styles.actionText}>{t('Link account ID')}</Text>}
           </TouchableOpacity>
+          </>}
         </View>
         {performanceTracingEnabled() && <View style={styles.advancedSection}>
           <Text style={styles.sectionTitle}>{t('Performance diagnostics')}</Text>
@@ -660,8 +666,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   header: { marginBottom: 28, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 20 },
   headerCopy: { flex: 1 },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '600', color: '#fff', letterSpacing: -0.8 },
-  backButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10, paddingRight: 12 },
-  backText: { fontSize: 14, color: '#aaaab3', fontWeight: '500' },
+  headerBackButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#1b1b20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   walletCard: { padding: 20, borderRadius: 20, backgroundColor: '#151518', borderWidth: 1, borderColor: '#2d2d31' },
   backupCard: { backgroundColor: '#151518', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#2d2d31' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },

@@ -5,14 +5,17 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "opagowallet",
+    "scheme": [
+      "opagowallet",
+      "com.opago.wallet"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.opago.wallet",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
+        "ITSAppUsesNonExemptEncryption": true,
         "CFBundleLocalizations": [
           "en",
           "de",
@@ -78,6 +81,14 @@
         }
       ],
       "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Opago to scan payment QR codes.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-camera",
         {

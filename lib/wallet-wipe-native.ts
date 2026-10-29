@@ -1,3 +1,4 @@
+import { clearOnchainWalletData } from './onchain/wallet-native';
 import { BACKUP_STATUS_KEY } from './wallet-backup';
 import { deleteSecureItem, getSecureItem, MNEMONIC_STORE_KEY, WALLET_IDENTITY_KEY, WALLET_WIPE_PENDING_KEY } from './storage';
 import { wipeTransactions } from './database';
@@ -12,14 +13,17 @@ import { operationalHealth } from './operational-health-native';
 import { createWalletWiper } from './wallet-wipe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { transactionRateStore } from './transaction-rates-native';
+import { clearF3PrivateStore } from './opago/store-native';
 
 const wiper = createWalletWiper({
   get: () => getSecureItem(WALLET_WIPE_PENDING_KEY),
   remove: () => deleteSecureItem(WALLET_WIPE_PENDING_KEY),
 }, [
+  () => clearOnchainWalletData(),
   () => homeBalancePreviewStore.clear(),
   () => wipeTransactions(),
   () => transactionRateStore.clear(),
+  () => clearF3PrivateStore(),
   () => clearHederaAccountBindings(),
   () => clearAllHederaPaymentJournals(),
   () => clearAllLightningPaymentJournals(),

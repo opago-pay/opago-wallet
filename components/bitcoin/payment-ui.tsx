@@ -62,8 +62,8 @@ export function BitcoinReview(props: {
       <Cost label={t('Fee, at most')} amount={props.feeSats} />
       <Cost label={t('Maximum total')} amount={props.amountSats + props.feeSats} />
     </View>
-    {props.route === 'onchain' && <Text style={[bitcoinStyles.note, { marginBottom: 16 }]}>{t('Bitcoin network confirmation required.')}</Text>}
-    {props.feeSats > props.amountSats / 10 && <Text style={[bitcoinStyles.note, { color: adaptColor('#ffce6b', 'color'), marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
+    {props.route === 'onchain' && <><Text style={bitcoinStyles.value}>{t('From Lightning balance')}</Text><Text style={[bitcoinStyles.note, { marginBottom: 16 }]}>{t('Bitcoin network confirmation required.')}</Text></>}
+    {props.feeSats > props.amountSats / 10 && <Text accessibilityRole="alert" style={[bitcoinStyles.note, { color: adaptColor('#ffce6b', 'color'), marginBottom: 16 }]}>{t('Fee is high relative to the amount.')}</Text>}
   </BitcoinSendScreen>;
 }
 
@@ -115,8 +115,8 @@ export function BitcoinInfo() {
   const [expanded, setExpanded] = useState(false);
   return <View><TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={t('About your Bitcoin balance')}
     style={bitcoinStyles.disclosure} onPress={() => setExpanded(!expanded)}>
-    <Text style={bitcoinStyles.muted}>{t('One balance. Two payment routes.')}</Text><Ionicons name="information-circle-outline" size={23} color={adaptColor('#aaaab3', 'color')} />
-  </TouchableOpacity>{expanded && <Text style={bitcoinStyles.note}>{t('It stays your Bitcoin. Lightning and the Bitcoin network are two ways to send and receive Bitcoin. You use one Bitcoin balance. Opago recognises the route from the address or request. You see costs and timing before sending. Learn about Spark and its dependencies in advanced wallet details.')}</Text>}</View>;
+    <Text style={bitcoinStyles.muted}>{t('Two Bitcoin balances')}</Text><Ionicons name="information-circle-outline" size={23} color={adaptColor('#aaaab3', 'color')} />
+  </TouchableOpacity>{expanded && <Text style={bitcoinStyles.note}>{t('Bitcoin on-chain and Lightning have separate balances. Move Bitcoin between them when needed. You review fees before each transfer. Lightning uses Spark; learn about its dependencies in wallet details.')}</Text>}</View>;
 }
 export const bitcoinStyles = adaptiveStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#09090b' }, page: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 36, gap: 16 },

@@ -7,6 +7,7 @@ export function sanitizeNativeIntent(path: string): string {
     if (path.length > 4_096) return '/';
     if (path === '/' || path === '' || path === 'opagowallet://') return '/';
     const url = new URL(path, 'opagowallet://app');
+    if (url.protocol === 'com.opago.wallet:' && !url.host && url.pathname === '/oauth/callback' && !url.hash) return '/opago-account';
     const checkout = url.hostname === 'hedera-checkout' && (!url.pathname || url.pathname === '/')
       || url.hostname === 'app' && url.pathname === '/hedera-checkout';
     if (url.protocol !== 'opagowallet:' || !checkout || url.username || url.password || url.port || url.hash) return '/';

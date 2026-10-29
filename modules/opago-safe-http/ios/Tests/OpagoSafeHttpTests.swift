@@ -4,6 +4,18 @@ import XCTest
 @testable import OpagoSafeHttp
 
 final class OpagoSafeHttpTests: XCTestCase {
+  // Public fixture only; no private key is stored in the repository.
+  func testOidcRs256PublicFixtureRejectsChangedMessageAndSignature() {
+    let n = "mN3lPnwl_vuVUdVNnpBQU4_THDRsnKQu17I5m6YQlVN39cPg3EwzRO0VZMn-k2YdKGfwBbzVbivblDlgALafUbB2XVjQMoZ3MOtW2iISx3fqCNVVBUrmqOTNq5tE9jYqclYd8ThPb1Pj1XoJHd_bjD6eLeM_KpO93SkwOIe_v_OWhIk4GwSJkfWgm0VY7dNkjAQocReWMNY0vr8e-TJzzB8X06FL8OY72CC_qPQPh4R0CfVIJwPxj55mPLYQI-98ufWKBuOVukI7VfiLR1GIpN8D7Doc3I_hPeoEbQbuGyH3zQPspELY_yFBqZnsrPewa_c1P49BIhe_x603ojdKQQ"
+    let e = "AQAB"
+    let message = "c3ludGhldGljLWhlYWRlci5zeW50aGV0aWMtY2xhaW1z"
+    let signature = "UMxyFC3zgtN_GvfvlR8ABY6thySHoZ98qthr9yiNLXpIVrT600SxokmYvkkCrJsOLjflTlGZ9UAOG4fyg_3jxynMaFXu00j8it4FE1a7-fZmXSvpG7rfCKmEZsiP1cxLw4OtTJ9cI24pvS3QnWFm2iSclS4vZXhZCIWjpmqDlnB9ewaWEAhdIf2oOpwsWGMTPE_j__xRj03og_OYj0lTFX-anGx1nPaD_whJy0xbOSNMwk5BrqA7nM1ET-_bPgydrDJDVQbr28O23lqMuGT-N7qh4JTkrFV_fkYV4iX2bLoWO3k5NGzJZr4-n6u27OOXCXR7W15YQT6i_u9oYdeMcg"
+    XCTAssertTrue(verifyOidcRs256(n: n, e: e, message: message, signature: signature))
+    XCTAssertFalse(verifyOidcRs256(n: n, e: e, message: "Y2hhbmdlZA", signature: signature))
+    XCTAssertFalse(verifyOidcRs256(n: n, e: e, message: message, signature: "AAAA"))
+    XCTAssertFalse(verifyOidcRs256(n: "AQ", e: e, message: message, signature: signature))
+  }
+
   func testPublicAddressClassificationAndMixedDNS() throws {
     for address in ["127.0.0.1", "10.0.0.4", "192.168.1.1", "169.254.1.1",
                     "100.64.0.1", "198.51.100.4", "::1", "fe80::1",
@@ -70,6 +82,15 @@ final class OpagoSafeHttpTests: XCTestCase {
     XCTAssertThrowsError(try ScreenedResolver.screen([later], development: false))
   }
 
+  func testRequestIdSurvivesBridgeAndDuplicateIsRejected() throws {
+    let id = "00000000-0000-4000-8000-000000000001"
+    let response = BoundedHTTPResponse(maxBytes: 64)
+    XCTAssertNil(try response.append(Data("HTTP/1.1 201 Created\r\nX-Request-Id: \(id)\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+    XCTAssertEqual(try response.endOfStream().bridgeValue["requestId"] as? String, id)
+    let duplicate = BoundedHTTPResponse(maxBytes: 64)
+    XCTAssertThrowsError(try duplicate.append(Data("HTTP/1.1 200 OK\r\nX-Request-Id: \(id)\r\nX-Request-Id: \(id)\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+  }
+
   func testRetryAfterSurvivesBridge() throws {
     let response = BoundedHTTPResponse(maxBytes: 64)
     XCTAssertNil(try response.append(Data("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 120\r\nContent-Length: 2\r\n\r\n{}".utf8)))
@@ -130,6 +151,23 @@ final class OpagoSafeHttpTests: XCTestCase {
     var unsafeURL = base
     unsafeURL["url"] = "https://user:pass@example.com/"
     XCTAssertThrowsError(try SafeRequest(unsafeURL))
+  }
+  func testBinaryPhotoRequestIsBoundedAndPreservesCiphertextBytes() throws {
+    let bytes = Data((0..<29).map { UInt8($0) })
+    var raw: [String: Any] = ["url": "https://example.com/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents?revision=1&side=front",
+      "method": "POST", "headers": ["Content-Type": "application/octet-stream", "X-Opago-Envelope": "synthetic"],
+      "body": bytes.base64EncodedString(), "bodyEncoding": "base64", "maxBytes": 91500, "timeoutMs": 120000, "requestId": "binary-test"]
+    let parsed = try SafeRequest(raw)
+    XCTAssertEqual(Data(parsed.requestData.suffix(bytes.count)),bytes)
+    raw["url"] = "https://example.com/another-route"
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["url"] = "https://example.com/api/v2/onboarding/kyc/00000000-0000-4000-8000-000000000001/documents"
+    raw["body"] = Data(repeating: 0,count: 28).base64EncodedString()
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["body"] = Data(repeating: 0,count: 10_485_789).base64EncodedString()
+    XCTAssertThrowsError(try SafeRequest(raw))
+    raw["body"] = bytes.base64EncodedString(); raw["method"] = "GET"
+    XCTAssertThrowsError(try SafeRequest(raw))
   }
 }
 
