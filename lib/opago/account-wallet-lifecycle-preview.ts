@@ -147,6 +147,7 @@ export class MockWalletDetachAdapter {
   readonly mode = 'mock-only' as const;
   readonly calls: LifecycleRequest[] = [];
   private readonly pendingChallenges = new Map<string, DetachChallenge>();
+  private readonly challengeResults = new Map<string, { fingerprint: string; result: DetachChallenge }>();
   private readonly consumedChallenges = new Set<string>();
   private detached = false;
   private readonly verifyResults = new Map<string, { fingerprint: string; result: { proof_token: string } }>();
@@ -155,8 +156,14 @@ export class MockWalletDetachAdapter {
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid,
     private readonly network: 'mainnet' | 'regtest' = 'mainnet', private readonly walletPubkey = '02' + '11'.repeat(32)) {}
-  async challenge(installationId: string): Promise<DetachChallenge> {
-    if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('invalid_request', 400);
+  async challenge(installationId: string, idempotencyKey: string): Promise<DetachChallenge> {
+    if (!uuidPattern.test(installationId) || !uuidPattern.test(idempotencyKey) || !/^(02|03)[0-9a-f]{64}$/i.test(this.walletPubkey)) throw new LifecyclePreviewError('invalid_request', 400);
+    const fingerprint = 'POST:/api/v2/wallet/auth/challenge:' + installationId;
+    const prior = this.challengeResults.get(idempotencyKey);
+    if (prior) {
+      if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      return clone(prior.result);
+    }
     for (const [id, challenge] of this.pendingChallenges) {
       if (this.now() >= Date.parse(challenge.expires_at)) this.pendingChallenges.delete(id);
     }
@@ -179,8 +186,9 @@ export class MockWalletDetachAdapter {
       installation_id: installationId, issued_at: issuedAtText, expires_at: expiresAtText };
     this.pendingChallenges.set(challenge.challenge_id, clone(challenge));
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/challenge', auth: 'wallet_proof',
-      body: { wallet_pubkey: challenge.wallet_pubkey, network: challenge.network, action: 'wallet_detach',
+      idempotency_key: idempotencyKey, body: { wallet_pubkey: challenge.wallet_pubkey, network: challenge.network, action: 'wallet_detach',
         action_params: challenge.action_params, installation_id: installationId } });
+    this.challengeResults.set(idempotencyKey, { fingerprint, result: clone(challenge) });
     return clone(challenge);
   }
   async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
@@ -200,14 +208,14 @@ export class MockWalletDetachAdapter {
         JSON.stringify(challenge.action_params) !== JSON.stringify(pending.action_params)) {
       throw new LifecyclePreviewError('challenge_invalid', 401);
     }
-    if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('proof_replayed', 409);
+    if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('challenge_invalid', 401);
     if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
     if (!signatureValid) throw new LifecyclePreviewError('signature_invalid', 401);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
       idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
     const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
     const result = { proof_token: proofToken };
-    this.issuedProofs.set(proofToken, { challengeId: pending.challenge_id,
+    this.issuedProofs.set(bytesToHex(sha256(utf8ToBytes(proofToken))), { challengeId: pending.challenge_id,
       installationId: pending.installation_id, expiresAt: this.now() + 300_000, used: false });
     this.consumedChallenges.add(challenge.challenge_id);
     this.pendingChallenges.delete(challenge.challenge_id);
@@ -225,7 +233,7 @@ export class MockWalletDetachAdapter {
       if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
       return clone(prior.result);
     }
-    const issued = this.issuedProofs.get(input.proofToken);
+    const issued = this.issuedProofs.get(bytesToHex(sha256(utf8ToBytes(input.proofToken))));
     if (!issued) throw new LifecyclePreviewError('proof_invalid', 403);
     if (this.now() >= issued.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
     if (!input.signatureVerified || issued.installationId !== input.installationId) throw new LifecyclePreviewError('proof_invalid', 403);
