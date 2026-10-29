@@ -5,5 +5,5 @@ export interface MilestoneStorage {
 export type FirstMilestone = 'received' | 'sent' | 'review';
 export function createMilestoneGate(storage: MilestoneStorage): { claim(wallet: string, milestone: FirstMilestone): Promise<boolean> };
 export function eligibleHistoryEvent(item: {
-  type: string; status: string; amountValue?: number; internalTransfer?: string;
+  type: string; status: string; amountValue?: number; internalTransfer?: string; legacyDeposit?: boolean; operation?: { kind?: string };
 } | null): 'received' | 'sent' | null;
