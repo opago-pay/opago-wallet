@@ -1,8 +1,12 @@
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 
-/** Contract-faithful lifecycle previews. These adapters are deterministic local mocks:
- * they never instantiate OpagoApi, HKA transport, fetch, or any live backend.
+/** Product-policy lifecycle previews, not the published 0.2.0 wire contract.
+ * The 30-day grace period, cancellation, 60-day mock receipt lifetime and wallet
+ * detach flow are preview assumptions; live support requires a separately agreed
+ * versioned contract and backend implementation. Do not use these types or call
+ * records as production API definitions or enable the flags as an integration.
+ * These adapters never instantiate OpagoApi, HKA transport, fetch or a live backend.
  */
 export const ACCOUNT_DELETION_PREVIEW_ENABLED = false;
 export const WALLET_DETACH_PREVIEW_ENABLED = false;

@@ -104,7 +104,7 @@ test('all new lifecycle UI strings have genuine translations in de/fr/es/it', ()
   for (const language of ['de', 'fr', 'es', 'it']) {
     const messages = accountWalletLifecycleMessages(language);
     for (const key of ['Wallet detach failed', 'Unlink wallet', 'Unlink wallet?', 'Wallet detached (mock). Payments are disabled.',
-      'Account deletion preview is disabled.', 'Wallet detach preview is disabled.']) {
+      'Account deletion preview is disabled.', 'Wallet detach preview is disabled.', 'Mock only: no live wallet request is made.']) {
       assert.ok(messages[key] && messages[key] !== key, language + ': ' + key);
     }
   }
@@ -248,4 +248,20 @@ test('verify retry does not resurrect an expired cached proof', async () => {
   assert.ok(proof.proof_token);
   now += 300_000;
   await assert.rejects(adapter.verify(challenge, true, uuid(255)), e => e.code === 'proof_expired' && e.status === 410);
+});
+
+
+test('both lifecycle screens identify product-policy mocks rather than the current API contract', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { accountWalletLifecycleMessages } = require('../lib/i18n/account-wallet-lifecycle-messages.ts');
+  for (const [screen, scope] of [['account-deletion-preview', 'account'], ['wallet-detach-preview', 'wallet']]) {
+    const disclaimer = `Product-policy mock only; not the current API contract. No live ${scope} request is made.`;
+    const source = fs.readFileSync(path.join(__dirname, '../app/' + screen + '.tsx'), 'utf8');
+    assert.ok(source.includes("t('" + disclaimer + "')"), screen + ': visible preview boundary');
+    for (const language of ['de', 'fr', 'es', 'it']) {
+      const translation = accountWalletLifecycleMessages(language)[disclaimer];
+      assert.ok(translation && translation !== disclaimer, language + ': ' + screen);
+    }
+  }
 });

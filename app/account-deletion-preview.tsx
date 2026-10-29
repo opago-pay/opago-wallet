@@ -44,7 +44,7 @@ export default function AccountDeletionPreview() {
     {!ACCOUNT_DELETION_PREVIEW_ENABLED ?
       <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Account deletion preview is disabled.')}</Text> :
       <>
-        <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Mock only: no live account request is made.')}</Text>
+        <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Product-policy mock only; not the current API contract. No live account request is made.')}</Text>
         <Text style={{ color: themeColor('text'), marginTop: 12 }}>{t('Deleting your OPAGO account immediately blocks account access and automatically detaches linked wallets. Your self-custody wallet and keys remain on your device. Final deletion is scheduled after 30 days; you can cancel during this grace period.')}</Text>
         {!receipt ? action('Request account deletion (mock)', () => Alert.alert(t('Delete OPAGO account?'),
           t('Deleting your OPAGO account immediately blocks account access and automatically detaches linked wallets. Your self-custody wallet and keys remain on your device. Final deletion is scheduled after 30 days; you can cancel during this grace period.'),

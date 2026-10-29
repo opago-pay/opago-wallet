@@ -116,6 +116,70 @@ test('F5 reports receipt acknowledgement independently from verification and pol
   const auth=await f.backend.authorize(owner);const receipt=await f.backend.receipt(auth,(await f.store.read(syncKey(owner))).receipts[0].receipt.receipt_id);
   for(const patch of [{wallet_id:randomUUID()},{source_payment_id:'wrong'},{external_id:'spark-transfer:wrong'}]) assert.throws(()=>checkReceipt({...receipt,...patch},auth.walletId,btc('a','settled').report));
 });
+test('F5 receipt polling remains fair across bounded batches and process restarts',async()=>{
+  const f=fixture([btc('a'),btc('b'),btc('c')]);await f.sync.collect();await f.sync.flush();
+  const ids=(await f.store.read(syncKey(owner))).receipts.map(ack=>ack.receipt.receipt_id);
+  const calls=[];const receipt=f.backend.receipt.bind(f.backend);
+  f.backend.receipt=async(auth,id)=>{calls.push(id);return receipt(auth,id);};
+  for(let i=0;i<4;i++){f.advance(60000);await f.reopen().refreshReceipts(1);}
+  assert.deepEqual(calls,[...ids,ids[0]]);
+  assert.equal((await f.sync.snapshot()).acknowledged,3);assert.equal(f.backend.writes.length,3);
+});
+test('F5 receipt failures honor Retry-After across restarts without starving other receipts',async()=>{
+  const f=fixture([btc('a'),btc('b')]);await f.sync.collect();await f.sync.flush();f.advance(6000);
+  const before=await f.store.read(syncKey(owner));const ids=before.receipts.map(ack=>ack.receipt.receipt_id);
+  const calls=[];const receipt=f.backend.receipt.bind(f.backend);
+  f.backend.receipt=async(auth,id)=>{calls.push(id);if(calls.length===1)throw new SyncError('upstream_unavailable',true,120);return receipt(auth,id);};
+  await assert.rejects(f.sync.refreshReceipts(1),code('upstream_unavailable'));
+  let doc=await f.store.read(syncKey(owner));assert.deepEqual(doc.receipts[0].receipt,before.receipts[0].receipt);
+  assert.equal(doc.receipts[0].attempts,1);assert.equal(doc.receipts[0].retryAt,Date.UTC(2026,9,6)+126000);
+  f.advance(30000);await f.reopen().refreshReceipts(1);assert.deepEqual(calls,ids);
+  f.advance(89000);await f.reopen().refreshReceipts(1);assert.deepEqual(calls,[...ids,ids[1]]);
+  f.advance(1000);await f.reopen().refreshReceipts(1);assert.deepEqual(calls,[...ids,ids[1],ids[0]]);
+  doc=await f.store.read(syncKey(owner));assert.equal(doc.acknowledged,2);assert.equal(doc.entries.length,0);
+});
+test('F5 concurrent receipt batches share durable progress and skip terminal receipts',async()=>{
+  const f=fixture([btc('a'),btc('b'),btc('c')]);await f.sync.collect();await f.sync.flush();f.advance(6000);
+  const doc=await f.store.read(syncKey(owner));const ids=doc.receipts.map(ack=>ack.receipt.receipt_id);
+  await f.backend.verifyTestEvidence();const auth=await f.backend.authorize(owner);
+  doc.receipts[1].receipt=await f.backend.receipt(auth,ids[1]);await f.store.write(syncKey(owner),doc);
+  const calls=[];const receipt=f.backend.receipt.bind(f.backend);
+  f.backend.receipt=async(a,id)=>{calls.push(id);return receipt(a,id);};
+  await Promise.all([f.sync.refreshReceipts(1),f.reopen().refreshReceipts(1)]);
+  assert.deepEqual(calls,[ids[0],ids[2]]);assert.equal((await f.sync.snapshot()).verified,3);
+});
+test('F5 a failed receipt checkpoint never sends a read or loses the prior receipt',async()=>{
+  for(const failAt of [1,2]){
+    const f=fixture();await f.sync.collect();await f.sync.flush();f.advance(6000);await f.backend.verifyTestEvidence();
+    const before=await f.store.read(syncKey(owner));let writes=0,reads=0;
+    const write=f.store.write.bind(f.store);const receipt=f.backend.receipt.bind(f.backend);
+    f.store.write=async(k,v)=>{if(k===syncKey(owner)&&++writes===failAt)throw Error('disk');return write(k,v);};
+    f.backend.receipt=async(auth,id)=>{reads++;return receipt(auth,id);};
+    await assert.rejects(f.sync.refreshReceipts(),/disk/);assert.equal(reads,failAt-1);
+    assert.deepEqual((await f.store.read(syncKey(owner))).receipts[0].receipt,before.receipts[0].receipt);
+    f.advance(10000);await f.reopen().refreshReceipts();assert.equal((await f.sync.snapshot()).verified,1);
+    assert.equal(f.backend.writes.length,1);
+  }
+});
+test('F5 invalid receipt responses preserve acknowledgement and do not block later receipts',async()=>{
+  const f=fixture([btc('a'),btc('b')]);await f.sync.collect();await f.sync.flush();f.advance(6000);
+  const before=await f.store.read(syncKey(owner));const ids=before.receipts.map(ack=>ack.receipt.receipt_id);
+  const calls=[];const receipt=f.backend.receipt.bind(f.backend);
+  f.backend.receipt=async(auth,id)=>{calls.push(id);const value=await receipt(auth,id);return id===ids[0]?{...value,receipt_id:randomUUID()}:value;};
+  await assert.rejects(f.sync.refreshReceipts(1),code('sync_invalid_receipt'));
+  assert.deepEqual((await f.store.read(syncKey(owner))).receipts[0].receipt,before.receipts[0].receipt);
+  f.advance(30000);await f.reopen().refreshReceipts(1);assert.deepEqual(calls,ids);
+  assert.equal((await f.sync.snapshot()).acknowledged,2);assert.equal(f.backend.writes.length,2);
+});
+test('F5 interrupted receipt reads cannot recreate a wiped outbox',async()=>{
+  const f=fixture();await f.sync.collect();await f.sync.flush();f.advance(6000);
+  const auth=await f.backend.authorize(owner);const id=(await f.store.read(syncKey(owner))).receipts[0].receipt.receipt_id;
+  const receipt=await f.backend.receipt(auth,id);let release;
+  f.backend.receipt=()=>new Promise(resolve=>release=resolve);
+  const work=f.sync.refreshReceipts();await new Promise(resolve=>setImmediate(resolve));
+  f.stop();await f.store.remove(syncKey(owner));release(receipt);
+  await assert.rejects(work,code('sync_owner_changed'));assert.equal(await f.store.read(syncKey(owner)),null);
+});
 test('F5 incomplete/zero amounts and null source IDs remain observations; terminal updates get distinct stable keys',async()=>{
   const f=fixture([btc('a','pending',null)]);await f.sync.collect();await f.sync.flush();
   f.streams[0].read=async()=>({items:[btc('a','settled'),btc('a','pending',null),btc('a','failed')],next:null});await f.sync.collect();await f.sync.flush();

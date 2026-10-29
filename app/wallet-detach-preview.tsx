@@ -36,7 +36,7 @@ export default function WalletDetachPreview() {
     {!WALLET_DETACH_PREVIEW_ENABLED ?
       <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Wallet detach preview is disabled.')}</Text> :
       <>
-        <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Mock only: no live wallet request is made.')}</Text>
+        <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Product-policy mock only; not the current API contract. No live wallet request is made.')}</Text>
         <Text style={{ color: themeColor('text'), marginTop: 12 }}>{t('Detaching disables inbound and outbound payments and your OPAGO Lightning address. Open invoices remain valid until they expire. Your wallet and keys stay on this device. Re-linking creates a new binding. No recovery or support exception is available.')}</Text>
         {!done && action('Detach wallet (mock)', () => Alert.alert(t('Unlink wallet?'),
           t('Detaching disables inbound and outbound payments and your OPAGO Lightning address. Open invoices remain valid until they expire. Your wallet and keys stay on this device. Re-linking creates a new binding. No recovery or support exception is available.'),
