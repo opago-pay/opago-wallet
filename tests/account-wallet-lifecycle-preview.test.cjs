@@ -16,6 +16,7 @@ test('account deletion returns receipt with 30-day schedule and status uses rece
   const receipt = await adapter.deleteAccount({ accountBearer: 'mock', authTime: now, idempotencyKey: uuid(20), hpkeEnvelope: true });
   assert.equal(receipt.status, 'deletion_pending');
   assert.equal(Date.parse(receipt.scheduled_delete_at) - Date.parse(receipt.requested_at), 30 * 86400000);
+  assert.ok(Date.parse(receipt.receipt_expires_at) > Date.parse(receipt.scheduled_delete_at));
   assert.equal((await adapter.deletionStatus(receipt.deletion_id, receipt.receipt_token)).status, 'deletion_pending');
   await assert.rejects(adapter.deletionStatus(receipt.deletion_id, 'wrong-token'), e => e.code === 'receipt_expired' && e.status === 410);
   assert.equal(adapter.calls[0].method, 'DELETE');
@@ -112,4 +113,21 @@ test('legacy deletion preview export and settings/screen use one default-off fla
   const legacy = require('../lib/opago/account-deletion-preview.ts');
   assert.equal(legacy.ACCOUNT_DELETION_PREVIEW_ENABLED, lifecycle.ACCOUNT_DELETION_PREVIEW_ENABLED);
   assert.equal(lifecycle.ACCOUNT_DELETION_PREVIEW_ENABLED, false);
+});
+
+test('deletion receipt remains valid after finalization so deleted status is observable', async () => {
+  let now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockAccountLifecycleAdapter(() => now, (() => { let n = 100; return () => uuid(n++); })());
+  const receipt = await adapter.deleteAccount({ accountBearer: 'mock', authTime: now, idempotencyKey: uuid(101), hpkeEnvelope: true });
+  now = Date.parse(receipt.scheduled_delete_at);
+  adapter.finalizeDeletion();
+  assert.equal((await adapter.deletionStatus(receipt.deletion_id, receipt.receipt_token)).status, 'deleted');
+});
+test('wallet detach navigation remains behind the default-off flag', () => {
+  const fs = require('node:fs');
+  const menu = fs.readFileSync(require('node:path').join(__dirname, '../components/settings/settings-menu.tsx'), 'utf8');
+  const settings = fs.readFileSync(require('node:path').join(__dirname, '../app/(tabs)/settings.tsx'), 'utf8');
+  assert.match(menu, /WALLET_DETACH_PREVIEW_ENABLED && props\.onOpenWalletDetachPreview/);
+  assert.match(settings, /onOpenWalletDetachPreview=\{\(\) => router\.push\('\/wallet-detach-preview'\)\}/);
+  assert.equal(lifecycle.WALLET_DETACH_PREVIEW_ENABLED, false);
 });
