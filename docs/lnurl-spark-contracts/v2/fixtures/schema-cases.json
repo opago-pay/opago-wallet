@@ -1280,6 +1280,67 @@
         },
         "request_id": "00000000-0000-4000-8000-000000000092"
       }
+    },
+    {
+      "id": "valid-wallet-detach-challenge",
+      "schema": "ChallengeRequest",
+      "valid": true,
+      "value": {
+        "wallet_pubkey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "network": "mainnet",
+        "action": "wallet_detach",
+        "action_params": {
+          "wallet_id": "00000000-0000-4000-8000-000000000010",
+          "party_id": "00000000-0000-4000-8000-000000000011",
+          "account_generation": 2
+        },
+        "installation_id": "00000000-0000-4000-8000-000000000012"
+      }
+    },
+    {
+      "id": "valid-deletion-receipt-with-grace-schedule",
+      "schema": "DeletionReceipt",
+      "valid": true,
+      "value": {
+        "deletion_id": "00000000-0000-4000-8000-000000000020",
+        "status": "deletion_pending",
+        "requested_at": "2026-10-29T10:00:00Z",
+        "scheduled_delete_at": "2026-11-28T10:00:00Z",
+        "receipt_token": "opaque-receipt-token",
+        "receipt_expires_at": "2026-12-28T10:00:00Z"
+      }
+    },
+    {
+      "id": "valid-deletion-status-cancelled",
+      "schema": "DeletionStatus",
+      "valid": true,
+      "value": {
+        "deletion_id": "00000000-0000-4000-8000-000000000020",
+        "status": "deletion_cancelled",
+        "requested_at": "2026-10-29T10:00:00Z",
+        "scheduled_delete_at": "2026-11-28T10:00:00Z"
+      }
+    },
+    {
+      "id": "valid-wallet-detach-request",
+      "schema": "WalletDetachRequest",
+      "valid": true,
+      "value": {
+        "proof_token": "opaque-action-proof",
+        "installation_id": "00000000-0000-4000-8000-000000000012"
+      }
+    },
+    {
+      "id": "valid-wallet-detach-receipt",
+      "schema": "WalletDetachReceipt",
+      "valid": true,
+      "value": {
+        "wallet_id": "00000000-0000-4000-8000-000000000010",
+        "status": "unbound",
+        "detached_at": "2026-10-29T10:00:00Z",
+        "payments_enabled": false,
+        "evidence_id": "00000000-0000-4000-8000-000000000021"
+      }
     }
   ]
 }
