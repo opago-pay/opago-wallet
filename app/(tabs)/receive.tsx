@@ -303,7 +303,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     } catch {
       // Notification availability cannot invalidate a confirmed payment.
     }
-  }, []);
+  }, [hederaPublicKey]);
 
   useEffect(() => {
     if (!pollingEnabled || !invoice || !invoicePaymentHash || !sparkWallet || !ownerKey ||
