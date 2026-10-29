@@ -1,5 +1,6 @@
 // English key, German, French, Spanish, Italian. Dynamic F3 labels share the normal catalog.
 const rows = [
+  ['Wallet linking is not enabled yet. Backend acceptance is pending. Browser sign-in and your local wallet remain available.', 'Die Wallet-Verknüpfung ist noch nicht aktiviert. Die Backend-Abnahme steht aus. Die Browser-Anmeldung und deine lokale Wallet bleiben verfügbar.', 'La liaison du portefeuille n’est pas encore activée. La validation du backend reste à faire. La connexion par navigateur et votre portefeuille local restent disponibles.', 'La vinculación de la cartera aún no está habilitada. La validación del backend está pendiente. El inicio de sesión en el navegador y tu cartera local siguen disponibles.', 'Il collegamento del wallet non è ancora attivo. La validazione del backend è in sospeso. L’accesso dal browser e il wallet locale restano disponibili.'],
   ['Maximum fee in SAT', 'Maximale Gebühr in SAT', 'Frais maximum en SAT', 'Comisión máxima en SAT', 'Commissione massima in SAT'],
   ['Copy Lightning address', 'Lightning-Adresse kopieren', 'Copier l’adresse Lightning', 'Copiar dirección Lightning', 'Copia indirizzo Lightning'],
   ['Share Lightning address', 'Lightning-Adresse teilen', 'Partager l’adresse Lightning', 'Compartir dirección Lightning', 'Condividi indirizzo Lightning'],

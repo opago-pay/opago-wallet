@@ -1,4 +1,5 @@
 import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { observeFirstConfirmedHistory } from '@/lib/first-payment-feedback';
 import { isOnchainUnavailable } from '@/lib/onchain/errors';
 import * as Clipboard from 'expo-clipboard';
 import { useOnchainBalance } from '@/hooks/useOnchainBalance';
@@ -593,6 +594,13 @@ export default function HomeScreen() {
     item => item.status !== 'pending' || !hiddenPaymentKeys.includes(item.key),
   ), [transactions, hiddenPaymentKeys,onchain.transactions,onchain.operations,onchain.network]);
 
+  // BDK on-chain receipts and sends may confirm without a HistoryPager update.
+  // Observe exactly the combined activity shown on Home, not the pager alone.
+  useEffect(() => {
+    if (!walletReady || !hederaPublicKey) return;
+    void observeFirstConfirmedHistory(hederaPublicKey, visibleTransactions);
+  }, [walletReady, hederaPublicKey, visibleTransactions]);
+
   const onchainEur=calculateBitcoinEur(onchain.state.value?.totalSats??null,displayRates.btcToEur);
   const bitcoinEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
   const hederaEur = calculateHederaEur(displayBalances.hbarTinybars, displayRates.hbarToEur);
@@ -782,6 +790,9 @@ export default function HomeScreen() {
       </View>
 
       {walletReady && <BitcoinConnectionStatus status={sparkStatus} error={sparkError} onRetry={retrySparkConnection} />}
+      <View style={styles.homeBackupReminder}>
+        <BackupReminder />
+      </View>
       <View style={styles.quickActions}>
         <QuickAction
           icon="qr-code-outline"
@@ -795,7 +806,6 @@ export default function HomeScreen() {
         <Text style={styles.balanceLabel}>{row.kind==='to_lightning'?'Bitcoin → Lightning':'Lightning → Bitcoin'}</Text>
         <Text style={styles.balanceSubtitle}>{t(row.transferStage==='claim_required'?'Lightning fee approval required':'Checking transfer')}</Text>
       </TouchableOpacity>)}
-      <BackupReminder />
       {(latestTransaction || historyLoadedRef.current) && <>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t('Latest activity')}</Text>
@@ -1125,6 +1135,7 @@ const styles = adaptiveStyles(StyleSheet.create({
   portfolioBalanceLabel: { color: '#d5d5da', fontSize: 19, fontWeight: '600', marginTop: 8 },
   balanceCaveat: { color: '#a59a84', fontSize: 11, textAlign: 'center', marginTop: 5 },
   total: { color: '#fff', fontSize: 52, fontWeight: '600', textAlign: 'center', flexShrink: 1, fontVariant: ['tabular-nums'] },
+  homeBackupReminder: { width: '100%', marginTop: 8, marginBottom: 4 },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',

@@ -1,7 +1,6 @@
 import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/useLanguage';
 import { Tabs } from 'expo-router';
-import React from 'react';
 
 export default function TabLayout() {
   useLanguage();

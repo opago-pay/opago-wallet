@@ -18,7 +18,7 @@ test('F3 is visible in the existing EAS build profiles', () => {
   assert.equal(eas.build.production.env.EXPO_PUBLIC_ENABLE_MAINNET, 'false');
 });
 
-test('live backend inspection is exposed without replacing account or wallet authentication', () => {
+test('prepared backend inspection preserves the production acceptance gate and separate browser authentication', () => {
   const screen = read('components/opago/public-account-screen.tsx');
   const bootstrap = read('lib/opago/bootstrap-native.ts');
   const runtime = read('lib/opago/runtime-native.ts');
@@ -26,8 +26,10 @@ test('live backend inspection is exposed without replacing account or wallet aut
   assert.match(screen, /getF3Runtime\(start\.sparkWallet, start\.hederaPublicKey\)/);
   assert.match(screen, /inspectWalletBackend\(runtime.account\)/);
   assert.match(screen, /label=\{t\('Transaction synchronization'\)\}/);
-  assert.doesNotMatch(bootstrap, /wallet_session_contract_pending/);
-  assert.match(bootstrap, /return createAccountBindingIntegration/);
+  assert.match(bootstrap, /throw new OpagoError\('wallet_session_contract_pending'\)/);
+  assert.doesNotMatch(bootstrap, /(?:import|require).*binding-integration/);
+  assert.match(read('lib/opago/binding-integration-native.ts'), /return createAccountBindingIntegration/);
+  assert.match(screen, /Wallet linking is not enabled yet\. Backend acceptance is pending/);
   assert.match(runtime, /if \(!nativeF3Enabled\(\)\)/);
   assert.match(runtime, /transactionSyncPort/);
   assert.match(runtime, /onchainSyncPort/);

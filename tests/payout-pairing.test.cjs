@@ -111,6 +111,53 @@ test('unlink timeout cannot silently enable payments or dispatch again', async (
   await assert.rejects(f.flow.unlink(), /offline/); assert.equal(f.flow.stage, 'unknown');
   await assert.rejects(f.flow.unlink(), /unlink_not_reviewed/); assert.equal(f.flow.paymentsAvailable, false);
 });
+for (const operation of ['confirm', 'unlink']) {
+  for (const timing of ['after timeout', 'while dispatched', 'before late success']) test(`cancel ${timing} preserves uncertain ${operation} until read-only reconciliation`, async () => {
+    const f = fixture();
+    if (operation === 'confirm') { f.scan(); await f.flow.prepare(); }
+    else { f.linked(); await f.flow.prepareUnlink(); }
+    let finish;
+    const original = f.ports[operation];
+    f.ports[operation] = async () => {
+      f.state.calls.push(operation);
+      if (timing !== 'after timeout') return new Promise((resolve, reject) => { finish = { resolve, reject }; });
+      throw Error('offline');
+    };
+    const pending = f.flow[operation]();
+    const rejected = assert.rejects(pending);
+    if (timing !== 'after timeout') {
+      while (!finish) await Promise.resolve();
+      f.flow.cancel();
+      if (timing === 'while dispatched') finish.reject(Error('offline'));
+      else {
+        const result = operation === 'confirm'
+          ? await original(f.state.credential, f.state.qr, f.state.proof, 4)
+          : await original(f.state.credential, 4, intentId);
+        f.state.calls.pop(); // The fixture constructs a response, not a second dispatch.
+        finish.resolve(result);
+      }
+    }
+    await rejected;
+    f.flow.cancel(); f.flow.cancel();
+    assert.equal(f.flow.stage, 'unknown');
+    assert.equal(f.flow.credential, null); assert.equal(f.flow.qr, null); assert.equal(f.flow.binding, null);
+    assert.equal(f.flow.paymentsAvailable, false);
+    assert.throws(f.scan, /pairing_busy/);
+    await assert.rejects(f.flow.prepare(), /pairing_outcome_unknown/);
+    await assert.rejects(f.flow.prepareUnlink(), /pairing_outcome_unknown/);
+    await assert.rejects(f.flow.confirm(), /pairing_not_reviewed/);
+    await assert.rejects(f.flow.unlink(), /unlink_not_reviewed/);
+    const calls = f.state.calls.slice();
+    f.state.credential.subject = intentId;
+    await assert.rejects(f.flow.reconcile(), /account_mismatch/);
+    assert.equal(f.flow.stage, 'unknown');
+    f.state.credential.subject = subject;
+    await f.flow.reconcile();
+    assert.equal(f.flow.stage, 'idle');
+    assert.deepEqual(f.state.calls.slice(calls.length), ['login', 'login', 'status']);
+    assert.equal(f.state.calls.filter(x => x === operation).length, 1);
+  });
+}
 test('reconciliation cannot adopt another account', async () => {
   const f = fixture(); f.scan(); await f.flow.prepare(); f.ports.confirm = async () => { throw Error('offline'); };
   await assert.rejects(f.flow.confirm()); f.state.credential.subject = intentId;

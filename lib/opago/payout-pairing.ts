@@ -22,10 +22,16 @@ export class PayoutPairingFlow {
   stage: 'idle' | 'scanned' | 'review' | 'unlink_review' | 'busy' | 'linked' | 'unlinked' | 'unknown' | 'cancelled' = 'idle';
   private generation = 0;
   private flight = false;
+  private uncertainSubject: string | null = null;
   constructor(private readonly ports: PayoutPairingPorts, readonly publicKey: string | null, readonly network: 'mainnet' | 'regtest', private readonly now = Date.now) {
     if ((publicKey !== null && !/^0[23][0-9a-f]{64}$/.test(publicKey)) || !['mainnet','regtest'].includes(network)) throw new Error('invalid_wallet_identity');
   }
-  cancel() { this.generation++; this.qr = null; this.credential = null; this.intent = null; this.binding = null; this.stage = 'cancelled'; }
+  cancel() {
+    this.generation++; this.qr = null; this.credential = null; this.intent = null; this.binding = null;
+    // Dismissing sensitive UI cannot undo a dispatched mutation. Keep only the
+    // account identity needed for read-only reconciliation, not its credential.
+    this.stage = this.uncertainSubject ? 'unknown' : 'cancelled';
+  }
   scan(raw: string) {
     if (this.flight || this.stage === 'unknown' || raw.length > 4096) throw new Error('pairing_busy');
     this.cancel(); this.qr = pairingQr(parseStrictJson(raw), this.now()); this.stage = 'scanned';
@@ -65,9 +71,11 @@ export class PayoutPairingFlow {
         pairingQr(qr, this.now());
         if (typeof proof !== 'string' || !/^[A-Za-z0-9_-]{32,512}$/.test(proof)) throw new Error('invalid_pairing_proof');
         // An unknown answer must be reconciled; never dispatch another proof automatically.
+        this.uncertainSubject = credential.subject;
         this.stage = 'unknown';
         const binding = payoutBinding(await this.ports.confirm(credential, qr, proof, intent.binding_version), credential.subject); check();
         if (binding.binding_version !== intent.binding_version + 1 || !binding.wallet || binding.wallet.identity_pubkey.replace(/^0[23](?=[0-9a-f]{64}$)/,'') !== this.publicKey.replace(/^0[23](?=[0-9a-f]{64}$)/,'') || binding.wallet.network !== this.network) throw new Error('invalid_pairing_response');
+        this.uncertainSubject = null;
         this.binding = binding; this.qr = null; this.stage = 'linked';
       } catch (error) { check(); if (this.stage !== 'unknown') this.stage = 'review'; throw error; }
     });
@@ -92,9 +100,11 @@ export class PayoutPairingFlow {
       if (this.stage !== 'unlink_review' || !this.credential || !this.binding?.wallet) throw new Error('unlink_not_reviewed');
       const credential = this.credential, before = this.binding;
       this.fresh(credential);
+      this.uncertainSubject = credential.subject;
       this.stage = 'unknown';
       const binding = payoutBinding(await this.ports.unlink(credential, before.binding_version, this.ports.uuid()), credential.subject); check();
       if (binding.wallet || binding.binding_version !== before.binding_version + 1) throw new Error('invalid_pairing_response');
+      this.uncertainSubject = null;
       this.binding = binding; this.qr = null; this.intent = null; this.stage = 'unlinked';
     });
   }
@@ -102,11 +112,12 @@ export class PayoutPairingFlow {
    * A fresh review is still required before any subsequent operation. */
   async reconcile() {
     await this.exclusive(async check => {
-      if (this.stage !== 'unknown' || !this.credential) throw new Error('pairing_not_uncertain');
-      const subject = this.credential.subject;
+      if (this.stage !== 'unknown' || !this.uncertainSubject) throw new Error('pairing_not_uncertain');
+      const subject = this.uncertainSubject;
       const credential = await this.ports.login(); check(); this.fresh(credential);
       if (credential.subject !== subject) throw new Error('account_mismatch');
       const binding = payoutBinding(await this.ports.status(credential), subject); check();
+      this.uncertainSubject = null;
       this.binding = binding; this.credential = credential;
       this.qr = null; this.intent = null; this.stage = 'idle';
     });

@@ -77,7 +77,7 @@ export function PublicAccountScreen() {
       // Only show a fixed, non-sensitive diagnostic code; never a server exception,
       // token, descriptor, subject, error body, or raw response.
       const { OpagoError } = await import('../../lib/opago/api');
-      const code = cause instanceof OpagoError && ['wallet_integration_disabled', 'app_update_required', 'session_expired', 'upstream_unavailable'].includes(cause.code)
+      const code = cause instanceof OpagoError && ['wallet_session_contract_pending', 'wallet_integration_disabled', 'app_update_required', 'session_expired', 'upstream_unavailable'].includes(cause.code)
         ? cause.code : 'wallet_backend_unavailable';
       setWalletBackendStatus(t('OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.', { code }));
     } finally {
@@ -117,6 +117,7 @@ export function PublicAccountScreen() {
       </Card>
       <Card title={t('OPAGO wallet backend')}>
         <Copy>{t('Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.')}</Copy>
+        <Copy>{t('Wallet linking is not enabled yet. Backend acceptance is pending. Browser sign-in and your local wallet remain available.')}</Copy>
         {walletBackendStatus && <Copy>{walletBackendStatus}</Copy>}
         <Action label={t('Check wallet backend')} disabled={busy} onPress={() => void checkWalletBackend()} />
         <Action label="Wallet ownership and binding" disabled={busy} onPress={() => router.push('/opago-wallet-link')} />

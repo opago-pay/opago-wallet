@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { useOnchainBalance } from '@/hooks/useOnchainBalance';
 import { useLanguage } from '@/hooks/useLanguage';
+import { markFirstConfirmedPayment } from '@/lib/first-payment-feedback';
 import { BitcoinSendScreen } from '@/components/bitcoin/send-sheet';
 import { BitcoinButton, BitcoinMoney, bitcoinStyles as styles } from '@/components/bitcoin/payment-ui';
 import { TextInput } from '@/components/ui/wallet-interaction';
@@ -20,7 +21,7 @@ export default function OnchainSendFlow() {
   useLanguage();
   const router=useRouter();
   const params=useLocalSearchParams<{address?:string;amountSats?:string;id?:string}>();
-  const {onchainWallet:wallet,onchainError,retryOnchainConnection}=useWalletAuth();
+  const {onchainWallet:wallet,onchainError,retryOnchainConnection,hederaPublicKey}=useWalletAuth();
   const balance=useOnchainBalance();
   const [address,setAddress]=useState(typeof params.address==='string'?params.address:'');
   const [amount,setAmount]=useState(typeof params.amountSats==='string'?params.amountSats:'');
@@ -39,6 +40,12 @@ export default function OnchainSendFlow() {
     }).catch(()=>{if(!cancelled)setError('Payment could not be loaded.');});
     return()=>{cancelled=true;};
   },[wallet,params.id,balance.state.updatedAt]);
+  // BDK confirms asynchronously; the user can still be on this stack screen.
+  // Only a finalized external send counts, never an unconfirmed broadcast.
+  useEffect(() => {
+    if (operation?.kind !== 'send' || operation.state !== 'confirmed') return;
+    void markFirstConfirmedPayment(hederaPublicKey, 'sent');
+  }, [operation?.id, operation?.kind, operation?.state, hederaPublicKey]);
   const close=()=>router.canGoBack()?router.back():router.replace('/(tabs)');
   const current=()=>{if(!active.current)throw new Error('Payment screen closed.');};
   const run=async(work:()=>Promise<void>)=>{

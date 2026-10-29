@@ -1,17 +1,34 @@
-# Native account/wallet adapter — updated 28 October 2026
+# Native account/wallet adapter — updated 29 October 2026
 
-This draft replaces the unconditional `wallet_session_contract_pending` failure
-shipped in APK source `855530934a0367d0108dbf2ddc157cef53f314ec` with real native
-account and wallet API wiring. It incorporates Wallet main
-`f8ea690eafe3318ad94dd0b53b7b55a75824e3ac`. No deployment, production flag, account
-or wallet binding was changed by this work.
+This implementation prepares real native account and wallet API wiring but keeps
+the production `wallet_session_contract_pending` boundary. It incorporates Wallet
+main `eed48bab70b4fd2d44f3ceed6a1e7faa2b239492`. No deployment, production flag,
+account or wallet binding was changed by this work.
 
-## Implemented app flow
+## Current release boundary
 
-`bootstrap-native.ts` constructs `NativeHkaTransport` and `OidcAccountLogin`
+The existing EAS production profiles already set `EXPO_PUBLIC_OPAGO_F3_ENABLED`
+to `true`. That flag must not silently activate this unfinished backend path.
+`bootstrap-native.ts` therefore still rejects before loading HTTP, browser,
+key-store or signing adapters. Prepared native wiring lives separately in
+`binding-integration-native.ts`, which application code does not import. Connecting
+it requires a separate reviewed rollout after backend lifecycle acceptance.
+
+The published AppConfig/OIDC/HPKE contracts establish transport and browser trust,
+not readiness of wallet status, refresh, logout, session keys or binding services.
+No new capability field, deployment flag or protocol is introduced. Ordinary public
+browser account login/signup and local self-custodial wallet operations remain
+independent. The account UI explicitly explains that wallet linking is not enabled.
+The historical APK and live probes below used earlier source and do not establish
+that this candidate activates or completes F3.
+
+## Prepared app flow (not activated in production)
+
+`binding-integration-native.ts` can construct `NativeHkaTransport` and `OidcAccountLogin`
 through `binding-integration.ts`. The existing F3 build opt-in is respected;
-current EAS production configuration already enables it. Disabled builds report
-`wallet_integration_disabled`, rather than pretending a backend request failed.
+the production bootstrap remains closed independently of that opt-in. Disabled
+builds report `wallet_integration_disabled`; enabled builds remain pending backend
+acceptance rather than constructing this adapter.
 
 Bootstrap validates fresh AppConfig, broker metadata, native build minimums,
 the independently pinned HPKE root/key document, revocations and rollback markers.
@@ -19,14 +36,15 @@ It issues only anonymous configuration reads. Account authentication uses the
 existing native ES256 verifier, PKCE browser, SecureStore and lifecycle guards.
 The verified broker token is forwarded unchanged; the backend must authorize it.
 
-The public account screen's **Check wallet backend** action restores the shared,
+After a future reviewed activation, the public account screen's **Check wallet
+backend** implementation would restore the shared,
 cryptographically verified browser session and reads `GET /api/v2/account`.
 If a wallet session exists it also reads `GET /api/v2/wallet/me`. It reports a
 binding only from a fresh matching account/wallet response with wallet scope.
 It never creates a challenge, signs, binds, or fabricates a session. Missing
 browser credentials clear stale local account/session authority.
 
-The separate **Wallet ownership and binding** screen exposes explicit sign-in,
+The prepared **Wallet ownership and binding** screen provides explicit sign-in,
 account refresh, ownership proof, binding and wallet status actions. Existing
 `OpagoAccount` code handles challenge/verify, native biometric approval and Spark
 identity signing, durable operation IDs, response validation and session renewal
@@ -36,11 +54,15 @@ The screen revalidates the browser session and backend status whenever it gains
 focus, before exposing cached state, including after logout through the public
 account screen. It ignores test-mode query parameters and hides account details
 while locked or unfocused. Lock/unlock rebuilds native adapters; delayed bootstrap
-results cannot replace the new wallet lifecycle.
+results cannot replace the new wallet lifecycle. Until activation, no runtime or
+ownership/binding actions load; the screen reports the pending backend acceptance.
 
 UMA, POS/QR pairing and transaction sync adapters remain separate integrations.
 The payout unlink/relink policy and domain model in this draft do not provide a
-new backend endpoint or enable payment destinations.
+new backend endpoint or enable payment destinations. Cancelling a dispatched
+pairing/unlink operation clears sensitive UI state but preserves an unknown-outcome
+fence until same-account read-only reconciliation; dismissal cannot allow a second
+mutation or a second proof.
 
 ## API implementation and remaining backend acceptance
 

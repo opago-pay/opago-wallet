@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState } from 'react-native';
 
-/** Decorative motion is opt-in after reading the device preference, and pauses in the background. */
-export function useWalletMotion(): boolean {
-  const [reduced, setReduced] = useState(true);
+/** Keep foreground state distinct from the actual accessibility preference. */
+export function useWalletMotionState(): { active: boolean; reduced: boolean | null } {
+  // Unknown until the OS answers: never mistake an unresolved lookup for
+  // an explicit reduced-motion preference and discard a claimed milestone.
+  const [reduced, setReduced] = useState<boolean | null>(null);
   const [active, setActive] = useState(AppState.currentState === 'active');
   useEffect(() => {
     let mounted = true;
@@ -18,5 +20,11 @@ export function useWalletMotion(): boolean {
     }).catch(() => undefined);
     return () => { mounted = false; motion.remove(); activity.remove(); };
   }, []);
-  return active && !reduced;
+  return { active, reduced };
+}
+
+/** Decorative motion is allowed only in foreground with reduced motion disabled. */
+export function useWalletMotion(): boolean {
+  const { active, reduced } = useWalletMotionState();
+  return active && reduced === false;
 }

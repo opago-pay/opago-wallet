@@ -217,6 +217,29 @@ test('native binding screen separates verified account, ownership approval and e
   assert.equal(action(tree, 'Refresh account status'), undefined);
   assert.doesNotMatch(content(tree), /explicitly linked/);
 });
+test('pending native binding shows its acceptance boundary and keeps browser account navigation available', t => {
+  const { OpagoError } = require('../lib/opago/api.ts');
+  const { opagoUserError } = require('../lib/opago/errors.ts');
+  const navigation = [];
+  const app = hookFixture('app/opago-wallet-link.tsx', () => ({
+    '@react-navigation/native': { useIsFocused: () => true },
+    'expo-screen-capture': { usePreventScreenCapture() {} },
+    'expo-router': { useRouter: () => ({ replace: route => navigation.push(route) }) },
+    '../hooks/useWalletAuth': { useWalletAuth: () => ({ isLocked: false }) },
+    '../hooks/useOpagoAccount': { useOpagoAccount: () => ({ runtime: null, busy: false,
+      error: opagoUserError(new OpagoError('wallet_session_contract_pending')),
+      run: () => { throw Error('Pending binding cannot run account actions'); } }) },
+    '../components/opago/opago-ui': { Action: 'action', Card: 'card', Copy: 'copy', OpagoPage: 'page' },
+    '../lib/i18n': { t: translate },
+  }), exports => exports.default());
+  t.after(app.unmount);
+  const tree = app.render();
+  assert.match(tree.props.error, /Backend acceptance is pending/);
+  assert.equal(action(tree, 'Prove wallet ownership'), undefined);
+  assert.equal(action(tree, 'Link this wallet to my OPAGO account'), undefined);
+  action(tree, 'OPAGO account').props.onPress();
+  assert.deepEqual(navigation, ['/opago-account']);
+});
 test('F3 UMA UI shows receiver, amount, fees and provider data before consent and a separate payment confirmation', async t => {
   const runtime = await runtimeFixture(true); const app = screenFixture(t, 'app/uma-send.tsx', runtime);
   let tree = app.render(); nodes(tree).find(n => n.type === 'input' && n.props.accessibilityLabel === 'Amount in SAT').props.onChangeText('100');
