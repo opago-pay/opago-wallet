@@ -170,7 +170,8 @@ export class MockWalletDetachAdapter {
       return clone(prior.result);
     }
     const issued = this.issuedProofs.get(input.proofToken);
-    if (!issued || this.now() >= issued.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
+    if (!issued) throw new LifecyclePreviewError('proof_invalid', 403);
+    if (this.now() >= issued.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
     if (!input.signatureVerified) throw new LifecyclePreviewError('proof_invalid', 403);
     if (issued.used || this.proofUsed) throw new LifecyclePreviewError('proof_replayed', 409);
     if (!input.installationId || this.detached) throw new LifecyclePreviewError('wallet_not_found', 404);
