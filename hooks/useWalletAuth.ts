@@ -118,6 +118,8 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const [backupStatus, setBackupStatus] = useState<WalletContextValue['backupStatus']>('loading');
   const initializationRef = useRef<Promise<void> | null>(null);
   const initializationGenerationRef = useRef(0);
+  const removalGenerationRef = useRef(0);
+  const activeRemovalsRef = useRef(0);
   const hederaPrivateKeyRef = useRef<PrivateKey | null>(null);
   const startupSeedRef = useRef<Uint8Array | null>(null);
   const hederaLookupRef = useRef<Promise<HederaAccountSnapshot | null> | null>(null);
@@ -457,19 +459,34 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const unlockWallet = useCallback(async () => {
     recordAuthDiagnostic('unlock.begin');
     try {
+      const assertNoRemoval = () => {
+        if (activeRemovalsRef.current) throw new Error('Wallet removal must finish before continuing.');
+      };
       const resumeRemoval = async () => {
-        if (await getSecureItem(WALLET_WIPE_PENDING_KEY) !== 'true') return false;
+        assertNoRemoval();
+        const pending = await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true';
+        assertNoRemoval();
+        if (!pending) return false;
         // A previous removal was already authorized. Complete it before reading
         // keys; a cached pre-wipe phrase must never reopen the removed wallet.
         walletSession.lock();
-        const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
-        await resumePendingWalletWipe();
+        removalGenerationRef.current += 1;
+        activeRemovalsRef.current += 1;
+        try {
+          const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+          await resumePendingWalletWipe();
+        } finally {
+          activeRemovalsRef.current -= 1;
+          removalGenerationRef.current += 1;
+        }
         setHasStoredWallet(await hasStoredMnemonic());
         setRecoveryRequired(false);
         setError(null);
         return true;
       };
       await resumeRemoval();
+      assertNoRemoval();
+      const removalGeneration = removalGenerationRef.current;
       // A protected iOS keychain read is itself the Face ID challenge. Reuse
       // its result to open the wallet instead of prompting and reading twice.
       // Legacy unprotected entries still require explicit device authorization.
@@ -483,9 +500,10 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
           authenticateDevice('Unlock Opago', { allowDeviceCredential: true }));
       }
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
-      // Removal may have started while the native authentication sheet was
-      // open. Discard that sheet's result as well if it belongs to the old key.
-      if (await resumeRemoval()) protectedMnemonic = null;
+      // Removal may have started or finished while the native authentication
+      // sheet was open. Its marker can already be gone; reject the old key too.
+      if (await resumeRemoval() || removalGeneration !== removalGenerationRef.current) protectedMnemonic = null;
+      assertNoRemoval();
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
       beginWalletStartupTiming();
       walletSession.unlock();
@@ -730,21 +748,32 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const wipeWallet = useCallback(async () => {
     const assertUnlocked = walletSession.capture();
     assertUnlocked();
-    await setSecureItem(WALLET_WIPE_PENDING_KEY, 'true');
-    // Invalidate running payment/claim/reconciliation callbacks before erasing
-    // storage, so they cannot repopulate the removed wallet's activity.
-    walletSession.lock();
-    if (initializationRef.current) {
-      await withTimeout(initializationRef.current.catch(() => undefined), 30_000,
-        'Wallet startup is still running. Restart Opago to finish removing this wallet.');
+    // Invalidate protected reads even when the durable marker is still being
+    // written or has already been cleared before their native result arrives.
+    removalGenerationRef.current += 1;
+    activeRemovalsRef.current += 1;
+    try {
+      await setSecureItem(WALLET_WIPE_PENDING_KEY, 'true');
+      // Invalidate running payment/claim/reconciliation callbacks before erasing
+      // storage, so they cannot repopulate the removed wallet's activity.
+      walletSession.lock();
+      if (initializationRef.current) {
+        await withTimeout(initializationRef.current.catch(() => undefined), 30_000,
+          'Wallet startup is still running. Restart Opago to finish removing this wallet.');
+      }
+      const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+      await resumePendingWalletWipe();
+      clearRuntimeState();
+      setRecoveryRequired(false);
+      setHasStoredWallet(false);
+      setBackupStatus('loading');
+      if (AppState.currentState === 'active') walletSession.unlock();
+    } finally {
+      // A read can begin after removal starts. A second generation change
+      // rejects that read too, including partial-removal failures.
+      activeRemovalsRef.current -= 1;
+      removalGenerationRef.current += 1;
     }
-    const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
-    await resumePendingWalletWipe();
-    clearRuntimeState();
-    setRecoveryRequired(false);
-    setHasStoredWallet(false);
-    setBackupStatus('loading');
-    if (AppState.currentState === 'active') walletSession.unlock();
   }, [clearRuntimeState]);
 
   const value = useMemo<WalletContextValue>(
