@@ -6640,6 +6640,391 @@
           }
         ]
       }
+    },
+    "/api/v2/account/deletions/{deletion_id}/cancel": {
+      "post": {
+        "operationId": "cancelAccountDeletion",
+        "summary": "Cancel scheduled account deletion",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh",
+        "x-opago-transport": "hpke",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "deletion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "X-Opago-Envelope",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 750000,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "description": "Unpadded base64url of UTF-8 JCS HpkeRequest JSON. Photo plaintext is PhotoDescriptor."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HpkeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HpkeResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated errors are encrypted. Before successful HPKE authentication only minimal plain Error is possible; see protocol.md.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas.json#/$defs/HpkeResponse"
+                    },
+                    {
+                      "$ref": "./schemas.json#/$defs/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative lifecycle, authorization and retry rules: protocol.md.",
+        "x-opago-plaintext-request": {
+          "$ref": "./schemas.json#/$defs/Empty"
+        },
+        "x-opago-plaintext-response": {
+          "$ref": "./schemas.json#/$defs/DeletionStatus"
+        },
+        "x-opago-plaintext-error": {
+          "$ref": "./schemas.json#/$defs/Error"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/HpkeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/account/wallets/{wallet_id}/detach": {
+      "post": {
+        "operationId": "detachWalletFromAccount",
+        "summary": "Detach wallet from OPAGO account",
+        "security": [
+          {
+            "AccountBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh",
+        "x-opago-transport": "hpke",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HpkeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/HpkeResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated errors are encrypted. Before successful HPKE authentication only minimal plain Error is possible; see protocol.md.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas.json#/$defs/HpkeResponse"
+                    },
+                    {
+                      "$ref": "./schemas.json#/$defs/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires fresh AccountBearer and a single-use, installation-bound wallet_detach ActionProof issued by /api/v2/wallet/auth/verify. The action proof is valid for 300 seconds from verify. Successful detach disables inbound/outbound payments and the OPAGO Lightning address; open invoices remain payable until expiry.",
+        "x-opago-plaintext-request": {
+          "$ref": "./schemas.json#/$defs/WalletDetachRequest"
+        },
+        "x-opago-plaintext-response": {
+          "$ref": "./schemas.json#/$defs/WalletDetachReceipt"
+        },
+        "x-opago-plaintext-error": {
+          "$ref": "./schemas.json#/$defs/Error"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/HpkeRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
