@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { randomUUID } from 'expo-crypto';
 import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { authorizeWalletAction } from '@/lib/device-authentication';
@@ -9,14 +9,15 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '@/hooks/useLanguage';
 import { t } from '@/lib/i18n';
 import { themeColor } from '@/lib/theme-styles';
-import { ACCOUNT_LINK_PREVIEW_ENABLED, LinkPreviewError, MockAccountLinkAdapter, linkWithSparkProof, type LinkStatus } from '@/lib/opago/account-link-preview';
+import { ACCOUNT_LINK_PREVIEW_ENABLED, LinkPreviewError, MockAccountLinkAdapter, accountLinkAdapterForWallet, linkWithSparkProof, type LinkStatus } from '@/lib/opago/account-link-preview';
 
 export default function AccountLinkPreview() {
   useLanguage();
   const router = useRouter();
   const { sparkWallet } = useWalletAuth();
+  const adapterRef = useRef<{ walletKey: string; adapter: MockAccountLinkAdapter } | null>(null);
   const [walletKey, setWalletKey] = useState<string | null>(null);
-  const adapter = useMemo(() => walletKey ? new MockAccountLinkAdapter(walletKey, appConfig.isMainnet ? 'mainnet' : 'regtest', randomUUID) : null, [walletKey]);
+  const adapter = walletKey && adapterRef.current?.walletKey === walletKey ? adapterRef.current.adapter : null;
   const [accountId, setAccountId] = useState<string | null>(null);
   const [status, setStatus] = useState<LinkStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,10 +49,16 @@ export default function AccountLinkPreview() {
       if (!sparkWallet) throw new LinkPreviewError('cancelled');
       const key = await sparkWallet.getIdentityPublicKey();
       if (!key) throw new LinkPreviewError('cancelled');
-      setWalletKey(key);
-      const current = new MockAccountLinkAdapter(key, appConfig.isMainnet ? 'mainnet' : 'regtest', randomUUID);
-      const id = await current.login();
-      if (id) { setAccountId(id); setStatus(await current.status(id)); }
+      const entry = accountLinkAdapterForWallet(adapterRef.current, key, () =>
+        new MockAccountLinkAdapter(key, appConfig.isMainnet ? 'mainnet' : 'regtest', randomUUID));
+      const id = await entry.adapter.login();
+      if (id) {
+        const currentStatus = await entry.adapter.status(id);
+        adapterRef.current = entry;
+        setWalletKey(key);
+        setAccountId(id);
+        setStatus(currentStatus);
+      }
     }))}
     {accountId && <>
       {adapter && action('Refresh linking status', () => void run(async () => setStatus(await adapter.status(accountId))))}
