@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 import * as StoreReview from 'expo-store-review';
 import { createMilestoneGate, eligibleHistoryEvent } from './first-payment-milestones.cjs';
-import { createReviewScheduler } from './first-payment-feedback-queue.cjs';
+import { attemptNativeReview, createReviewScheduler } from './first-payment-feedback-queue.cjs';
 import type { PaymentHistoryItem } from './payment-details';
 
 export type FirstPaymentKind = 'received' | 'sent';
@@ -15,24 +15,31 @@ export function subscribeFirstPaymentFeedback(listener: (event: { kind: FirstPay
   return () => { listeners.delete(listener); };
 }
 
+let foregroundGeneration = 0;
+
 async function requestNativeReviewOnce(wallet: string): Promise<boolean> {
-  if (Platform.OS === 'web' || AppState.currentState !== 'active') return false;
+  if (Platform.OS === 'web') return false;
+  const generation = foregroundGeneration;
+  const isCurrent = () => AppState.currentState === 'active' && generation === foregroundGeneration;
   try {
-    if (!(await StoreReview.isAvailableAsync())) return false;
-    // Recheck foreground after the asynchronous store availability lookup.
-    // Claim before asking: neither OS guarantees the prompt will be displayed.
-    if (AppState.currentState !== 'active') return false;
-    if (!(await gate.claim(wallet, 'review'))) return true;
-    await StoreReview.requestReview();
-    return true;
-  } catch { /* A store failure must never affect a confirmed payment. */ return false; }
+    return await attemptNativeReview(wallet, {
+      isCurrent,
+      hasClaim: key => gate.hasClaim(key, 'review'),
+      isAvailable: () => StoreReview.isAvailableAsync(),
+      requestReview: () => StoreReview.requestReview(),
+      claim: key => gate.claim(key, 'review'),
+    });
+  } catch { /* Store or storage failure must never affect a payment. */ return false; }
 }
 
 const reviews = createReviewScheduler({
   isActive: () => AppState.currentState === 'active',
   requestReview: requestNativeReviewOnce,
 });
-AppState.addEventListener('change', state => reviews.onAppStateChange(state));
+AppState.addEventListener('change', state => {
+  if (state !== 'active') foregroundGeneration++;
+  reviews.onAppStateChange(state);
+});
 
 export async function markFirstConfirmedPayment(wallet: string | null | undefined, kind: FirstPaymentKind) {
   if (!wallet || AppState.currentState !== 'active') return;
