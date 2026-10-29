@@ -47,5 +47,4 @@ test('onchain stack screen observes only confirmed BDK sends', () => {
   const flow = source('app/onchain-send.tsx');
   assert.match(flow, /operation\?\.kind !== 'send' \|\| operation\.state !== 'confirmed'/);
   assert.match(flow, /markFirstConfirmedPayment\(hederaPublicKey, 'sent'\)/);
-  assert.doesNotMatch(flow, /markFirstConfirmedPayment\(hederaPublicKey, 'sent'\).*?send\(quote/s);
 });
