@@ -139,10 +139,9 @@ export type DetachChallenge = {
 export class MockWalletDetachAdapter {
   readonly mode = 'mock-only' as const;
   readonly calls: LifecycleRequest[] = [];
-  private pending: DetachChallenge | null = null;
-  private proofUsed = false;
-  private detached = false;
+  private readonly pendingChallenges = new Map<string, DetachChallenge>();
   private readonly consumedChallenges = new Set<string>();
+  private detached = false;
   private readonly verifyResults = new Map<string, { fingerprint: string; result: { proof_token: string } }>();
   private readonly issuedProofs = new Map<string, { challengeId: string; installationId: string; expiresAt: number; used: boolean }>();
   private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
@@ -150,13 +149,17 @@ export class MockWalletDetachAdapter {
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid) {}
   async challenge(installationId: string): Promise<DetachChallenge> {
     if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('proof_invalid', 403);
+    for (const [id, challenge] of this.pendingChallenges) {
+      if (this.now() >= Date.parse(challenge.expires_at)) this.pendingChallenges.delete(id);
+    }
+    if (this.pendingChallenges.size >= 5) throw new LifecyclePreviewError('rate_limited', 429);
     const issuedAt = this.now();
     const challenge = { challenge_id: this.makeUuid(),
       nonce: (this.makeUuid() + this.makeUuid()).replace(/-/g, '').toLowerCase(),
       action: 'wallet_detach' as const,
       action_params: { wallet_id: this.walletId, party_id: this.partyId, account_generation: this.generation },
       installation_id: installationId, issued_at: time(issuedAt), expires_at: time(issuedAt + 300_000) };
-    this.pending = challenge; this.proofUsed = false;
+    this.pendingChallenges.set(challenge.challenge_id, clone(challenge));
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/challenge', auth: 'wallet_proof',
       body: { action: 'wallet_detach', action_params: challenge.action_params, installation_id: installationId } });
     return clone(challenge);
@@ -169,24 +172,25 @@ export class MockWalletDetachAdapter {
       if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
       return clone(prior.result);
     }
-    if (!this.pending || challenge.challenge_id !== this.pending.challenge_id ||
-        challenge.nonce !== this.pending.nonce ||
-        challenge.installation_id !== this.pending.installation_id ||
-        challenge.issued_at !== this.pending.issued_at ||
-        challenge.expires_at !== this.pending.expires_at ||
-        JSON.stringify(challenge.action_params) !== JSON.stringify(this.pending.action_params)) {
+    const pending = this.pendingChallenges.get(challenge.challenge_id);
+    if (!pending || challenge.nonce !== pending.nonce ||
+        challenge.installation_id !== pending.installation_id ||
+        challenge.issued_at !== pending.issued_at ||
+        challenge.expires_at !== pending.expires_at ||
+        JSON.stringify(challenge.action_params) !== JSON.stringify(pending.action_params)) {
       throw new LifecyclePreviewError('proof_invalid', 403);
     }
     if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('proof_replayed', 409);
-    if (this.now() >= Date.parse(this.pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
+    if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
     if (!signatureValid) throw new LifecyclePreviewError('proof_invalid', 403);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
       idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
     const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
     const result = { proof_token: proofToken };
-    this.issuedProofs.set(proofToken, { challengeId: this.pending.challenge_id,
-      installationId: this.pending.installation_id, expiresAt: this.now() + 300_000, used: false });
+    this.issuedProofs.set(proofToken, { challengeId: pending.challenge_id,
+      installationId: pending.installation_id, expiresAt: this.now() + 300_000, used: false });
     this.consumedChallenges.add(challenge.challenge_id);
+    this.pendingChallenges.delete(challenge.challenge_id);
     this.verifyResults.set(idempotencyKey, { fingerprint, result: clone(result) });
     return clone(result);
   }
@@ -205,11 +209,11 @@ export class MockWalletDetachAdapter {
     if (!issued) throw new LifecyclePreviewError('proof_invalid', 403);
     if (this.now() >= issued.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
     if (!input.signatureVerified || issued.installationId !== input.installationId) throw new LifecyclePreviewError('proof_invalid', 403);
-    if (issued.used || this.proofUsed) throw new LifecyclePreviewError('proof_replayed', 409);
+    if (issued.used) throw new LifecyclePreviewError('proof_replayed', 409);
     if (!input.installationId || this.detached) throw new LifecyclePreviewError('wallet_not_found', 404);
     this.calls.push({ method: 'POST', path: '/api/v2/account/wallets/' + this.walletId + '/detach', auth: 'account_fresh',
       idempotency_key: input.idempotencyKey, body: { proof_token: input.proofToken, installation_id: input.installationId } });
-    issued.used = true; this.proofUsed = true; this.detached = true;
+    issued.used = true; this.detached = true;
     const result = { wallet_id: this.walletId, status: 'unbound' as const, detached_at: time(this.now()), payments_enabled: false as const, evidence_id: this.makeUuid() };
     this.detachResults.set(input.idempotencyKey, { fingerprint, result: clone(result) });
     return clone(result);
