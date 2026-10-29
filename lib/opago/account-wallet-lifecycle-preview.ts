@@ -166,7 +166,7 @@ export class MockWalletDetachAdapter {
   }
   async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
     if (!uuidPattern.test(idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
-    const fingerprint = 'POST:/api/v2/wallet/auth/verify:' + challenge.challenge_id;
+    const fingerprint = 'POST:/api/v2/wallet/auth/verify:' + JSON.stringify({ challenge, signatureValid });
     const prior = this.verifyResults.get(idempotencyKey);
     if (prior) {
       if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
