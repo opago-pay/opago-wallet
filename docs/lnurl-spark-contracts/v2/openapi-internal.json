@@ -6714,6 +6714,321 @@
         "description": "Normative lifecycle, authorization and retry rules: protocol.md.",
         "x-opago-end-user-policy": "none"
       }
+    },
+    "/api/account/deletions/{deletion_id}/cancel": {
+      "post": {
+        "operationId": "cancelAccountDeletion",
+        "summary": "Cancel scheduled account deletion",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh",
+        "x-opago-transport": "tls-internal",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "deletion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8200
+            },
+            "description": "Original Bearer credential; stripped from untrusted ingress then set by the facade. api-internal MUST independently verify token and policy."
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8200
+            },
+            "description": "Original AccountBearer, verified internally."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/DeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error, identical HTTP status and error code",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Normative lifecycle, authorization and retry rules: protocol.md.",
+        "x-opago-end-user-policy": "account_fresh",
+        "x-opago-plaintext-request": {
+          "$ref": "./schemas.json#/$defs/Empty"
+        },
+        "x-opago-plaintext-response": {
+          "$ref": "./schemas.json#/$defs/DeletionStatus"
+        }
+      }
+    },
+    "/api/account/wallets/{wallet_id}/detach": {
+      "post": {
+        "operationId": "detachWalletFromAccount",
+        "summary": "Detach wallet from OPAGO account",
+        "security": [
+          {
+            "ServiceBearer": []
+          }
+        ],
+        "x-opago-auth-policy": "account_fresh+wallet_proof",
+        "x-opago-transport": "tls-internal",
+        "x-opago-max-plaintext-bytes": 65536,
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-Platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "pos"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-User-Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8200
+            },
+            "description": "Original Bearer credential; stripped from untrusted ingress then set by the facade. api-internal MUST independently verify token and policy."
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Wallet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Business error, identical HTTP status and error code",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "description": "Delay in seconds when retry is appropriate; transient TME issuance errors default to 5. See tme-v7.md."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires fresh AccountBearer plus an installation-bound wallet_detach ActionProof verified within the prior 300 seconds. Disables payments and OPAGO Lightning address; open invoices remain payable until expiry.",
+        "x-opago-end-user-policy": "account_fresh",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/WalletBindingRequest"
+              }
+            }
+          }
+        },
+        "x-opago-plaintext-request": {
+          "$ref": "./schemas.json#/$defs/WalletDetachRequest"
+        },
+        "x-opago-plaintext-response": {
+          "$ref": "./schemas.json#/$defs/WalletDetachReceipt"
+        }
+      }
     }
   },
   "components": {
