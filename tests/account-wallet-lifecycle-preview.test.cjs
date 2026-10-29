@@ -60,7 +60,7 @@ test('wallet detach rejects invalid or expired proof and records challenge, veri
   let now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(60), uuid(61), 1, () => now, () => uuid(62));
   const challenge = await adapter.challenge(uuid(63));
-  await assert.rejects(adapter.verify(challenge, false, uuid(64)), e => e.code === 'proof_invalid' && e.status === 403);
+  await assert.rejects(adapter.verify(challenge, false, uuid(64)), e => e.code === 'signature_invalid' && e.status === 401);
   now += 301000;
   await assert.rejects(adapter.verify(challenge, true, uuid(64)), e => e.code === 'proof_expired' && e.status === 410);
   assert.deepEqual(adapter.calls.map(call => call.path), ['/api/v2/wallet/auth/challenge']);
@@ -170,7 +170,7 @@ test('verify requires UUID idempotency key and identical retries return same pro
   const now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(160), uuid(161), 1, () => now, (() => { let n = 162; return () => uuid(n++); })());
   const challenge = await adapter.challenge(uuid(163));
-  await assert.rejects(adapter.verify(challenge, true, 'bad-key'), e => e.code === 'idempotency_conflict' && e.status === 409);
+  await assert.rejects(adapter.verify(challenge, true, 'bad-key'), e => e.code === 'invalid_request' && e.status === 400);
   const first = await adapter.verify(challenge, true, uuid(164));
   assert.deepEqual(await adapter.verify(challenge, true, uuid(164)), first);
   await assert.rejects(adapter.verify(challenge, true, uuid(165)), e => e.code === 'proof_replayed' && e.status === 409);
