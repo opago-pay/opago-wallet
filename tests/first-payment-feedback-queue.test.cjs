@@ -180,3 +180,58 @@ test('successful native review is persisted only after its request resolves', as
   assert.equal(await attemptNativeReview('wallet', deps), true);
   assert.equal(calls, 1);
 });
+
+test('background during async durable lookup never consumes review marker', async () => {
+  let active = true;
+  let resolveLookup;
+  let stored = false;
+  let prompted = 0;
+  const lookup = new Promise(resolve => { resolveLookup = resolve; });
+  const deps = {
+    isCurrent: () => active,
+    hasClaim: () => lookup,
+    isAvailable: async () => true,
+    requestReview: async () => { prompted++; },
+    claim: async () => { stored = true; return true; },
+  };
+  const attempt = attemptNativeReview('wallet', deps);
+  active = false;
+  resolveLookup(false);
+  assert.equal(await attempt, false);
+  assert.equal(prompted, 0);
+  assert.equal(stored, false);
+  active = true;
+  assert.equal(await attemptNativeReview('wallet', { ...deps, hasClaim: async () => stored }), true);
+  assert.equal(prompted, 1);
+  assert.equal(stored, true);
+});
+
+test('background during pending native review request leaves marker retryable', async () => {
+  let generation = 0;
+  let active = true;
+  let resolvePrompt;
+  let claims = 0;
+  let promptCalls = 0;
+  const firstPrompt = new Promise(resolve => { resolvePrompt = resolve; });
+  const deps = {
+    isCurrent: () => active && generation === 0,
+    hasClaim: async () => claims > 0,
+    isAvailable: async () => true,
+    requestReview: async () => { promptCalls++; await firstPrompt; },
+    claim: async () => { claims++; return true; },
+  };
+  const attempt = attemptNativeReview('wallet', deps);
+  await new Promise(resolve => setImmediate(resolve));
+  active = false;
+  generation++;
+  resolvePrompt();
+  assert.equal(await attempt, false);
+  assert.equal(claims, 0);
+  active = true;
+  assert.equal(await attemptNativeReview('wallet', {
+    ...deps, isCurrent: () => active,
+    requestReview: async () => { promptCalls++; },
+  }), true);
+  assert.equal(promptCalls, 2);
+  assert.equal(claims, 1);
+});
