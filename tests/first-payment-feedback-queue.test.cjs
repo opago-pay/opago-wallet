@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { enqueueCelebration, finishCelebration, createReviewScheduler, attemptNativeReview } =
+const { enqueueCelebration, finishCelebration, createReviewScheduler, attemptNativeReview, celebrationDisposition } =
   require('../lib/first-payment-feedback-queue.cjs');
 
 test('received and sent events in one snapshot play sequentially', () => {
@@ -234,4 +234,34 @@ test('background during pending native review request leaves marker retryable', 
   }), true);
   assert.equal(promptCalls, 2);
   assert.equal(claims, 1);
+});
+
+test('background pauses a claimed confetti event and resumes the same FIFO head', () => {
+  const incoming = { id: 41, kind: 'received' };
+  const outgoing = { id: 42, kind: 'sent' };
+  let queue = enqueueCelebration([], incoming);
+  queue = enqueueCelebration(queue, outgoing);
+
+  assert.equal(celebrationDisposition(true, false), 'play');
+  // The app transitions to background mid-animation. No completion and no
+  // milestone deletion may happen until an actual foreground playback.
+  assert.equal(celebrationDisposition(false, false), 'pause');
+  assert.deepEqual(queue, [incoming, outgoing]);
+  assert.equal(celebrationDisposition(true, false), 'play');
+  assert.equal(queue[0], incoming);
+  queue = finishCelebration(queue, incoming.id);
+  assert.equal(queue[0], outgoing);
+  queue = finishCelebration(queue, outgoing.id);
+  assert.deepEqual(queue, []);
+});
+
+test('unknown accessibility preference pauses rather than discarding; explicit reduced motion discards', () => {
+  let queue = enqueueCelebration([], { id: 9, kind: 'received' });
+  assert.equal(celebrationDisposition(true, null), 'pause');
+  assert.equal(queue.length, 1);
+  assert.equal(celebrationDisposition(false, null), 'pause');
+  assert.equal(queue.length, 1);
+  assert.equal(celebrationDisposition(false, true), 'discard');
+  queue = finishCelebration(queue, 9);
+  assert.deepEqual(queue, []);
 });
