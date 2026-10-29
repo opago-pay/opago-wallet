@@ -21,10 +21,11 @@ export default function WalletDetachPreview() {
     if (busy || done) return;
     setBusy(true);
     try {
-      const challenge = await adapter.challenge();
-      const proof = await adapter.verify(challenge, true);
+      const installationId = randomUUID();
+      const challenge = await adapter.challenge(installationId);
+      const proof = await adapter.verify(challenge, true, randomUUID());
       const result = await adapter.detach({ accountBearer: 'mock-account-bearer', authTime: Date.now(),
-        proofToken: proof.proof_token, installationId: randomUUID(), idempotencyKey: randomUUID(), signatureVerified: true });
+        proofToken: proof.proof_token, installationId, idempotencyKey: randomUUID(), signatureVerified: true });
       setDone(true);
       Alert.alert(t('Wallet detached (mock). Payments are disabled.'), result.evidence_id);
     } catch (error) { Alert.alert(t('Wallet detach failed'), t(error instanceof Error ? error.message : 'Network error. Please retry.')); }
