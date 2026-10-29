@@ -6782,6 +6782,16 @@
               "maxLength": 36,
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
           }
         ],
         "responses": {
@@ -6938,6 +6948,16 @@
               "minLength": 1,
               "maxLength": 36,
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Opago-App-Build",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           }
         ],
