@@ -67,6 +67,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { satsToBtc } from '@/lib/bitcoin/amount';
 import { beginPerformanceSpan, markNavigationReady, measurePerformance, recordPerformanceDuration } from '@/lib/performance-trace';
 import { PaymentSuccessIcon, PaymentSuccessMotionScrollView } from '@/components/ui/payment-success-motion';
+import { markFirstConfirmedPayment } from '@/lib/first-payment-feedback';
 
 import { useAccessibleStatus } from '@/hooks/useAccessibleStatus';
 import { useAccessibleHeading } from '@/hooks/useAccessibleHeading';
@@ -276,6 +277,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
     setReceivedDescription(t('{amount} SAT confirmed.', { amount }));
     setReceivedEurValue(paymentEurValueAtCurrentRate('SAT', amount, ratesRef.current));
     setIsPaid(true);
+    void markFirstConfirmedPayment(hederaPublicKey, 'received');
     await addTransaction('incoming', amount, asset, {
       txId,
       reference,
@@ -412,6 +414,7 @@ export default function ReceiveScreen({ modal = false, initialNetwork = 'lightni
           setReceivedExplorerUrl(incoming.hashscanUrl);
           setPaidNetwork('hedera');
           setIsPaid(true);
+          void markFirstConfirmedPayment(hederaPublicKey, 'received');
           await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
           try {
             const permissions = await Notifications.getPermissionsAsync();
