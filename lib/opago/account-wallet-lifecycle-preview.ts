@@ -172,7 +172,7 @@ export class MockWalletDetachAdapter {
       'wallet_pubkey: ' + this.walletPubkey.toLowerCase(), 'nonce: ' + nonce,
       'issued_at: ' + issuedAtText, 'expires_at: ' + expiresAtText,
       'action: wallet_detach', 'action_params_sha256: ' + actionParamsHash,
-    ].join('\\n');
+    ].join('\n');
     const challenge = { challenge_id: this.makeUuid(), nonce, network: this.network, wallet_pubkey: this.walletPubkey.toLowerCase(),
       message, action: 'wallet_detach' as const, action_params: actionParams,
       installation_id: installationId, issued_at: issuedAtText, expires_at: expiresAtText };
