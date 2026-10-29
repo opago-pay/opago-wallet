@@ -1,6 +1,58 @@
 # OPAGO Wallet – Apple-Einreichungspaket
 
-**Stand: 20. Oktober 2026.** Dieses Dokument beschreibt den aktuellen Quellstand. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
+**Grundfassung: 20. Oktober 2026; Integrationsnachtrag: 29. Oktober 2026.** Dieses Dokument trennt den belegten Quellstand von noch offenen Build- und Betriebsprüfungen. Es ist keine Freigabe eines signierten Builds und keine bereits erfolgte Änderung in App Store Connect. Die frühere Bestandsaufnahme vom September ist durch diese Fassung ersetzt; ihre Historie bleibt in Git verfügbar.
+
+## Ergänzung: belegter Integrationsstand am 29. Oktober 2026
+
+Diese Ergänzung aktualisiert die Integrationsnachweise; ältere Build- und
+Store-Angaben unten bleiben historisch und müssen am Einreichungsartefakt geprüft
+werden. Keine neue Einreichung, Freigabe oder signierte Binärdatei wird behauptet.
+
+- Wallet main: `456e284de7c09824cbff0499b411b6a84e970415` nach PR #72.
+  Der exakt reviewte PR-Stand `45ade344e5238eb337230ac8e1f85521673608fb`
+  bestand [CI 40943170960](https://github.com/opago-pay/opago-wallet/actions/runs/40943170960).
+  Lokal bestanden 1.257 App-Tests und neun Vertragstests; ein bestehender Test
+  wurde übersprungen. Der Merge enthält denselben getesteten Quellbaum.
+- API main: `d017f37484f16e98a44d0a23a46d854264aea75c` nach PR #657.
+  [Release 40943589590](https://github.com/opago-pay/opago-api/actions/runs/40943589590)
+  bestand; Image `20261029195309` wurde veröffentlicht. Ein produktives
+  Kubernetes-Rollout ist damit nicht nachgewiesen.
+- Gemeinsamer Browser-Einstieg für Login/Registrierung ist implementiert;
+  Dashboard #181/#182 liefern den PrivateCustomer-Kontext. Reale Anmeldung,
+  E-Mail-Bestätigung und Rückkehr in den neuen nativen Kandidaten bleiben
+  separat zu prüfen. Diese Aussage betrifft nicht die schon belegten Tests
+  der bisherigen Basis-Wallet-Funktionen.
+- Die vorbereitete native F3-Anbindung bleibt produktiv gesperrt. Die
+  Löschungs-/Trennungsvorschauen bleiben ausgeschaltet. Store-Texte dürfen
+  diese Funktionen nicht als produktiv verfügbar ausweisen.
+
+### Abnahme am tatsächlich signierten Kandidaten
+
+Vor einer neuen Einreichung Build-ID, Quellrevision, Version/Buildnummer,
+Plattform, Netzwerk und wirksame Konfiguration erfassen. Die obigen Commits
+sind ein auditierter Quellstand, keine Bindung an ein bereits erzeugtes Artefakt.
+
+1. Vorhandenes Testkonto: Browser-Login, verifizierter Callback, Neustart und
+   Wiederherstellung; abgelaufene Sitzung und Client-Logout einschließlich
+   Offline-Wiederholung prüfen.
+2. Neues autorisiertes Testkonto: Registrierung, E-Mail-Bestätigung und frischer
+   Login zurück zur Wallet. Nach Timeout/Lock darf der alte Callback nicht
+   authentifizieren. Abbruch, Kontowechsel und verspätete Antworten prüfen.
+3. Basis-Wallet unverändert testen; keine echte Zahlung ohne separate Freigabe.
+   Keine Secrets, Token oder Wiederherstellungswörter im Prüfprotokoll ablegen.
+4. Gesperrte F3-/Lifecycle-Funktionen müssen gesperrt bleiben; eine Vorschau ist
+   kein Backend-Abnahmenachweis. Den Review-Walkthrough an aktivierte Funktionen
+   und tatsächlich bereitgestellten Review-Zugang anpassen.
+5. Privacy Manifest und SDK-Manifeste im finalen IPA prüfen; Store-Datenschutz,
+   Exportangaben, Kontakt und Zielländer bleiben Betreiber-/Rechtsfreigaben.
+
+Die öffentlichen EN/DE-Löschungsseiten sind im Website-PR #70 auf main
+zusammengeführt. Beim lesenden Abruf am 29. Oktober lieferte das Webwerkzeug
+Inhalt der Supportseite `/contact/` (Crawl der Vorwoche); das ist kein aktueller
+HTTP-Status- oder Formularfunktionstest. Löschungs- und Wallet-Datenschutzseiten
+blieben mit diesem Werkzeug unverifiziert; dies belegt keinen HTTP-404-Fehler.
+Vor Einreichung alle im Paket genannten URLs öffentlich prüfen.
+
 
 ## Produktumfang
 
