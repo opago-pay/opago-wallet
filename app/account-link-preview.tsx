@@ -27,11 +27,11 @@ export default function AccountLinkPreview() {
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={onPress} style={{ padding: 16, borderWidth: 1, borderRadius: 12, borderColor: themeColor('border'), marginTop: 12 }}>
       <Text style={{ color: themeColor('text') }}>{t(label)}</Text>
     </TouchableOpacity>;
-  if (!ACCOUNT_LINK_PREVIEW_ENABLED) return <View style={{ flex: 1, padding: 24, backgroundColor: themeColor('background') }}>
+  if (!ACCOUNT_LINK_PREVIEW_ENABLED) return <View style={{ flex: 1, padding: 24, backgroundColor: themeColor('canvas') }}>
     <Text style={{ color: themeColor('text') }}>{t('Account linking preview is disabled.')}</Text>
     {action('Back', () => router.back())}
   </View>;
-  return <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 72, backgroundColor: themeColor('background'), flexGrow: 1 }}>
+  return <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 72, backgroundColor: themeColor('canvas'), flexGrow: 1 }}>
     <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '700', color: themeColor('text') }}>{t('OPAGO account and wallet linking')}</Text>
     <Text style={{ marginTop: 12, color: themeColor('text') }}>{t('Mock preview only. No real account or wallet changes are made.')}</Text>
     <Text style={{ marginTop: 12, color: themeColor('text') }}>{accountId ? t('Signed in (mock)') : t('Not signed in')}</Text>
