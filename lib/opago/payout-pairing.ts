@@ -65,14 +65,15 @@ export class PayoutPairingFlow {
       if (this.stage !== 'review' || !this.publicKey || !this.qr || !this.credential || !this.intent || !this.binding) throw new Error('pairing_not_reviewed');
       const qr = pairingQr(this.qr, this.now()), credential = this.credential, intent = this.intent;
       this.fresh(credential);
-      this.stage = 'busy';
+      // Proof generation can itself dispatch Challenge/Verify. Fence before that
+      // port starts: cancellation or a lost proof response must not permit a new
+      // proof/mutation until same-account read-only reconciliation.
+      this.uncertainSubject = credential.subject;
+      this.stage = 'unknown';
       try {
         const proof = await this.ports.prove({ credential, qr, intent, publicKey: this.publicKey, network: this.network }); check();
         pairingQr(qr, this.now());
         if (typeof proof !== 'string' || !/^[A-Za-z0-9_-]{32,512}$/.test(proof)) throw new Error('invalid_pairing_proof');
-        // An unknown answer must be reconciled; never dispatch another proof automatically.
-        this.uncertainSubject = credential.subject;
-        this.stage = 'unknown';
         const binding = payoutBinding(await this.ports.confirm(credential, qr, proof, intent.binding_version), credential.subject); check();
         if (binding.binding_version !== intent.binding_version + 1 || !binding.wallet || binding.wallet.identity_pubkey.replace(/^0[23](?=[0-9a-f]{64}$)/,'') !== this.publicKey.replace(/^0[23](?=[0-9a-f]{64}$)/,'') || binding.wallet.network !== this.network) throw new Error('invalid_pairing_response');
         this.uncertainSubject = null;

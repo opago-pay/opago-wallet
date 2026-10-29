@@ -163,6 +163,35 @@ test('reconciliation cannot adopt another account', async () => {
   await assert.rejects(f.flow.confirm()); f.state.credential.subject = intentId;
   await assert.rejects(f.flow.reconcile(), /account_mismatch/); assert.equal(f.flow.stage, 'unknown');
 });
+for (const timing of ['lost response', 'cancel before rejection', 'cancel before success']) test(`proof ${timing} requires reconciliation before another proof`, async () => {
+  const f = fixture(); f.scan(); await f.flow.prepare();
+  let finish;
+  f.ports.prove = async () => {
+    f.state.calls.push('prove');
+    return new Promise((resolve, reject) => { finish = { resolve, reject }; });
+  };
+  const pending = f.flow.confirm();
+  const rejected = assert.rejects(pending);
+  assert.equal(f.flow.stage, 'unknown');
+  if (timing !== 'lost response') f.flow.cancel();
+  if (timing === 'cancel before success') finish.resolve(f.state.proof);
+  else finish.reject(Error('offline'));
+  await rejected;
+  f.flow.cancel();
+  assert.equal(f.flow.stage, 'unknown');
+  assert.throws(f.scan, /pairing_busy/);
+  await assert.rejects(f.flow.prepare(), /pairing_outcome_unknown/);
+  await assert.rejects(f.flow.confirm(), /pairing_not_reviewed/);
+  assert.equal(f.state.calls.filter(x => x === 'prove').length, 1);
+  assert.equal(f.state.calls.includes('confirm'), false);
+  const before = f.state.calls.length;
+  await f.flow.reconcile();
+  assert.deepEqual(f.state.calls.slice(before), ['login', 'status']);
+  assert.equal(f.flow.stage, 'idle');
+  f.scan(); await f.flow.prepare();
+  assert.equal(f.flow.stage, 'review');
+  assert.equal(f.state.calls.filter(x => x === 'prove').length, 1);
+});
 for (const event of ['cancel','lock']) test('delayed proof after ' + event + ' cannot confirm', async () => {
   const f = fixture(); f.scan(); await f.flow.prepare(); let resolve;
   f.ports.prove = () => new Promise(r => { resolve = r; }); const pending = f.flow.confirm();

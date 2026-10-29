@@ -64,7 +64,7 @@ export type F3Runtime = { account: OpagoAccount; uma: UmaSending; pos: PosLinkin
   onchainSyncPort?: OnchainAccountPort;
   startupError?: unknown;
   publicAddressOrigin: string;
-  perform(action: () => Promise<unknown>): Promise<void>;
+  perform(action: () => Promise<unknown>, assertOperationCurrent?: () => void): Promise<void>;
   prepare(): Promise<void>; confirm(): Promise<void>; reconcile(): Promise<void>;
   setTestKya?: (status: 'draft' | 'submitted' | 'in_review' | 'approved' | 'correction_requested' | 'rejected') => Promise<void>;
   startTestPos?: () => Promise<string>; confirmTestOperator?: (id: string) => Promise<void>;
@@ -78,6 +78,8 @@ walletSession.subscribe(() => {
 });
 async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string | null, testOnly: boolean): Promise<F3Runtime> {
   const assertCurrent = walletSession.captureRuntime();
+  let operationGuard: (() => void) | undefined;
+  const assertOperation = () => { assertCurrent(); operationGuard?.(); };
   let account: OpagoAccount; let uma: UmaSending; let testKya: F3Runtime['setTestKya'];
   let source: PosLinkSource | undefined; let startTestPos: F3Runtime['startTestPos']; let confirmTestOperator: F3Runtime['confirmTestOperator'];
   let setTestIdentity: F3Runtime['setTestIdentity']; let loseTestIdentityResponse: F3Runtime['loseTestIdentityResponse'];
@@ -98,14 +100,15 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
     const sparkKey = wallet ? await wallet.getIdentityPublicKey() : ''; assertCurrent();
     // Existing HKA transport owns all HPKE crypto. Guard lifecycle before and after requests.
     const guarded: HkaTransport = { mode: 'hka', audience: configured.hka.audience, request: async request => {
-      assertCurrent(); const result = await configured.hka.request(request); assertCurrent(); return result;
+      assertOperation(); const result = await configured.hka.request(request); assertOperation(); return result;
     } };
     account = new OpagoAccount(new OpagoApi(guarded), f3PrivateStore, { publicKey: sparkKey, available: !!wallet,
       network: appConfig.isMainnet ? 'mainnet' : 'regtest', sign: async (challenge, intent, installationId) => {
+        assertOperation();
         if (!wallet) throw new OpagoError('wallet_unavailable');
         const authorized = await authorizeWalletAction(intent.action === 'pos_bind' ? 'Approve POS wallet recipient' : 'Approve OPAGO wallet ownership');
-        authorized(); const result = await wallet.signOpagoWalletChallenge(challenge, intent, appConfig.isMainnet ? 'mainnet' : 'regtest', installationId);
-        authorized(); return result;
+        assertOperation(); authorized(); const result = await wallet.signOpagoWalletChallenge(challenge, intent, appConfig.isMainnet ? 'mainnet' : 'regtest', installationId);
+        assertOperation(); authorized(); return result;
       } }, configured.accountLogin, randomUUID);
     const disclosure: UmaDisclosureProvider = configured.disclosure && configured.umaContractResolution ? configured.disclosure : {
       mode: 'backend', async review() { throw new Error('UMA integration awaits the agreed TRU contract and required data disclosure.'); },
@@ -126,7 +129,13 @@ async function buildRuntime(wallet: BitcoinSparkWallet | null, publicKey: string
     assertCurrent(); const result = await txIntegration.hka.request(request); assertCurrent(); return result;
   } }, owner => txIntegration.transactionSync!.authorize(account, owner)) : undefined;
   return { account, uma, pos, testOnly, transactionSyncPort, onchainSyncPort:txIntegration?.onchainSync?.create(account), startupError, setTestKya: testKya, startTestPos, confirmTestOperator, setTestIdentity, loseTestIdentityResponse, publicAddressOrigin: testOnly ? 'https://opago.com' : integration!.publicAddressOrigin,
-    async perform(action) { await account.exclusive(async () => { assertCurrent(); await action(); assertCurrent(); }); },
+    async perform(action, assertOperationCurrent) {
+      await account.exclusive(async () => {
+        operationGuard = assertOperationCurrent;
+        try { assertOperation(); await action(); assertOperation(); }
+        finally { operationGuard = undefined; }
+      });
+    },
     async prepare() {
       await uma.consentAndPrepare(uma.payment!.disclosure.id, async invoice => {
         if (testOnly) return 1;
