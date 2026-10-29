@@ -79,6 +79,9 @@ function fixture(data = {}) {
       secondaryDataReady: data.primaryReady !== false, refreshBalances: query('balances'),
     }); } },
     '@/lib/onchain/history': require('../lib/onchain/history.ts'),
+    '@/lib/first-payment-feedback': { observeFirstConfirmedHistory: async (wallet, items) => {
+      (data.observedMilestones ??= []).push({ wallet, items });
+    } },
     '@/hooks/useOnchainBalance': { useOnchainBalance: () => ({ network:data.onchainNetwork, state: { value: data.onchain === null ? null : {totalSats:data.onchain??0,availableSats:data.onchain??0},status:data.onchain===null?'loading':'ready',updatedAt:1 }, operations:data.onchainOperations??[],transactions:data.onchainTransactions??[],refresh:async()=>{} }) },
     '@/components/onchain/account-details': { AccountDetails:'account-details', AccountIcon:'account-icon' },
     '@/hooks/useHomeBalancePreview': { useHomeBalancePreview: () => null },
