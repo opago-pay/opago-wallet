@@ -1,3 +1,6 @@
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
+
 /** Contract-faithful lifecycle previews. These adapters are deterministic local mocks:
  * they never instantiate OpagoApi, HKA transport, fetch, or any live backend.
  */
@@ -130,6 +133,9 @@ export class MockAccountLifecycleAdapter {
 export type DetachChallenge = {
   challenge_id: string;
   nonce: string;
+  network: 'mainnet' | 'regtest';
+  wallet_pubkey: string;
+  message: string;
   action: 'wallet_detach';
   action_params: { wallet_id: string; party_id: string; account_generation: number };
   installation_id: string;
@@ -146,7 +152,8 @@ export class MockWalletDetachAdapter {
   private readonly issuedProofs = new Map<string, { challengeId: string; installationId: string; expiresAt: number; used: boolean }>();
   private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
-    private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid) {}
+    private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid,
+    private readonly network: 'mainnet' | 'regtest' = 'mainnet', private readonly walletPubkey = '02' + '11'.repeat(32)) {}
   async challenge(installationId: string): Promise<DetachChallenge> {
     if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('proof_invalid', 403);
     for (const [id, challenge] of this.pendingChallenges) {
@@ -154,14 +161,25 @@ export class MockWalletDetachAdapter {
     }
     if (this.pendingChallenges.size >= 5) throw new LifecyclePreviewError('rate_limited', 429);
     const issuedAt = this.now();
-    const challenge = { challenge_id: this.makeUuid(),
-      nonce: (this.makeUuid() + this.makeUuid()).replace(/-/g, '').toLowerCase(),
-      action: 'wallet_detach' as const,
-      action_params: { wallet_id: this.walletId, party_id: this.partyId, account_generation: this.generation },
-      installation_id: installationId, issued_at: time(issuedAt), expires_at: time(issuedAt + 300_000) };
+    const actionParams = { wallet_id: this.walletId, party_id: this.partyId, account_generation: this.generation };
+    const issuedAtText = time(issuedAt);
+    const expiresAtText = time(issuedAt + 300_000);
+    const nonce = (this.makeUuid() + this.makeUuid()).replace(/-/g, '').toLowerCase();
+    const paramsJson = JSON.stringify({ account_generation: actionParams.account_generation, party_id: actionParams.party_id, wallet_id: actionParams.wallet_id });
+    const actionParamsHash = bytesToHex(sha256(utf8ToBytes(paramsJson)));
+    const message = [
+      'opago-wallet-auth', 'domain: api.opago.com', 'network: ' + this.network,
+      'wallet_pubkey: ' + this.walletPubkey.toLowerCase(), 'nonce: ' + nonce,
+      'issued_at: ' + issuedAtText, 'expires_at: ' + expiresAtText,
+      'action: wallet_detach', 'action_params_sha256: ' + actionParamsHash,
+    ].join('\\n');
+    const challenge = { challenge_id: this.makeUuid(), nonce, network: this.network, wallet_pubkey: this.walletPubkey.toLowerCase(),
+      message, action: 'wallet_detach' as const, action_params: actionParams,
+      installation_id: installationId, issued_at: issuedAtText, expires_at: expiresAtText };
     this.pendingChallenges.set(challenge.challenge_id, clone(challenge));
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/challenge', auth: 'wallet_proof',
-      body: { action: 'wallet_detach', action_params: challenge.action_params, installation_id: installationId } });
+      body: { wallet_pubkey: challenge.wallet_pubkey, network: challenge.network, action: 'wallet_detach',
+        action_params: challenge.action_params, installation_id: installationId } });
     return clone(challenge);
   }
   async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
@@ -175,6 +193,7 @@ export class MockWalletDetachAdapter {
     const pending = this.pendingChallenges.get(challenge.challenge_id);
     if (!pending || challenge.nonce !== pending.nonce ||
         challenge.installation_id !== pending.installation_id ||
+        challenge.message !== pending.message || challenge.wallet_pubkey !== pending.wallet_pubkey || challenge.network !== pending.network ||
         challenge.issued_at !== pending.issued_at ||
         challenge.expires_at !== pending.expires_at ||
         JSON.stringify(challenge.action_params) !== JSON.stringify(pending.action_params)) {
