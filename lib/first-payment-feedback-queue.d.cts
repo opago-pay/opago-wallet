@@ -21,10 +21,3 @@ export function attemptNativeReview(wallet: string, deps: {
   claim(wallet: string): Promise<boolean>;
 }): Promise<boolean>;
 
-export function attemptNativeReview(wallet: string, deps: {
-  isCurrent(): boolean;
-  isAvailable(): Promise<boolean>;
-  hasClaim(wallet: string): Promise<boolean>;
-  requestReview(): Promise<unknown>;
-  claim(wallet: string): Promise<boolean>;
-}): Promise<boolean>;
