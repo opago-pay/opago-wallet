@@ -155,7 +155,7 @@ export class MockWalletDetachAdapter {
   private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid,
-    private readonly network: 'mainnet' | 'regtest' = 'mainnet', private readonly walletPubkey = '02' + '11'.repeat(32)) {}
+    private readonly network: 'mainnet' | 'regtest' = 'mainnet', private readonly walletPubkey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798') {}
   async challenge(installationId: string, idempotencyKey: string): Promise<DetachChallenge> {
     if (!uuidPattern.test(installationId) || !uuidPattern.test(idempotencyKey) || !/^(02|03)[0-9a-f]{64}$/i.test(this.walletPubkey)) throw new LifecyclePreviewError('invalid_request', 400);
     const fingerprint = 'POST:/api/v2/wallet/auth/challenge:' + installationId;
