@@ -1,4 +1,5 @@
 import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { observeFirstConfirmedHistory } from '@/lib/first-payment-feedback';
 import { isOnchainUnavailable } from '@/lib/onchain/errors';
 import * as Clipboard from 'expo-clipboard';
 import { useOnchainBalance } from '@/hooks/useOnchainBalance';
@@ -375,6 +376,7 @@ export default function HomeScreen() {
         }
         if (generation !== refreshGenerationRef.current) return;
         setTransactions(items);
+        void observeFirstConfirmedHistory(hederaPublicKey, items);
         setHistoryHasMore(snapshot.hasMore);
         setHistoryErrors(snapshot.errors);
         refreshTransactionRates();
