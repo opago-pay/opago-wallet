@@ -131,7 +131,6 @@ export class MockAccountLifecycleAdapter {
   }
 }
 
-export type DetachActionProof = { kind: 'proof'; proof_token: string; action: 'wallet_detach'; wallet_id: string; installation_id: string; expires_at: string };
 export type DetachChallenge = {
   challenge_id: string;
   nonce: string;
@@ -152,7 +151,7 @@ export class MockWalletDetachAdapter {
   private readonly consumedChallenges = new Set<string>();
   private readonly consumedNonces = new Set<string>();
   private detached = false;
-  private readonly verifyResults = new Map<string, { fingerprint: string; result: DetachActionProof }>();
+  private readonly verifyResults = new Map<string, { fingerprint: string; result: { proof_token: string } }>();
   private readonly issuedProofs = new Map<string, { challengeId: string; installationId: string; expiresAt: number; used: boolean }>();
   private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
@@ -193,7 +192,7 @@ export class MockWalletDetachAdapter {
     this.challengeResults.set(idempotencyKey, { fingerprint, result: clone(challenge) });
     return clone(challenge);
   }
-  async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<DetachActionProof> {
+  async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
     if (!uuidPattern.test(idempotencyKey)) throw new LifecyclePreviewError('invalid_request', 400);
     const fingerprint = 'POST:/api/v2/wallet/auth/verify:' + JSON.stringify({ challenge, signatureValid });
     const prior = this.verifyResults.get(idempotencyKey);
@@ -218,11 +217,9 @@ export class MockWalletDetachAdapter {
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
       idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
     const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
-    const proofExpiry = this.now() + 300_000;
-    const result: DetachActionProof = { kind: 'proof', proof_token: proofToken, action: 'wallet_detach', wallet_id: this.walletId,
-      installation_id: pending.installation_id, expires_at: time(proofExpiry) };
+    const result = { proof_token: proofToken };
     this.issuedProofs.set(bytesToHex(sha256(utf8ToBytes(proofToken))), { challengeId: pending.challenge_id,
-      installationId: pending.installation_id, expiresAt: proofExpiry, used: false });
+      installationId: pending.installation_id, expiresAt: this.now() + 300_000, used: false });
     this.consumedChallenges.add(challenge.challenge_id);
     this.consumedNonces.add(pending.nonce);
     this.pendingChallenges.delete(challenge.challenge_id);
