@@ -996,6 +996,69 @@
             "installation_id"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "wallet_pubkey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 66,
+              "pattern": "^0[23][0-9a-f]{64}$"
+            },
+            "network": {
+              "type": "string",
+              "enum": [
+                "mainnet",
+                "regtest"
+              ]
+            },
+            "action": {
+              "const": "wallet_detach"
+            },
+            "action_params": {
+              "type": "object",
+              "properties": {
+                "wallet_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "party_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 36,
+                  "format": "uuid"
+                },
+                "account_generation": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "wallet_id",
+                "party_id",
+                "account_generation"
+              ],
+              "additionalProperties": false
+            },
+            "installation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "wallet_pubkey",
+            "network",
+            "action",
+            "action_params",
+            "installation_id"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1135,7 +1198,8 @@
             "wallet_close",
             "wallet_restore",
             "pos_bind",
-            "payer_proof"
+            "payer_proof",
+            "wallet_detach"
           ]
         },
         "wallet_id": {
@@ -1150,6 +1214,12 @@
           "maxLength": 30,
           "format": "date-time",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
         }
       },
       "required": [
@@ -1157,7 +1227,8 @@
         "proof_token",
         "action",
         "wallet_id",
-        "expires_at"
+        "expires_at",
+        "installation_id"
       ],
       "additionalProperties": false
     },
@@ -1513,6 +1584,13 @@
           "maxLength": 30,
           "format": "date-time",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "scheduled_delete_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
         }
       },
       "required": [
@@ -1520,7 +1598,8 @@
         "status",
         "requested_at",
         "receipt_token",
-        "receipt_expires_at"
+        "receipt_expires_at",
+        "scheduled_delete_at"
       ],
       "additionalProperties": false
     },
@@ -1537,40 +1616,30 @@
           "type": "string",
           "enum": [
             "deletion_pending",
+            "deletion_cancelled",
             "deleted"
           ]
         },
-        "access_revoked_at": {
+        "requested_at": {
           "type": "string",
           "minLength": 1,
           "maxLength": 30,
           "format": "date-time",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+          "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
         },
-        "identity_account_deleted_at": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 30,
-              "format": "date-time",
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "retained_data": {
-          "type": "boolean"
+        "scheduled_delete_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
         }
       },
       "required": [
         "deletion_id",
         "status",
-        "access_revoked_at",
-        "identity_account_deleted_at",
-        "retained_data"
+        "requested_at",
+        "scheduled_delete_at"
       ],
       "additionalProperties": false
     },
@@ -4700,6 +4769,65 @@
         "coverage",
         "items",
         "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "WalletDetachRequest": {
+      "type": "object",
+      "properties": {
+        "proof_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "installation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "proof_token",
+        "installation_id"
+      ],
+      "additionalProperties": false
+    },
+    "WalletDetachReceipt": {
+      "type": "object",
+      "properties": {
+        "wallet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "status": {
+          "const": "unbound"
+        },
+        "detached_at": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "format": "date-time",
+          "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
+        },
+        "payments_enabled": {
+          "const": false
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "wallet_id",
+        "status",
+        "detached_at",
+        "payments_enabled",
+        "evidence_id"
       ],
       "additionalProperties": false
     }
