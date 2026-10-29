@@ -150,7 +150,7 @@ export class MockWalletDetachAdapter {
     if (!input.accountBearer) throw new LifecyclePreviewError('unauthorized', 401);
     if (input.authTime == null || this.now() - input.authTime < 0 || this.now() - input.authTime > 300_000) throw new LifecyclePreviewError('account_not_fresh', 403);
     if (!uuidPattern.test(input.idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
-    const fingerprint = 'POST:/api/v2/account/wallets/' + this.walletId + '/detach:' + input.installationId;
+    const fingerprint = 'POST:/api/v2/account/wallets/' + this.walletId + '/detach:' + input.installationId + ':' + input.proofToken;
     const prior = this.detachResults.get(input.idempotencyKey);
     if (prior) {
       if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
