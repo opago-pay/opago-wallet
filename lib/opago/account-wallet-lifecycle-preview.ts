@@ -149,6 +149,7 @@ export class MockWalletDetachAdapter {
   private readonly pendingChallenges = new Map<string, DetachChallenge>();
   private readonly challengeResults = new Map<string, { fingerprint: string; result: DetachChallenge }>();
   private readonly consumedChallenges = new Set<string>();
+  private readonly consumedNonces = new Set<string>();
   private detached = false;
   private readonly verifyResults = new Map<string, { fingerprint: string; result: { proof_token: string } }>();
   private readonly issuedProofs = new Map<string, { challengeId: string; installationId: string; expiresAt: number; used: boolean }>();
@@ -208,7 +209,7 @@ export class MockWalletDetachAdapter {
         JSON.stringify(challenge.action_params) !== JSON.stringify(pending.action_params)) {
       throw new LifecyclePreviewError('challenge_invalid', 401);
     }
-    if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('challenge_invalid', 401);
+    if (this.consumedChallenges.has(challenge.challenge_id) || this.consumedNonces.has(pending.nonce)) throw new LifecyclePreviewError('challenge_invalid', 401);
     if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('challenge_invalid', 401);
     if (!signatureValid) throw new LifecyclePreviewError('signature_invalid', 401);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
@@ -218,6 +219,7 @@ export class MockWalletDetachAdapter {
     this.issuedProofs.set(bytesToHex(sha256(utf8ToBytes(proofToken))), { challengeId: pending.challenge_id,
       installationId: pending.installation_id, expiresAt: this.now() + 300_000, used: false });
     this.consumedChallenges.add(challenge.challenge_id);
+    this.consumedNonces.add(pending.nonce);
     this.pendingChallenges.delete(challenge.challenge_id);
     this.verifyResults.set(idempotencyKey, { fingerprint, result: clone(result) });
     return clone(result);
