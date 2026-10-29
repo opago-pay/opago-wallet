@@ -50,8 +50,9 @@ function walletFixture(t, options = {}) {
       },
       getBiometricallyProtectedMnemonic: async () => {
         prompts.push('keychain');
+        const value = storage.get(MNEMONIC) ?? null;
         await options.beforeProtectedRead?.(changeState);
-        return options.protectedKey === false || options.inaccessible?.value ? null : storage.get(MNEMONIC) ?? null;
+        return options.protectedKey === false || options.inaccessible?.value ? null : value;
       },
       replaceInaccessibleMnemonic: async phrase => {
         writes.push({ operation: 'replace', key: MNEMONIC });
@@ -508,4 +509,112 @@ test('Android can create a fresh 12-word wallet after retrying an interrupted re
   assert.equal(bip39.validateMnemonic(storage.get(MNEMONIC)), true);
   assert.notEqual(storage.get(MNEMONIC), PHRASE);
   assert.deepEqual(fixture.prompts, ['unlock', 'authorize']);
+});
+
+
+test('a completed concurrent removal invalidates a protected key read started before the wipe marker persisted', async t => {
+  for (const failAfterDeletion of [false, true]) {
+    const markerWrite = deferred();
+    const protectedRead = deferred();
+    let delayRead = false;
+    const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY]]);
+    const fixture = walletFixture(t, { os: 'ios', storage,
+      beforeWrite: key => key === WIPE_PENDING ? markerWrite.promise : undefined,
+      beforeProtectedRead: () => delayRead ? protectedRead.promise : undefined,
+      dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+        storage.clear();
+        if (failAfterDeletion) throw new Error('Synthetic post-removal activation failure');
+        return true;
+      } } },
+    });
+    await fixture.settle();
+    await fixture.render().unlockWallet();
+    await fixture.settle();
+    assert.equal(fixture.render().walletReady, true);
+    assert.equal(fixture.sdkStarts(), 1);
+
+    // Removal is authorized while foreground, but persisting its marker is slow.
+    const wipeResult = fixture.render().wipeWallet().then(() => null, cause => cause);
+    await fixture.settle();
+    fixture.changeState('background');
+    fixture.changeState('active');
+    await fixture.settle();
+    delayRead = true;
+    const unlockResult = fixture.render().unlockWallet().then(() => null, cause => cause);
+    await fixture.settle();
+    markerWrite.resolve();
+    const wipeError = await wipeResult;
+    if (failAfterDeletion) assert.match(wipeError.message, /post-removal activation/);
+    else assert.equal(wipeError, null);
+    await fixture.settle();
+    assert.equal(storage.size, 0);
+    protectedRead.resolve();
+    const unlockError = await unlockResult;
+    assert.match(unlockError.message, /removal must finish/);
+    await fixture.settle();
+    assert.equal(fixture.sdkStarts(), 1, 'completed removal must invalidate the pre-wipe key read');
+    assert.equal(fixture.render().walletReady, false);
+    if (!failAfterDeletion) assert.equal(fixture.render().hasStoredWallet, false);
+    assert.equal(storage.size, 0);
+  }
+});
+
+
+test('unlock stays blocked while an authorized removal has not persisted its marker', async t => {
+  const markerWrite = deferred();
+  const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY]]);
+  const fixture = walletFixture(t, { os: 'ios', storage,
+    beforeWrite: key => key === WIPE_PENDING ? markerWrite.promise : undefined,
+    dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+      storage.clear(); return true;
+    } } },
+  });
+  await fixture.settle();
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  const wipe = fixture.render().wipeWallet();
+  await fixture.settle();
+  fixture.changeState('background');
+  fixture.changeState('active');
+  await assert.rejects(fixture.render().unlockWallet(), /removal must finish/);
+  await fixture.settle();
+  assert.equal(fixture.sdkStarts(), 1);
+  assert.equal(fixture.render().walletReady, false);
+  assert.equal(fixture.render().isLocked, true);
+  assert.deepEqual(fixture.prompts, ['keychain']);
+  markerWrite.resolve();
+  await wipe;
+  await fixture.settle();
+  // Successful completion releases the in-flight guard for explicit onboarding.
+  await fixture.render().createWallet();
+  await fixture.settle();
+  assert.equal(fixture.render().walletReady, true);
+});
+
+test('a protected read already in flight is invalidated when removal finishes before it returns', async t => {
+  const protectedRead = deferred();
+  let delayRead = false;
+  const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY]]);
+  const fixture = walletFixture(t, { os: 'ios', storage,
+    beforeProtectedRead: () => delayRead ? protectedRead.promise : undefined,
+    dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+      storage.clear(); return true;
+    } } },
+  });
+  await fixture.settle();
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  delayRead = true;
+  const unlock = fixture.render().unlockWallet();
+  await fixture.settle();
+  await fixture.render().wipeWallet();
+  await fixture.settle();
+  assert.equal(storage.size, 0);
+  protectedRead.resolve();
+  await unlock;
+  await fixture.settle();
+  assert.equal(fixture.sdkStarts(), 1);
+  assert.equal(fixture.render().walletReady, false);
+  assert.equal(fixture.render().hasStoredWallet, false);
+  assert.equal(storage.size, 0);
 });
