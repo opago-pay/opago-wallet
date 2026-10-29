@@ -17,6 +17,7 @@ function screen(t, options = {}) {
     'expo-screen-capture': { usePreventScreenCapture() {} }, '../../hooks/useWalletAuth': { useWalletAuth: () => auth },
     '../../lib/wallet-session': { walletSession: f.wallet }, '../../lib/opago/broker-account-native': { nativeBrokerAccount: () => f.flow },
     '../../lib/opago/website-account': account, '../../lib/i18n': { t: value => value },
+    '../../lib/opago/payout-binding-policy': require('../lib/opago/payout-binding-policy.ts'),
     './opago-ui': { Action: 'action', Card: 'card', Copy: 'copy', OpagoPage: 'page' },
   }), exports => exports.PublicAccountScreen());
   t.after(app.unmount);
@@ -32,6 +33,11 @@ test('production screen authenticates with the broker and offers client logout w
   assert.match(content(tree), /Signed in to OPAGO/); assert.match(content(tree), /Linking this wallet is a separate step/);
   assert.equal(action(tree, 'Sign in or register').props.disabled, true);
   assert.equal(action(tree, 'Link this wallet to my OPAGO account'), undefined);
+  assert.match(content(tree), /without immediately replacing/);
+  assert.match(content(tree), /incoming and outgoing payments are unavailable/);
+  assert.match(content(tree), /does not recover or transfer the old funds/);
+  assert.match(content(tree), /Compliance backend for 5 years/);
+  assert.equal(action(tree, 'Unlink wallet'), undefined);
   action(tree, 'Sign out of OPAGO').props.onPress(); tree = await f.settle();
   assert.match(content(tree), /Signed out of this wallet/); assert.equal(await f.store.read(f.slot), null);
   action(tree, 'Continue using my wallet').props.onPress(); assert.deepEqual(f.navigation, ['/']);

@@ -9,6 +9,8 @@ export interface AccountLogin {
   readonly mode: 'oidc' | 'contract-test';
   login(fresh: boolean): Promise<AccountCredential>;
   refresh(): Promise<AccountCredential>;
+  /** Revalidate an existing broker session without opening a browser. */
+  restore?(): Promise<AccountCredential | null>;
   logout(): Promise<void>;
 }
 export interface WalletIdentity {
@@ -197,8 +199,29 @@ export class OpagoAccount {
     await this.refreshAccount();
   }
   async refreshAccount() {
-    this.verifiedAt = 0;
+    this.verifiedAt = 0; this.confirmedContext = null; this.state.account = null;
     this.state.account = await this.read<Account>('/api/v2/account', 'account'); await this.save();
+  }
+  /** Resume the browser account through its verifier, then ask the API for authority.
+   * A saved broker token is never treated as a wallet session or binding. */
+  async resumeAccount(): Promise<boolean> {
+    if (this.state.deletion) throw new OpagoError('account_deleted');
+    if (!this.login.restore) throw new OpagoError('session_expired');
+    this.lifecycle++; this.verifiedAt = 0; this.confirmedContext = null;
+    this.state.account = null; this.state.wallet = null;
+    const assertCurrent = this.captureContext();
+    const credential = await this.login.restore();
+    assertCurrent();
+    if (!credential) {
+      this.state.credential = null; this.state.session = null;
+      await this.save(); return false;
+    }
+    if (credential.expiresAt <= this.now()) throw new OpagoError('session_expired');
+    if (this.state.session && this.state.credential?.subject !== credential.subject) throw new OpagoError('account_mismatch');
+    this.state.credential = credential;
+    await this.save();
+    await this.refreshAccount();
+    return true;
   }
   private async freshAccount() {
     const subject = this.state.credential?.subject;
@@ -247,7 +270,7 @@ export class OpagoAccount {
         (wallet.party_id && this.state.account && wallet.party_id !== this.state.account.party_id)) throw new OpagoError('account_mismatch');
   }
   async refresh() {
-    this.verifiedAt = 0;
+    this.verifiedAt = 0; this.confirmedContext = null;
     const sequence = ++this.refreshSequence;
     const wallet = await this.read<Wallet>('/api/v2/wallet/me', 'wallet'); this.checkWallet(wallet);
     if (sequence !== this.refreshSequence) throw new OpagoError('address_changed');

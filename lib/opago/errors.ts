@@ -3,8 +3,9 @@ import { OpagoError } from './api';
 export function opagoUserError(cause: unknown): string {
   if (cause instanceof OpagoError) {
     const messages: Record<string, string> = {
+      wallet_session_contract_pending: 'Wallet linking is not enabled yet. Backend acceptance is pending. Browser sign-in and your local wallet remain available.',
       account_logout_pending: 'Wallet sign-out could not be confirmed. Retry signing out. Portal and website sessions are not signed out by this action.',
-      wallet_session_contract_pending: 'Wallet linking and personal Lightning addresses are not available yet. Your local wallet remains available.',
+      wallet_integration_disabled: 'OPAGO account services are not available in this build. Your local wallet remains available.',
       pos_integration_unavailable: 'POS linking awaits the agreed QR format and wallet-readable backend details and status. Your existing wallet remains available.',
       pos_qr_invalid: 'This is not a supported POS linking code. Ask the operator for a new QR code.',
       pos_wrong_wallet: 'This linking request targets another wallet. Open it with the intended wallet.',

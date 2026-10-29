@@ -3,37 +3,61 @@ import { useWalletAuth } from './useWalletAuth';
 import { getF3Runtime, type F3Runtime } from '../lib/opago/runtime-native';
 import { opagoUserError } from '../lib/opago/errors';
 import { OpagoError } from '../lib/opago/api';
-export function useOpagoAccount(testOnly: boolean) {
+import { inspectWalletBackend } from '../lib/opago/backend-status';
+export function useOpagoAccount(testOnly: boolean, resumeBrowserSession = false) {
   const { sparkWallet, hederaPublicKey } = useWalletAuth();
-  const [loaded, setLoaded] = useState<{ runtime: F3Runtime; sparkWallet: typeof sparkWallet; hederaPublicKey: typeof hederaPublicKey; testOnly: boolean } | null>(null);
+  const [loaded, setLoaded] = useState<{ runtime: F3Runtime; sparkWallet: typeof sparkWallet; hederaPublicKey: typeof hederaPublicKey; testOnly: boolean; resumeBrowserSession: boolean } | null>(null);
   // Hide a previous wallet in the very first render after switching, before effects run.
-  const runtime = loaded && loaded.sparkWallet === sparkWallet && loaded.hederaPublicKey === hederaPublicKey && loaded.testOnly === testOnly ? loaded.runtime : null;
+  const runtime = loaded && loaded.sparkWallet === sparkWallet && loaded.hederaPublicKey === hederaPublicKey && loaded.testOnly === testOnly && loaded.resumeBrowserSession === resumeBrowserSession ? loaded.runtime : null;
   const current = useRef(runtime); current.current = runtime;
+  const operationGeneration = useRef({ value: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [updateRequired, setUpdateRequired] = useState(false);
   const [, update] = useState(0);
   useEffect(() => {
+    const scope = operationGeneration.current;
     let active = true; setLoaded(null); setBusy(false); setError(''); setUpdateRequired(false);
-    getF3Runtime(sparkWallet, hederaPublicKey, testOnly).then(value => {
-      if (active) { setLoaded({ runtime: value, sparkWallet, hederaPublicKey, testOnly }); if (value.startupError) setError(opagoUserError(value.startupError)); update(v => v + 1); }
+    getF3Runtime(sparkWallet, hederaPublicKey, testOnly).then(async value => {
+      if (!active) return;
+      let failure = value.startupError;
+      if (resumeBrowserSession && !value.account.state.deletion) {
+        try {
+          await value.perform(async () => { await inspectWalletBackend(value.account); }, () => {
+            if (!active) throw new OpagoError('operation_cancelled');
+          });
+          failure = undefined;
+        } catch (cause) { failure = cause; }
+      }
+      if (active) {
+        setLoaded({ runtime: value, sparkWallet, hederaPublicKey, testOnly, resumeBrowserSession });
+        if (failure) {
+          setError(opagoUserError(failure));
+          setUpdateRequired(failure instanceof OpagoError && failure.code === 'app_update_required');
+        }
+        update(v => v + 1);
+      }
     }, cause => { if (active) {
       const update = cause instanceof OpagoError && cause.code === 'app_update_required'; setUpdateRequired(update);
-      setError(update ? opagoUserError(cause) : 'OPAGO account services are not available in this build. Your local wallet remains available.');
+      setError(opagoUserError(cause));
     } });
-    return () => { active = false; current.current = null; };
-  }, [sparkWallet, hederaPublicKey, testOnly]);
+    return () => { active = false; scope.value++; current.current = null; };
+  }, [sparkWallet, hederaPublicKey, testOnly, resumeBrowserSession]);
   const run = useCallback(async (action: () => Promise<unknown>) => {
     if (!runtime || current.current !== runtime || busy) return;
+    const generation = operationGeneration.current.value;
+    const assertCurrent = () => {
+      if (current.current !== runtime || operationGeneration.current.value !== generation) throw new OpagoError('operation_cancelled');
+    };
     setBusy(true); setError('');
-    try { await runtime.perform(action); }
+    try { await runtime.perform(action, assertCurrent); }
     catch (cause) {
       // Only stable local messages/codes; never display raw peer/backend bodies or PII.
-      if (current.current === runtime) {
+      if (current.current === runtime && operationGeneration.current.value === generation) {
         setError(opagoUserError(cause));
         setUpdateRequired(cause instanceof OpagoError && cause.code === 'app_update_required');
       }
-    } finally { if (current.current === runtime) { setBusy(false); update(v => v + 1); } }
+    } finally { if (current.current === runtime && operationGeneration.current.value === generation) { setBusy(false); update(v => v + 1); } }
   }, [runtime, busy]);
   return { runtime, busy, error, run, updateRequired };
 }
