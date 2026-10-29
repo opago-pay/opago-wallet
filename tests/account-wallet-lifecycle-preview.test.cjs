@@ -64,3 +64,52 @@ test('wallet detach rejects invalid or expired proof and records challenge, veri
   await assert.rejects(adapter.verify(challenge, true), e => e.code === 'proof_expired' && e.status === 410);
   assert.deepEqual(adapter.calls.map(call => call.path), ['/api/v2/wallet/auth/challenge']);
 });
+
+test('DELETE retry with the same key returns the original receipt after cancellation', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockAccountLifecycleAdapter(() => now, (() => { let n = 70; return () => uuid(n++); })());
+  const args = { accountBearer: 'mock', authTime: now, idempotencyKey: uuid(71), hpkeEnvelope: true };
+  const receipt = await adapter.deleteAccount(args);
+  await adapter.cancelDeletion({ deletionId: receipt.deletion_id, accountBearer: 'mock', authTime: now, idempotencyKey: uuid(72) });
+  assert.deepEqual(await adapter.deleteAccount(args), receipt);
+  assert.equal((await adapter.deletionStatus(receipt.deletion_id, receipt.receipt_token)).status, 'deletion_cancelled');
+});
+test('cancel retry with the same key returns the original success after status changed', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockAccountLifecycleAdapter(() => now, (() => { let n = 80; return () => uuid(n++); })());
+  const receipt = await adapter.deleteAccount({ accountBearer: 'mock', authTime: now, idempotencyKey: uuid(81), hpkeEnvelope: true });
+  const args = { deletionId: receipt.deletion_id, accountBearer: 'mock', authTime: now, idempotencyKey: uuid(82) };
+  const first = await adapter.cancelDeletion(args);
+  assert.deepEqual(await adapter.cancelDeletion(args), first);
+  await assert.rejects(adapter.cancelDeletion({ ...args, idempotencyKey: uuid(83) }), e => e.code === 'deletion_not_cancellable');
+});
+test('detach accepts only a randomly issued verify token and caches identical retries before proof replay', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(90), uuid(91), 2, () => now, (() => { let n = 92; return () => uuid(n++); })());
+  const challenge = await adapter.challenge();
+  const guessed = 'mock-proof-' + challenge.challenge_id;
+  await assert.rejects(adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: guessed,
+    installationId: uuid(93), idempotencyKey: uuid(94), signatureVerified: true }), e => e.code === 'proof_invalid');
+  const verified = await adapter.verify(challenge, true);
+  assert.notEqual(verified.proof_token, guessed);
+  const args = { accountBearer: 'mock', authTime: now, proofToken: verified.proof_token,
+    installationId: uuid(93), idempotencyKey: uuid(94), signatureVerified: true };
+  const first = await adapter.detach(args);
+  assert.deepEqual(await adapter.detach(args), first);
+  await assert.rejects(adapter.detach({ ...args, idempotencyKey: uuid(95) }), e => e.code === 'proof_replayed');
+});
+test('all new lifecycle UI strings have genuine translations in de/fr/es/it', () => {
+  const { accountWalletLifecycleMessages } = require('../lib/i18n/account-wallet-lifecycle-messages.ts');
+  for (const language of ['de', 'fr', 'es', 'it']) {
+    const messages = accountWalletLifecycleMessages(language);
+    for (const key of ['Wallet detach failed', 'Unlink wallet', 'Unlink wallet?', 'Wallet detached (mock). Payments are disabled.',
+      'Account deletion preview is disabled.', 'Wallet detach preview is disabled.']) {
+      assert.ok(messages[key] && messages[key] !== key, language + ': ' + key);
+    }
+  }
+});
+test('legacy deletion preview export and settings/screen use one default-off flag', () => {
+  const legacy = require('../lib/opago/account-deletion-preview.ts');
+  assert.equal(legacy.ACCOUNT_DELETION_PREVIEW_ENABLED, lifecycle.ACCOUNT_DELETION_PREVIEW_ENABLED);
+  assert.equal(lifecycle.ACCOUNT_DELETION_PREVIEW_ENABLED, false);
+});
