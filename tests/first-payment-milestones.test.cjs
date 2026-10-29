@@ -38,5 +38,9 @@ test('only positive, confirmed external transactions count', () => {
   }
   assert.equal(eligibleHistoryEvent({ ...item, amountValue: 0 }), null);
   assert.equal(eligibleHistoryEvent({ ...item, internalTransfer: 'to_lightning' }), null);
+  assert.equal(eligibleHistoryEvent({ ...item, legacyDeposit: true }), null);
+  assert.equal(eligibleHistoryEvent({ ...item, operation: { kind: 'transfer' } }), null);
+  assert.equal(eligibleHistoryEvent({ ...item, type: 'outgoing', status: 'broadcast' }), null);
+  assert.equal(eligibleHistoryEvent({ ...item, type: 'incoming', status: 'pending' }), null);
   assert.equal(eligibleHistoryEvent({ ...item, type: 'other' }), null);
 });
