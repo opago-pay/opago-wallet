@@ -7040,7 +7040,7 @@
       "DeletionReceiptBearer": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Opaque receipt only for the corresponding deletion status."
+        "description": "Opaque receipt token, bound to one deletion ID; valid for 60 days from request and limited to status lookup."
       },
       "ServiceBearer": {
         "type": "http",
