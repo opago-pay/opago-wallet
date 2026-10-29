@@ -2,7 +2,8 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
+import { FirstPaymentConfetti } from '@/components/ui/first-payment-confetti';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -52,6 +53,7 @@ function AppStack() {
     <WalletProvider>
       <ThemeProvider value={mode === 'light' ? DefaultTheme : DarkTheme}>
         <WalletGate>
+        <View style={styles.navigationHost}>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -64,12 +66,16 @@ function AppStack() {
           <Stack.Screen name="exchange-flow" options={{ headerShown: false }} />
           <Stack.Screen name="bitcoin-deposits" options={{ headerShown: false }} />
           <Stack.Screen name="opago-account" options={{ headerShown: false }} />
+          <Stack.Screen name="opago-wallet-link" options={{ headerShown: false }} />
           <Stack.Screen name="opago-signup" options={{ headerShown: false }} />
           <Stack.Screen name="identity" options={{ headerShown: false }} />
           <Stack.Screen name="pos-link" options={{ headerShown: false }} />
           <Stack.Screen name="transaction-sync" options={{ headerShown: false }} />
           <Stack.Screen name="uma-send" options={{ headerShown: false }} />
         </Stack>
+        {/* Root navigator sibling: visible over send-flow, onchain-send and other stack screens. */}
+        <FirstPaymentConfetti />
+        </View>
         <BackupPrompt />
         <TransactionSyncAgent />
         <TransferAgent />
@@ -83,3 +89,5 @@ function AppStack() {
 export default function RootLayout() {
   return <LanguageProvider><ColorModeProvider><SecurityPreferencesProvider><BitcoinOnlyProvider><AppStack /></BitcoinOnlyProvider></SecurityPreferencesProvider></ColorModeProvider></LanguageProvider>;
 }
+
+const styles = StyleSheet.create({ navigationHost: { flex: 1 } });

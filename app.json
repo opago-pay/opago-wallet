@@ -15,7 +15,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.opago.wallet",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
+        "ITSAppUsesNonExemptEncryption": true,
         "CFBundleLocalizations": [
           "en",
           "de",
@@ -84,15 +84,15 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Allow Opago to photograph your identity document for the photo and data comparison.",
-          "photosPermission": "Allow Opago to select an identity document image for the photo and data comparison.",
+          "cameraPermission": "Allow Opago to scan payment QR codes.",
+          "photosPermission": false,
           "microphonePermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Opago uses the camera to scan payment QR codes and photograph your identity document for the photo and data comparison.",
+          "cameraPermission": "Opago uses the camera to scan payment QR codes.",
           "recordAudioAndroid": false,
           "microphonePermission": false
         }

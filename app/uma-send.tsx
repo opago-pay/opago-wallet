@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Action, Card, Copy, OpagoPage, TextInput, ui } from '../components/opago/opago-ui';
 import { useOpagoAccount } from '../hooks/useOpagoAccount';
 import { themeColor } from '../lib/theme-styles';
-import { appConfig } from '../lib/config';
 import { t } from '../lib/i18n';
 const identityLabels: Record<string, string> = { given_name: 'Given name', family_name: 'Family name', date_of_birth: 'Date of birth',
   nationality: 'Nationality', document_number: 'Document number', document_expiry: 'Document expiry date', contact_email: 'Contact email' };
@@ -11,7 +10,10 @@ export default function UmaSendScreen() {
   const params = useLocalSearchParams<{ test?: string; receiver?: string }>(); const router = useRouter();
   const testOnly = __DEV__ && params.test === '1'; const { runtime, busy, error, run } = useOpagoAccount(testOnly);
   const [receiver, setReceiver] = useState(params.receiver || (testOnly ? '$alice@receiver.example' : ''));
-  const [amount, setAmount] = useState(''); const payment = runtime?.uma.payment;
+  const [amount, setAmount] = useState('');
+  const [feeBudget, setFeeBudget] = useState('');
+  const validFeeBudget = /^(0|[1-9]\d*)$/.test(feeBudget) && Number.isSafeInteger(Number(feeBudget));
+  const payment = runtime?.uma.payment;
   const canStart = !payment || payment.phase === 'cancelled' || payment.phase === 'confirmed';
   return <OpagoPage title="Send with UMA" busy={busy} error={error} testOnly={testOnly}>
     <Copy>{t('UMA shares required identity data with the listed providers. Review the data before consenting, then confirm the payment separately.')}</Copy>
@@ -23,8 +25,11 @@ export default function UmaSendScreen() {
       <TextInput value={amount} onChangeText={setAmount} editable={!busy} keyboardType="number-pad" maxLength={15}
         accessibilityLabel={t('Amount in SAT')} placeholder={t('Amount in SAT')} placeholderTextColor={themeColor('muted')}
         style={[ui.input, { color: themeColor('text'), borderColor: themeColor('border') }]} />
-      <Action label="Review identity disclosure" disabled={busy || !/^[1-9]\d*$/.test(amount)}
-        onPress={() => void run(() => runtime.uma.reviewDisclosure(receiver, Number(amount), appConfig.maxLightningFeeSats))} />
+      <TextInput value={feeBudget} onChangeText={setFeeBudget} editable={!busy} keyboardType="number-pad" maxLength={16}
+        accessibilityLabel={t('Maximum fee in SAT')} placeholder={t('Maximum fee in SAT')} placeholderTextColor={themeColor('muted')}
+        style={[ui.input, { color: themeColor('text'), borderColor: themeColor('border') }]} />
+      <Action label="Review identity disclosure" disabled={busy || !/^[1-9]\d*$/.test(amount) || !validFeeBudget}
+        onPress={() => { if (validFeeBudget) void run(() => runtime.uma.reviewDisclosure(receiver, Number(amount), Number(feeBudget))); }} />
     </Card>}
     {payment && !['cancelled', 'confirmed'].includes(payment.phase) && <Card title="Required data disclosure">
       <Copy>{t('Recipient: {receiver}', { receiver: payment.disclosure.receiver })}</Copy>
@@ -38,6 +43,8 @@ export default function UmaSendScreen() {
       <Copy>{payment.disclosure.receiver}</Copy>
       <Copy>{t('Amount: {amount} SAT', { amount: payment.disclosure.amountMsat / 1000 })}</Copy>
       <Copy>{t('Payment fee limit: {fee} SAT', { fee: payment.feeSats! })}</Copy>
+      <Copy>{t('Maximum total')}: {payment.disclosure.amountMsat / 1000 + payment.feeSats!} SAT</Copy>
+      {payment.feeSats! > payment.disclosure.amountMsat / 10000 && <Copy warning>{t('Fee is high relative to the amount.')}</Copy>}
       <Copy>{t('Network: {network}', { network: runtime!.account.identity.network })}</Copy>
       <Action label={testOnly ? 'Simulate confirmed payment' : 'Confirm and pay'} disabled={busy} onPress={() => void run(() => runtime!.confirm())} />
     </Card>}

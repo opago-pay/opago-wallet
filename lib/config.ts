@@ -73,18 +73,6 @@ export function resolveLightningBuildPolicy(
   };
 }
 
-export function resolveMaxLightningFeeSats(value?: string): number {
-  const normalized = value === undefined || value === '' ? '100' : value;
-  if (!/^[1-9]\d*$/.test(normalized)) {
-    throw new Error('EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS must be a positive whole number.');
-  }
-  const amount = Number(normalized);
-  if (!Number.isSafeInteger(amount) || amount > 100_000) {
-    throw new Error('EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS must not exceed 100000 SAT.');
-  }
-  return amount;
-}
-
 export function resolveHederaBuildPolicy(
   input: HederaBuildPolicyInput,
 ): HederaBuildPolicy {
@@ -214,9 +202,6 @@ export const appConfig = Object.freeze({
   hederaMaxTransferHbar: hederaBuildPolicy.maxTransferHbar,
   hederaCheckoutContractId: hederaBuildPolicy.checkoutContractId,
   hederaCheckoutRuntimeSha256: hederaBuildPolicy.checkoutRuntimeSha256,
-  maxLightningFeeSats: resolveMaxLightningFeeSats(
-    process.env.EXPO_PUBLIC_MAX_LIGHTNING_FEE_SATS,
-  ),
 });
 
 export function isPrivateDevelopmentHost(hostname: string): boolean {

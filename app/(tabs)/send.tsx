@@ -1,4 +1,5 @@
 import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
+import { markFirstConfirmedPayment } from '@/lib/first-payment-feedback';
 import { bitcoinOnlyPreference, isBitcoinAsset } from '@/lib/bitcoin-only';
 import { t } from '@/lib/i18n';
 import { beginSendTiming } from '@/lib/send-timing';
@@ -439,6 +440,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       setPendingHedera(null);
       setHederaResultEur(paymentEurValueAtCurrentRate('HBAR', Number(result.amountHbar), ratesRef.current));
       setHederaResult(result);
+      void markFirstConfirmedPayment(hederaPublicKey, 'sent');
       await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
     } catch (cause) {
       finishPerformance('error');
@@ -491,6 +493,7 @@ export default function SendScreen({ modal = false, initialAccount = 'bitcoin_sp
       setPendingLightning(null);
       setLightningResultEur(paymentEurValueAtCurrentRate('SAT', result.amountSats, ratesRef.current));
       setLightningResult(result);
+      void markFirstConfirmedPayment(hederaPublicKey, 'sent');
       try {
         await notifyPaymentHaptics(Haptics.NotificationFeedbackType.Success);
       } catch {

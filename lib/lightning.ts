@@ -146,18 +146,13 @@ export function calculateMaxLightningFee(
     if (!Number.isSafeInteger(estimatedFeeSats) || estimatedFeeSats < 0) {
       throw new Error('Spark returned an invalid Lightning fee estimate.');
     }
-    if (estimatedFeeSats > appConfig.maxLightningFeeSats) {
-      throw new Error(
-        'The Lightning fee estimate of ' + estimatedFeeSats +
-          ' SAT exceeds your maximum fee of ' + appConfig.maxLightningFeeSats + ' SAT.',
-      );
-    }
     // The review screen presents this exact ceiling. Submission must retain it,
-    // even if a later network quote increases; never silently use the build cap.
+    // even if a later network quote increases; never silently raise approval.
     fee = estimatedFeeSats;
   } else {
     const percentageCap = Math.max(1, Number((BigInt(amountSats) + 199n) / 200n));
-    fee = Math.min(appConfig.maxLightningFeeSats, percentageCap);
+    // Without a quote, review the existing 0.5% maximum, without a fixed SAT cap.
+    fee = percentageCap;
   }
   if (fee > balanceSats - amountSats) {
     throw new Error('Insufficient balance for the payment and maximum fee of ' + fee + ' SAT.');

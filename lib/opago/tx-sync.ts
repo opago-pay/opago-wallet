@@ -23,7 +23,7 @@ type Entry = { id: string; digest: string; localId: string; report: Report; atte
 type Acknowledged = { eventId: string; identity: Pick<Report, 'id_source' | 'source_payment_id'>; receipt: Receipt; retryAt: number; attempts: number };
 type Document = { version: 1; owner: SyncOwner; target: { walletId: string; ownershipEpoch: number } | null;
   entries: Entry[]; seen: Record<string, string[]>; sources: Record<string, { cursor: string | null; pages: number; cycles: number; skipped: number }>;
-  receipts: Acknowledged[]; acknowledged: number; migrated: string[]; nextSource?: number };
+  receipts: Acknowledged[]; acknowledged: number; migrated: string[]; nextSource?: number; nextReceipt?: number };
 export class SyncError extends Error {
   constructor(readonly code: string, readonly retryable = false, readonly retryAfterSeconds = 0) { super(code); }
 }
@@ -164,14 +164,24 @@ export class TransactionSync {
   refreshReceipts(maxReceipts = 20) { return this.serial(async () => {
     if (!Number.isSafeInteger(maxReceipts) || maxReceipts < 1 || maxReceipts > 100) throw new SyncError('sync_invalid_contract');
     const doc = await this.load(); const auth = await this.authorization(doc); let read = 0;
-    for (const ack of doc.receipts) {
-      if (read >= maxReceipts) break;
+    // Keep a durable round-robin cursor: an unresolved head must not starve later
+    // receipts when a foreground interval makes the first batch due again.
+    for (let visited = 0; visited < doc.receipts.length && read < maxReceipts; visited++) {
+      const index = (doc.nextReceipt || 0) % doc.receipts.length;
+      const ack = doc.receipts[index]; doc.nextReceipt = (index + 1) % doc.receipts.length;
       if (!['unresolved','quarantined'].includes(ack.receipt.resolution) && ack.receipt.verification_status === 'verified' || ack.receipt.resolution === 'non_payment' || ack.retryAt > this.now()) continue;
       this.assertCurrent(); if (auth.expiresAt <= this.now()) throw new SyncError('sync_session_expired');
       ack.attempts++; ack.retryAt = this.now() + this.delay(ack.attempts); await this.save(doc);
-      const receipt = await this.port!.receipt(auth, ack.receipt.receipt_id); this.assertCurrent();
-      checkReceipt(receipt, auth.walletId, ack.identity as Report);
-      if (receipt.receipt_id !== ack.receipt.receipt_id) throw new SyncError('sync_invalid_receipt');
+      let receipt: Receipt;
+      try {
+        receipt = await this.port!.receipt(auth, ack.receipt.receipt_id); this.assertCurrent();
+        checkReceipt(receipt, auth.walletId, ack.identity as Report);
+        if (receipt.receipt_id !== ack.receipt.receipt_id) throw new SyncError('sync_invalid_receipt');
+      } catch (cause) {
+        this.assertCurrent();
+        ack.retryAt = this.now() + this.delay(ack.attempts, cause instanceof SyncError ? cause.retryAfterSeconds : 0);
+        await this.save(doc); throw cause;
+      }
       ack.receipt = receipt; ack.retryAt = receipt.retry_due_at ? Math.max(this.now() + 5000, Date.parse(receipt.retry_due_at)) : this.now() + 60_000;
       await this.save(doc); read++;
     }

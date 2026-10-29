@@ -9,6 +9,7 @@ import { nativeBrokerAccount } from '../../lib/opago/broker-account-native';
 import type { BrokerAccountAction } from '../../lib/opago/broker-account';
 import { WebsiteAccountError, websiteAccountMessage } from '../../lib/opago/website-account';
 import { t } from '../../lib/i18n';
+import { payoutBindingPolicy } from '../../lib/opago/payout-binding-policy';
 import { Action, Card, Copy, OpagoPage } from './opago-ui';
 
 export function PublicAccountScreen() {
@@ -18,12 +19,13 @@ export function PublicAccountScreen() {
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [expiresAt, setExpiresAt] = useState(0), [signedIn, setSignedIn] = useState(false);
+  const [walletBackendStatus, setWalletBackendStatus] = useState('');
   const generation = useRef(0), pending = useRef(false);
   const context = useRef({ focused, isLocked, sparkWallet, hederaPublicKey });
   context.current = { focused, isLocked, sparkWallet, hederaPublicKey };
   const clear = useCallback(() => {
     generation.current++; pending.current = false; nativeBrokerAccount().cancel();
-    setBusy(false); setSignedIn(false); setExpiresAt(0); setError(''); setNotice('');
+    setBusy(false); setSignedIn(false); setExpiresAt(0); setError(''); setNotice(''); setWalletBackendStatus('');
   }, []);
   const execute = useCallback(async (action: BrokerAccountAction) => {
     const start = context.current;
@@ -47,6 +49,37 @@ export function PublicAccountScreen() {
       else setError(websiteAccountMessage());
     } catch (cause) {
       try { check(); setError(action === 'logout' ? 'Wallet sign-out could not be confirmed. Please retry.' : websiteAccountMessage(cause)); } catch { /* Old screen/wallet. */ }
+    } finally {
+      if (epoch === generation.current) { pending.current = false; setBusy(false); }
+    }
+  }, []);
+  const checkWalletBackend = useCallback(async () => {
+    const start = context.current;
+    if (pending.current || !start.focused || start.isLocked || AppState.currentState !== 'active') return;
+    let current: () => void;
+    try { current = walletSession.captureRuntime(); current(); } catch { return; }
+    const epoch = generation.current;
+    pending.current = true; setBusy(true); setWalletBackendStatus('');
+    try {
+      // Restore the verified broker session and revalidate account authority at the API.
+      const { getF3Runtime } = await import('../../lib/opago/runtime-native');
+      const runtime = await getF3Runtime(start.sparkWallet, start.hederaPublicKey);
+      if (epoch !== generation.current) return;
+      current();
+      const { inspectWalletBackend } = await import('../../lib/opago/backend-status');
+      let status = '';
+      await runtime.perform(async () => { status = await inspectWalletBackend(runtime.account); });
+      if (epoch !== generation.current) return;
+      current(); setWalletBackendStatus(t(status));
+    } catch (cause) {
+      if (epoch !== generation.current) return;
+      try { current(); } catch { return; }
+      // Only show a fixed, non-sensitive diagnostic code; never a server exception,
+      // token, descriptor, subject, error body, or raw response.
+      const { OpagoError } = await import('../../lib/opago/api');
+      const code = cause instanceof OpagoError && ['wallet_session_contract_pending', 'wallet_integration_disabled', 'app_update_required', 'session_expired', 'upstream_unavailable'].includes(cause.code)
+        ? cause.code : 'wallet_backend_unavailable';
+      setWalletBackendStatus(t('OPAGO wallet backend unavailable ({code}). Account/wallet binding and synchronization are not confirmed.', { code }));
     } finally {
       if (epoch === generation.current) { pending.current = false; setBusy(false); }
     }
@@ -82,6 +115,19 @@ export function PublicAccountScreen() {
         <Action label="Check again" disabled={busy} onPress={() => void execute('check')} />
         {busy && <Action label="Cancel sign-in" onPress={clear} />}
       </Card>
+      <Card title={t('OPAGO wallet backend')}>
+        <Copy>{t('Wallet ownership, personal Lightning address and transaction reporting require a separate verified account and wallet session.')}</Copy>
+        <Copy>{t('Wallet linking is not enabled yet. Backend acceptance is pending. Browser sign-in and your local wallet remain available.')}</Copy>
+        {walletBackendStatus && <Copy>{walletBackendStatus}</Copy>}
+        <Action label={t('Check wallet backend')} disabled={busy} onPress={() => void checkWalletBackend()} />
+        <Action label="Wallet ownership and binding" disabled={busy} onPress={() => router.push('/opago-wallet-link')} />
+        <Action label={t('Transaction synchronization')} disabled={busy} onPress={() => router.push('/transaction-sync')} />
+      </Card>
+      {signedIn && <Card title={payoutBindingPolicy.title}>
+        <Copy>{t(payoutBindingPolicy.unlink)}</Copy>
+        <Copy warning>{t(payoutBindingPolicy.loss)}</Copy>
+        <Copy>{t(payoutBindingPolicy.evidence)}</Copy>
+      </Card>}
       <Action label="Continue using my wallet" onPress={() => { clear(); context.current.focused = false; router.replace('/'); }} />
     </>}
   </OpagoPage>;
