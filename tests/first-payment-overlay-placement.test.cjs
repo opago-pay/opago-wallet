@@ -17,7 +17,7 @@ function isTag(node, tag) {
 }
 function allNodes(node, match, found = []) {
   if (match(node)) found.push(node);
-  ts.forEachChild(node, child => allNodes(child, match, found));
+  ts.forEachChild(node, child => { allNodes(child, match, found); });
   return found;
 }
 
