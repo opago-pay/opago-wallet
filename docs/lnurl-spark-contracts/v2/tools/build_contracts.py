@@ -56,7 +56,6 @@ actions = {
  'login': {}, 'onboarding_restart': {}, 'wallet_bind': {'party_id': UUID, 'account_generation': number(1)},
  'address_bind': {'name': NAME}, 'address_rename': {'name': NAME},
  'address_deactivate': {'address_id': UUID}, 'address_reactivate': {'address_id': UUID},
- 'wallet_detach': {'wallet_id': UUID, 'party_id': UUID, 'account_generation': number(1)},
  'wallet_close': {'wallet_id': UUID},
  'wallet_restore': {'wallet_id': UUID, 'party_id': UUID, 'account_generation': number(1)},
  'pos_bind': {'pos_id': string(14, pattern='^pos-[a-z2-7]{10}$'), 'binding_intent_id': UUID, 'binding_version': number(1)},
@@ -65,7 +64,7 @@ S['ChallengeRequest'] = {'oneOf': [obj({'wallet_pubkey': PUBKEY, 'network': NETW
 S['Challenge'] = obj({'challenge_id': UUID, 'message': string(4096), 'expires_at': TIME})
 S['VerifyRequest'] = obj({'challenge_id': UUID, 'signature': string(128, pattern='^[0-9a-f]{128}$'), 'installation_id': UUID})
 S['WalletSession'] = obj({'kind': {'const': 'session'}, 'access_token': TOKEN, 'access_expires_at': TIME, 'refresh_token': TOKEN, 'refresh_expires_at': TIME, 'wallet_id': UUID, 'scope': enum('onboarding', 'wallet')})
-S['ActionProof'] = obj({'kind': {'const': 'proof'}, 'proof_token': TOKEN, 'action': enum(*[a for a in actions if a != 'login']), 'wallet_id': UUID, 'installation_id': UUID, 'expires_at': TIME})
+S['ActionProof'] = obj({'kind': {'const': 'proof'}, 'proof_token': TOKEN, 'action': enum(*[a for a in actions if a != 'login']), 'wallet_id': UUID, 'expires_at': TIME})
 S['VerifyResponse'] = {'oneOf': [ref('WalletSession'), ref('ActionProof')]}
 S['RefreshRequest'] = obj({'refresh_token': TOKEN, 'installation_id': UUID})
 S['ProofRequest'] = obj({'proof_token': TOKEN})
@@ -73,10 +72,8 @@ S['WalletBindingRequest'] = obj({'wallet_pubkey': PUBKEY, 'network': NETWORK, 'i
 S['Account'] = obj({'party_id': UUID, 'account_generation': number(1), 'email_verified': BOOL, 'wallets': array(obj({'wallet_id': UUID, 'network': NETWORK, 'wallet_pubkey': PUBKEY, 'custodial': BOOL, 'status': enum('active','closed','deleted')})), 'wallet_photo_match_status': enum('none','pending','passed','mismatch','unreadable'), 'identification_status': enum('identified','unidentified'), 'identification_source': nullable(enum('full_kyc','opago_kyb'))})
 S['Wallet'] = obj({'wallet_id': UUID, 'network': NETWORK, 'wallet_pubkey': PUBKEY, 'custodial': BOOL, 'status': enum('unbound','active','closed','deleted'), 'party_id': nullable(UUID), 'address': nullable(ref('Address')), 'photo_match': nullable(ref('PhotoMatchSummary'))})
 S['RestoreRequest'] = obj({'wallet_id': UUID, 'proof_token': TOKEN, 'installation_id': UUID})
-S['DeletionReceipt'] = obj({'deletion_id': UUID, 'status': {'const': 'deletion_pending'}, 'requested_at': TIME, 'scheduled_delete_at': TIME, 'receipt_token': TOKEN, 'receipt_expires_at': TIME})
-S['DeletionStatus'] = obj({'deletion_id': UUID, 'status': enum('deletion_pending','deletion_cancelled','deleted'), 'requested_at': TIME, 'scheduled_delete_at': TIME})
-S['WalletDetachRequest'] = obj({'proof_token': TOKEN, 'installation_id': UUID})
-S['WalletDetachReceipt'] = obj({'wallet_id': UUID, 'status': {'const': 'unbound'}, 'detached_at': TIME, 'payments_enabled': {'const': False}, 'evidence_id': UUID})
+S['DeletionReceipt'] = obj({'deletion_id': UUID, 'status': {'const': 'deletion_pending'}, 'requested_at': TIME, 'receipt_token': TOKEN, 'receipt_expires_at': TIME})
+S['DeletionStatus'] = obj({'deletion_id': UUID, 'status': enum('deletion_pending','deleted'), 'access_revoked_at': TIME, 'identity_account_deleted_at': nullable(TIME), 'retained_data': BOOL})
 
 FIELDS = {'given_name': string(100), 'family_name': string(100), 'date_of_birth': string(10, format='date'), 'document_number': string(64), 'document_expiry': string(10, format='date'), 'nationality': string(3, pattern='^[A-Z]{3}$'), 'contact_email': string(254, format='email'), 'document_type': enum('passport','identity_card')}
 S['PhotoMatchFields'] = obj(FIELDS)
@@ -182,8 +179,6 @@ route('get','/api/v2/account','getAccount',None,'Account','account')
 route('post','/api/v2/account/wallets','bindWalletToAccount','WalletBindingRequest','Wallet','account_fresh',status=201)
 route('delete','/api/v2/account','deleteAccount','Empty','DeletionReceipt','account_fresh',status=202)
 route('get','/api/v2/account/deletions/{deletion_id}','getAccountDeletion',None,'DeletionStatus','receipt')
-route('post','/api/v2/account/deletions/{deletion_id}/cancel','cancelAccountDeletion','Empty','DeletionStatus','account_fresh')
-route('post','/api/v2/account/wallets/{wallet_id}/detach','detachWalletFromAccount','WalletDetachRequest','WalletDetachReceipt','account_fresh+wallet_proof',policy='protocol.md#auth')
 route('get','/api/v2/wallet/me','getWallet',None,'Wallet','wallet_or_bootstrap')
 route('post','/api/v2/wallet/close','closeWallet','ProofRequest','Wallet')
 route('post','/api/v2/wallet/restore','restoreWallet','RestoreRequest','WalletSession','account_fresh')
@@ -224,13 +219,13 @@ route('get','/.well-known/uma-configuration','getUmaConfig',None,'UmaConfigurati
 AUTH = {
  'none':[{}], 'conditional':[{}, {'AccountBearer':[]}, {'WalletBearer':[]}],
  'wallet':[{'WalletBearer':[]}], 'bootstrap':[{'WalletBearer':[]}], 'wallet_or_bootstrap':[{'WalletBearer':[]}],
- 'account':[{'AccountBearer':[]}], 'account_fresh':[{'AccountBearer':[]}], 'account_fresh+wallet_proof':[{'AccountBearer':[]}],
+ 'account':[{'AccountBearer':[]}], 'account_fresh':[{'AccountBearer':[]}],
  'owner':[{'WalletBearer':[]},{'AccountBearer':[]}], 'receipt':[{'DeletionReceiptBearer':[]}],
  'wallet_or_pos':[{'WalletBearer':[]},{'PosBearer':[]}],
  'operator':[{'AccountBearer':[]}], 'operator_fresh':[{'AccountBearer':[]}]}
 
 def api(title):
-    return {'openapi':'3.1.1','info':{'title':title,'version':VERSION,'description':'Implementation contract based on OPAGO plan V7. NOT a deployed API. Read protocol.md and decisions.md; x-opago-* fields are normative.'},'servers':[{'url':'https://api.opago.com'}],'paths':{},'components':{'securitySchemes':{n:{'type':'http','scheme':'bearer','description':d} for n,d in {'WalletBearer':'Internal-issued wallet access token, scoped to one wallet and installation.','AccountBearer':'Keycloak account access token; issuer/audience/auth_time and party are verified internally.','PosBearer':'Device credential restricted to the registered POS.','DeletionReceiptBearer':'Opaque receipt token, bound to one deletion ID; valid for 60 days from request and limited to status lookup.','ServiceBearer':'Service credential; never substitutes end-user authorization.'}.items()}}}
+    return {'openapi':'3.1.1','info':{'title':title,'version':VERSION,'description':'Implementation contract based on OPAGO plan V7. NOT a deployed API. Read protocol.md and decisions.md; x-opago-* fields are normative.'},'servers':[{'url':'https://api.opago.com'}],'paths':{},'components':{'securitySchemes':{n:{'type':'http','scheme':'bearer','description':d} for n,d in {'WalletBearer':'Internal-issued wallet access token, scoped to one wallet and installation.','AccountBearer':'Keycloak account access token; issuer/audience/auth_time and party are verified internally.','PosBearer':'Device credential restricted to the registered POS.','DeletionReceiptBearer':'Opaque receipt only for the corresponding deletion status.','ServiceBearer':'Service credential; never substitutes end-user authorization.'}.items()}}}
 
 public=api('OPAGO Wallet and LNURL public API')
 internal=api('OPAGO Wallet and LNURL internal API')
