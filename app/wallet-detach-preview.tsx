@@ -22,7 +22,7 @@ export default function WalletDetachPreview() {
     setBusy(true);
     try {
       const installationId = randomUUID();
-      const challenge = await adapter.challenge(installationId);
+      const challenge = await adapter.challenge(installationId, randomUUID());
       const proof = await adapter.verify(challenge, true, randomUUID());
       const result = await adapter.detach({ accountBearer: 'mock-account-bearer', authTime: Date.now(),
         proofToken: proof.proof_token, installationId, idempotencyKey: randomUUID(), signatureVerified: true });
