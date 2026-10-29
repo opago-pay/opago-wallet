@@ -53,7 +53,8 @@ export class MockAccountLifecycleAdapter {
   readonly calls: LifecycleRequest[] = [];
   private status: AccountLifecycleStatus = 'active';
   private receipt: DeletionReceipt | null = null;
-  private readonly idempotency = new Map<string, string>();
+  private readonly idempotency = new Map<string, { fingerprint: string; receipt: DeletionReceipt }>();
+  private readonly cancelResults = new Map<string, { fingerprint: string; result: DeletionStatus }>();
   constructor(private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid) {}
   private fresh(authTime: number | null | undefined) {
     if (authTime == null || this.now() - authTime < 0 || this.now() - authTime > 300_000) {
@@ -68,11 +69,11 @@ export class MockAccountLifecycleAdapter {
     this.calls.push({ method: 'DELETE', path: '/api/v2/account', auth: 'account_fresh', idempotency_key: input.idempotencyKey, body: { encryption: 'hpke-v1' } });
     const fingerprint = 'DELETE:/api/v2/account';
     const prior = this.idempotency.get(input.idempotencyKey);
-    if (prior && prior !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
-    if (this.receipt && this.status === 'deletion_pending') {
-      if (prior === fingerprint) return clone(this.receipt);
-      throw new LifecyclePreviewError('deletion_in_progress', 409);
+    if (prior) {
+      if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      return clone(prior.receipt);
     }
+    if (this.receipt && this.status === 'deletion_pending') throw new LifecyclePreviewError('deletion_in_progress', 409);
     const requested = this.now();
     this.status = 'deletion_pending';
     this.receipt = {
@@ -80,7 +81,7 @@ export class MockAccountLifecycleAdapter {
       scheduled_delete_at: time(requested + 30 * 86400_000), receipt_token: 'mock-receipt-' + this.makeUuid(),
       receipt_expires_at: time(requested + 30 * 86400_000),
     };
-    this.idempotency.set(input.idempotencyKey, fingerprint);
+    this.idempotency.set(input.idempotencyKey, { fingerprint, receipt: clone(this.receipt) });
     return clone(this.receipt);
   }
   async deletionStatus(deletionId: string, receiptToken: string): Promise<DeletionStatus> {
@@ -95,11 +96,19 @@ export class MockAccountLifecycleAdapter {
     if (!input.accountBearer) throw new LifecyclePreviewError('unauthorized', 401);
     this.fresh(input.authTime);
     if (!uuidPattern.test(input.idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
+    const fingerprint = 'POST:/api/v2/account/deletions/' + input.deletionId + '/cancel';
+    const prior = this.cancelResults.get(input.idempotencyKey);
+    if (prior) {
+      if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      return clone(prior.result);
+    }
     if (!this.receipt || input.deletionId !== this.receipt.deletion_id || this.status !== 'deletion_pending' ||
         this.now() >= Date.parse(this.receipt.scheduled_delete_at)) throw new LifecyclePreviewError('deletion_not_cancellable', 410);
     this.calls.push({ method: 'POST', path: '/api/v2/account/deletions/' + input.deletionId + '/cancel', auth: 'account_fresh', idempotency_key: input.idempotencyKey });
     this.status = 'deletion_cancelled';
-    return { deletion_id: input.deletionId, status: this.status, requested_at: this.receipt.requested_at, scheduled_delete_at: this.receipt.scheduled_delete_at };
+    const result = { deletion_id: input.deletionId, status: this.status, requested_at: this.receipt.requested_at, scheduled_delete_at: this.receipt.scheduled_delete_at };
+    this.cancelResults.set(input.idempotencyKey, { fingerprint, result: clone(result) });
+    return clone(result);
   }
   /** Mock the 30-day lifecycle transition without performing any external deletion. */
   finalizeDeletion() { if (this.status === 'deletion_pending' && this.receipt && this.now() >= Date.parse(this.receipt.scheduled_delete_at)) this.status = 'deleted'; }
@@ -112,6 +121,8 @@ export class MockWalletDetachAdapter {
   private pending: DetachChallenge | null = null;
   private proofUsed = false;
   private detached = false;
+  private readonly issuedProofs = new Map<string, { challengeId: string; used: boolean }>();
+  private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid) {}
   async challenge(): Promise<DetachChallenge> {
@@ -130,20 +141,31 @@ export class MockWalletDetachAdapter {
     if (this.now() >= Date.parse(this.pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
     if (!signatureValid) throw new LifecyclePreviewError('proof_invalid', 403);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof', body: { challenge_id: challenge.challenge_id } });
-    return { proof_token: 'mock-proof-' + challenge.challenge_id };
+    const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
+    this.issuedProofs.set(proofToken, { challengeId: this.pending.challenge_id, used: false });
+    return { proof_token: proofToken };
   }
   async detach(input: { accountBearer: string; authTime: number | null; proofToken: string; installationId: string;
     idempotencyKey: string; signatureVerified: boolean }): Promise<DetachReceipt> {
     if (!input.accountBearer) throw new LifecyclePreviewError('unauthorized', 401);
     if (input.authTime == null || this.now() - input.authTime < 0 || this.now() - input.authTime > 300_000) throw new LifecyclePreviewError('account_not_fresh', 403);
-    if (!this.pending || this.now() >= Date.parse(this.pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
-    if (!input.signatureVerified || input.proofToken !== 'mock-proof-' + this.pending.challenge_id) throw new LifecyclePreviewError('proof_invalid', 403);
-    if (this.proofUsed) throw new LifecyclePreviewError('proof_replayed', 409);
     if (!uuidPattern.test(input.idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
+    const fingerprint = 'POST:/api/v2/account/wallets/' + this.walletId + '/detach:' + input.installationId;
+    const prior = this.detachResults.get(input.idempotencyKey);
+    if (prior) {
+      if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      return clone(prior.result);
+    }
+    if (!this.pending || this.now() >= Date.parse(this.pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
+    const issued = this.issuedProofs.get(input.proofToken);
+    if (!input.signatureVerified || !issued || issued.challengeId !== this.pending.challenge_id) throw new LifecyclePreviewError('proof_invalid', 403);
+    if (issued.used || this.proofUsed) throw new LifecyclePreviewError('proof_replayed', 409);
     if (!input.installationId || this.detached) throw new LifecyclePreviewError('wallet_not_found', 404);
     this.calls.push({ method: 'POST', path: '/api/v2/account/wallets/' + this.walletId + '/detach', auth: 'account_fresh',
       idempotency_key: input.idempotencyKey, body: { proof_token: input.proofToken, installation_id: input.installationId } });
-    this.proofUsed = true; this.detached = true;
-    return { wallet_id: this.walletId, status: 'unbound', detached_at: time(this.now()), payments_enabled: false, evidence_id: this.makeUuid() };
+    issued.used = true; this.proofUsed = true; this.detached = true;
+    const result = { wallet_id: this.walletId, status: 'unbound' as const, detached_at: time(this.now()), payments_enabled: false as const, evidence_id: this.makeUuid() };
+    this.detachResults.set(input.idempotencyKey, { fingerprint, result: clone(result) });
+    return clone(result);
   }
 }
