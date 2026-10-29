@@ -12,3 +12,11 @@ export function createReviewScheduler(options: {
   onAppStateChange(state: string): void;
   pendingCount(): number;
 };
+
+export function attemptNativeReview(wallet: string, deps: {
+  isCurrent(): boolean;
+  isAvailable(): Promise<boolean>;
+  hasClaim(wallet: string): Promise<boolean>;
+  requestReview(): Promise<unknown>;
+  claim(wallet: string): Promise<boolean>;
+}): Promise<boolean>;
