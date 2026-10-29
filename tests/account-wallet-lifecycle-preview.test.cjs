@@ -239,3 +239,13 @@ test('challenge issuance requires a UUID idempotency key and replays the origina
   assert.deepEqual(await adapter.challenge(uuid(243), uuid(244)), first);
   await assert.rejects(adapter.challenge(uuid(245), uuid(244)), e => e.code === 'idempotency_conflict' && e.status === 409);
 });
+
+test('verify retry does not resurrect an expired cached proof', async () => {
+  let now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(250), uuid(251), 1, () => now, (() => { let n = 252; return () => uuid(n++); })());
+  const challenge = await adapter.challenge(uuid(253), uuid(254));
+  const proof = await adapter.verify(challenge, true, uuid(255));
+  assert.ok(proof.proof_token);
+  now += 300_000;
+  await assert.rejects(adapter.verify(challenge, true, uuid(255)), e => e.code === 'proof_expired' && e.status === 410);
+});
