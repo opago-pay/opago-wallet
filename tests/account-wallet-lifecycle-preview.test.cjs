@@ -131,3 +131,37 @@ test('wallet detach navigation remains behind the default-off flag', () => {
   assert.match(settings, /onOpenWalletDetachPreview=\{\(\) => router\.push\('\/wallet-detach-preview'\)\}/);
   assert.equal(lifecycle.WALLET_DETACH_PREVIEW_ENABLED, false);
 });
+
+test('each verified wallet proof remains valid for 300 seconds after verify even when challenge expires', async () => {
+  let now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(120), uuid(121), 3, () => now, (() => { let n = 122; return () => uuid(n++); })());
+  const challenge = await adapter.challenge();
+  const verifiedAt = now;
+  const proof = await adapter.verify(challenge, true);
+  now = verifiedAt + 61_000;
+  const result = await adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
+    installationId: uuid(123), idempotencyKey: uuid(124), signatureVerified: true });
+  assert.equal(result.status, 'unbound');
+});
+test('verified wallet proof expires 300 seconds after verify, independently of challenge expiry', async () => {
+  let now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(130), uuid(131), 4, () => now, (() => { let n = 132; return () => uuid(n++); })());
+  const challenge = await adapter.challenge();
+  const proof = await adapter.verify(challenge, true);
+  now += 300_000;
+  await assert.rejects(adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
+    installationId: uuid(133), idempotencyKey: uuid(134), signatureVerified: true }), e => e.code === 'proof_expired' && e.status === 410);
+});
+test('deletion receipts remain independently addressable after cancel and a new deletion', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockAccountLifecycleAdapter(() => now, (() => { let n = 140; return () => uuid(n++); })());
+  const firstArgs = { accountBearer: 'mock', authTime: now, idempotencyKey: uuid(141), hpkeEnvelope: true };
+  const first = await adapter.deleteAccount(firstArgs);
+  await adapter.cancelDeletion({ deletionId: first.deletion_id, accountBearer: 'mock', authTime: now, idempotencyKey: uuid(142) });
+  const second = await adapter.deleteAccount({ ...firstArgs, idempotencyKey: uuid(143) });
+  assert.notEqual(second.deletion_id, first.deletion_id);
+  assert.equal((await adapter.deletionStatus(first.deletion_id, first.receipt_token)).status, 'deletion_cancelled');
+  assert.equal((await adapter.deletionStatus(second.deletion_id, second.receipt_token)).status, 'deletion_pending');
+  assert.deepEqual(await adapter.deleteAccount(firstArgs), first);
+  assert.equal((await adapter.deletionStatus(first.deletion_id, first.receipt_token)).status, 'deletion_cancelled');
+});
