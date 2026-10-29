@@ -37,7 +37,7 @@ export default function AccountDeletionPreview() {
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={onPress} style={{ padding: 16, marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: themeColor('border') }}>
       <Text style={{ color: themeColor('text') }}>{t(label)}</Text>
     </TouchableOpacity>;
-  return <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 72, backgroundColor: themeColor('background') }}>
+  return <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 72, backgroundColor: themeColor('canvas') }}>
     <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '700', color: themeColor('text') }}>{t('Delete OPAGO account')}</Text>
     {!ACCOUNT_DELETION_PREVIEW_ENABLED ?
       <Text style={{ color: themeColor('text'), marginTop: 16 }}>{t('Account deletion preview is disabled.')}</Text> :
