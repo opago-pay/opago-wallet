@@ -6689,18 +6689,6 @@
             }
           },
           {
-            "name": "X-Opago-Envelope",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 750000,
-              "pattern": "^[A-Za-z0-9_-]+$"
-            },
-            "description": "Unpadded base64url of UTF-8 JCS HpkeRequest JSON. Photo plaintext is PhotoDescriptor."
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
