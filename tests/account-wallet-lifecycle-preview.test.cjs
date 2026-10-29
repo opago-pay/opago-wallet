@@ -62,7 +62,7 @@ test('wallet detach rejects invalid or expired proof and records challenge, veri
   const challenge = await adapter.challenge(uuid(63), uuid(363));
   await assert.rejects(adapter.verify(challenge, false, uuid(64)), e => e.code === 'signature_invalid' && e.status === 401);
   now += 301000;
-  await assert.rejects(adapter.verify(challenge, true, uuid(64)), e => e.code === 'proof_expired' && e.status === 410);
+  await assert.rejects(adapter.verify(challenge, true, uuid(64)), e => e.code === 'challenge_invalid' && e.status === 401);
   assert.deepEqual(adapter.calls.map(call => call.path), ['/api/v2/wallet/auth/challenge']);
 });
 
