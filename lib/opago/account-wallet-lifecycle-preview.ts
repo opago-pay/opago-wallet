@@ -198,6 +198,8 @@ export class MockWalletDetachAdapter {
     const prior = this.verifyResults.get(idempotencyKey);
     if (prior) {
       if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      const cachedProof = this.issuedProofs.get(bytesToHex(sha256(utf8ToBytes(prior.result.proof_token))));
+      if (!cachedProof || this.now() >= cachedProof.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
       return clone(prior.result);
     }
     const pending = this.pendingChallenges.get(challenge.challenge_id);
