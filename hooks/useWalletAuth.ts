@@ -457,11 +457,24 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
   const unlockWallet = useCallback(async () => {
     recordAuthDiagnostic('unlock.begin');
     try {
+      const resumeRemoval = async () => {
+        if (await getSecureItem(WALLET_WIPE_PENDING_KEY) !== 'true') return false;
+        // A previous removal was already authorized. Complete it before reading
+        // keys; a cached pre-wipe phrase must never reopen the removed wallet.
+        walletSession.lock();
+        const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
+        await resumePendingWalletWipe();
+        setHasStoredWallet(await hasStoredMnemonic());
+        setRecoveryRequired(false);
+        setError(null);
+        return true;
+      };
+      await resumeRemoval();
       // A protected iOS keychain read is itself the Face ID challenge. Reuse
       // its result to open the wallet instead of prompting and reading twice.
       // Legacy unprotected entries still require explicit device authorization.
       const lockOnOpen = securityPreferences.getSnapshot().lockOnOpen;
-      const protectedMnemonic = lockOnOpen && Platform.OS === 'ios'
+      let protectedMnemonic = lockOnOpen && Platform.OS === 'ios'
         ? await measurePerformance('wallet.device_unlock', () =>
           readProtectedKeyForUnlock(getBiometricallyProtectedMnemonic))
         : null;
@@ -470,10 +483,9 @@ function WalletProviderCore({ children }: { children?: ReactNode }) {
           authenticateDevice('Unlock Opago', { allowDeviceCredential: true }));
       }
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
-      if (await getSecureItem(WALLET_WIPE_PENDING_KEY) === 'true') {
-        const { resumePendingWalletWipe } = await import('../lib/wallet-wipe-native');
-        await resumePendingWalletWipe();
-      }
+      // Removal may have started while the native authentication sheet was
+      // open. Discard that sheet's result as well if it belongs to the old key.
+      if (await resumeRemoval()) protectedMnemonic = null;
       if (AppState.currentState !== 'active') throw new Error('Return to Opago and unlock again.');
       beginWalletStartupTiming();
       walletSession.unlock();
