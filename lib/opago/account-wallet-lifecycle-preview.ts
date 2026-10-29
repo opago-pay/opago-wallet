@@ -209,7 +209,7 @@ export class MockWalletDetachAdapter {
       throw new LifecyclePreviewError('challenge_invalid', 401);
     }
     if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('challenge_invalid', 401);
-    if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
+    if (this.now() >= Date.parse(pending.expires_at)) throw new LifecyclePreviewError('challenge_invalid', 401);
     if (!signatureValid) throw new LifecyclePreviewError('signature_invalid', 401);
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
       idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
