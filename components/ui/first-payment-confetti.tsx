@@ -3,6 +3,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useWalletMotion } from '@/hooks/useWalletMotion';
 import { subscribeFirstPaymentFeedback } from '@/lib/first-payment-feedback';
+import { enqueueCelebration, finishCelebration } from '@/lib/first-payment-feedback-queue.cjs';
 
 const COLORS = ['#FFB000', '#FFE081', '#FFFFFF', '#26B9B1', '#F47D59'];
 const PARTICLES = Array.from({ length: 22 }, (_, index) => ({
@@ -33,14 +34,23 @@ function Particle({ index, x, drift, delay, spin, width }: {
 /** Purely decorative, pointer-transparent; disabled by the device motion preference. */
 export function FirstPaymentConfetti() {
   const motionAllowed = useWalletMotion();
-  const [event, setEvent] = useState<{ kind: string; id: number } | null>(null);
+  const [queue, setQueue] = useState<{ kind: string; id: number }[]>([]);
+  const event = queue[0] ?? null;
   const { width } = useWindowDimensions();
-  useEffect(() => subscribeFirstPaymentFeedback(setEvent), []);
+  useEffect(() => subscribeFirstPaymentFeedback(next => {
+    setQueue(current => enqueueCelebration(current, next));
+  }), []);
   useEffect(() => {
     if (!event) return;
-    const timeout = setTimeout(() => setEvent(current => current?.id === event.id ? null : current), 2200);
+    // Every milestone owns a full animation window; do not overwrite an
+    // incoming celebration when an outgoing milestone arrives in the same tick.
+    if (!motionAllowed) {
+      setQueue(current => finishCelebration(current, event.id));
+      return;
+    }
+    const timeout = setTimeout(() => setQueue(current => finishCelebration(current, event.id)), 2200);
     return () => clearTimeout(timeout);
-  }, [event]);
+  }, [event?.id, motionAllowed]);
   if (!motionAllowed || !event) return null;
   return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
     style={styles.overlay}>
