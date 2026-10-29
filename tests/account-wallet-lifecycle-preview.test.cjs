@@ -204,15 +204,15 @@ test('detach challenge nonces are single-use while distinct outstanding challeng
 test('detach challenge issuance is limited to five outstanding challenges per wallet', async () => {
   const now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(190), uuid(191), 1, () => now, (() => { let n = 192; return () => uuid(n++); })());
-  for (let i = 0; i < 5; i++) await adapter.challenge(uuid(200 + i));
-  await assert.rejects(adapter.challenge(uuid(206), uuid(506)), e => e.code === 'rate_limited' && e.status === 429);
+  for (let i = 0; i < 5; i++) await adapter.challenge(uuid(200 + i), uuid(600 + i));
+  await assert.rejects(adapter.challenge(uuid(206), uuid(606)), e => e.code === 'rate_limited' && e.status === 429);
 });
 
 test('detach challenge matches protocol message fields and binds installation', async () => {
   const now = Date.parse('2026-10-29T10:00:00Z');
   const installationId = uuid(220);
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(221), uuid(222), 5, () => now, (() => { let n = 223; return () => uuid(n++); })(), 'regtest');
-  const challenge = await adapter.challenge(installationId);
+  const challenge = await adapter.challenge(installationId, uuid(218));
   assert.equal(challenge.installation_id, installationId);
   assert.equal(challenge.network, 'regtest');
   assert.match(challenge.wallet_pubkey, /^(02|03)[0-9a-f]{64}$/);
