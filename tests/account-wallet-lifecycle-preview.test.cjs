@@ -135,9 +135,9 @@ test('wallet detach navigation remains behind the default-off flag', () => {
 test('each verified wallet proof remains valid for 300 seconds after verify even when challenge expires', async () => {
   let now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(120), uuid(121), 3, () => now, (() => { let n = 122; return () => uuid(n++); })());
-  const challenge = await adapter.challenge();
+  const challenge = await adapter.challenge(uuid(123));
   const verifiedAt = now;
-  const proof = await adapter.verify(challenge, true);
+  const proof = await adapter.verify(challenge, true, uuid(126));
   now = verifiedAt + 61_000;
   const result = await adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
     installationId: uuid(123), idempotencyKey: uuid(124), signatureVerified: true });
@@ -146,8 +146,8 @@ test('each verified wallet proof remains valid for 300 seconds after verify even
 test('verified wallet proof expires 300 seconds after verify, independently of challenge expiry', async () => {
   let now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(130), uuid(131), 4, () => now, (() => { let n = 132; return () => uuid(n++); })());
-  const challenge = await adapter.challenge(uuid(123));
-  const proof = await adapter.verify(challenge, true, uuid(125));
+  const challenge = await adapter.challenge(uuid(133));
+  const proof = await adapter.verify(challenge, true, uuid(136));
   now += 300_000;
   await assert.rejects(adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
     installationId: uuid(133), idempotencyKey: uuid(134), signatureVerified: true }), e => e.code === 'proof_expired' && e.status === 410);
@@ -187,4 +187,23 @@ test('detach proof is bound to the installation ID from its challenge', async ()
   const result = await adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
     installationId, idempotencyKey: uuid(177), signatureVerified: true });
   assert.equal(result.status, 'unbound');
+});
+
+test('detach challenge nonces are single-use while distinct outstanding challenges can verify', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(180), uuid(181), 1, () => now, (() => { let n = 182; return () => uuid(n++); })());
+  const first = await adapter.challenge(uuid(183));
+  const second = await adapter.challenge(uuid(184));
+  assert.notEqual(first.nonce, second.nonce);
+  const firstProof = await adapter.verify(first, true, uuid(185));
+  assert.ok(firstProof.proof_token);
+  await assert.rejects(adapter.verify(first, true, uuid(186)), e => e.code === 'proof_replayed' && e.status === 409);
+  const secondProof = await adapter.verify(second, true, uuid(187));
+  assert.ok(secondProof.proof_token);
+});
+test('detach challenge issuance is limited to five outstanding challenges per wallet', async () => {
+  const now = Date.parse('2026-10-29T10:00:00Z');
+  const adapter = new lifecycle.MockWalletDetachAdapter(uuid(190), uuid(191), 1, () => now, (() => { let n = 192; return () => uuid(n++); })());
+  for (let i = 0; i < 5; i++) await adapter.challenge(uuid(200 + i));
+  await assert.rejects(adapter.challenge(uuid(206)), e => e.code === 'rate_limited' && e.status === 429);
 });
