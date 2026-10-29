@@ -136,9 +136,9 @@ test('each verified wallet proof remains valid for 300 seconds after verify even
   let now = Date.parse('2026-10-29T10:00:00Z');
   const adapter = new lifecycle.MockWalletDetachAdapter(uuid(120), uuid(121), 3, () => now, (() => { let n = 122; return () => uuid(n++); })());
   const challenge = await adapter.challenge(uuid(123), uuid(423));
-  const verifiedAt = now;
+  now += 299_000;
   const proof = await adapter.verify(challenge, true, uuid(126));
-  now = verifiedAt + 61_000;
+  now += 2_000;
   const result = await adapter.detach({ accountBearer: 'mock', authTime: now, proofToken: proof.proof_token,
     installationId: uuid(123), idempotencyKey: uuid(124), signatureVerified: true });
   assert.equal(result.status, 'unbound');
