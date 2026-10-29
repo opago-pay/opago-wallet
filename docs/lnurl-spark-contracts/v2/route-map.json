@@ -360,6 +360,22 @@
       "auth": "none",
       "transport": "plain",
       "operation_id": "getUmaConfig"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/account/deletions/{deletion_id}/cancel",
+      "internal_path": "/api/account/deletions/{deletion_id}/cancel",
+      "auth": "account_fresh",
+      "transport": "hpke",
+      "operation_id": "cancelAccountDeletion"
+    },
+    {
+      "method": "POST",
+      "public_path": "/api/v2/account/wallets/{wallet_id}/detach",
+      "internal_path": "/api/account/wallets/{wallet_id}/detach",
+      "auth": "account_fresh+wallet_proof",
+      "transport": "hpke",
+      "operation_id": "detachWalletFromAccount"
     }
   ]
 }
