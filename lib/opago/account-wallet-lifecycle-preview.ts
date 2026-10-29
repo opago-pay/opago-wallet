@@ -127,36 +127,68 @@ export class MockAccountLifecycleAdapter {
   }
 }
 
-export type DetachChallenge = { challenge_id: string; action: 'wallet_detach'; action_params: { wallet_id: string; party_id: string; account_generation: number }; expires_at: string };
+export type DetachChallenge = {
+  challenge_id: string;
+  nonce: string;
+  action: 'wallet_detach';
+  action_params: { wallet_id: string; party_id: string; account_generation: number };
+  installation_id: string;
+  issued_at: string;
+  expires_at: string;
+};
 export class MockWalletDetachAdapter {
   readonly mode = 'mock-only' as const;
   readonly calls: LifecycleRequest[] = [];
   private pending: DetachChallenge | null = null;
   private proofUsed = false;
   private detached = false;
-  private readonly issuedProofs = new Map<string, { challengeId: string; expiresAt: number; used: boolean }>();
+  private readonly consumedChallenges = new Set<string>();
+  private readonly verifyResults = new Map<string, { fingerprint: string; result: { proof_token: string } }>();
+  private readonly issuedProofs = new Map<string, { challengeId: string; installationId: string; expiresAt: number; used: boolean }>();
   private readonly detachResults = new Map<string, { fingerprint: string; result: DetachReceipt }>();
   constructor(private readonly walletId: string, private readonly partyId: string, private readonly generation: number,
     private readonly now: () => number = Date.now, private readonly makeUuid: () => string = uuid) {}
-  async challenge(): Promise<DetachChallenge> {
-    const challenge = { challenge_id: this.makeUuid(), action: 'wallet_detach' as const,
+  async challenge(installationId: string): Promise<DetachChallenge> {
+    if (!uuidPattern.test(installationId)) throw new LifecyclePreviewError('proof_invalid', 403);
+    const issuedAt = this.now();
+    const challenge = { challenge_id: this.makeUuid(),
+      nonce: (this.makeUuid() + this.makeUuid()).replace(/-/g, '').toLowerCase(),
+      action: 'wallet_detach' as const,
       action_params: { wallet_id: this.walletId, party_id: this.partyId, account_generation: this.generation },
-      expires_at: time(this.now() + 60_000) };
+      installation_id: installationId, issued_at: time(issuedAt), expires_at: time(issuedAt + 300_000) };
     this.pending = challenge; this.proofUsed = false;
     this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/challenge', auth: 'wallet_proof',
-      body: { action: 'wallet_detach', action_params: challenge.action_params } });
+      body: { action: 'wallet_detach', action_params: challenge.action_params, installation_id: installationId } });
     return clone(challenge);
   }
-  async verify(challenge: DetachChallenge, signatureValid: boolean): Promise<{ proof_token: string }> {
-    if (!this.pending || challenge.challenge_id !== this.pending.challenge_id || JSON.stringify(challenge.action_params) !== JSON.stringify(this.pending.action_params)) {
+  async verify(challenge: DetachChallenge, signatureValid: boolean, idempotencyKey: string): Promise<{ proof_token: string }> {
+    if (!uuidPattern.test(idempotencyKey)) throw new LifecyclePreviewError('idempotency_conflict', 409);
+    const fingerprint = 'POST:/api/v2/wallet/auth/verify:' + challenge.challenge_id;
+    const prior = this.verifyResults.get(idempotencyKey);
+    if (prior) {
+      if (prior.fingerprint !== fingerprint) throw new LifecyclePreviewError('idempotency_conflict', 409);
+      return clone(prior.result);
+    }
+    if (!this.pending || challenge.challenge_id !== this.pending.challenge_id ||
+        challenge.nonce !== this.pending.nonce ||
+        challenge.installation_id !== this.pending.installation_id ||
+        challenge.issued_at !== this.pending.issued_at ||
+        challenge.expires_at !== this.pending.expires_at ||
+        JSON.stringify(challenge.action_params) !== JSON.stringify(this.pending.action_params)) {
       throw new LifecyclePreviewError('proof_invalid', 403);
     }
+    if (this.consumedChallenges.has(challenge.challenge_id)) throw new LifecyclePreviewError('proof_replayed', 409);
     if (this.now() >= Date.parse(this.pending.expires_at)) throw new LifecyclePreviewError('proof_expired', 410);
     if (!signatureValid) throw new LifecyclePreviewError('proof_invalid', 403);
-    this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof', body: { challenge_id: challenge.challenge_id } });
+    this.calls.push({ method: 'POST', path: '/api/v2/wallet/auth/verify', auth: 'wallet_proof',
+      idempotency_key: idempotencyKey, body: { challenge_id: challenge.challenge_id, installation_id: challenge.installation_id } });
     const proofToken = 'mock-proof-' + this.makeUuid() + '-' + this.makeUuid();
-    this.issuedProofs.set(proofToken, { challengeId: this.pending.challenge_id, expiresAt: this.now() + 300_000, used: false });
-    return { proof_token: proofToken };
+    const result = { proof_token: proofToken };
+    this.issuedProofs.set(proofToken, { challengeId: this.pending.challenge_id,
+      installationId: this.pending.installation_id, expiresAt: this.now() + 300_000, used: false });
+    this.consumedChallenges.add(challenge.challenge_id);
+    this.verifyResults.set(idempotencyKey, { fingerprint, result: clone(result) });
+    return clone(result);
   }
   async detach(input: { accountBearer: string; authTime: number | null; proofToken: string; installationId: string;
     idempotencyKey: string; signatureVerified: boolean }): Promise<DetachReceipt> {
@@ -172,7 +204,7 @@ export class MockWalletDetachAdapter {
     const issued = this.issuedProofs.get(input.proofToken);
     if (!issued) throw new LifecyclePreviewError('proof_invalid', 403);
     if (this.now() >= issued.expiresAt) throw new LifecyclePreviewError('proof_expired', 410);
-    if (!input.signatureVerified) throw new LifecyclePreviewError('proof_invalid', 403);
+    if (!input.signatureVerified || issued.installationId !== input.installationId) throw new LifecyclePreviewError('proof_invalid', 403);
     if (issued.used || this.proofUsed) throw new LifecyclePreviewError('proof_replayed', 409);
     if (!input.installationId || this.detached) throw new LifecyclePreviewError('wallet_not_found', 404);
     this.calls.push({ method: 'POST', path: '/api/v2/account/wallets/' + this.walletId + '/detach', auth: 'account_fresh',
