@@ -407,7 +407,8 @@ export default function SettingsScreen() {
         disabled={busy} onSelect={navigateToSection} onLock={lockWallet}
         onOpenOpagoAccount={() => router.push('/opago-account')}
         onOpenAccountDeletionPreview={() => router.push('/account-deletion-preview')}
-        onOpenAccountLinkPreview={() => router.push('/account-link-preview')} />}
+        onOpenAccountLinkPreview={() => router.push('/account-link-preview')}
+        onOpenWalletDetachPreview={() => router.push('/wallet-detach-preview')} />}
 
       {activeSection === 'security' && <>
       {backupStatus === 'loading' ? <View style={styles.backupCard}><BackupStatusNotice /></View> : <View style={styles.backupCard}>
