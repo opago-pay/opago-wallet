@@ -6782,17 +6782,6 @@
               "maxLength": 36,
               "format": "uuid"
             }
-          },
-          {
-            "name": "X-Opago-User-Authorization",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 8200
-            },
-            "description": "Original AccountBearer, verified internally."
           }
         ],
         "responses": {
@@ -6943,7 +6932,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": "Success",
             "headers": {
               "X-Request-Id": {
@@ -6971,7 +6960,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./schemas.json#/$defs/Wallet"
+                  "$ref": "./schemas.json#/$defs/WalletDetachReceipt"
                 }
               }
             }
