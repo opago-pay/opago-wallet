@@ -7000,7 +7000,7 @@
           }
         },
         "description": "Requires fresh AccountBearer plus an installation-bound wallet_detach ActionProof verified within the prior 300 seconds. Disables payments and OPAGO Lightning address; open invoices remain payable until expiry.",
-        "x-opago-end-user-policy": "account_fresh",
+        "x-opago-end-user-policy": "account_fresh+wallet_proof",
         "requestBody": {
           "required": true,
           "content": {
