@@ -13,6 +13,7 @@ const { normalizeRecoveryMnemonic } = require('../lib/wallet-seed.ts');
 const PHRASE = 'abandon '.repeat(11) + 'about';
 const MNEMONIC = 'test-mnemonic';
 const IDENTITY = 'test-wallet-identity';
+const WIPE_PENDING = 'test-wallet-wipe-pending';
 const PUBLIC_KEY = 'synthetic-wallet-public-key';
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
@@ -38,7 +39,11 @@ function walletFixture(t, options = {}) {
     '../lib/storage': {
       MNEMONIC_STORE_KEY: MNEMONIC,
       WALLET_IDENTITY_KEY: IDENTITY,
-      hasStoredMnemonic: async () => storage.has(MNEMONIC) || storage.has(IDENTITY),
+      WALLET_WIPE_PENDING_KEY: WIPE_PENDING,
+      hasStoredMnemonic: async () => {
+        if (storage.get(WIPE_PENDING) === 'true') throw new Error('Wallet removal must finish before continuing.');
+        return storage.has(MNEMONIC) || storage.has(IDENTITY);
+      },
       getSecureItem: async key => {
         if (key === MNEMONIC) await options.beforeMnemonicRead?.(changeState);
         return key === MNEMONIC && options.inaccessible?.value ? null : storage.get(key) ?? null;
@@ -402,4 +407,105 @@ test('failed secure-storage writes cannot publish a successful recovery or backu
   await assert.rejects(fixture.render().markBackupVerified(), /Secure storage unavailable/);
   assert.equal(fixture.render().backupStatus, 'required');
   assert.equal(fixture.storage.has(backup.BACKUP_STATUS_KEY), false);
+});
+
+test('retrying an interrupted startup wipe cannot reopen the removed iOS wallet', async t => {
+  const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY], [WIPE_PENDING, 'true']]);
+  let attempts = 0;
+  const fixture = walletFixture(t, { os: 'ios', storage,
+    beforeProtectedRead: () => assert.equal(storage.size, 0, 'removal must finish before reading keys'),
+    dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+      if (++attempts === 1) throw new Error('Synthetic interrupted removal');
+      storage.clear();
+      return true;
+    } } },
+  });
+  await fixture.settle();
+  assert.equal(fixture.render().securityReady, true);
+  assert.equal(fixture.render().hasStoredWallet, null);
+  assert.equal(fixture.render().isLocked, true);
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  assert.equal(attempts, 2);
+  assert.equal(fixture.sdkStarts(), 0);
+  assert.equal(fixture.render().hasStoredWallet, false);
+  assert.equal(fixture.render().walletReady, false);
+  assert.equal(fixture.render().recoveryRequired, false);
+  assert.equal(fixture.render().error, null);
+  assert.deepEqual(fixture.writes, []);
+  assert.equal(storage.size, 0);
+});
+
+
+test('a repeatedly failing removal keeps both platforms locked without reading or recreating keys', async t => {
+  for (const os of ['android', 'ios']) {
+    const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY], [WIPE_PENDING, 'true']]);
+    let attempts = 0;
+    const fixture = walletFixture(t, { os, storage,
+      dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+        attempts++;
+        throw new Error('Synthetic interrupted removal');
+      } } },
+    });
+    await fixture.settle();
+    await assert.rejects(fixture.render().unlockWallet(), /interrupted removal/);
+    await assert.rejects(fixture.render().unlockWallet(), /interrupted removal/);
+    await fixture.settle();
+    assert.equal(attempts, 3);
+    assert.equal(fixture.render().isLocked, true);
+    assert.equal(fixture.render().walletReady, false);
+    assert.equal(fixture.sdkStarts(), 0);
+    assert.deepEqual(fixture.prompts, []);
+    assert.deepEqual(fixture.writes, []);
+    assert.equal(storage.get(MNEMONIC), PHRASE);
+    assert.equal(storage.get(WIPE_PENDING), 'true');
+  }
+});
+
+test('a removal started during iOS authentication discards the protected-key result', async t => {
+  const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY]]);
+  const fixture = walletFixture(t, { os: 'ios', storage,
+    beforeProtectedRead: () => storage.set(WIPE_PENDING, 'true'),
+    dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+      storage.clear();
+      return true;
+    } } },
+  });
+  await fixture.settle();
+  assert.equal(fixture.render().hasStoredWallet, true);
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  assert.deepEqual(fixture.prompts, ['keychain']);
+  assert.equal(fixture.render().hasStoredWallet, false);
+  assert.equal(fixture.render().walletReady, false);
+  assert.equal(fixture.sdkStarts(), 0);
+  assert.deepEqual(fixture.writes, []);
+  assert.equal(storage.size, 0);
+});
+
+test('Android can create a fresh 12-word wallet after retrying an interrupted removal', async t => {
+  const storage = new Map([[MNEMONIC, PHRASE], [IDENTITY, PUBLIC_KEY], [WIPE_PENDING, 'true']]);
+  let attempts = 0;
+  const fixture = walletFixture(t, { storage,
+    dependencies: { '../lib/wallet-wipe-native': { resumePendingWalletWipe: async () => {
+      if (++attempts === 1) throw new Error('Synthetic interrupted removal');
+      storage.clear();
+      return true;
+    } } },
+  });
+  await fixture.settle();
+  await fixture.render().unlockWallet();
+  await fixture.settle();
+  assert.equal(fixture.render().hasStoredWallet, false);
+  assert.equal(fixture.render().walletReady, false);
+  assert.equal(fixture.sdkStarts(), 0);
+  assert.equal(fixture.render().error, null);
+  await fixture.render().createWallet();
+  await fixture.settle();
+  assert.equal(fixture.render().walletReady, true);
+  assert.equal(fixture.render().hasStoredWallet, true);
+  assert.equal(storage.get(MNEMONIC).split(' ').length, 12);
+  assert.equal(bip39.validateMnemonic(storage.get(MNEMONIC)), true);
+  assert.notEqual(storage.get(MNEMONIC), PHRASE);
+  assert.deepEqual(fixture.prompts, ['unlock', 'authorize']);
 });
