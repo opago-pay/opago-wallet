@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { enqueueCelebration, finishCelebration, createReviewScheduler } =
+const { enqueueCelebration, finishCelebration, createReviewScheduler, attemptNativeReview } =
   require('../lib/first-payment-feedback-queue.cjs');
 
 test('received and sent events in one snapshot play sequentially', () => {
@@ -105,4 +105,78 @@ test('multiple pending wallet reviews remain serialized', async () => {
   await clock.fire();
   assert.deepEqual(calls, ['one', 'two']);
   assert.equal(scheduler.pendingCount(), 0);
+});
+
+test('background during asynchronous review storage lookup does not claim or open native sheet', async () => {
+  let resolveLookup;
+  const storageLookup = new Promise(resolve => { resolveLookup = resolve; });
+  let active = true;
+  let nativeCalls = 0;
+  let claims = 0;
+  const attempt = attemptNativeReview('wallet', {
+    isCurrent: () => active,
+    hasClaim: () => storageLookup,
+    isAvailable: async () => true,
+    requestReview: async () => { nativeCalls++; },
+    claim: async () => { claims++; return true; },
+  });
+  active = false;
+  resolveLookup(false);
+  assert.equal(await attempt, false);
+  assert.equal(nativeCalls, 0);
+  assert.equal(claims, 0);
+  active = true;
+  assert.equal(await attemptNativeReview('wallet', {
+    isCurrent: () => active,
+    hasClaim: async () => false,
+    isAvailable: async () => true,
+    requestReview: async () => { nativeCalls++; },
+    claim: async () => { claims++; return true; },
+  }), true);
+  assert.equal(nativeCalls, 1);
+  assert.equal(claims, 1);
+});
+
+test('background during native review request does not persist review marker', async () => {
+  let finishRequest;
+  const nativeRequest = new Promise(resolve => { finishRequest = resolve; });
+  let generation = 0;
+  const captured = generation;
+  let claims = 0;
+  const attempt = attemptNativeReview('wallet', {
+    isCurrent: () => generation === captured,
+    hasClaim: async () => false,
+    isAvailable: async () => true,
+    requestReview: () => nativeRequest,
+    claim: async () => { claims++; return true; },
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  generation++;
+  finishRequest();
+  assert.equal(await attempt, false);
+  assert.equal(claims, 0);
+});
+
+test('successful native review is persisted only after its request resolves', async () => {
+  let finishRequest;
+  const nativeRequest = new Promise(resolve => { finishRequest = resolve; });
+  let claimed = false;
+  let calls = 0;
+  const deps = {
+    isCurrent: () => true,
+    hasClaim: async () => claimed,
+    isAvailable: async () => true,
+    requestReview: async () => { calls++; await nativeRequest; },
+    claim: async () => { claimed = true; return true; },
+  };
+  const first = attemptNativeReview('wallet', deps);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(claimed, false);
+  finishRequest();
+  assert.equal(await first, true);
+  assert.equal(claimed, true);
+  assert.equal(await attemptNativeReview('wallet', deps), true);
+  assert.equal(calls, 1);
 });
