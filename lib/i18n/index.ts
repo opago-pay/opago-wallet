@@ -4,6 +4,7 @@ import de from './locales/de.json';
 import fr from './locales/fr.json';
 import es from './locales/es.json';
 import it from './locales/it.json';
+import { accountDeletionPreviewMessages } from './account-deletion-preview-messages';
 import { f3Messages } from './f3-messages';
 import { f4Messages } from './f4-messages';
 import { f5Messages } from './f5-messages';
@@ -11,8 +12,8 @@ import { p3Messages } from './p3-messages';
 import { languagePreference, LANGUAGE_LOCALES, type AppLanguage } from './language';
 
 export const dictionaries: Record<Exclude<AppLanguage, 'en'>, Record<string, string>> = {
-  de: { ...de, ...f3Messages('de'), ...f4Messages('de'), ...f5Messages('de'), ...p3Messages('de'), ...signupMessages('de'), ...onchainMessages('de') }, fr: { ...fr, ...f3Messages('fr'), ...f4Messages('fr'), ...f5Messages('fr'), ...p3Messages('fr'), ...signupMessages('fr'), ...onchainMessages('fr') },
-  es: { ...es, ...f3Messages('es'), ...f4Messages('es'), ...f5Messages('es'), ...p3Messages('es'), ...signupMessages('es'), ...onchainMessages('es') }, it: { ...it, ...f3Messages('it'), ...f4Messages('it'), ...f5Messages('it'), ...p3Messages('it'), ...signupMessages('it'), ...onchainMessages('it') },
+  de: { ...de, ...accountDeletionPreviewMessages('de'), ...f3Messages('de'), ...f4Messages('de'), ...f5Messages('de'), ...p3Messages('de'), ...signupMessages('de'), ...onchainMessages('de') }, fr: { ...fr, ...accountDeletionPreviewMessages('fr'), ...f3Messages('fr'), ...f4Messages('fr'), ...f5Messages('fr'), ...p3Messages('fr'), ...signupMessages('fr'), ...onchainMessages('fr') },
+  es: { ...es, ...accountDeletionPreviewMessages('es'), ...f3Messages('es'), ...f4Messages('es'), ...f5Messages('es'), ...p3Messages('es'), ...signupMessages('es'), ...onchainMessages('es') }, it: { ...it, ...accountDeletionPreviewMessages('it'), ...f3Messages('it'), ...f4Messages('it'), ...f5Messages('it'), ...p3Messages('it'), ...signupMessages('it'), ...onchainMessages('it') },
 };
 export type TranslationValues = Record<string, string | number>;
 
