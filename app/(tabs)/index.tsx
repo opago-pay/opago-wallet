@@ -376,7 +376,6 @@ export default function HomeScreen() {
         }
         if (generation !== refreshGenerationRef.current) return;
         setTransactions(items);
-        void observeFirstConfirmedHistory(hederaPublicKey, items);
         setHistoryHasMore(snapshot.hasMore);
         setHistoryErrors(snapshot.errors);
         refreshTransactionRates();
@@ -594,6 +593,13 @@ export default function HomeScreen() {
   const visibleTransactions = useMemo(() => mergeOnchainHistory(transactions,onchain.transactions??[],onchain.operations,appLocale(),onchain.network).filter(
     item => item.status !== 'pending' || !hiddenPaymentKeys.includes(item.key),
   ), [transactions, hiddenPaymentKeys,onchain.transactions,onchain.operations,onchain.network]);
+
+  // BDK on-chain receipts and sends may confirm without a HistoryPager update.
+  // Observe exactly the combined activity shown on Home, not the pager alone.
+  useEffect(() => {
+    if (!walletReady || !hederaPublicKey) return;
+    void observeFirstConfirmedHistory(hederaPublicKey, visibleTransactions);
+  }, [walletReady, hederaPublicKey, visibleTransactions]);
 
   const onchainEur=calculateBitcoinEur(onchain.state.value?.totalSats??null,displayRates.btcToEur);
   const bitcoinEur = calculateBitcoinEur(displayBalances.spark, displayRates.btcToEur);
