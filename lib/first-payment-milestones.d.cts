@@ -3,7 +3,7 @@ export interface MilestoneStorage {
   setItem(key: string, value: string): Promise<unknown>;
 }
 export type FirstMilestone = 'received' | 'sent' | 'review';
-export function createMilestoneGate(storage: MilestoneStorage): { claim(wallet: string, milestone: FirstMilestone): Promise<boolean> };
+export function createMilestoneGate(storage: MilestoneStorage): { claim(wallet: string, milestone: FirstMilestone): Promise<boolean>; hasClaim(wallet: string, milestone: FirstMilestone): Promise<boolean> };
 export function eligibleHistoryEvent(item: {
   type: string; status: string; amountValue?: number; internalTransfer?: string; legacyDeposit?: boolean; operation?: { kind?: string };
 } | null): 'received' | 'sent' | null;
