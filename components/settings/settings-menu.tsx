@@ -1,3 +1,4 @@
+import { ACCOUNT_LINK_PREVIEW_ENABLED } from '@/lib/opago/account-link-preview';
 import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -77,6 +78,7 @@ export function SettingsMenu(props: {
   onSelect(section: SettingsSection): void;
   onLock(): void;
   onOpenOpagoAccount(): void;
+  onOpenAccountLinkPreview?(): void;
 }) {
   const { selection } = useColorMode();
   const { language } = useLanguage();
@@ -92,6 +94,7 @@ export function SettingsMenu(props: {
     <MenuGroup title={t('Wallet')}>
       <MenuRow title={t('OPAGO account')} detail={t('Account services')}
         icon="person-circle-outline" divider disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
+      {ACCOUNT_LINK_PREVIEW_ENABLED && props.onOpenAccountLinkPreview && <MenuRow title={t('OPAGO account and wallet linking')} detail={t('Mock preview only. No real account or wallet changes are made.')} icon="link-outline" disabled={props.disabled} onPress={props.onOpenAccountLinkPreview} />}
       <MenuRow title={t('Lightning address')} detail={t('Manage your Lightning address')}
         icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
     </MenuGroup>
