@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { useWalletMotion } from '@/hooks/useWalletMotion';
+import { useWalletMotionState } from '@/hooks/useWalletMotion';
 import { subscribeFirstPaymentFeedback } from '@/lib/first-payment-feedback';
-import { enqueueCelebration, finishCelebration } from '@/lib/first-payment-feedback-queue.cjs';
+import { celebrationDisposition, enqueueCelebration, finishCelebration } from '@/lib/first-payment-feedback-queue.cjs';
 
 const COLORS = ['#FFB000', '#FFE081', '#FFFFFF', '#26B9B1', '#F47D59'];
 const PARTICLES = Array.from({ length: 22 }, (_, index) => ({
@@ -33,7 +33,7 @@ function Particle({ index, x, drift, delay, spin, width }: {
 
 /** Purely decorative, pointer-transparent; disabled by the device motion preference. */
 export function FirstPaymentConfetti() {
-  const motionAllowed = useWalletMotion();
+  const { active, reduced } = useWalletMotionState();
   const [queue, setQueue] = useState<{ kind: string; id: number }[]>([]);
   const event = queue[0] ?? null;
   const { width } = useWindowDimensions();
@@ -44,14 +44,18 @@ export function FirstPaymentConfetti() {
     if (!event) return;
     // Every milestone owns a full animation window; do not overwrite an
     // incoming celebration when an outgoing milestone arrives in the same tick.
-    if (!motionAllowed) {
+    const disposition = celebrationDisposition(active, reduced);
+    if (disposition === 'discard') {
       setQueue(current => finishCelebration(current, event.id));
       return;
     }
+    // On background/unknown accessibility state, retain this event. Cleanup
+    // pauses the timer; the overlay remounts with a fresh animation on resume.
+    if (disposition === 'pause') return;
     const timeout = setTimeout(() => setQueue(current => finishCelebration(current, event.id)), 2200);
     return () => clearTimeout(timeout);
-  }, [event?.id, motionAllowed]);
-  if (!motionAllowed || !event) return null;
+  }, [event?.id, active, reduced]);
+  if (celebrationDisposition(active, reduced) !== 'play' || !event) return null;
   return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
     style={styles.overlay}>
     {PARTICLES.map(p => <Particle key={event.id + ':' + p.id} index={p.id} x={p.x}
