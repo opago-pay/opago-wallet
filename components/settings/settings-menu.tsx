@@ -1,5 +1,5 @@
 import { ACCOUNT_LINK_PREVIEW_ENABLED } from '@/lib/opago/account-link-preview';
-import { ACCOUNT_DELETION_PREVIEW_ENABLED } from '@/lib/opago/account-deletion-preview';
+import { ACCOUNT_DELETION_PREVIEW_ENABLED } from '@/lib/opago/account-wallet-lifecycle-preview';
 import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
