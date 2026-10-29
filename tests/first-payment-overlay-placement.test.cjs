@@ -48,3 +48,13 @@ test('onchain stack screen observes only confirmed BDK sends', () => {
   assert.match(flow, /operation\?\.kind !== 'send' \|\| operation\.state !== 'confirmed'/);
   assert.match(flow, /markFirstConfirmedPayment\(hederaPublicKey, 'sent'\)/);
 });
+
+test('receive success paths trigger received milestone directly and rely on persistent gate for deduplication', () => {
+  const receive = source('app/(tabs)/receive.tsx');
+  assert.match(receive, /setIsPaid\(true\);\s*void markFirstConfirmedPayment\(hederaPublicKey, 'received'\);\s*await addTransaction\('incoming'/);
+  assert.match(receive, /setPaidNetwork\('hedera'\);\s*setIsPaid\(true\);\s*void markFirstConfirmedPayment\(hederaPublicKey, 'received'\);/);
+  assert.match(receive, /markFirstConfirmedPayment/);
+  const feedback = source('lib/first-payment-feedback.ts');
+  assert.match(feedback, /gate\.claim\(wallet, kind\)/,
+    'the persistent wallet/milestone claim makes Home and Receive safe to call for the same event');
+});
