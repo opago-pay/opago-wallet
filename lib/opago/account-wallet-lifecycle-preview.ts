@@ -1,3 +1,5 @@
+import { randomUUID } from 'expo-crypto';
+
 /** Contract-faithful lifecycle previews. These adapters are deterministic local mocks:
  * they never instantiate OpagoApi, HKA transport, fetch, or any live backend.
  */
@@ -41,10 +43,7 @@ export class LifecyclePreviewError extends Error {
 }
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const time = (ms: number) => new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z');
-const uuid = () => {
-  const hex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-4' + hex.slice(13, 16) + '-a' + hex.slice(17, 20) + '-' + hex.slice(20);
-};
+const uuid = () => randomUUID();
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /** State is owned by this adapter instance, just like a server-side pending record. */
