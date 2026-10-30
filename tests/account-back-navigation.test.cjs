@@ -60,7 +60,7 @@ test('both public and contract account opt into Back while other OPAGO pages ret
 function navigationFixture(t, origin) {
   const { StackRouter, StackActions, TabRouter, CommonActions } = require('@react-navigation/routers');
   const stack = StackRouter({ initialRouteName: '(tabs)' });
-  const stackOptions = { routeNames: ['(tabs)', 'opago-account', 'pos-link', 'transaction-sync', 'uma-send'], routeParamList: {}, routeGetIdList: {} };
+  const stackOptions = { routeNames: ['(tabs)', 'opago-account', 'opago-wallet-link', 'pos-link', 'transaction-sync', 'uma-send'], routeParamList: {}, routeGetIdList: {} };
   const tabs = TabRouter({ initialRouteName: 'index', backBehavior: 'initialRoute' });
   const tabOptions = { routeNames: ['index', 'send', 'receive', 'settings'], routeParamList: {}, routeGetIdList: {} };
   let tabState = tabs.getInitialState(tabOptions);
@@ -90,7 +90,7 @@ function navigationFixture(t, origin) {
   };
   const dependencies = {
     'expo/dom': {}, 'expo-linking': {}, 'react-native': { Platform: { OS: 'android' } },
-    './router-store': { store }, '../domComponents/emitDomEvent': { emitDomLinkEvent: () => false, emitDomGoBack: () => false },
+    './router-store': { store }, '../domComponents/emitDomEvent': { emitDomLinkEvent: () => false, emitDomGoBack: () => false, emitDomDismiss: () => false, emitDomDismissAll: () => false },
     '../getRoutesRedirects': { applyRedirects: href => href },
     '../link/href': { resolveHref: href => href, resolveHrefStringWithSegments: href => href },
     '../matchers': { matchDynamicName: () => undefined },
@@ -120,7 +120,9 @@ function navigationFixture(t, origin) {
       }
     }
   }
-  const router = { back: () => { routing.goBack(); flush(); }, dismissTo: href => { routing.dismissTo(href); flush(); } };
+  const router = { back: () => routing.goBack(),
+    dismiss: count => routing.dismiss(count), dismissAll: () => routing.dismissAll(),
+    replace: href => routing.replace(href), dismissTo: href => routing.dismissTo(href) };
   let hardwareBack;
   const ui = hookFixture('components/navigation/back-to-settings.tsx', hooks => ({
     'react-native': { StyleSheet: { create: value => value }, Keyboard: { dismiss() {} },
@@ -132,7 +134,16 @@ function navigationFixture(t, origin) {
       useFocusEffect: callback => hooks.useEffect(callback, [callback]) },
   }), exports => exports.BackToSettings());
   t.after(() => ui.unmount());
-  return { render: ui.render, back: () => hardwareBack(), getState: () => state, initialState, pushAccount, actions };
+  const walletLinkReturn = () => {
+    state = stack.getStateForAction(state, StackActions.push('opago-wallet-link'), stackOptions);
+    state = stack.getStateForAction(state, StackActions.replace('opago-account'), stackOptions);
+  };
+  const drive = action => { const result = action(); flush(); return result; };
+  const render = () => {
+    const button = ui.render();
+    return { ...button, props: { ...button.props, onPress: () => drive(button.props.onPress) } };
+  };
+  return { render, back: () => drive(hardwareBack), getState: () => state, initialState, pushAccount, walletLinkReturn, actions };
 }
 
 for (const origin of ['settings', 'receive', 'send', 'pos-link', 'transaction-sync', 'uma-send']) {
@@ -164,4 +175,33 @@ for (const origin of ['index', 'unhydrated-anchor', 'account-only', 'undefined-s
     assert.equal(f.actions.at(-1).type, 'GO_BACK');
     assert.deepEqual(f.getState().routes, state.routes);
   });
+}
+
+
+for (const origin of ['settings', 'receive', 'index', 'account-only']) {
+  for (const count of [2, 3]) {
+    test(`account Back skips ${count} consecutive account screens after wallet-link returns (${origin})`, t => {
+      const f = navigationFixture(t, origin);
+      const expectedEntry = f.initialState.routes.slice(0, -1);
+      for (let n = 1; n < count; n++) f.walletLinkReturn();
+      assert.equal(f.getState().routes.filter(route => route.name === 'opago-account').length, count);
+      const button = f.render();
+      if (count === 2) button.props.onPress(); else assert.equal(f.back(), true);
+      const state = f.getState();
+      assert.equal(state.routes.some(route => route.name === 'opago-account'), false);
+      if (origin === 'settings' || origin === 'receive') {
+        assert.deepEqual(state.routes, expectedEntry);
+        assert.equal(f.actions.at(-1).type, 'POP');
+        assert.equal(f.actions.at(-1).payload.count, count);
+      } else {
+        assert.deepEqual(state.routes.map(route => route.name), ['(tabs)']);
+        const tabs = state.routes[0].state;
+        assert.equal(tabs.routes[tabs.index].name, 'settings');
+        assert.deepEqual(tabs.routes[tabs.index].params, { section: 'overview' });
+      }
+      f.pushAccount();
+      f.render().props.onPress();
+      assert.deepEqual(f.getState().routes, state.routes);
+    });
+  }
 }

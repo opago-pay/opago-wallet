@@ -15,13 +15,21 @@ export function BackToSettings() {
   const goBack = useCallback(() => {
     Keyboard.dismiss();
     const state = navigation.getState();
-    const previous = state?.routes[state.index - 1];
+    let previousIndex = (state?.index ?? 0) - 1;
+    // Child account flows can replace themselves with another account route.
+    // Skip that contiguous duplicate history instead of revealing the same page.
+    while (state?.routes[previousIndex]?.name === 'opago-account') previousIndex--;
+    const previous = state?.routes[previousIndex];
     const priorTab = previous?.state?.routes[previous.state.index ?? 0]?.name;
     // Account can also be opened from Receive, POS linking or sync. Preserve
     // that real history, but don't send direct links to the synthetic home anchor.
-    if (previous && (previous.name !== '(tabs)' || priorTab && priorTab !== 'index')) {
-      router.back();
+    if (state && previous && (previous.name !== '(tabs)' || priorTab && priorTab !== 'index')) {
+      const count = state.index - previousIndex;
+      if (count === 1) router.back(); else router.dismiss(count);
     } else {
+      // With an account-only deep-link stack there is no menu to pop to yet.
+      // Remove duplicate accounts before replacing the final one with settings.
+      if (state && previousIndex < 0 && state.index > 0) router.dismiss(state.index);
       router.dismissTo('/(tabs)/settings?section=overview');
     }
   }, [navigation, router]);
