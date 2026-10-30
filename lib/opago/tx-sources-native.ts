@@ -8,6 +8,7 @@ import { bitcoinStore } from '../bitcoin/store-native';
 import { listMirrorTransactionsForSync } from '../hedera/mirror';
 import { sparkTransferCandidate, sparkRequestCandidate, lightningJournalCandidate, hederaJournalCandidate, hederaMirrorCandidate, exactAmount } from './tx-sources';
 import type { Candidate, SyncSource } from './tx-sync';
+import { localSourcePage } from './tx-local-source';
 export function sparkSyncSources(wallet: BitcoinSparkWallet, network: 'MAINNET' | 'REGTEST', publicKey: string, sparkIdentity: string): SyncSource[] {
   const history = wallet as unknown as SparkHistoryWalletLike;
   const journal = lightningPaymentJournalFor(network, publicKey);
@@ -26,23 +27,23 @@ export function sparkSyncSources(wallet: BitcoinSparkWallet, network: 'MAINNET' 
       return { items: items.filter((row): row is Candidate => row !== null), skipped: items.filter(row => row === null).length,
         next: page.pageInfo.hasNextPage ? page.pageInfo.endCursor! : null };
     } },
-    { id: 'lightning-journal', async read() { return { items: (await journal.list()).map(lightningJournalCandidate), next: null }; } },
-    { id: 'lightning-receives', async read() {
+    { id: 'lightning-journal', async read(cursor) { return localSourcePage((await journal.list()).map(lightningJournalCandidate), cursor); } },
+    { id: 'lightning-receives', async read(cursor) {
       const rows = await listArchivedBitcoinRequests(network + ':' + sparkIdentity.toLowerCase());
-      return { items: rows.map(row => ({ localId: 'spark-request:' + row.requestId, report: {
+      return localSourcePage(rows.map(row => ({ localId: 'spark-request:' + row.requestId, report: {
         asset: 'BTC', rail: 'lightning', id_source: 'SPARK_LIGHTNING_REQUEST_ID', source_payment_id: row.requestId, payment_hash: row.paymentHash,
         direction: 'incoming', sdk_status: row.state, status: row.state === 'confirmed' && exactAmount(row.amountSats, 1000n) ? 'settled' : row.state === 'failed' ? 'failed' : 'pending',
-        amount_msat: exactAmount(row.amountSats, 1000n) } } as Candidate)), next: null };
+        amount_msat: exactAmount(row.amountSats, 1000n) } } as Candidate)), cursor);
     } },
-    { id: 'bitcoin-operations', async read() {
+    { id: 'bitcoin-operations', async read(cursor) {
       const rows = await bitcoinStore.list(network + ':' + sparkIdentity.toLowerCase());
       // v3 has no on-chain request report namespace. Use only a real Spark transfer identity;
       // retain everything else in the existing operation store for the future contract extension.
       const supported = rows.filter(row => row.transferId);
-      return { items: supported.map(row => ({ localId: 'spark-transfer:' + row.transferId, report: { asset: 'BTC', rail: 'spark',
+      return localSourcePage(supported.map(row => ({ localId: 'spark-transfer:' + row.transferId, report: { asset: 'BTC', rail: 'spark',
         id_source: 'SPARK_TRANSFER_ID', source_payment_id: row.transferId!, direction: row.kind === 'deposit' ? 'incoming' : 'outgoing',
         sdk_status: row.state, status: row.state === 'confirmed' && exactAmount(row.amountSats, 1000n) ? 'settled' : null,
-        amount_msat: exactAmount(row.amountSats, 1000n) } } as Candidate)), skipped: rows.length - supported.length, next: null };
+        amount_msat: exactAmount(row.amountSats, 1000n) } } as Candidate)), cursor, rows.length - supported.length);
     } },
   ];
   return [
@@ -59,10 +60,11 @@ export function hederaSyncSources(network: 'mainnet' | 'testnet', publicKey: str
       const items = page.transactions.map(row => hederaMirrorCandidate(row, network, accountId));
       return { items: items.filter((item): item is Candidate => item !== null), next: page.next, skipped: items.filter(item => item === null).length };
     } },
-    { id: 'hedera-journal', async read() {
+    { id: 'hedera-journal', async read(cursor) {
       const items = (await journal.list()).map(row => hederaJournalCandidate(row, network, accountId));
-      return { items: items.filter((item): item is Candidate => item !== null), next: null, skipped: items.filter(item => item === null).length };
+      return localSourcePage(items.filter((item): item is Candidate => item !== null), cursor, items.filter(item => item === null).length);
     } },
   ];
   return [{ id: 'hedera-mirror-head', async read() { const page = await streams[0].read(null); return { ...page, next: null }; } }, ...streams];
 }
+
