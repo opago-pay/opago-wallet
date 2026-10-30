@@ -141,3 +141,22 @@ test('an in-flight local read cannot return a bearer after clearLocal', async ()
   await f.client.clearLocal(); finish();
   assert.equal(await reading, null);
 });
+test('overlapping lifecycle clears keep issuance blocked until the last clear finishes', async () => {
+  const f = fixture(); await f.client.issue(f.c, signer(), f.authorize);
+  const remove = f.store.remove.bind(f.store); let removes = 0, release;
+  f.store.remove = async key => {
+    removes++;
+    if (removes === 4) await new Promise(resolve => { release = resolve; });
+    await remove(key);
+  };
+  const first = f.client.clearLocal(), second = f.client.clearLocal();
+  await first;
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(f.client.issue(f.c, signer(), f.authorize), /in progress/);
+  await assert.rejects(f.client.recover(), /in progress/);
+  await assert.rejects(f.client.challenge(), /in progress/);
+  assert.equal(await f.client.localSession(), null);
+  release(); await second;
+  assert.equal(await f.client.localSession(), null);
+  await assert.rejects(f.client.recover(), /No valid pending/);
+});

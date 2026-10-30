@@ -29,7 +29,7 @@ function sessionResponse(value: unknown, context: V3SessionContext, now: number)
 export class V3WalletSessionClient {
   private busy = false;
   private generation = 0;
-  private clearing = false;
+  private clearing = 0;
   private writes: Promise<unknown> = Promise.resolve();
   private readonly context: V3SessionContext;
   private readonly key: string;
@@ -115,11 +115,11 @@ export class V3WalletSessionClient {
   /** Invalidates in-flight callbacks; clears locally even while the network is stalled.
    * Does not claim server-side revocation. */
   async clearLocal(): Promise<void> {
-    this.generation++; this.clearing = true;
+    this.generation++; this.clearing++;
     try {
       await this.write(() => {}, async () => {
         await this.store.remove(this.key); await this.store.remove(this.key + ':pending'); await this.store.remove(this.key + ':challenge');
       });
-    } finally { this.clearing = false; }
+    } finally { this.clearing--; }
   }
 }
