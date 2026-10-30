@@ -20,7 +20,7 @@
     "tools/build_contracts.py": "93f18992f2bf17d01d310465381a5ce07224eb3b96e00b6d560ee0fff08e4e18",
     "tools/build_fixtures.py": "52f20176fe6acb6352691eced99686acc4fd600763f56db62e41567c8a8fbe5b",
     "tools/package.json": "de927346e4315a8f9bd3dc3c05c21dc16ab1914a5fa467b6803466a60a3c2b2f",
-    "tools/requirements-validation.txt": "9ed064c2d3000638a5aeaeb3f853680d8729462601369c44193f5e4693bf994c",
+    "tools/requirements-validation.txt": "7b53a2e33ac88875cacc9520b6d5a0c7109bab40a5cb79e7dd2a7738eb2c188c",
     "tools/validate_contracts.py": "244106ac31026f0ecf01dd2e1ac595321ade159947da342da9ef634ff7b5145c",
     "tools/verify-fixtures.cjs": "e98a37b72794e8518c58213a6233e18e348b5d13fd8e0ac3bfa5221e7be6275a",
     "validation-report.json": "c83ca8573890d37c910918b46a53cbac67f33ee4d43e7c179247a96f5d740a13"
