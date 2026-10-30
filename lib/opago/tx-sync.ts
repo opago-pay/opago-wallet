@@ -69,7 +69,7 @@ export class TransactionSync {
     if (this.owner.source === 'spark' && report.asset !== 'BTC' || this.owner.source === 'hedera' &&
       (report.asset !== 'HBAR' || report.network !== this.owner.network)) throw new SyncError('sync_owner_changed');
   }
-  private enqueue(doc: Document, items: Candidate[]) {
+  private enqueue(doc: Document, items: Candidate[], backpressure = false): boolean {
     for (const item of items) {
       if (!item.localId || item.localId.length > 512) throw new SyncError('sync_invalid_contract');
       assertTxContract('WalletPaymentReport', item.report); this.checkSource(item.report);
@@ -78,10 +78,15 @@ export class TransactionSync {
       const { observed_at: ignored, ...facts } = item.report; void ignored;
       const digest = hash(facts); const localKey = hash(item.localId); const seen = doc.seen[localKey] || [];
       if (seen.includes(digest)) continue;
-      if (doc.entries.length >= 500 || Object.keys(doc.seen).length >= 10_000 && !doc.seen[localKey] || seen.length >= 64) throw new SyncError('sync_storage_full');
+      if (doc.entries.length >= 500) {
+        if (backpressure) return false;
+        throw new SyncError('sync_storage_full');
+      }
+      if (Object.keys(doc.seen).length >= 10_000 && !doc.seen[localKey] || seen.length >= 64) throw new SyncError('sync_storage_full');
       doc.entries.push({ id: this.uuid(), localId: item.localId, digest, report: item.report, attempts: 0, retryAt: 0 });
       doc.seen[localKey] = [...seen, digest];
     }
+    return true;
   }
   /** Migration uses the existing journals after their own idempotent v1/v2 migration.
    * No old transport cursor/ack is treated as a v3 ack; no journal is deleted. */
@@ -106,7 +111,14 @@ export class TransactionSync {
         if (!Array.isArray(page.items) || page.next !== null && (typeof page.next !== 'string' || page.next.length > 4096 || page.next === progress.cursor)) throw new SyncError('sync_invalid_contract');
         const cursors = visited.get(source.id) || new Set(); cursors.add(progress.cursor); visited.set(source.id, cursors);
         if (page.next !== null && cursors.has(page.next)) throw new SyncError('sync_invalid_contract');
-        this.enqueue(doc, page.items);
+        if (!this.enqueue(doc, page.items, true)) {
+          // Commit only admitted facts, never the continuation of an incomplete page.
+          // Re-read this cursor after delivery frees capacity; durable seen digests
+          // skip the admitted prefix even if a local archive was reordered meanwhile.
+          await this.save(doc);
+          if (failure) throw failure;
+          return;
+        }
         doc.sources[source.id] = { cursor: page.next, pages: progress.pages + 1, cycles: progress.cycles + (page.next === null ? 1 : 0), skipped: progress.skipped + (page.skipped || 0) };
         await this.save(doc); // Items and source checkpoint are one atomic protected document.
         if (page.next === null) finished.add(source.id);
@@ -197,3 +209,4 @@ export class TransactionSync {
       sources: doc.sources, backendAvailable: !!this.port, nextRetryAt: Math.min(...doc.entries.map(e => e.retryAt).filter(t => t > this.now()), Infinity) };
   }); }
 }
+

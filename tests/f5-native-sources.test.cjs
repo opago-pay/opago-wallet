@@ -1,9 +1,9 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const ts=require('typescript');
-const previous=new Set(Object.keys(require.cache));require('./register-typescript.cjs');const converters=require('../lib/opago/tx-sources.ts');
+const previous=new Set(Object.keys(require.cache));require('./register-typescript.cjs');const converters=require('../lib/opago/tx-sources.ts');const localSource=require('../lib/opago/tx-local-source.ts');
 for(const n of Object.keys(require.cache))if(n.endsWith('.ts')&&!previous.has(n))delete require.cache[n];
 function load(dependencies){const exports={};const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../lib/opago/tx-sources-native.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-  new Function('require','exports',code)(name=>dependencies[name]||{},exports);return exports;}
+  new Function('require','exports',code)(name=>dependencies[name]||(name==='./tx-local-source'?localSource:{}),exports);return exports;}
 test('F5 native source readers preserve distinct Spark and journal identities, all directions and independent cursors without payment dispatch',async()=>{
   const hederaKey='aa'.repeat(32),sparkKey='02'+'bb'.repeat(32);const calls=[];
   const dependencies={
@@ -32,4 +32,23 @@ test('F5 Hedera native reader keeps provider pagination separate from the journa
   const mirror=await sources[0].read('provider-cursor');const journal=await sources[1].read(null);
   assert.deepEqual(calls[0],['0.0.123','provider-cursor']);assert.equal(mirror.next,'provider-continuation');assert.equal(mirror.skipped,1);
   assert.equal(journal.next,null);assert.equal(journal.items[0].report.source_payment_id,'0.0.123@1.000000001');assert.equal(journal.skipped,1);
+});
+
+test('F5 every local native archive uses bounded stable pages without rewriting its journals',async()=>{
+  const rows=Array.from({length:101},(_,i)=>({requestId:'request-'+i,paymentHash:i.toString(16).padStart(64,'0'),amountSats:1,state:'pending',result:null}));
+  const deps={'./tx-sources':converters,
+    '../lightning/payment-journal-native':{lightningPaymentJournalFor:()=>({async list(){return rows;}})},
+    '../bitcoin/receive-archive':{async listArchivedBitcoinRequests(){return rows;}},
+    '../bitcoin/store-native':{bitcoinStore:{async list(){return rows.map((row,i)=>({...row,id:'operation-'+i,transferId:'transfer-'+i,kind:'deposit'}));}}},
+    '../hedera/payment-journal-native':{hederaPaymentJournalFor:()=>({async list(){return rows.map((row,i)=>({...row,mode:'direct',transactionId:`0.0.123@${i+1}.1`,amountTinybars:'123',recipientAccountId:'0.0.456'}));}})},
+  };
+  const native=load(deps);const original=JSON.stringify(rows);
+  const sources=[...native.sparkSyncSources({},'REGTEST','key','identity'),...native.hederaSyncSources('testnet','key','0.0.123')]
+    .filter(source=>['lightning-journal','lightning-receives','bitcoin-operations','hedera-journal'].includes(source.id));
+  for(const source of sources){
+    let cursor=null;const items=[];const sizes=[];
+    do {const page=await source.read(cursor);items.push(...page.items);sizes.push(page.items.length);cursor=page.next;}while(cursor);
+    assert.deepEqual(sizes,[50,50,1],source.id);assert.equal(new Set(items.map(item=>item.localId)).size,101,source.id);
+  }
+  assert.equal(JSON.stringify(rows),original);
 });

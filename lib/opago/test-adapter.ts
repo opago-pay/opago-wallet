@@ -105,10 +105,14 @@ export class F3ContractTestBackend implements HkaTransport {
       if ((intent.action === 'wallet_bind' || intent.action === 'wallet_restore') && req.auth !== 'account') return this.failure('reproof_required', 401);
       const params = '{' + Object.entries(intent.action_params).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => JSON.stringify(k) + ':' + JSON.stringify(v)).join(',') + '}';
       const id = this.uuid();
+      // One clock snapshot keeps the signed fields and response identical even
+      // when challenge construction crosses a wall-clock second boundary.
+      const issuedAt = this.time();
+      const expiresAt = new Date(Date.parse(issuedAt) + 300_000).toISOString().replace('.000Z', 'Z');
       const message = ['opago-wallet-auth', 'domain: api.opago.com', 'network: ' + this.network, 'wallet_pubkey: ' + wallet.wallet_pubkey,
-        'nonce: ' + bytesToHex(sha256(utf8ToBytes(id))), 'issued_at: ' + this.time(), 'expires_at: ' + this.time(300_000),
+        'nonce: ' + bytesToHex(sha256(utf8ToBytes(id))), 'issued_at: ' + issuedAt, 'expires_at: ' + expiresAt,
         'action: ' + intent.action, 'action_params_sha256: ' + bytesToHex(sha256(utf8ToBytes(params)))].join('\n');
-      this.challenges.set(id, { message, intent }); output = { challenge_id: id, message, expires_at: this.time(300_000) };
+      this.challenges.set(id, { message, intent }); output = { challenge_id: id, message, expires_at: expiresAt };
     } else if (req.path.endsWith('/auth/verify')) {
       const c = this.challenges.get(String(body.challenge_id));
       if (!c || !schnorr.verify(String(body.signature), sha256(utf8ToBytes(c.message)), fixturePubkey)) return this.failure('signature_invalid', 401);
