@@ -1,5 +1,11 @@
 # F4 · Wallet-side POS link
 
+> Historical implementation record, superseded for live roles on 2026-10-30.
+> The POS confirms `/bindings` and saves its rotated key; the Wallet only signs.
+> `PosLinking` can no longer install a live backend. Its old dev simulation is
+> retained explicitly as historical, not as the current acceptance target.
+> See `pos-recipient-signature-boundary.md` for the replacement local controller.
+
 Stand: 06.10.2026. Task `recfkncDb6Ol9ZAYw`, Vertrag `docs/lnurl-spark-contracts/v2`, Version 0.2.0. Keine Geräte-/Backend-Abnahme, kein Deployment, keine echten Zahlungen oder produktive Verknüpfung.
 
 ## Ausgangsbasis und F3

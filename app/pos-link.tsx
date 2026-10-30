@@ -56,9 +56,10 @@ export default function PosLinkScreen() {
     <Copy>{t('The operator starts the link. You approve the recipient wallet; this gives you no POS management rights. Both sides must consent within five minutes.')}</Copy>
     {__DEV__ && <Action label={testOnly ? 'Leave local POS test mode' : 'Start local POS test mode'} disabled={busy}
       onPress={() => { setInput(''); setTestOnly(!testOnly); }} />}
-    {(!runtime || !pos?.available) && <Card title="POS integration pending"><Copy>{t('POS linking awaits the agreed QR format and wallet-readable backend details and status. Your existing wallet remains available.')}</Copy></Card>}
+    {(!runtime || !pos?.available) && <Card title="POS integration pending"><Copy>{t('The wallet signs the recipient approval; the POS confirms the binding and saves its new key. The authenticated signature handoff is not connected yet. Your existing wallet remains available.')}</Copy></Card>}
     <Action label="Open OPAGO account" disabled={busy} onPress={() => router.push({ pathname: '/opago-account', params: testOnly ? { test: '1' } : {} })} />
     {testOnly && runtime?.startTestPos && <Card title="Local POS test adapter">
+      <Copy warning>{t('Historical local simulation only. This separate operator-confirm flow is not the current production pairing protocol.')}</Copy>
       <Copy warning>{t('Synthetic POS only. No real device, backend or funds are changed. The test QR format is not a production linking QR.')}</Copy>
       <Action label="Test: operator starts linking" disabled={!canAct || !runtime.account.state.session}
         onPress={() => void run(async () => { const code = await runtime.startTestPos!(); setInput(code); await runtime.pos.scan(code); })} />

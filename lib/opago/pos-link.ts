@@ -40,6 +40,9 @@ export class PosLinking {
   private readonly key: string;
   constructor(readonly account: OpagoAccount, readonly source?: PosLinkSource) {
     this.key = account.operationKey('pos.snapshot');
+    // Historical dev simulation only: the real POS, never the Wallet, confirms binding.
+    // The new signature-only controller has no confirmation/list/status capability.
+    if (source?.mode === 'backend') throw new OpagoError('pos_integration_unavailable');
     if (source && (source.mode === 'contract-test') !== (account.api.transport.mode === 'contract-test')) throw new Error('Test and live POS sources cannot be mixed.');
   }
   get available() { return !!this.source; }
