@@ -67,7 +67,7 @@ test('F4 UI invalidates cached completed status on background, disables consent 
 });
 test('F4 UI unavailable integration is explicit; production has no test mode controls',async t=>{
   const app=await fixture(t,{},false);app.runtime.startTestPos=undefined;app.runtime.confirmTestOperator=undefined;app.pos.source=undefined;
-  const tree=app.render();assert.match(text(tree),/awaits the agreed QR format/);assert.equal(action(tree,'Start local POS test mode'),undefined);
+  const tree=app.render();assert.match(text(tree),/authenticated signature handoff is not connected/);assert.equal(action(tree,'Start local POS test mode'),undefined);
   assert.equal(action(tree,'Test: operator starts linking'),undefined);assert.equal(action(tree,'Approve this POS recipient wallet'),undefined);
   assert.equal(action(tree,'Scan operator linking QR'),undefined);
 });

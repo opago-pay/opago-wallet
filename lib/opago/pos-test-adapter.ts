@@ -10,8 +10,9 @@ type TestProof = { intent: WalletAuthIntent; walletId: string; expiresAt: number
 type Result = { status: number; body: unknown; authenticated: true };
 type State = { reviews: PosLinkReview[]; challenges: [string, WalletAuthIntent][]; proofs: [string, TestProof][];
   results: [string, { fingerprint: string; result: Result }][] };
-/** Local F4 simulation, never an HTTP server. QR/review/list/operator controls
- * below are test-only ports, not additions to the 0.2.0 API contract. */
+/** Historical local F4 simulation, never an HTTP server or the current live role
+ * model. Wallet-confirm/list/status controls below cannot be installed live.
+ * Current signature-only behavior is covered by pos-recipient-approval tests. */
 export class F4ContractTestBackend extends F3ContractTestBackend implements PosLinkSource {
   reviews: PosLinkReview[] = [];
   private posChallenges = new Map<string, WalletAuthIntent>();

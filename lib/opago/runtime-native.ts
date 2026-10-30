@@ -27,7 +27,7 @@ export type F3Integration = { hka: HkaTransport; accountLogin: AccountLogin; dis
   onchainSync?: { resolution: string; create(account: OpagoAccount): OnchainAccountPort };
   /** Jointly approved revision resolving 0.2.0 versus TRU's non-wait decision. */
   umaContractResolution?: string;
-  /** Awaiting versioned QR + wallet-readable review/status/list contract. */
+  /** Retired Wallet-confirm flow; cannot be installed live. */
   posLinkSource?: PosLinkSource;
   /** Explicit backend agreement resolving v3 auth/IDs/networks and HPKE framing. */
   transactionSync?: { revision: '3.0.0-draft.1'; resolution: string; authorize(account: OpagoAccount, owner: SyncOwner): Promise<TxAuthorization> } };
@@ -52,7 +52,7 @@ export function installF3Integration(value: F3Integration) {
   if (value.hka.mode !== 'hka' || value.accountLogin.mode !== 'oidc' || value.disclosure && value.disclosure.mode !== 'backend') throw new Error('Only reviewed live integrations can be installed.');
   const origin = new URL(value.publicAddressOrigin);
   if (origin.protocol !== 'https:' || origin.origin !== value.publicAddressOrigin || origin.username || origin.password) throw new Error('Invalid public address origin.');
-  if (value.posLinkSource?.mode === 'contract-test') throw new Error('A local POS adapter cannot be installed in the live integration.');
+  if (value.posLinkSource) throw new Error('Wallet-confirm POS integration is retired; use the separately reviewed signature-only integration.');
   if (value.transactionSync && (value.transactionSync.revision !== '3.0.0-draft.1' || !value.transactionSync.resolution)) throw new Error('A reviewed transaction sync resolution is required.');
   if(value.onchainSync&&!value.onchainSync.resolution)throw new Error('A reviewed onchain sync resolution is required.');
   installPosQrSource(value.posLinkSource);

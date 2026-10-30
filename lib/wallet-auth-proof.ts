@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha256';
+import { isRuntimePosId } from './opago/pos-runtime-profile';
 
 type LoginIntent = { action: 'login' | 'onboarding_restart'; action_params: Record<string, never> };
 type BindIntent = { action: 'wallet_bind'; action_params: { party_id: string; account_generation: number } };
@@ -31,7 +32,7 @@ function canonicalActionParams(intent: WalletAuthIntent): string {
   for (const key of expected) {
     const value = params[key];
     if (key === 'account_generation' || key === 'binding_version' ? !Number.isSafeInteger(value) || Number(value) < 1 :
-        key === 'pos_id' ? typeof value !== 'string' || !/^pos-[a-z2-7]{10}$/.test(value) :
+        key === 'pos_id' ? !isRuntimePosId(value) :
         key === 'name' ? typeof value !== 'string' || !/^(?!.*\.\.)[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/.test(value) :
         typeof value !== 'string' || !uuid.test(value)) throw new Error('Invalid action parameters.');
   }
