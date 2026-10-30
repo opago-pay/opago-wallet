@@ -1,3 +1,4 @@
+import { BitcoinOnlyToggle } from '@/components/settings/bitcoin-only-toggle';
 import { useBitcoinOnly } from '@/hooks/useBitcoinOnly';
 import { adaptColor, adaptiveStyles, themeColor } from '@/lib/theme-styles';
 import { t } from '@/lib/i18n';
@@ -553,6 +554,7 @@ export default function SettingsScreen() {
         </KeyboardAvoidingView></WalletActivityBoundary>
       </Modal>
 
+      {activeSection === 'bitcoin-only' && <BitcoinOnlyToggle disabled={busy} />}
       {activeSection === 'appearance' && <ColorModePicker embedded />}
       {activeSection === 'language' && <LanguagePicker embedded />}
       {activeSection === 'help' && <LegalLinks embedded disabled={busy} />}

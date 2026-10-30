@@ -1,6 +1,5 @@
 import { ACCOUNT_LINK_PREVIEW_ENABLED } from '@/lib/opago/account-link-preview';
 import { ACCOUNT_DELETION_PREVIEW_ENABLED, WALLET_DETACH_PREVIEW_ENABLED } from '@/lib/opago/account-wallet-lifecycle-preview';
-import { BitcoinOnlyToggle } from './bitcoin-only-toggle';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,11 +13,11 @@ import { useSyncExternalStore } from 'react';
 import { LANGUAGE_NAMES } from '@/lib/i18n/language';
 import { adaptiveStyles, themeColor } from '@/lib/theme-styles';
 
-export type SettingsSection = 'overview' | 'security' | 'appearance' | 'language' | 'help' | 'diagnostics' | 'advanced' | 'wallet';
+export type SettingsSection = 'overview' | 'bitcoin-only' | 'security' | 'appearance' | 'language' | 'help' | 'diagnostics' | 'advanced' | 'wallet';
 
 export function getSettingsSection(value: string | string[] | undefined): SettingsSection {
   switch (value) {
-    case 'security': case 'appearance': case 'language': case 'help': case 'diagnostics': case 'advanced': case 'wallet':
+    case 'bitcoin-only': case 'security': case 'appearance': case 'language': case 'help': case 'diagnostics': case 'advanced': case 'wallet':
       return value;
     default: return 'overview';
   }
@@ -26,6 +25,7 @@ export function getSettingsSection(value: string | string[] | undefined): Settin
 
 export function settingsSectionTitle(section: SettingsSection): string {
   switch (section) {
+    case 'bitcoin-only': return t('Bitcoin Only');
     case 'security': return t('Security and backup');
     case 'appearance': return t('Appearance');
     case 'language': return t('Language');
@@ -104,7 +104,9 @@ export function SettingsMenu(props: {
         icon="flash-outline" disabled={props.disabled} onPress={props.onOpenOpagoAccount} />
     </MenuGroup>
     <MenuGroup title={t('Preferences')}>
-      <BitcoinOnlyToggle disabled={props.disabled} />
+      <MenuRow title={t('Bitcoin Only')}
+        detail={t('Show only Bitcoin and Lightning balances and payment options. All activity stays visible.')}
+        icon="logo-bitcoin" divider disabled={props.disabled} onPress={() => props.onSelect('bitcoin-only')} />
       <MenuRow title={t('Appearance')} detail={t(selection === 'system' ? 'System' : selection === 'light' ? 'Day' : 'Dark')}
         icon="color-palette-outline" divider disabled={props.disabled} onPress={() => props.onSelect('appearance')} />
       <MenuRow title={t('Language')} detail={LANGUAGE_NAMES[language]}

@@ -71,6 +71,7 @@ function settingsFixture(t, initialSection = 'overview') {
     '@/components/navigation/close-wallet-screen': { CloseWalletScreen: 'Close' },
     '@/components/settings/settings-menu': { ...menuExports, SettingsMenu: 'Menu' },
     '@/components/settings/settings-transition': { SettingsTransition: 'Transition' },
+    '@/components/settings/bitcoin-only-toggle': { BitcoinOnlyToggle: 'BitcoinOnly' },
     '@/components/settings/color-mode-picker': { ColorModePicker: 'Appearance' },
     '@/components/settings/security-options': { SecurityOptions: 'SecurityOptions' },
     '@/components/settings/language-picker': { LanguagePicker: 'Language' },
@@ -188,4 +189,49 @@ test('appearance options are full-width and labels remain on one line', () => {
   assert.match(source, /<Text numberOfLines=\{1\} ellipsizeMode="tail"/);
   assert.match(source, /choice: \{ width: '100%'/);
   assert.doesNotMatch(source, /flexBasis: 140/);
+});
+
+
+test('Bitcoin Only uses a dedicated settings page with header and Android return paths', t => {
+  const ui = settingsFixture(t);
+  let screen = ui.render();
+  assert.equal(find(screen, node => node.type === 'BitcoinOnly'), null);
+  find(screen, node => node.type === 'Menu').props.onSelect('bitcoin-only');
+  screen = ui.render();
+  assert.ok(find(screen, node => node.type === 'BitcoinOnly'));
+  assert.equal(find(screen, node => node.type === 'Menu'), null);
+  assert.match(text(screen), /Bitcoin Only/);
+  find(screen, node => node.props?.accessibilityLabel === 'Back').props.onPress();
+  assert.ok(find(ui.render(), node => node.type === 'Menu'));
+  ui.setSection('bitcoin-only');
+  assert.ok(find(ui.render(), node => node.type === 'BitcoinOnly'));
+  assert.equal(ui.back(), true);
+  assert.ok(find(ui.render(), node => node.type === 'Menu'));
+  assert.deepEqual(ui.navigation, []);
+});
+
+test('Bitcoin Only menu row opens the subpage rather than rendering or mutating a switch', t => {
+  const selected = [];
+  const ui = hookFixture('components/settings/settings-menu.tsx', hooks => ({
+    react: { ...hooks, useSyncExternalStore: (_subscribe, snapshot) => snapshot() },
+    'react-native': { StyleSheet: { create: value => value }, Text: 'Text', View: 'View' },
+    '@expo/vector-icons': { Ionicons: 'Icon' },
+    '@/lib/i18n': { t: message => message },
+    '@/hooks/useLanguage': { useLanguage: () => ({ language: 'de' }) },
+    '@/lib/i18n/language': { LANGUAGE_NAMES: { de: 'Deutsch' } },
+    '@/lib/diagnostics-consent': { diagnosticsConsent: { subscribe() {}, getSnapshot: () => ({ granted: false }) } },
+    '@/components/ui/wallet-interaction': { TouchableOpacity: 'Button' },
+  }), exports => exports.SettingsMenu({ onSelect: value => selected.push(value), backupChecked: true, backupLoading: false }));
+  t.after(() => ui.unmount());
+  const tree = ui.render();
+  const row = find(tree, node => node.props?.title === 'Bitcoin Only');
+  assert.ok(row);
+  const button = row.type(row.props);
+  assert.equal(button.type, 'Button');
+  assert.equal(button.props.accessibilityRole, 'button');
+  assert.match(button.props.accessibilityLabel, /^Bitcoin Only\./);
+  assert.ok(find(button, node => node.props?.name === 'chevron-forward'));
+  button.props.onPress();
+  assert.deepEqual(selected, ['bitcoin-only']);
+  assert.equal(find(tree, node => node.type === 'Switch' || node.type?.name === 'BitcoinOnlyToggle'), null);
 });
