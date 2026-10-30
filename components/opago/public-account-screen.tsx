@@ -102,7 +102,7 @@ export function PublicAccountScreen() {
     return () => clearTimeout(timer);
   }, [expiresAt, execute]);
   const visible = focused && foreground && !isLocked;
-  return <OpagoPage title="OPAGO account" busy={busy} error={visible ? error : ''} testOnly={false}>
+  return <OpagoPage backToSettings title="OPAGO account" busy={busy} error={visible ? error : ''} testOnly={false}>
     <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
     {visible && <>
       <Card title="Account sign-in">

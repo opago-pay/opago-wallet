@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TouchableOpacity, TextInput } from '../ui/wallet-interaction';
+import { BackToSettings } from '../navigation/back-to-settings';
 import { CloseWalletScreen } from '../navigation/close-wallet-screen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorMode } from '../../hooks/useColorMode';
@@ -8,11 +9,11 @@ import { useLanguage } from '../../hooks/useLanguage';
 import { themeColor } from '../../lib/theme-styles';
 import { t } from '../../lib/i18n';
 export { TextInput };
-export function OpagoPage({ title, children, busy, error, testOnly }: PropsWithChildren<{ title: string; busy: boolean; error: string; testOnly: boolean }>) {
+export function OpagoPage({ title, children, busy, error, testOnly, backToSettings = false }: PropsWithChildren<{ title: string; busy: boolean; error: string; testOnly: boolean; backToSettings?: boolean }>) {
   const insets = useSafeAreaInsets(); useColorMode(); useLanguage();
   return <ScrollView style={{ backgroundColor: themeColor('canvas') }} keyboardShouldPersistTaps="handled"
     contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32, gap: 18 }}>
-    <View style={ui.header}><Text style={[ui.title, { color: themeColor('text') }]} accessibilityRole="header">{t(title)}</Text><CloseWalletScreen /></View>
+    <View style={ui.header}><Text style={[ui.title, { color: themeColor('text') }]} accessibilityRole="header">{t(title)}</Text>{backToSettings ? <BackToSettings /> : <CloseWalletScreen />}</View>
     {testOnly && <Copy warning>{t('Contract test mode: synthetic data and simulated payments. No funds are transferred.')}</Copy>}
     {busy && <ActivityIndicator color={themeColor('accentText')} accessibilityLabel={t('Processing')} />}
     {!!error && <Text accessibilityRole="alert" style={{ color: themeColor('errorText'), fontSize: 16 }}>{t(error)}</Text>}

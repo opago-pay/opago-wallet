@@ -43,7 +43,7 @@ export function ContractAccountScreen() {
     const timer = setInterval(() => { void run(async () => { await runtime.account.refreshAccount(); await runtime.account.refresh(); }); }, 30_000);
     return () => clearInterval(timer);
   }, [runtime, busy, run]);
-  return <OpagoPage title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
+  return <OpagoPage backToSettings title="OPAGO account" busy={busy} error={error} testOnly={testOnly}>
     {updateRequired && <UpdateAccountApp />}
     <Copy>{t('Your local BTC, Lightning and HBAR wallet works without an OPAGO account. Its 12 recovery words remain your wallet backup.')}</Copy>
     {!state?.credential && <Action label="Create an OPAGO account" disabled={busy} onPress={() => router.push('/opago-signup')} />}
